@@ -1,0 +1,76 @@
+import { config } from 'dotenv';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { PrismaService } from './prisma/prisma.service';
+import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { CreateKpiAlosDto } from './kpiAlos/dto/create-kpiAlos.dto';
+import { UpdateKpiAlosDto } from './kpiAlos/dto/update-kpiAlos.dto';
+import { CreateKpiRevenueDto } from './kpiRevenue/dto/create-kpiRevenue.dto';
+import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
+
+// Carregar variáveis de ambiente do arquivo .env
+config();
+
+async function bootstrap() {
+  try {
+    const app = await NestFactory.create(AppModule);
+    app.setGlobalPrefix('lapa');
+
+    // Configuração do Swagger
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('LHG Analytics Backend - Lush Lapa')
+      .setDescription(
+        'API para visualização e gerenciamento dos Endpoints no backend',
+      )
+      .setVersion('1.0')
+      .addTag('users')
+      .addTag('KpiAlos')
+      .addTag('KpiRevenue')
+      .addTag('KpiTotalRentals')
+      .addTag('KpiTicketAverage')
+      .addTag('KpiOccupancyRate')
+      .addTag('KpiGiro')
+      .addTag('KpiRevpar')
+      .addTag('KpiTrevpar')
+      .addTag('Company')
+      .addTag('Governance')
+      .addTag('Cleanings')
+      .addTag('Inspections')
+      .addTag('CronJobs')
+      .addTag('BookingsRevenue')
+      .build();
+
+    const document = SwaggerModule.createDocument(app, swaggerConfig, {
+      extraModels: [
+        CreateKpiAlosDto,
+        UpdateKpiAlosDto,
+        CreateKpiRevenueDto,
+        UpdateKpiRevenueDto,
+      ],
+    });
+    SwaggerModule.setup('lapa/api/docs', app, document);
+
+    // Inicialize o PrismaService
+    const prismaService = app.get(PrismaService);
+    await prismaService.onModuleInit();
+
+    const corsOptions: CorsOptions = {
+      origin: ['https://lhg-analytics.vercel.app/'],
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+      credentials: true,
+    };
+
+    app.enableCors(corsOptions);
+
+    const port = process.env.PORT || 3001;
+
+    // Use a porta do ambiente ou 3001 como padrão
+    await app.listen(port, () => {
+      console.log(`App listening on port ${port}`);
+    });
+  } catch (error) {
+    console.error('Error during application bootstrap:', error);
+  }
+}
+bootstrap();
