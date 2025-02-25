@@ -74,9 +74,9 @@ async function bootstrap() {
 
     const port = process.env.PORT || 3001;
     await app.listen(port);
-    console.log(`Servidor rodando na porta ${port}`);
+    console.log(`App listening on port ${port}`);
   } catch (error) {
-    console.error('Erro durante a inicialização da aplicação:', error);
+    console.error('Error during application bootstrap:', error);
     process.exit(1);
   }
 }

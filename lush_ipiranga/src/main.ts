@@ -51,14 +51,25 @@ async function bootstrap() {
     });
     SwaggerModule.setup('ipiranga/api', app, document);
 
-    // Inicialize o PrismaService
+    // Inicialize o PrismaService com tratamento de erro
     const prismaService = app.get(PrismaService);
-    await prismaService.onModuleInit();
+    try {
+      await prismaService.onModuleInit();
+      console.log('Prisma conectado com sucesso.');
+    } catch (error) {
+      console.error('Erro ao conectar ao Prisma:', error);
+      process.exit(1); // Encerrar o processo caso o banco não esteja acessível
+    }
+
+    // Configuração de CORS
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+      'https://lhg-analytics.vercel.app/',
+    ];
 
     const corsOptions: CorsOptions = {
-      origin: ['https://lhg-analytics.vercel.app/'],
+      origin: allowedOrigins,
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-      credentials: true,
+      credentials: true, // Só manter se necessário
     };
 
     app.enableCors(corsOptions);
