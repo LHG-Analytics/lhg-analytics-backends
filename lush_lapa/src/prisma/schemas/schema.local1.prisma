@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL_LOCAL_1")
+  url      = env("DATABASE_URL_LOCAL_LAPA")
 }
 
 model Company {
