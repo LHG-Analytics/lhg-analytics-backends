@@ -15,7 +15,7 @@ config();
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
-    app.setGlobalPrefix('ipiranga');
+    app.setGlobalPrefix('ipiranga/api');
 
     // Configuração do Swagger
     const swaggerConfig = new DocumentBuilder()

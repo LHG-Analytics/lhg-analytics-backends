@@ -1,4 +1,4 @@
-import { config } from 'dotenv';
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
@@ -9,13 +9,10 @@ import { UpdateKpiAlosDto } from './kpiAlos/dto/update-kpiAlos.dto';
 import { CreateKpiRevenueDto } from './kpiRevenue/dto/create-kpiRevenue.dto';
 import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
 
-// Carregar variáveis de ambiente do arquivo .env
-config();
-
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
-    app.setGlobalPrefix('lapa');
+    app.setGlobalPrefix('lapa/api');
 
     // Configuração do Swagger
     const swaggerConfig = new DocumentBuilder()
@@ -50,27 +47,38 @@ async function bootstrap() {
       ],
     });
     SwaggerModule.setup('lapa/api', app, document);
+    console.log('Swagger UI disponível em: /lapa/api');
 
-    // Inicialize o PrismaService
+    // Inicialize o PrismaService com tratamento de erro
     const prismaService = app.get(PrismaService);
-    await prismaService.onModuleInit();
+    try {
+      await prismaService.onModuleInit();
+      console.log('Prisma conectado com sucesso.');
+    } catch (error) {
+      console.error('Erro ao conectar ao Prisma:', error);
+      process.exit(1); // Encerrar o processo caso o banco não esteja acessível
+    }
+
+    // Configuração de CORS
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+      'https://lhg-analytics.vercel.app/',
+    ];
 
     const corsOptions: CorsOptions = {
-      origin: ['https://lhg-analytics.vercel.app/'],
+      origin: allowedOrigins,
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-      credentials: true,
+      credentials: true, // Só manter se necessário
     };
 
     app.enableCors(corsOptions);
 
     const port = process.env.PORT || 3001;
-
-    // Use a porta do ambiente ou 3001 como padrão
-    await app.listen(port, () => {
-      console.log(`App listening on port ${port}`);
-    });
+    await app.listen(port);
+    console.log(`Servidor rodando na porta ${port}`);
   } catch (error) {
-    console.error('Error during application bootstrap:', error);
+    console.error('Erro durante a inicialização da aplicação:', error);
+    process.exit(1);
   }
 }
+
 bootstrap();
