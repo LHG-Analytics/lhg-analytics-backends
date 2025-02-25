@@ -3,9 +3,22 @@ const { createProxyMiddleware } = require("http-proxy-middleware");
 
 const app = express();
 
-// Encaminha as requisições para o backend correto
-app.use("/ipiranga/api", createProxyMiddleware({ target: "http://localhost:3001", changeOrigin: true }));
-app.use("/lapa/api", createProxyMiddleware({ target: "http://localhost:3002", changeOrigin: true }));
+// Atualize as URLs de destino para os backends no Render
+app.use("/ipiranga/api", createProxyMiddleware({ 
+  target: "https://lhg-analytics-backend-bmmd.onrender.com", 
+  changeOrigin: true,
+  pathRewrite: {
+    '^/ipiranga/api': '/api', // Reescreve o caminho para o backend
+  }
+}));
+
+app.use("/lapa/api", createProxyMiddleware({ 
+  target: "https://lhg-analytics-backend-bmmd.onrender.com", 
+  changeOrigin: true,
+  pathRewrite: {
+    '^/lapa/api': '/api', // Reescreve o caminho para o backend
+  }
+}));
 
 // Inicia o servidor
 const PORT = process.env.PORT || 3000;

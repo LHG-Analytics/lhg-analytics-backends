@@ -10,7 +10,9 @@
         "build:lapa": "cd lush_lapa && npm run build"
     },
     "dependencies": {
-        "pm2": "^5.1.2",
-        "dotenv": "^16.0.0"
+        "dotenv": "^16.0.0",
+        "express": "^4.21.2",
+        "http-proxy-middleware": "^3.0.3",
+        "pm2": "^5.1.2"
     }
 }
