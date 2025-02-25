@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "description": "Backend services for LHG Analytics",
     "scripts": {
+        "preinstall": "npm install -g pm2",
         "install": "cd lush_ipiranga && npm install --legacy-peer-deps && cd ../lush_lapa && npm install --legacy-peer-deps",
         "start:prod": "pm2-runtime ecosystem.config.js",
         "build": "npm run build:ipiranga && npm run build:lapa",
