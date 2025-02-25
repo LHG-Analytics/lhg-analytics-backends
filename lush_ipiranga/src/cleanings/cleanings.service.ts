@@ -453,17 +453,6 @@ export class CleaningsService {
 
       const insertData = []; // Array para armazenar os dados a serem inseridos
 
-      // Mapeamento de dias da semana para números
-      const dayOfWeekMap = {
-        domingo: 7,
-        'segunda-feira': 1,
-        'terça-feira': 2,
-        'quarta-feira': 3,
-        'quinta-feira': 4,
-        'sexta-feira': 5,
-        sábado: 6,
-      };
-
       // Calcular totais e preparar dados para inserção
       for (const shift in cleaningsByShiftAndDay) {
         let shiftTotalCount = 0;

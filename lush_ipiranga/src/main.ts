@@ -49,7 +49,7 @@ async function bootstrap() {
         UpdateKpiRevenueDto,
       ],
     });
-    SwaggerModule.setup('ipiranga/api/docs', app, document);
+    SwaggerModule.setup('ipiranga/api', app, document);
 
     // Inicialize o PrismaService
     const prismaService = app.get(PrismaService);

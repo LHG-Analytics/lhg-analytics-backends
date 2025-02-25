@@ -36,7 +36,7 @@ export class CleaningsService {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       }
 
-      let currentDate = new Date(startDate);
+      const currentDate = new Date(startDate);
       currentDate.setUTCHours(4, 0, 0, 0); // Início do dia contábil às 04:00:00
 
       // Obtendo os dados de limpeza dentro do período fornecido
@@ -240,7 +240,7 @@ export class CleaningsService {
       currentDate.setUTCHours(4, 0, 0, 0); // Início do dia contábil às 06:00:00
 
       while (currentDate < endDate) {
-        let nextDate = new Date(currentDate);
+        const nextDate = new Date(currentDate);
 
         if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
@@ -453,17 +453,6 @@ export class CleaningsService {
 
       const insertData = []; // Array para armazenar os dados a serem inseridos
 
-      // Mapeamento de dias da semana para números
-      const dayOfWeekMap = {
-        domingo: 7,
-        'segunda-feira': 1,
-        'terça-feira': 2,
-        'quarta-feira': 3,
-        'quinta-feira': 4,
-        'sexta-feira': 5,
-        sábado: 6,
-      };
-
       // Calcular totais e preparar dados para inserção
       for (const shift in cleaningsByShiftAndDay) {
         let shiftTotalCount = 0;
@@ -514,7 +503,7 @@ export class CleaningsService {
           shiftTotalCount / Object.keys(cleaningsByShiftAndDay[shift]).length
         ).toFixed(2);
         cleaningsByShiftAndDay[shift].idealShiftMaid = Math.ceil(
-          cleaningsByShiftAndDay[shift].totalAverageShiftCleaning / 7,
+          cleaningsByShiftAndDay[shift].totalAverageShiftCleaning / 9,
         );
 
         totals.totalIdealShiftMaid +=

@@ -1,4 +1,7 @@
 -- CreateEnum
+CREATE TYPE "ChannelTypeEnum" AS ENUM ('WEBSITE_SCHEDULED', 'WEBSITE_IMMEDIATE', 'INTERNAL', 'GUIA_GO', 'GUIA_SCHEDULED', 'BOOKING', 'EXPEDIA');
+
+-- CreateEnum
 CREATE TYPE "PeriodEnum" AS ENUM ('LAST_7_D', 'LAST_30_D', 'LAST_6_M', 'CUSTOM');
 
 -- CreateEnum
@@ -13,6 +16,14 @@ CREATE TABLE "Company" (
     "name" TEXT NOT NULL,
 
     CONSTRAINT "Company_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Governance" (
+    "id" SERIAL NOT NULL,
+    "companyId" INTEGER NOT NULL,
+
+    CONSTRAINT "Governance_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -273,6 +284,210 @@ CREATE TABLE "KpiTrevparByPeriod" (
     CONSTRAINT "KpiTrevparByPeriod_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "Cleanings" (
+    "id" SERIAL NOT NULL,
+    "employeeName" TEXT NOT NULL,
+    "totalSuitesCleanings" INTEGER NOT NULL,
+    "totalAllSuitesCleanings" INTEGER NOT NULL,
+    "totalDaysWorked" INTEGER NOT NULL,
+    "shift" TEXT NOT NULL,
+    "averageDailyCleaning" DECIMAL(65,30) NOT NULL,
+    "totalAllAverageDailyCleaning" INTEGER NOT NULL,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "period" "PeriodEnum",
+    "companyId" INTEGER NOT NULL,
+    "governanceId" INTEGER,
+
+    CONSTRAINT "Cleanings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "CleaningsByPeriod" (
+    "id" SERIAL NOT NULL,
+    "totalSuitesCleanings" INTEGER NOT NULL,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "period" "PeriodEnum",
+    "companyId" INTEGER NOT NULL,
+    "governanceId" INTEGER,
+
+    CONSTRAINT "CleaningsByPeriod_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "CleaningsByPeriodShift" (
+    "id" SERIAL NOT NULL,
+    "totalSuitesCleanings" INTEGER NOT NULL,
+    "employeeName" TEXT NOT NULL,
+    "shift" TEXT NOT NULL,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "period" "PeriodEnum",
+    "companyId" INTEGER NOT NULL,
+    "governanceId" INTEGER,
+
+    CONSTRAINT "CleaningsByPeriodShift_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "CleaningsByWeek" (
+    "id" SERIAL NOT NULL,
+    "totalAverageDailyWeekCleaning" DECIMAL(65,30) NOT NULL,
+    "totalAverageShiftCleaning" DECIMAL(65,30) NOT NULL,
+    "totalAllAverageShiftCleaning" DECIMAL(65,30) NOT NULL,
+    "averageDailyWeekCleaning" DECIMAL(65,30) NOT NULL,
+    "totalSuitesCleanings" INTEGER NOT NULL,
+    "idealShiftMaid" INTEGER NOT NULL,
+    "totalIdealShiftMaid" INTEGER NOT NULL,
+    "realShiftMaid" INTEGER NOT NULL,
+    "totalRealShiftMaid" INTEGER NOT NULL,
+    "difference" INTEGER NOT NULL,
+    "totalDifference" INTEGER NOT NULL,
+    "period" "PeriodEnum",
+    "shift" TEXT NOT NULL,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "companyId" INTEGER NOT NULL,
+    "governanceId" INTEGER,
+
+    CONSTRAINT "CleaningsByWeek_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Inspections" (
+    "id" SERIAL NOT NULL,
+    "employeeName" TEXT NOT NULL,
+    "totalInspections" INTEGER NOT NULL,
+    "totalAllInspections" INTEGER NOT NULL,
+    "period" "PeriodEnum",
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "companyId" INTEGER NOT NULL,
+    "governanceId" INTEGER,
+
+    CONSTRAINT "Inspections_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Bookings" (
+    "id" SERIAL NOT NULL,
+    "companyId" INTEGER NOT NULL,
+
+    CONSTRAINT "Bookings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "BookingsRevenue" (
+    "id" SERIAL NOT NULL,
+    "period" "PeriodEnum",
+    "totalAllValue" DECIMAL(10,2) NOT NULL,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "companyId" INTEGER NOT NULL,
+    "bookingsId" INTEGER,
+
+    CONSTRAINT "BookingsRevenue_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "BookingsRevenueByPeriod" (
+    "id" SERIAL NOT NULL,
+    "period" "PeriodEnum",
+    "totalValue" DECIMAL(10,2) NOT NULL,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "companyId" INTEGER NOT NULL,
+    "bookingsId" INTEGER,
+
+    CONSTRAINT "BookingsRevenueByPeriod_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "BookingsByRentalType" (
+    "id" SERIAL NOT NULL,
+    "period" "PeriodEnum",
+    "rentalType" "RentalTypeEnum",
+    "totalValue" DECIMAL(10,2) NOT NULL,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "companyId" INTEGER NOT NULL,
+    "bookingsId" INTEGER,
+
+    CONSTRAINT "BookingsByRentalType_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "BookingsByChannelType" (
+    "id" SERIAL NOT NULL,
+    "period" "PeriodEnum",
+    "channelType" "ChannelTypeEnum",
+    "totalValue" DECIMAL(10,2) NOT NULL,
+    "totalAllValue" DECIMAL(10,2) NOT NULL,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "companyId" INTEGER NOT NULL,
+    "bookingsId" INTEGER,
+
+    CONSTRAINT "BookingsByChannelType_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "BookingsTicketAverage" (
+    "id" SERIAL NOT NULL,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "period" "PeriodEnum",
+    "totalAllTicketAverage" DECIMAL(10,2) NOT NULL,
+    "companyId" INTEGER NOT NULL,
+    "bookingsId" INTEGER,
+
+    CONSTRAINT "BookingsTicketAverage_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "BookingsRepresentativeness" (
+    "id" SERIAL NOT NULL,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "period" "PeriodEnum",
+    "totalAllRepresentativeness" DECIMAL(10,2) NOT NULL,
+    "representativenessGoal" DECIMAL(10,2) NOT NULL,
+    "companyId" INTEGER NOT NULL,
+    "bookingsId" INTEGER,
+
+    CONSTRAINT "BookingsRepresentativeness_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "BookingsRepresentativenessByPeriod" (
+    "id" SERIAL NOT NULL,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "period" "PeriodEnum",
+    "totalAllRepresentativeness" DECIMAL(10,2) NOT NULL,
+    "companyId" INTEGER NOT NULL,
+    "bookingsId" INTEGER,
+
+    CONSTRAINT "BookingsRepresentativenessByPeriod_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "BookingsTotalRentals" (
+    "id" SERIAL NOT NULL,
+    "period" "PeriodEnum",
+    "totalAllRentalsApartments" INTEGER,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "companyId" INTEGER NOT NULL,
+    "bookingsId" INTEGER,
+
+    CONSTRAINT "BookingsTotalRentals_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "BookingsTotalRentalsByPeriod" (
+    "id" SERIAL NOT NULL,
+    "period" "PeriodEnum",
+    "totalRentalsApartments" INTEGER,
+    "createdDate" TIMESTAMP(3) NOT NULL,
+    "companyId" INTEGER NOT NULL,
+    "bookingsId" INTEGER,
+
+    CONSTRAINT "BookingsTotalRentalsByPeriod_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Governance_companyId_key" ON "Governance"("companyId");
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
@@ -333,6 +548,39 @@ CREATE UNIQUE INDEX "KpiTrevpar_suiteCategoryId_period_createdDate_key" ON "KpiT
 -- CreateIndex
 CREATE UNIQUE INDEX "KpiTrevparByPeriod_period_createdDate_key" ON "KpiTrevparByPeriod"("period", "createdDate");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "Cleanings_employeeName_createdDate_period_key" ON "Cleanings"("employeeName", "createdDate", "period");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CleaningsByPeriod_period_createdDate_key" ON "CleaningsByPeriod"("period", "createdDate");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CleaningsByPeriodShift_period_createdDate_employeeName_key" ON "CleaningsByPeriodShift"("period", "createdDate", "employeeName");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CleaningsByWeek_period_shift_createdDate_key" ON "CleaningsByWeek"("period", "shift", "createdDate");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Inspections_employeeName_period_createdDate_key" ON "Inspections"("employeeName", "period", "createdDate");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "BookingsRevenue_period_createdDate_key" ON "BookingsRevenue"("period", "createdDate");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "BookingsRevenueByPeriod_period_createdDate_key" ON "BookingsRevenueByPeriod"("period", "createdDate");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "BookingsByRentalType_period_createdDate_rentalType_key" ON "BookingsByRentalType"("period", "createdDate", "rentalType");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "BookingsByChannelType_period_createdDate_channelType_key" ON "BookingsByChannelType"("period", "createdDate", "channelType");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "BookingsTicketAverage_period_createdDate_key" ON "BookingsTicketAverage"("period", "createdDate");
+
+-- AddForeignKey
+ALTER TABLE "Governance" ADD CONSTRAINT "Governance_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -389,3 +637,90 @@ ALTER TABLE "KpiTrevpar" ADD CONSTRAINT "KpiTrevpar_companyId_fkey" FOREIGN KEY 
 
 -- AddForeignKey
 ALTER TABLE "KpiTrevparByPeriod" ADD CONSTRAINT "KpiTrevparByPeriod_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Cleanings" ADD CONSTRAINT "Cleanings_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Cleanings" ADD CONSTRAINT "Cleanings_governanceId_fkey" FOREIGN KEY ("governanceId") REFERENCES "Governance"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CleaningsByPeriod" ADD CONSTRAINT "CleaningsByPeriod_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CleaningsByPeriod" ADD CONSTRAINT "CleaningsByPeriod_governanceId_fkey" FOREIGN KEY ("governanceId") REFERENCES "Governance"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CleaningsByPeriodShift" ADD CONSTRAINT "CleaningsByPeriodShift_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CleaningsByPeriodShift" ADD CONSTRAINT "CleaningsByPeriodShift_governanceId_fkey" FOREIGN KEY ("governanceId") REFERENCES "Governance"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CleaningsByWeek" ADD CONSTRAINT "CleaningsByWeek_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CleaningsByWeek" ADD CONSTRAINT "CleaningsByWeek_governanceId_fkey" FOREIGN KEY ("governanceId") REFERENCES "Governance"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Inspections" ADD CONSTRAINT "Inspections_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Inspections" ADD CONSTRAINT "Inspections_governanceId_fkey" FOREIGN KEY ("governanceId") REFERENCES "Governance"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Bookings" ADD CONSTRAINT "Bookings_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsRevenue" ADD CONSTRAINT "BookingsRevenue_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsRevenue" ADD CONSTRAINT "BookingsRevenue_bookingsId_fkey" FOREIGN KEY ("bookingsId") REFERENCES "Bookings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsRevenueByPeriod" ADD CONSTRAINT "BookingsRevenueByPeriod_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsRevenueByPeriod" ADD CONSTRAINT "BookingsRevenueByPeriod_bookingsId_fkey" FOREIGN KEY ("bookingsId") REFERENCES "Bookings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsByRentalType" ADD CONSTRAINT "BookingsByRentalType_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsByRentalType" ADD CONSTRAINT "BookingsByRentalType_bookingsId_fkey" FOREIGN KEY ("bookingsId") REFERENCES "Bookings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsByChannelType" ADD CONSTRAINT "BookingsByChannelType_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsByChannelType" ADD CONSTRAINT "BookingsByChannelType_bookingsId_fkey" FOREIGN KEY ("bookingsId") REFERENCES "Bookings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsTicketAverage" ADD CONSTRAINT "BookingsTicketAverage_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsTicketAverage" ADD CONSTRAINT "BookingsTicketAverage_bookingsId_fkey" FOREIGN KEY ("bookingsId") REFERENCES "Bookings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsRepresentativeness" ADD CONSTRAINT "BookingsRepresentativeness_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsRepresentativeness" ADD CONSTRAINT "BookingsRepresentativeness_bookingsId_fkey" FOREIGN KEY ("bookingsId") REFERENCES "Bookings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsRepresentativenessByPeriod" ADD CONSTRAINT "BookingsRepresentativenessByPeriod_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsRepresentativenessByPeriod" ADD CONSTRAINT "BookingsRepresentativenessByPeriod_bookingsId_fkey" FOREIGN KEY ("bookingsId") REFERENCES "Bookings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsTotalRentals" ADD CONSTRAINT "BookingsTotalRentals_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsTotalRentals" ADD CONSTRAINT "BookingsTotalRentals_bookingsId_fkey" FOREIGN KEY ("bookingsId") REFERENCES "Bookings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsTotalRentalsByPeriod" ADD CONSTRAINT "BookingsTotalRentalsByPeriod_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BookingsTotalRentalsByPeriod" ADD CONSTRAINT "BookingsTotalRentalsByPeriod_bookingsId_fkey" FOREIGN KEY ("bookingsId") REFERENCES "Bookings"("id") ON DELETE SET NULL ON UPDATE CASCADE;

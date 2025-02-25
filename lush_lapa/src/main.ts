@@ -49,7 +49,7 @@ async function bootstrap() {
         UpdateKpiRevenueDto,
       ],
     });
-    SwaggerModule.setup('lapa/api/docs', app, document);
+    SwaggerModule.setup('lapa/api', app, document);
 
     // Inicialize o PrismaService
     const prismaService = app.get(PrismaService);

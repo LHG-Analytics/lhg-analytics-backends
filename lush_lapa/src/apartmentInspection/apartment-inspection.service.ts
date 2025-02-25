@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PeriodEnum, Prisma } from '../../dist/generated/client-online';
+import { PeriodEnum } from '../../dist/generated/client-online';
 import { PrismaService } from '../prisma/prisma.service';
 
 import * as moment from 'moment-timezone';
@@ -31,6 +31,9 @@ export class ApartmentInspectionService {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       }
 
+      console.log('startDate:', startDate);
+      console.log('endDate:', endDate);
+
       // Obtendo os dados de inspeção dentro do período fornecido
       const inspections =
         await this.prisma.prismaLocal.apartmentInspection.findMany({
@@ -44,7 +47,7 @@ export class ApartmentInspectionService {
               employee: {
                 role: {
                   id: {
-                    equals: 24,
+                    equals: 19,
                   },
                 },
               },
