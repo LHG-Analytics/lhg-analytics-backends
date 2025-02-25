@@ -29,7 +29,9 @@ module.exports = {
       },
     ],
     post_deploy: [
-      "npm install -g pm2"  // Instalar o PM2 globalmente após o deploy
-    ]
+      // Certificar-se de que o pm2 será instalado globalmente
+      "npm install --legacy-peer-deps", // Instalar dependências (caso ainda não tenha feito)
+      "npm install -g pm2",  // Instalar o PM2 globalmente
+    ],
   };
   
