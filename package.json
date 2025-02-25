@@ -1,0 +1,16 @@
+{
+    "name": "lhg-analytics-backends",
+    "version": "1.0.0",
+    "description": "Backend services for LHG Analytics",
+    "scripts": {
+        "install": "npm install --legacy-peer-deps",
+        "start": "pm2-runtime ecosystem.config.js",
+        "build": "npm run build:ipiranga && npm run build:lapa",
+        "build:ipiranga": "cd lush_ipiranga && npm install && npm run build",
+        "build:lapa": "cd lush_lapa && npm install && npm run build"
+    },
+    "dependencies": {
+        "pm2": "^5.1.2",
+        "dotenv": "^16.0.0"
+    }
+}
