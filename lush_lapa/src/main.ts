@@ -22,7 +22,7 @@ async function bootstrap() {
         'API para visualização e gerenciamento dos Endpoints no backend',
       )
       .setVersion('1.0')
-      .addServer('/lush_lapa/lapa/api')
+      .addServer('/lush_lapa')
       .addTag('users')
       .addTag('KpiAlos')
       .addTag('KpiRevenue')
