@@ -25,6 +25,7 @@ async function bootstrap() {
         'API para visualização e gerenciamento dos Endpoints no backend',
       )
       .setVersion('1.0')
+      .addServer('/lush_ipiranga/ipiranga/api')
       .addTag('users')
       .addTag('KpiAlos')
       .addTag('KpiRevenue')
@@ -50,7 +51,7 @@ async function bootstrap() {
         UpdateKpiRevenueDto,
       ],
     });
-    SwaggerModule.setup('lush_ipiranga/ipiranga/api', app, document);
+    SwaggerModule.setup('ipiranga/api', app, document);
     console.log('Swagger UI disponível em: /ipiranga/api');
 
     // Inicialize o PrismaService com tratamento de erro

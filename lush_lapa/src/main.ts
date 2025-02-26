@@ -22,6 +22,7 @@ async function bootstrap() {
         'API para visualização e gerenciamento dos Endpoints no backend',
       )
       .setVersion('1.0')
+      .addServer('/lush_lapa/lapa/api')
       .addTag('users')
       .addTag('KpiAlos')
       .addTag('KpiRevenue')
@@ -47,7 +48,7 @@ async function bootstrap() {
         UpdateKpiRevenueDto,
       ],
     });
-    SwaggerModule.setup('lush_lapa/lapa/api', app, document);
+    SwaggerModule.setup('lapa/api', app, document);
     console.log('Swagger UI disponível em: /lapa/api');
 
     // Inicialize o PrismaService com tratamento de erro
