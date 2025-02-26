@@ -49,7 +49,8 @@ async function bootstrap() {
         UpdateKpiRevenueDto,
       ],
     });
-    SwaggerModule.setup('ipiranga/api', app, document);
+    SwaggerModule.setup('api', app, document);
+    console.log('Swagger UI disponível em: /api');
 
     // Inicialize o PrismaService com tratamento de erro
     const prismaService = app.get(PrismaService);
