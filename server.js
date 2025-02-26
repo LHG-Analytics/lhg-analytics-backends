@@ -1,27 +1,28 @@
-const express = require("express");
-const { createProxyMiddleware } = require("http-proxy-middleware");
+const express = require('express');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
 
-// Configurar proxy reverso para os serviços
-const targets = {
-  "/ipiranga/api": "http://localhost:3001",
-  "/lapa/api": "http://localhost:3002",
-};
+// Proxy para o backend do Lush Ipiranga
+app.use('/lush_ipiranga', createProxyMiddleware({
+  target: 'http://localhost:3001',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/lush_ipiranga': '',
+  },
+}));
 
-// Criar um proxy para cada serviço
-Object.keys(targets).forEach((context) => {
-  app.use(
-    context,
-    createProxyMiddleware({
-      target: targets[context],
-      changeOrigin: true,
-    })
-  );
-});
+// Proxy para o backend do Lush Lapa
+app.use('/lush_lapa', createProxyMiddleware({
+  target: 'http://localhost:3002',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/lush_lapa': '',
+  },
+}));
 
-// Definir a porta do proxy
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Proxy rodando na porta ${PORT}`);
+// Certifique-se de que o proxy está escutando na porta correta
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Proxy rodando na porta ${port}`);
 });

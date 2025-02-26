@@ -4,7 +4,7 @@ module.exports = {
         name: "proxy",
         script: "./server.js", // Proxy reverso para direcionar chamadas
         env: {
-          PORT: 3000, // Única porta exposta no Render
+          PORT: process.env.PORT || 3000, // A porta que o Render vai expor
         },
       },
       {
@@ -14,7 +14,7 @@ module.exports = {
           NODE_ENV: "production",
           DATABASE_URL_LOCAL_IPIRANGA: process.env.DATABASE_URL_LOCAL_IPIRANGA,
           DATABASE_URL_ONLINE_IPIRANGA: process.env.DATABASE_URL_ONLINE_IPIRANGA,
-          SERVICE_PREFIX: "ipiranga", // Definir um prefixo para diferenciação
+          SERVICE_PREFIX: "ipiranga", // Prefixo para diferenciação
         },
       },
       {
@@ -24,13 +24,13 @@ module.exports = {
           NODE_ENV: "production",
           DATABASE_URL_LOCAL_LAPA: process.env.DATABASE_URL_LOCAL_LAPA,
           DATABASE_URL_ONLINE_LAPA: process.env.DATABASE_URL_ONLINE_LAPA,
-          SERVICE_PREFIX: "lapa", // Definir um prefixo para diferenciação
+          SERVICE_PREFIX: "lapa", // Prefixo para diferenciação
         },
       },
     ],
     post_deploy: [
       "npm install --legacy-peer-deps",
-      "npm install -g pm2",
+      "npm install -g pm2", // Certifique-se de que o pm2 esteja instalado globalmente
     ],
   };
   
