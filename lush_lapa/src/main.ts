@@ -47,7 +47,7 @@ async function bootstrap() {
         UpdateKpiRevenueDto,
       ],
     });
-    SwaggerModule.setup('lapa/api', app, document);
+    SwaggerModule.setup('lush_lapa/lapa/api', app, document);
     console.log('Swagger UI disponível em: /lapa/api');
 
     // Inicialize o PrismaService com tratamento de erro
