@@ -5,7 +5,7 @@ const app = express();
 
 // Proxy para o backend do Lush Ipiranga
 app.use('/lush_ipiranga', createProxyMiddleware({
-  target: 'http://localhost:3001',
+  target: 'https://lhg-analytics-backend-bmmd.onrender.com/lush_ipiranga',
   changeOrigin: true,
   pathRewrite: {
     '^/lush_ipiranga': '',
@@ -14,7 +14,7 @@ app.use('/lush_ipiranga', createProxyMiddleware({
 
 // Proxy para o backend do Lush Lapa
 app.use('/lush_lapa', createProxyMiddleware({
-  target: 'http://localhost:3002',
+  target: 'https://lhg-analytics-backend-bmmd.onrender.com/lush_lapa',
   changeOrigin: true,
   pathRewrite: {
     '^/lush_lapa': '',
