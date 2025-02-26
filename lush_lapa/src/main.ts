@@ -12,7 +12,8 @@ import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
-    app.setGlobalPrefix('lapa/api');
+    const servicePrefix = process.env.SERVICE_PREFIX || 'lapa';
+    app.setGlobalPrefix(`${servicePrefix}/api`);
 
     // Configuração do Swagger
     const swaggerConfig = new DocumentBuilder()
@@ -47,8 +48,8 @@ async function bootstrap() {
       ],
     });
     // Corrigido o caminho do Swagger para 'api' em vez de 'lapa/api'
-    SwaggerModule.setup('api', app, document);
-    console.log('Swagger UI disponível em: /api');
+    SwaggerModule.setup('lapa/api', app, document);
+    console.log('Swagger UI disponível em: /lapa/api');
 
     // Inicialize o PrismaService com tratamento de erro
     const prismaService = app.get(PrismaService);
@@ -73,7 +74,7 @@ async function bootstrap() {
 
     app.enableCors(corsOptions);
 
-    const port = process.env.PORT || 3002;
+    const port = process.env.PORT || 3000;
     await app.listen(port);
     console.log(`App listening on port ${port}`);
   } catch (error) {

@@ -15,7 +15,8 @@ config();
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
-    app.setGlobalPrefix('ipiranga/api');
+    const servicePrefix = process.env.SERVICE_PREFIX || 'ipiranga';
+    app.setGlobalPrefix(`${servicePrefix}/api`);
 
     // Configuração do Swagger
     const swaggerConfig = new DocumentBuilder()
@@ -49,8 +50,8 @@ async function bootstrap() {
         UpdateKpiRevenueDto,
       ],
     });
-    SwaggerModule.setup('api', app, document);
-    console.log('Swagger UI disponível em: /api');
+    SwaggerModule.setup('ipiranga/api', app, document);
+    console.log('Swagger UI disponível em: /ipiranga/api');
 
     // Inicialize o PrismaService com tratamento de erro
     const prismaService = app.get(PrismaService);
@@ -75,7 +76,7 @@ async function bootstrap() {
 
     app.enableCors(corsOptions);
 
-    const port = process.env.PORT || 3001;
+    const port = process.env.PORT || 3000;
 
     // Use a porta do ambiente ou 3000 como padrão
     await app.listen(port, () => {
