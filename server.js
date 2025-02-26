@@ -7,18 +7,12 @@ const app = express();
 app.use('/lush_ipiranga', createProxyMiddleware({
     target: 'http://localhost:3001', // Alterado para localhost
     changeOrigin: true,
-    pathRewrite: {
-      '^/lush_ipiranga': '', // Remove o prefixo
-    },
 }));
 
 // Proxy para o backend do Lush Lapa
 app.use('/lush_lapa', createProxyMiddleware({
     target: 'http://localhost:3002', // Alterado para localhost
     changeOrigin: true,
-    pathRewrite: {
-      '^/lush_lapa': '', // Remove o prefixo
-    },
 }));
 
 const port = process.env.PORT || 3000;
