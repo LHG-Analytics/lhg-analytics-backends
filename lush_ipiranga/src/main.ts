@@ -76,7 +76,7 @@ async function bootstrap() {
 
     app.enableCors(corsOptions);
 
-    const port = process.env.PORT || 3001;
+    const port = process.env.PORT_IPIRANGA || 3001;
 
     // Use a porta do ambiente ou 3001 como padrão
     await app.listen(port, () => {
