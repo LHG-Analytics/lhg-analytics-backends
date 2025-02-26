@@ -21,8 +21,8 @@ app.use('/lush_lapa', createProxyMiddleware({
   },
 }));
 
-// Certifique-se de que o proxy está escutando na porta correta
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`Proxy rodando na porta ${port}`);
 });
+

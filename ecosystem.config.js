@@ -2,9 +2,12 @@ module.exports = {
     apps: [
       {
         name: "proxy",
-        script: "./server.js", // Proxy reverso para direcionar chamadas
+        script: "./server.js",
         env: {
-          PORT: process.env.PORT || 3000, // A porta que o Render vai expor
+          PORT: process.env.PORT || 3000, // Porta do proxy
+        },
+        env_production: {
+          PORT: process.env.PORT || 3000, // Porta do proxy
         },
       },
       {
@@ -14,7 +17,15 @@ module.exports = {
           NODE_ENV: "production",
           DATABASE_URL_LOCAL_IPIRANGA: process.env.DATABASE_URL_LOCAL_IPIRANGA,
           DATABASE_URL_ONLINE_IPIRANGA: process.env.DATABASE_URL_ONLINE_IPIRANGA,
-          SERVICE_PREFIX: "ipiranga", // Prefixo para diferenciação
+          SERVICE_PREFIX: "ipiranga",
+          PORT: 3001, // Porta específica para o Lush Ipiranga
+        },
+        env_production: {
+          NODE_ENV: "production",
+          DATABASE_URL_LOCAL_IPIRANGA: process.env.DATABASE_URL_LOCAL_IPIRANGA,
+          DATABASE_URL_ONLINE_IPIRANGA: process.env.DATABASE_URL_ONLINE_IPIRANGA,
+          SERVICE_PREFIX: "ipiranga",
+          PORT: 3001, // Porta específica para o Lush Ipiranga
         },
       },
       {
@@ -24,13 +35,21 @@ module.exports = {
           NODE_ENV: "production",
           DATABASE_URL_LOCAL_LAPA: process.env.DATABASE_URL_LOCAL_LAPA,
           DATABASE_URL_ONLINE_LAPA: process.env.DATABASE_URL_ONLINE_LAPA,
-          SERVICE_PREFIX: "lapa", // Prefixo para diferenciação
+          SERVICE_PREFIX: "lapa",
+          PORT: 3002, // Porta específica para o Lush Lapa
+        },
+        env_production: {
+          NODE_ENV: "production",
+          DATABASE_URL_LOCAL_LAPA: process.env.DATABASE_URL_LOCAL_LAPA,
+          DATABASE_URL_ONLINE_LAPA: process.env.DATABASE_URL_ONLINE_LAPA,
+          SERVICE_PREFIX: "lapa",
+          PORT: 3002, // Porta específica para o Lush Lapa
         },
       },
     ],
     post_deploy: [
       "npm install --legacy-peer-deps",
-      "npm install -g pm2", // Certifique-se de que o pm2 esteja instalado globalmente
+      "npm install -g pm2",
     ],
   };
   
