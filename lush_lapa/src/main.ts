@@ -12,7 +12,7 @@ import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
-    const servicePrefix = process.env.SERVICE_PREFIX || 'lapa';
+    const servicePrefix = process.env.SERVICE_PREFIX_LAPA || 'lapa';
     app.setGlobalPrefix(`${servicePrefix}/api`);
 
     // Configuração do Swagger

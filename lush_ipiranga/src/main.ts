@@ -15,7 +15,7 @@ config();
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
-    const servicePrefix = process.env.SERVICE_PREFIX || 'ipiranga';
+    const servicePrefix = process.env.SERVICE_PREFIX_IPIRANGA || 'ipiranga';
     app.setGlobalPrefix(`${servicePrefix}/api`);
 
     // Configuração do Swagger
