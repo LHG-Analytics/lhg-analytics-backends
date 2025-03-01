@@ -34,7 +34,7 @@ CREATE TABLE "User" (
     "cpf" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "role" "Role" DEFAULT 'MANAGER',
-    "companyId" INTEGER NOT NULL,
+    "company" TEXT NOT NULL,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -580,9 +580,6 @@ CREATE UNIQUE INDEX "BookingsTicketAverage_period_createdDate_key" ON "BookingsT
 
 -- AddForeignKey
 ALTER TABLE "Governance" ADD CONSTRAINT "Governance_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "User" ADD CONSTRAINT "User_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "KpiRevenue" ADD CONSTRAINT "KpiRevenue_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

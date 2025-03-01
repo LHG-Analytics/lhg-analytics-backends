@@ -17,6 +17,7 @@ async function bootstrap() {
     const app = await NestFactory.create(AppModule);
     const servicePrefix = process.env.SERVICE_PREFIX_IPIRANGA || 'ipiranga';
     app.setGlobalPrefix(`${servicePrefix}/api`);
+    const isProduction = process.env.NODE_ENV === 'production';
 
     // Configuração do Swagger
     const swaggerConfig = new DocumentBuilder()
@@ -25,7 +26,8 @@ async function bootstrap() {
         'API para visualização e gerenciamento dos Endpoints no backend',
       )
       .setVersion('1.0')
-      .addServer('/lush_ipiranga')
+      //.addBearerAuth()
+      .addServer(isProduction ? '/lush_ipiranga' : '/')
       .addTag('users')
       .addTag('KpiAlos')
       .addTag('KpiRevenue')

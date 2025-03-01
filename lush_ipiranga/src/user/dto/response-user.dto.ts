@@ -24,11 +24,7 @@ export class UserResponseDto {
   @IsString({ message: 'A função (role) deve ser uma string' })
   role?: Role;
 
-  @ApiProperty({ example: 1 })
-  @IsOptional()
-  companyId?: number;
-
-  @ApiProperty({ example: 'Empresa Exemplo' })
-  @IsOptional()
-  companyName?: string; // Nome da empresa, se necessário
+  @ApiProperty({ example: 'Lush Ipiranga' })
+  @IsString({ message: 'O nome da empresa deve ser uma string' })
+  company: string;
 }

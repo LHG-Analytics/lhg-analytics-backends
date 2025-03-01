@@ -18,17 +18,6 @@ export class UserService {
   ) {}
 
   async createUser(createUserDto: CreateUserDto): Promise<User> {
-    // Verificar se a companhia existe no banco de dados local
-    const company = await this.prisma.prismaOnline.company.findUnique({
-      where: { id: createUserDto.companyId },
-    });
-
-    if (!company) {
-      throw new NotFoundException(
-        `Company with ID ${createUserDto.companyId} not found`,
-      );
-    }
-
     if (!cpf.isValid(createUserDto.cpf)) {
       throw new BadRequestException('CPF inválido');
     }
@@ -46,7 +35,7 @@ export class UserService {
         cpf: createUserDto.cpf,
         password: hashedPassword,
         role: createUserDto.role,
-        companyId: createUserDto.companyId,
+        company: createUserDto.company,
       },
     });
 
@@ -56,25 +45,12 @@ export class UserService {
       cpf: createUserDto.cpf,
       password: hashedPassword,
       role: createUserDto.role,
-      companyId: createUserDto.companyId,
+      company: createUserDto.company,
     };
   }
 
   async updateUser(id: number, updateUserDto: UpdateUserDto): Promise<User> {
     await this.findUserById(id);
-
-    // Verificar se a companhia existe no banco de dados local
-    if (updateUserDto.companyId) {
-      const company = await this.prisma.prismaOnline.company.findUnique({
-        where: { id: updateUserDto.companyId },
-      });
-
-      if (!company) {
-        throw new NotFoundException(
-          `Company with ID ${updateUserDto.companyId} not found`,
-        );
-      }
-    }
 
     // Verificar se o CPF é válido
     if (updateUserDto.cpf && !cpf.isValid(updateUserDto.cpf)) {
@@ -108,10 +84,6 @@ export class UserService {
       // Mapeia os usuários e busca o nome da empresa associada
       const usersWithCompanyNames = await Promise.all(
         users.map(async (user) => {
-          const company = await this.prisma.prismaOnline.company.findUnique({
-            where: { id: user.companyId },
-          });
-
           return {
             id: user.id,
             name: user.name,
@@ -119,8 +91,7 @@ export class UserService {
             password: user.password,
             role: user.role,
             email: user.email,
-            companyId: user.companyId,
-            companyName: company ? company.name : null,
+            company: user.company,
           };
         }),
       );
@@ -140,10 +111,6 @@ export class UserService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    const company = await this.prisma.prismaOnline.company.findUnique({
-      where: { id: user.companyId },
-    });
-
     return {
       id: user.id,
       name: user.name,
@@ -151,8 +118,7 @@ export class UserService {
       password: user.password,
       role: user.role,
       email: user.email,
-      companyId: user.companyId,
-      companyName: company ? company.name : null,
+      company: user.company,
     };
   }
 
@@ -165,10 +131,6 @@ export class UserService {
       throw new NotFoundException(`User with email ${email} not found`);
     }
 
-    const company = await this.prisma.prismaOnline.company.findUnique({
-      where: { id: user.companyId },
-    });
-
     return {
       id: user.id,
       name: user.name,
@@ -176,8 +138,7 @@ export class UserService {
       password: user.password,
       role: user.role,
       email: user.email,
-      companyId: user.companyId,
-      companyName: company ? company.name : null,
+      company: user.company,
     };
   }
 

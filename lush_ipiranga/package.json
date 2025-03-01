@@ -35,6 +35,7 @@
     "class-validator": "^0.14.1",
     "cpf-cnpj-validator": "^1.0.3",
     "dotenv": "^16.4.5",
+    "jsonwebtoken": "^9.0.2",
     "moment-timezone": "^0.5.46",
     "npm": "^10.8.2",
     "pg": "^8.11.5",

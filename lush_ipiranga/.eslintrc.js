@@ -21,14 +21,12 @@ module.exports = {
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
-    'prefer-const': 'off',  // Desabilita a regra de preferir 'const' sobre 'let'
-    'no-unused-vars': 'off', // Desabilita a regra de variáveis não usadas
-    '@typescript-eslint/no-unused-vars': [
-      'error', 
-      {
-        argsIgnorePattern: '^_'  // Ignora parâmetros começando com '_'
-      }
-    ], 
-    'no-unused-imports': 'off', // Desabilita a regra de imports não usados
+    '@typescript-eslint/no-unused-vars': 'off',
+    'prefer-const': 'off',
+    'no-unused-vars': 'off',
+    'no-unused-imports': 'off',
+
+    // 🔹 Corrigir erro de quebra de linha (CRLF/LF)
+    'prettier/prettier': ['error', { endOfLine: 'auto' }],
   },
 };

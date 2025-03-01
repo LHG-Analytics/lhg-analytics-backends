@@ -35,7 +35,7 @@ export class CreateUserDto {
   @IsString({ message: 'A função (role) deve ser uma string' })
   role?: Role;
 
-  @ApiProperty({ example: 1 })
-  @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
-  companyId: number;
+  @ApiProperty({ example: 'Lush Ipiranga' })
+  @IsString({ message: 'O nome da empresa deve ser uma string' })
+  company: string;
 }

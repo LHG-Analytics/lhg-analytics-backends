@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -20,6 +21,7 @@ import { CleaningsModule } from './cleanings/cleanings.module';
 import { ApartmentInspectionModule } from './apartmentInspection/apartment-inspection.module';
 import { GovernanceModule } from './governance/governance.module';
 import { BookingsRevenueModule } from './bookingsRevenue/bookingsRevenue.module';
+import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de autenticação
 
 @Module({
   imports: [
@@ -42,6 +44,14 @@ import { BookingsRevenueModule } from './bookingsRevenue/bookingsRevenue.module'
     BookingsRevenueModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService, CronJobsService],
+  providers: [
+    AppService,
+    PrismaService,
+    CronJobsService,
+    //{
+    //provide: APP_GUARD,
+    // useClass: JwtAuthGuard, // Aplicado o guard de autenticação globalmente
+    //},
+  ],
 })
 export class AppModule {}

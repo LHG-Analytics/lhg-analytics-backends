@@ -7,6 +7,5 @@ export class User implements Prisma.UserUncheckedCreateInput {
   cpf: string;
   password: string;
   role?: Role;
-  companyId: number;
-  companyName?: string;
+  company: string;
 }
