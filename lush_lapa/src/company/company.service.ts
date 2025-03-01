@@ -2622,7 +2622,7 @@ export class CompanyService {
     };
 
     return {
-      Company: 'Lush Ipiranga',
+      Company: 'Lush Lapa',
       BigNumbers: [bigNumbers],
       BillingRentalType: dataTableBillingRentalType,
       RevenueByDate: revenueByDate,

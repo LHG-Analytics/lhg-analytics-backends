@@ -1,26 +1,25 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
+  Delete,
   Get,
+  NotFoundException,
+  Param,
   Post,
   Put,
-  Body,
-  Param,
-  NotFoundException,
-  BadRequestException,
-  Delete,
 } from '@nestjs/common';
-import { UserService } from './user.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { UserResponseDto } from './dto/response-user.dto'; // Novo DTO
 import {
-  ApiTags,
   ApiBadRequestResponse,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiParam,
-  ApiBody,
+  ApiTags,
 } from '@nestjs/swagger';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UserResponseDto } from './dto/response-user.dto'; // Novo DTO
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UserService } from './user.service';
 
 @ApiTags('users')
 @Controller('users')

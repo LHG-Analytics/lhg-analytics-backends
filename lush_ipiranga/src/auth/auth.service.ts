@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import bcrypt from 'bcrypt'; // Alterado para 'bcrypt' com exportação padrão
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
