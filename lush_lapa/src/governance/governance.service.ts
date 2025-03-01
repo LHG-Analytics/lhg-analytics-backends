@@ -3,10 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PeriodEnum, Prisma } from '../../dist/generated/client-online';
-import { PrismaService } from '../prisma/prisma.service';
 import * as moment from 'moment-timezone';
 import { Moment } from 'moment-timezone';
+import { PeriodEnum } from '../../dist/generated/client-online';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class GovernanceService {
@@ -322,8 +322,7 @@ export class GovernanceService {
 
     // Itera sobre os dados de limpeza
     for (const cleaning of cleanings) {
-      const { shift, totalSuitesCleanings, employeeName, createdDate } =
-        cleaning;
+      const { shift, employeeName, createdDate } = cleaning;
 
       // Cria uma chave única para o empregado e o turno
       const key = `${employeeName}-${shift}`;
