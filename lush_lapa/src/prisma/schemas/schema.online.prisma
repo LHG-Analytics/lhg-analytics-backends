@@ -11,7 +11,6 @@ datasource db {
 model Company {
   id                                 Int                                  @id @default(autoincrement())
   name                               String
-  users                              User[]
   kpiRevenues                        KpiRevenue[]
   kpiTotalRentals                    KpiTotalRentals[]
   kpiTicketAverages                  KpiTicketAverage[]
@@ -60,14 +59,13 @@ model Governance {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String
-  cpf       String   @unique
-  password  String
-  role      Role?    @default(MANAGER)
-  companyId Int
-  company   Company? @relation(fields: [companyId], references: [id])
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  name     String
+  cpf      String @unique
+  password String
+  role     Role?  @default(MANAGER)
+  company  String
 }
 
 model KpiRevenue {
