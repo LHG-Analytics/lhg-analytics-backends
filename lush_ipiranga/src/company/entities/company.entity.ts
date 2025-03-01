@@ -3,7 +3,6 @@ import { Prisma } from '../../../dist/generated/client-online';
 export class Company implements Prisma.CompanyUncheckedCreateInput {
   id: number;
   name: string;
-  users?: Prisma.UserUncheckedCreateNestedManyWithoutCompanyInput;
   kpiRevenues?: Prisma.KpiRevenueUncheckedCreateNestedManyWithoutCompanyInput;
   kpiTotalRentals?: Prisma.KpiTotalRentalsUncheckedCreateNestedManyWithoutCompanyInput;
   kpiTicketAverages?: Prisma.KpiTicketAverageUncheckedCreateNestedManyWithoutCompanyInput;
