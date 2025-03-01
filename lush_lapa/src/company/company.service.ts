@@ -12,8 +12,6 @@ export class CompanyService {
   constructor(private prisma: PrismaService) {}
 
   async findAllCompany(period: PeriodEnum) {
-    const moment = require('moment-timezone');
-
     // Define o fuso horário padrão como São Paulo
     moment.tz.setDefault('America/Sao_Paulo');
 
@@ -118,7 +116,6 @@ export class CompanyService {
       KpiRevparPreviousData,
       KpiRevparByPeriod,
       KpiOccupancyRate,
-      KpiOccupancyRatePreviousData,
       KpiOccupancyRateByWeek,
       KpiOccupancyRateByPeriod,
       KpiOccupancyRateBySuiteCategory,
@@ -365,25 +362,6 @@ export class CompanyService {
           period: period,
           createdDate: {
             gte: startDate,
-          },
-        },
-        select: {
-          occupancyRate: true,
-          suiteCategoryName: true,
-          suiteCategoryId: true,
-          totalOccupancyRate: true,
-          createdDate: true,
-        },
-        orderBy: {
-          createdDate: 'desc',
-        },
-      }),
-      this.prisma.prismaOnline.kpiOccupancyRate.findMany({
-        where: {
-          period: period,
-          createdDate: {
-            gte: startDatePrevious,
-            lte: endDatePrevious,
           },
         },
         select: {
