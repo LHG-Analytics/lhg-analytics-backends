@@ -12,11 +12,6 @@ import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
-    app.use((req, res, next) => {
-      console.log('Headers antes de qualquer middleware:', req.headers);
-      next();
-    });
-
     const servicePrefix = process.env.SERVICE_PREFIX_LAPA || 'lapa';
     app.setGlobalPrefix(`${servicePrefix}/api`);
     const isProduction = process.env.NODE_ENV === 'production';
@@ -76,7 +71,7 @@ async function bootstrap() {
     const corsOptions: CorsOptions = {
       origin: allowedOrigins,
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-      credentials: true, // Se estiver enviando cookies, mantenha true
+      //  credentials: true, // Se estiver enviando cookies, mantenha true
       allowedHeaders: ['Authorization', 'Content-Type'], //Adicionando Authorization aqui
     };
 
