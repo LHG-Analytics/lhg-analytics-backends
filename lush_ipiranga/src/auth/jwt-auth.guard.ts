@@ -13,6 +13,7 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+    console.log('Headers completos recebidos:', request.headers);
     const authHeader = request.headers.authorization;
 
     console.log('Cabeçalho Authorization recebido:', authHeader);

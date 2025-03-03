@@ -10,6 +10,7 @@ import * as jwt from 'jsonwebtoken';
 export class JwtAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
+    console.log('Headers completos recebidos:', request.headers);
     const authHeader = request.headers.authorization;
 
     console.log('Cabeçalho Authorization recebido:', authHeader);

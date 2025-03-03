@@ -71,7 +71,8 @@ async function bootstrap() {
     const corsOptions: CorsOptions = {
       origin: allowedOrigins,
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-      credentials: true, // Só manter se necessário
+      credentials: true, // Se estiver enviando cookies, mantenha true
+      allowedHeaders: ['Authorization', 'Content-Type'], //Adicionando Authorization aqui
     };
 
     app.enableCors(corsOptions);
