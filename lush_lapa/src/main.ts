@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
@@ -9,22 +9,30 @@ import { UpdateKpiAlosDto } from './kpiAlos/dto/update-kpiAlos.dto';
 import { CreateKpiRevenueDto } from './kpiRevenue/dto/create-kpiRevenue.dto';
 import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
 
+// Carregar variáveis de ambiente do arquivo .env
+config();
+
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
-    const servicePrefix = process.env.SERVICE_PREFIX_LAPA || 'lapa';
+    app.use((req, res, next) => {
+      console.log('Headers antes de qualquer middleware:', req.headers);
+      next();
+    });
+
+    const servicePrefix = process.env.SERVICE_PREFIX_IPIRANGA || 'ipiranga';
     app.setGlobalPrefix(`${servicePrefix}/api`);
     const isProduction = process.env.NODE_ENV === 'production';
 
     // Configuração do Swagger
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('LHG Analytics Backend - Lush Lapa')
+      .setTitle('LHG Analytics Backend - Lush Ipiranga')
       .setDescription(
         'API para visualização e gerenciamento dos Endpoints no backend',
       )
       .setVersion('1.0')
       .addBearerAuth()
-      .addServer(isProduction ? '/lush_lapa' : '/')
+      .addServer(isProduction ? '/lush_ipiranga' : '/')
       .addTag('users')
       .addTag('KpiAlos')
       .addTag('KpiRevenue')
@@ -50,8 +58,8 @@ async function bootstrap() {
         UpdateKpiRevenueDto,
       ],
     });
-    SwaggerModule.setup('lapa/api', app, document);
-    console.log('Swagger UI disponível em: /lapa/api');
+    SwaggerModule.setup('ipiranga/api', app, document);
+    console.log('Swagger UI disponível em: /ipiranga/api');
 
     // Inicialize o PrismaService com tratamento de erro
     const prismaService = app.get(PrismaService);
@@ -77,13 +85,14 @@ async function bootstrap() {
 
     app.enableCors(corsOptions);
 
-    const port = process.env.PORT_LAPA || 3002;
-    await app.listen(port);
-    console.log(`App listening on port ${port}`);
+    const port = process.env.PORT_IPIRANGA || 3001;
+
+    // Use a porta do ambiente ou 3001 como padrão
+    await app.listen(port, () => {
+      console.log(`App listening on port ${port}`);
+    });
   } catch (error) {
     console.error('Error during application bootstrap:', error);
-    process.exit(1);
   }
 }
-
 bootstrap();
