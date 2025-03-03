@@ -25,7 +25,7 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.AUTH_SECRET);
+      const decoded = jwt.verify(token, process.env.NEXTAUTH_SECRET);
       request.user = decoded; // Adiciona os dados do usuário na requisição
       return true;
     } catch (error) {

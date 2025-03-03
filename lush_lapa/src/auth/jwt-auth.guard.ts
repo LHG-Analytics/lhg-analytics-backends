@@ -12,17 +12,24 @@ export class JwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
 
-    if (!authHeader) {
-      throw new UnauthorizedException('Token não fornecido');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedException(
+        'Token não fornecido ou formato inválido',
+      );
     }
 
-    const token = authHeader.split(' ')[1]; // Bearer <token>
+    const token = authHeader.split(' ')[1]; // Extrai o token do header
+
+    if (!process.env.NEXTAUTH_SECRET) {
+      throw new Error('NEXTAUTH_SECRET não definido no ambiente');
+    }
+
     try {
-      const decoded = jwt.verify(token, process.env.AUTH_SECRET);
-      request.user = decoded; // Adiciona o usuário no request
+      const decoded = jwt.verify(token, process.env.NEXTAUTH_SECRET);
+      request.user = decoded; // Adiciona os dados do usuário na requisição
       return true;
     } catch (error) {
-      throw new UnauthorizedException('Token inválido');
+      throw new UnauthorizedException('Token inválido ou expirado');
     }
   }
 }
