@@ -48,10 +48,10 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de aute
     AppService,
     PrismaService,
     CronJobsService,
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard, // Aplicado o guard de autenticação globalmente
-    },
+    //{
+    //provide: APP_GUARD,
+    //useClass: JwtAuthGuard, // Aplicado o guard de autenticação globalmente
+    //},
   ],
 })
 export class AppModule {}
