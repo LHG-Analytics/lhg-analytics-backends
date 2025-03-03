@@ -1,4 +1,4 @@
-import { config } from 'dotenv';
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
@@ -9,9 +9,6 @@ import { UpdateKpiAlosDto } from './kpiAlos/dto/update-kpiAlos.dto';
 import { CreateKpiRevenueDto } from './kpiRevenue/dto/create-kpiRevenue.dto';
 import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
 
-// Carregar variáveis de ambiente do arquivo .env
-config();
-
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
@@ -20,19 +17,19 @@ async function bootstrap() {
       next();
     });
 
-    const servicePrefix = process.env.SERVICE_PREFIX_IPIRANGA || 'ipiranga';
+    const servicePrefix = process.env.SERVICE_PREFIX_LAPA || 'lapa';
     app.setGlobalPrefix(`${servicePrefix}/api`);
     const isProduction = process.env.NODE_ENV === 'production';
 
     // Configuração do Swagger
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('LHG Analytics Backend - Lush Ipiranga')
+      .setTitle('LHG Analytics Backend - Lush Lapa')
       .setDescription(
         'API para visualização e gerenciamento dos Endpoints no backend',
       )
       .setVersion('1.0')
       .addBearerAuth()
-      .addServer(isProduction ? '/lush_ipiranga' : '/')
+      .addServer(isProduction ? '/lush_lapa' : '/')
       .addTag('users')
       .addTag('KpiAlos')
       .addTag('KpiRevenue')
@@ -58,8 +55,8 @@ async function bootstrap() {
         UpdateKpiRevenueDto,
       ],
     });
-    SwaggerModule.setup('ipiranga/api', app, document);
-    console.log('Swagger UI disponível em: /ipiranga/api');
+    SwaggerModule.setup('lapa/api', app, document);
+    console.log('Swagger UI disponível em: /lapa/api');
 
     // Inicialize o PrismaService com tratamento de erro
     const prismaService = app.get(PrismaService);
@@ -85,14 +82,13 @@ async function bootstrap() {
 
     app.enableCors(corsOptions);
 
-    const port = process.env.PORT_IPIRANGA || 3001;
-
-    // Use a porta do ambiente ou 3001 como padrão
-    await app.listen(port, () => {
-      console.log(`App listening on port ${port}`);
-    });
+    const port = process.env.PORT_LAPA || 3002;
+    await app.listen(port);
+    console.log(`App listening on port ${port}`);
   } catch (error) {
     console.error('Error during application bootstrap:', error);
+    process.exit(1);
   }
 }
+
 bootstrap();
