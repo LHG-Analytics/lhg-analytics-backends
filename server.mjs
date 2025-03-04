@@ -17,8 +17,18 @@ const proxyConfig = (target) =>
     },
   });
 
-app.use("/lush_ipiranga", proxyConfig("http://localhost:3001"));
-app.use("/lush_lapa", proxyConfig("http://localhost:3002"));
+app.use(
+  "/lush_ipiranga",
+  proxyConfig(
+    "https://lhg-analytics-backend-bmmd.onrender.com/lush_ipiranga/ipiranga/api"
+  )
+);
+app.use(
+  "/lush_lapa",
+  proxyConfig(
+    "https://lhg-analytics-backend-bmmd.onrender.com/lush_lapa/lapa/api"
+  )
+);
 
 const port = process.env.PORT || 3000;
 app.listen(port, "0.0.0.0", () => {
