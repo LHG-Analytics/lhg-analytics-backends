@@ -8,7 +8,11 @@ const proxyConfig = (target) =>
   createProxyMiddleware({
     target,
     changeOrigin: true,
-    logLevel: "debug", // Logs detalhados no terminal
+    logLevel: "debug", // Logs detalhados no terminal para ver as requisições
+    pathRewrite: (path, req) => {
+      console.log(`Reescrevendo caminho: ${path}`); // Mostra o caminho antes de ser reescrito
+      return path; // Não reescreve o caminho, apenas passa como está
+    },
     onProxyReq: (proxyReq, req, res) => {
       console.log(
         `🔄 Proxy encaminhando requisição para: ${target}${req.originalUrl}`
@@ -17,6 +21,10 @@ const proxyConfig = (target) =>
       if (req.headers["authorization"]) {
         proxyReq.setHeader("Authorization", req.headers["authorization"]);
       }
+    },
+    onError: (err, req, res) => {
+      console.error("Erro no Proxy:", err);
+      res.status(500).send("Erro ao conectar ao servidor de destino.");
     },
   });
 
