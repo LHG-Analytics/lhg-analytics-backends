@@ -31,7 +31,7 @@ async function bootstrap() {
         'API para visualização e gerenciamento dos Endpoints no backend',
       )
       .setVersion('1.0')
-      //.addBearerAuth()
+      .addBearerAuth()
       .addServer(isProduction ? '/lush_ipiranga' : '/')
       .addTag('users')
       .addTag('KpiAlos')
@@ -79,8 +79,8 @@ async function bootstrap() {
     const corsOptions: CorsOptions = {
       origin: allowedOrigins,
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-      //credentials: true, // Se estiver enviando cookies, mantenha true
       allowedHeaders: ['Authorization', 'Content-Type'], //Adicionando Authorization aqui
+      credentials: true, // Se estiver enviando cookies, mantenha true
     };
 
     app.enableCors(corsOptions);
