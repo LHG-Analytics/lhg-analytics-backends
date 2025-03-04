@@ -3,12 +3,12 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
 
-const proxyConfig = (target, pathRewrite) =>
+// Função para configuração do proxy
+const proxyConfig = (target) =>
   createProxyMiddleware({
     target,
     changeOrigin: true,
-    pathRewrite,
-    logLevel: "debug", // <-- Adiciona logs detalhados no terminal
+    logLevel: "debug", // Logs detalhados no terminal
     onProxyReq: (proxyReq, req, res) => {
       console.log(
         `🔄 Proxy encaminhando requisição para: ${target}${req.originalUrl}`
@@ -20,17 +20,16 @@ const proxyConfig = (target, pathRewrite) =>
     },
   });
 
+// Configuração do proxy para o Lush Ipiranga
 app.use(
   "/lush_ipiranga",
-  proxyConfig("https://lhg-analytics-backend-bmmd.onrender.com", {
-    "^/lush_ipiranga": "",
-  })
+  proxyConfig("https://lhg-analytics-backend-bmmd.onrender.com")
 );
+
+// Configuração do proxy para o Lush Lapa
 app.use(
   "/lush_lapa",
-  proxyConfig("https://lhg-analytics-backend-bmmd.onrender.com", {
-    "^/lush_lapa": "",
-  })
+  proxyConfig("https://lhg-analytics-backend-bmmd.onrender.com")
 );
 
 const port = process.env.PORT || 3000;
