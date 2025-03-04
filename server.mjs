@@ -8,10 +8,11 @@ const proxyConfig = (target) =>
   createProxyMiddleware({
     target,
     changeOrigin: true,
-    logLevel: "debug", // Logs detalhados no terminal para ver as requisições
-    pathRewrite: (path, req) => {
-      console.log(`Reescrevendo caminho: ${path}`); // Mostra o caminho antes de ser reescrito
-      return path; // Não reescreve o caminho, apenas passa como está
+    logLevel: "debug", // Logs detalhados no terminal
+    pathRewrite: (path) => {
+      // Não reescreve o caminho, apenas passa como está
+      console.log(`Reescrevendo caminho: ${path}`); // Apenas loga o caminho
+      return path;
     },
     onProxyReq: (proxyReq, req, res) => {
       console.log(
