@@ -9,7 +9,6 @@ import {
   ChannelTypeEnum,
   PeriodEnum,
   Prisma,
-  RentalTypeEnum,
 } from '../../dist/generated/client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import { BookingsRevenue } from './entities/bookingsRevenue.entity';
