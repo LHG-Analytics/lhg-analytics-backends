@@ -53,6 +53,11 @@ export class CleaningsService {
             reasonEnd: {
               equals: 'COMPLETA',
             },
+            employee: {
+              idResponsibleDeletion: {
+                equals: null,
+              },
+            },
           },
           include: {
             employee: {
@@ -361,6 +366,11 @@ export class CleaningsService {
           where: {
             startDate: { gte: startDate, lte: endDate },
             endDate: { not: null }, // Excluir registros onde endDate é null
+            employee: {
+              idResponsibleDeletion: {
+                equals: null,
+              },
+            },
           },
           include: {
             employee: {
@@ -635,6 +645,11 @@ export class CleaningsService {
               startDate: { gte: currentDate.toDate(), lte: nextDate.toDate() },
               endDate: { not: null },
               reasonEnd: { equals: 'COMPLETA' },
+              employee: {
+                idResponsibleDeletion: {
+                  equals: null,
+                },
+              },
             },
             include: {
               employee: {
