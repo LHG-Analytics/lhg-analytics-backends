@@ -61,6 +61,11 @@ export class CleaningsService {
           },
           include: {
             employee: {
+              where: {
+                idResponsibleDeletion: {
+                  equals: null,
+                },
+              },
               include: {
                 personPaper: {
                   include: {
@@ -374,6 +379,11 @@ export class CleaningsService {
           },
           include: {
             employee: {
+              where: {
+                idResponsibleDeletion: {
+                  equals: null,
+                },
+              },
               include: {
                 personPaper: {
                   include: {
@@ -653,6 +663,11 @@ export class CleaningsService {
             },
             include: {
               employee: {
+                where: {
+                  idResponsibleDeletion: {
+                    equals: null,
+                  },
+                },
                 include: {
                   personPaper: {
                     include: {
