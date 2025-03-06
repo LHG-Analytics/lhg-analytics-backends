@@ -68,6 +68,11 @@ export class CleaningsService {
               },
               include: {
                 personPaper: {
+                  where: {
+                    idResponsibleDeletion: {
+                      equals: null,
+                    },
+                  },
                   include: {
                     person: true,
                   },
@@ -276,6 +281,16 @@ export class CleaningsService {
               reasonEnd: {
                 equals: 'COMPLETA',
               },
+              employee: {
+                idResponsibleDeletion: {
+                  equals: null,
+                },
+                personPaper: {
+                  idResponsibleDeletion: {
+                    equals: null,
+                  },
+                },
+              },
             },
           });
 
@@ -386,6 +401,11 @@ export class CleaningsService {
               },
               include: {
                 personPaper: {
+                  where: {
+                    idResponsibleDeletion: {
+                      equals: null,
+                    },
+                  },
                   include: {
                     person: true,
                   },
@@ -670,6 +690,11 @@ export class CleaningsService {
                 },
                 include: {
                   personPaper: {
+                    where: {
+                      idResponsibleDeletion: {
+                        equals: null,
+                      },
+                    },
                     include: {
                       person: true,
                     },
