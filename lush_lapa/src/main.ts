@@ -65,13 +65,21 @@ async function bootstrap() {
 
     // Configuração de CORS
     const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
-      'https://lhg-analytics.vercel.app/',
+      'https://lhg-analytics.vercel.app', // Substitua pela URL do seu frontend
     ];
 
     const corsOptions: CorsOptions = {
-      origin: allowedOrigins,
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+          // Se a origem estiver na lista ou se não houver origem (ex: chamadas de servidor para servidor), permita
+          callback(null, true);
+        } else {
+          // Se a origem não estiver na lista, rejeite a requisição
+          callback(new Error('Not allowed by CORS'), false);
+        }
+      },
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-      allowedHeaders: ['Authorization', 'Content-Type'], //Adicionando Authorization aqui
+      allowedHeaders: ['Authorization', 'Content-Type'], // Adicionando Authorization aqui
       credentials: true, // Se estiver enviando cookies, mantenha true
     };
 
