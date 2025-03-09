@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { jwtDecrypt } from 'jose'; // 📌 Importando o decodificador de JWE
 import { PrismaService } from '../prisma/prisma.service'; // Importa o PrismaService
+import { TextEncoder } from 'util'; // 📌 Importando TextEncoder
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -34,7 +35,7 @@ export class JwtAuthGuard implements CanActivate {
       // 🔹 Decodifica o JWE corretamente usando `jose`
       const { payload } = await jwtDecrypt(
         token,
-        new TextEncoder().encode(process.env.NEXTAUTH_SECRET),
+        new TextEncoder().encode(process.env.NEXTAUTH_SECRET), // Transformando a chave secreta no formato correto
       );
 
       // 🔹 Convertendo para o tipo correto

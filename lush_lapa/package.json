@@ -5,6 +5,7 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
+  "type": "module",
   "scripts": {
     "generate": "npx prisma generate --schema=./src/prisma/schemas/schema.online.prisma && npx prisma generate --schema=./src/prisma/schemas/schema.local1.prisma",
     "build": "npm run generate && tsc",
