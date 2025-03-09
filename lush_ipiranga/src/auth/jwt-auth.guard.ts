@@ -4,19 +4,18 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { jwtDecrypt } from 'jose'; // 📌 Importando o decodificador de JWE
+import * as jwt from 'jsonwebtoken';
 import { PrismaService } from '../prisma/prisma.service'; // Importa o PrismaService
-import { TextEncoder } from 'util'; // 📌 Importando TextEncoder
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {} // Injeta o PrismaService
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     console.log('Headers completos recebidos:', request.headers);
-
     const authHeader = request.headers.authorization;
+
     console.log('Cabeçalho Authorization recebido:', authHeader);
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -32,14 +31,10 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      // 🔹 Decodifica o JWE corretamente usando `jose`
-      const { payload } = await jwtDecrypt(
-        token,
-        new TextEncoder().encode(process.env.NEXTAUTH_SECRET), // Transformando a chave secreta no formato correto
-      );
-
-      // 🔹 Convertendo para o tipo correto
-      const decoded = payload as { email: string; id: string };
+      const decoded = jwt.verify(token, process.env.NEXTAUTH_SECRET) as {
+        email: string;
+        id: string;
+      };
 
       console.log('Usuário autenticado:', decoded);
 
@@ -52,7 +47,7 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException('Usuário não encontrado no banco');
       }
 
-      request.user = user; // 🔹 Armazena o usuário na requisição
+      request.user = user; // Armazena o usuário na requisição
       return true;
     } catch (error) {
       console.error('Erro ao validar token:', error.message);

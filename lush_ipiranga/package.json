@@ -5,7 +5,6 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
-  "type": "module",
   "scripts": {
     "generate": "npx prisma generate --schema=./src/prisma/schemas/schema.online.prisma && npx prisma generate --schema=./src/prisma/schemas/schema.local1.prisma",
     "build": "npm run generate && tsc",
@@ -36,7 +35,6 @@
     "class-validator": "^0.14.1",
     "cpf-cnpj-validator": "^1.0.3",
     "dotenv": "^16.4.5",
-    "jose": "^6.0.8",
     "jsonwebtoken": "^9.0.2",
     "moment-timezone": "^0.5.46",
     "npm": "^10.8.2",
