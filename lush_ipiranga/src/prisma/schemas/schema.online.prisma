@@ -492,14 +492,16 @@ model BookingsRepresentativenessByPeriod {
 }
 
 model BookingsTotalRentals {
-  id                        Int         @id @default(autoincrement())
-  period                    PeriodEnum?
-  totalAllRentalsApartments Int
-  createdDate               DateTime
-  companyId                 Int
-  company                   Company?    @relation(fields: [companyId], references: [id])
-  bookings                  Bookings?   @relation(fields: [bookingsId], references: [id])
-  bookingsId                Int?
+  id               Int         @id @default(autoincrement())
+  period           PeriodEnum?
+  totalAllBookings Int
+  createdDate      DateTime
+  companyId        Int
+  company          Company?    @relation(fields: [companyId], references: [id])
+  bookings         Bookings?   @relation(fields: [bookingsId], references: [id])
+  bookingsId       Int?
+
+  @@unique([period, createdDate])
 }
 
 model BookingsTotalRentalsByRentalType {

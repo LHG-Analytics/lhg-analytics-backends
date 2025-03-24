@@ -15,10 +15,6 @@ config();
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
-    app.use((req, res, next) => {
-      console.log('Headers antes de qualquer middleware:', req.headers);
-      next();
-    });
 
     const servicePrefix = process.env.SERVICE_PREFIX_IPIRANGA || 'ipiranga';
     app.setGlobalPrefix(`${servicePrefix}/api`);
@@ -48,6 +44,7 @@ async function bootstrap() {
       .addTag('Inspections')
       .addTag('CronJobs')
       .addTag('BookingsRevenue')
+      .addTag('BookingsTotalRentals')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig, {

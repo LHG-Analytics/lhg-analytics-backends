@@ -22,6 +22,7 @@ import { ApartmentInspectionModule } from './apartmentInspection/apartment-inspe
 import { GovernanceModule } from './governance/governance.module';
 import { BookingsRevenueModule } from './bookingsRevenue/bookingsRevenue.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de autenticação
+import { BookingsTotalRentalsModule } from './bookingsTotalRentals/bookingsTotalRentals.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de aute
     ApartmentInspectionModule,
     GovernanceModule,
     BookingsRevenueModule,
+    BookingsTotalRentalsModule,
   ],
   controllers: [AppController],
   providers: [
