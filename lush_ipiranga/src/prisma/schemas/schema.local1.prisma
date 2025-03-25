@@ -353,6 +353,7 @@ model Booking {
   hideDeposit                Boolean          @map("ocultar_deposito")
   qtdGuests                  Int?             @map("qtd_hospedes")
   idTypeOriginBooking        Int              @map("id_tipoorigemreserva")
+  originBooking              OriginBooking?   @relation(fields: [idTypeOriginBooking], references: [id])
   idCarInGarage              Int?             @map("id_carronagaragem")
   bookingProgram             Boolean          @map("reserva_programada_guia")
 
@@ -365,6 +366,7 @@ model OriginBooking {
   typeOrigin            String    @map("tipo_origem")
   deletionDate          DateTime? @map("dataexclusao")
   idResponsibleDeletion Int?      @map("id_responsavelexclusao")
+  booking               Booking[]
 
   @@map("tipo_origem_reserva")
 }

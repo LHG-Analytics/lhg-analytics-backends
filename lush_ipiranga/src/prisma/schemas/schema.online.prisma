@@ -45,6 +45,7 @@ model Company {
   BookingsTotalRentals               BookingsTotalRentals[]
   BookingsTotalRentalsByPeriod       BookingsTotalRentalsByPeriod[]
   BookingsRevenueByPeriod            BookingsRevenueByPeriod[]
+  BookingsTotalRentalsByChannelType  BookingsTotalRentalsByChannelType[]
 }
 
 model Governance {
@@ -412,6 +413,7 @@ model Bookings {
   bookingsTotalRentals               BookingsTotalRentals[]
   bookingsTotalRentalsByPeriod       BookingsTotalRentalsByPeriod[]
   bookingsRevenueByPeriod            BookingsRevenueByPeriod[]
+  BookingsTotalRentalsByChannelType  BookingsTotalRentalsByChannelType[]
 }
 
 model BookingsRevenue {
@@ -505,28 +507,44 @@ model BookingsTotalRentals {
 }
 
 model BookingsTotalRentalsByRentalType {
-  id                     Int             @id @default(autoincrement())
-  period                 PeriodEnum?
-  rentalType             RentalTypeEnum?
-  totalRentalsApartments Int
-  createdDate            DateTime
-  companyId              Int
-  company                Company?        @relation(fields: [companyId], references: [id])
-  bookings               Bookings?       @relation(fields: [bookingsId], references: [id])
-  bookingsId             Int?
+  id            Int             @id @default(autoincrement())
+  period        PeriodEnum?
+  rentalType    RentalTypeEnum?
+  totalBookings Int
+  createdDate   DateTime
+  companyId     Int
+  company       Company?        @relation(fields: [companyId], references: [id])
+  bookings      Bookings?       @relation(fields: [bookingsId], references: [id])
+  bookingsId    Int?
 
   @@unique([period, createdDate, rentalType])
 }
 
 model BookingsTotalRentalsByPeriod {
-  id                     Int         @id @default(autoincrement())
-  period                 PeriodEnum?
-  totalRentalsApartments Int
-  createdDate            DateTime
-  companyId              Int
-  company                Company?    @relation(fields: [companyId], references: [id])
-  bookings               Bookings?   @relation(fields: [bookingsId], references: [id])
-  bookingsId             Int?
+  id            Int         @id @default(autoincrement())
+  period        PeriodEnum?
+  totalBookings Int
+  createdDate   DateTime
+  companyId     Int
+  company       Company?    @relation(fields: [companyId], references: [id])
+  bookings      Bookings?   @relation(fields: [bookingsId], references: [id])
+  bookingsId    Int?
+
+  @@unique([period, createdDate])
+}
+
+model BookingsTotalRentalsByChannelType {
+  id            Int              @id @default(autoincrement())
+  period        PeriodEnum?
+  channelType   ChannelTypeEnum?
+  totalBookings Int
+  createdDate   DateTime
+  companyId     Int
+  company       Company?         @relation(fields: [companyId], references: [id])
+  bookings      Bookings?        @relation(fields: [bookingsId], references: [id])
+  bookingsId    Int?
+
+  @@unique([period, createdDate, channelType])
 }
 
 enum ChannelTypeEnum {

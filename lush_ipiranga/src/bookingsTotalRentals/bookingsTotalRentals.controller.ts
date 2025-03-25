@@ -63,7 +63,7 @@ export class BookingsTotalRentalsController {
       }
 
       // Chama o serviço com as datas e o período, se fornecidos
-      return await this.bookingsTotalRentalsService.findAllKpiTotalRentals(
+      return await this.bookingsTotalRentalsService.findAllBookingsTotalRentals(
         start,
         end,
         period,
@@ -110,7 +110,7 @@ export class BookingsTotalRentalsController {
     return date;
   }
 
-  /*@Get('run-cron-job')
+  @Get('run-cron-job')
   @HttpCode(HttpStatus.OK)
   @ApiNotFoundResponse({ description: 'No bookings found.' })
   @ApiBadRequestResponse({ description: 'Failed to run the cron job.' })
@@ -123,5 +123,5 @@ export class BookingsTotalRentalsController {
         `Failed to run the cron job: ${error.message}`,
       );
     }
-  }*/
+  }
 }

@@ -181,6 +181,8 @@ export class BookingsRevenueService {
           return dateService.toDateString() === startDate.toDateString()
             ? ChannelTypeEnum.WEBSITE_IMMEDIATE
             : ChannelTypeEnum.WEBSITE_SCHEDULED;
+        case 6: //INTERNA
+          return ChannelTypeEnum.INTERNAL;
         case 7: // BOOKING
           return ChannelTypeEnum.BOOKING;
         case 8: // EXPEDIA
