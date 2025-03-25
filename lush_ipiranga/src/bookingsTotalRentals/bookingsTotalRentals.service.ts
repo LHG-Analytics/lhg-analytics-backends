@@ -73,8 +73,6 @@ export class BookingsTotalRentalsService {
         createdDate: adjustedEndDate,
       });
 
-      console.log('Total Result:', totalResult);
-
       return {
         'Total Result': totalResult,
       };
@@ -190,8 +188,6 @@ export class BookingsTotalRentalsService {
         });
       }
 
-      console.log('Total Result:', totalResult);
-
       return {
         'Total Result': totalResult,
       };
@@ -297,8 +293,6 @@ export class BookingsTotalRentalsService {
       const totalBookingsForThePeriod = Object.keys(results).map((date) => ({
         [date]: results[date],
       }));
-
-      console.log('TotalBookingsForThePeriod:', totalBookingsForThePeriod);
 
       return {
         TotalBookingsForThePeriod: totalBookingsForThePeriod,
@@ -440,8 +434,6 @@ export class BookingsTotalRentalsService {
           channelType: channelTypeEnum, // Passa o tipo convertido
         });
       }
-
-      console.log('Total Result by ChannelType:', totalResult);
 
       return {
         'Total Result': totalResult,

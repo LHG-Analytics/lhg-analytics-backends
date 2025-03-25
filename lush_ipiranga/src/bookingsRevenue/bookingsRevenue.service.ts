@@ -256,8 +256,6 @@ export class BookingsRevenueService {
       },
     };
 
-    console.log('result channel:', result);
-
     return result;
   }
 
@@ -273,9 +271,6 @@ export class BookingsRevenueService {
       const adjustedEndDate = new Date(endDate);
       adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Subtrai um dia
       adjustedEndDate.setUTCHours(23, 59, 59, 999); // Define o final do dia
-
-      console.log('startDateByPeriod', startDate);
-      console.log('adjustedEndDateByPeriod', adjustedEndDate);
 
       // Iniciar currentDate no início do dia da startDate
       let currentDate = new Date(startDate);
@@ -329,8 +324,6 @@ export class BookingsRevenueService {
       const totalBookingRevenueByDate = Object.keys(results).map((date) => ({
         [date]: results[date],
       }));
-
-      console.log('totalBookingRevenueByDate:', totalBookingRevenueByDate);
 
       return {
         BookingRevenueByDate: totalBookingRevenueByDate,
