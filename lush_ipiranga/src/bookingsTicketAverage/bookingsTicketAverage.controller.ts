@@ -112,7 +112,7 @@ export class BookingsTicketAverageController {
     return date;
   }
 
-  /*@Get('run-cron-job')
+  @Get('run-cron-job')
   @HttpCode(HttpStatus.OK)
   @ApiNotFoundResponse({ description: 'No Booking Ticket Average found.' })
   @ApiBadRequestResponse({ description: 'Failed to run the cron job.' })
@@ -125,5 +125,5 @@ export class BookingsTicketAverageController {
         `Failed to run the cron job: ${error.message}`,
       );
     }
-  }*/
+  }
 }
