@@ -23,6 +23,7 @@ import { GovernanceModule } from './governance/governance.module';
 import { BookingsRevenueModule } from './bookingsRevenue/bookingsRevenue.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de autenticação
 import { BookingsTotalRentalsModule } from './bookingsTotalRentals/bookingsTotalRentals.module';
+import { BookingsTicketAverageModule } from './bookingsTicketAverage/bookingsTicketAverage.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { BookingsTotalRentalsModule } from './bookingsTotalRentals/bookingsTotal
     GovernanceModule,
     BookingsRevenueModule,
     BookingsTotalRentalsModule,
+    BookingsTicketAverageModule,
   ],
   controllers: [AppController],
   providers: [

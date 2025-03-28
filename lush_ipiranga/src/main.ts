@@ -45,6 +45,7 @@ async function bootstrap() {
       .addTag('CronJobs')
       .addTag('BookingsRevenue')
       .addTag('BookingsTotalRentals')
+      .addTag('BookingsTicketAverage')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig, {

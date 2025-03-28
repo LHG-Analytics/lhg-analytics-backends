@@ -46,6 +46,8 @@ model Company {
   BookingsTotalRentalsByPeriod       BookingsTotalRentalsByPeriod[]
   BookingsRevenueByPeriod            BookingsRevenueByPeriod[]
   BookingsTotalRentalsByChannelType  BookingsTotalRentalsByChannelType[]
+  BookingsTicketAverageByChannelType BookingsTicketAverageByChannelType[]
+  BookingsByPayment                  BookingsByPayment[]
 }
 
 model Governance {
@@ -414,6 +416,8 @@ model Bookings {
   bookingsTotalRentalsByPeriod       BookingsTotalRentalsByPeriod[]
   bookingsRevenueByPeriod            BookingsRevenueByPeriod[]
   BookingsTotalRentalsByChannelType  BookingsTotalRentalsByChannelType[]
+  BookingsTicketAverageByChannelType BookingsTicketAverageByChannelType[]
+  BookingsByPayment                  BookingsByPayment[]
 }
 
 model BookingsRevenue {
@@ -468,6 +472,20 @@ model BookingsTicketAverage {
   bookingsId            Int?
 
   @@unique([period, createdDate])
+}
+
+model BookingsTicketAverageByChannelType {
+  id                    Int              @id @default(autoincrement())
+  createdDate           DateTime
+  period                PeriodEnum?
+  channelType           ChannelTypeEnum?
+  totalAllTicketAverage Decimal          @db.Decimal(10, 2)
+  companyId             Int
+  company               Company?         @relation(fields: [companyId], references: [id])
+  bookings              Bookings?        @relation(fields: [bookingsId], references: [id])
+  bookingsId            Int?
+
+  @@unique([period, createdDate, channelType])
 }
 
 model BookingsRepresentativeness {
@@ -545,6 +563,20 @@ model BookingsTotalRentalsByChannelType {
   bookingsId    Int?
 
   @@unique([period, createdDate, channelType])
+}
+
+model BookingsByPayment {
+  id            Int         @id @default(autoincrement())
+  period        PeriodEnum?
+  paymentMethod String
+  totalBookings Int
+  createdDate   DateTime
+  companyId     Int
+  company       Company?    @relation(fields: [companyId], references: [id])
+  bookings      Bookings?   @relation(fields: [bookingsId], references: [id])
+  bookingsId    Int?
+
+  @@unique([period, createdDate, paymentMethod])
 }
 
 enum ChannelTypeEnum {
