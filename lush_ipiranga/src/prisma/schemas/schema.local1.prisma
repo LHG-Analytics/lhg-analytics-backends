@@ -380,6 +380,7 @@ model NewRelease {
   description                String?          @map("descricao")
   releaseType                String?          @map("tipolancamento")
   halfPaymentId              Int              @map("id_meiopagamento")
+  halfPayment                HalfPayment      @relation(fields: [halfPaymentId], references: [id])
   maturity                   DateTime?        @map("vencimento")
   accountPayReceiveId        Int?             @map("id_contapagarreceber")
   increase                   Decimal          @map("acrescimo") @db.Decimal(10, 2)
@@ -406,15 +407,16 @@ model NewRelease {
 }
 
 model HalfPayment {
-  id                    Int       @id @default(autoincrement()) @map("id")
-  version               Int       @map("versao")
-  name                  String    @map("nome")
-  deletionDate          DateTime? @map("dataexclusao")
-  idResponsibleDeletion Int?      @map("id_responsavelexclusao")
-  type                  String    @map("tipo")
-  flagTypeCard          String?   @map("tipobandeiracartao")
-  configurationTefId    Int?      @map("id_configuracaotef")
-  enableIntegrationTef  Boolean   @map("habilitar_integracao_tef")
+  id                    Int          @id @default(autoincrement()) @map("id")
+  version               Int          @map("versao")
+  name                  String       @map("nome")
+  deletionDate          DateTime?    @map("dataexclusao")
+  idResponsibleDeletion Int?         @map("id_responsavelexclusao")
+  type                  String       @map("tipo")
+  flagTypeCard          String?      @map("tipobandeiracartao")
+  configurationTefId    Int?         @map("id_configuracaotef")
+  enableIntegrationTef  Boolean      @map("habilitar_integracao_tef")
+  newRelease            NewRelease[]
 
   @@map("meiopagamento")
 }

@@ -47,7 +47,7 @@ model Company {
   BookingsRevenueByPeriod            BookingsRevenueByPeriod[]
   BookingsTotalRentalsByChannelType  BookingsTotalRentalsByChannelType[]
   BookingsTicketAverageByChannelType BookingsTicketAverageByChannelType[]
-  BookingsByPayment                  BookingsByPayment[]
+  BookingsRevenueByPayment           BookingsRevenueByPayment[]
 }
 
 model Governance {
@@ -417,7 +417,7 @@ model Bookings {
   bookingsRevenueByPeriod            BookingsRevenueByPeriod[]
   BookingsTotalRentalsByChannelType  BookingsTotalRentalsByChannelType[]
   BookingsTicketAverageByChannelType BookingsTicketAverageByChannelType[]
-  BookingsByPayment                  BookingsByPayment[]
+  BookingsRevenueByPayment           BookingsRevenueByPayment[]
 }
 
 model BookingsRevenue {
@@ -459,6 +459,20 @@ model BookingsByChannelType {
   bookingsId    Int?
 
   @@unique([period, createdDate, channelType])
+}
+
+model BookingsRevenueByPayment {
+  id            Int         @id @default(autoincrement())
+  period        PeriodEnum?
+  paymentMethod String
+  totalValue    Decimal     @db.Decimal(10, 2)
+  createdDate   DateTime
+  companyId     Int
+  company       Company?    @relation(fields: [companyId], references: [id])
+  bookings      Bookings?   @relation(fields: [bookingsId], references: [id])
+  bookingsId    Int?
+
+  @@unique([period, createdDate, paymentMethod])
 }
 
 model BookingsTicketAverage {
@@ -563,20 +577,6 @@ model BookingsTotalRentalsByChannelType {
   bookingsId    Int?
 
   @@unique([period, createdDate, channelType])
-}
-
-model BookingsByPayment {
-  id            Int         @id @default(autoincrement())
-  period        PeriodEnum?
-  paymentMethod String
-  totalBookings Int
-  createdDate   DateTime
-  companyId     Int
-  company       Company?    @relation(fields: [companyId], references: [id])
-  bookings      Bookings?   @relation(fields: [bookingsId], references: [id])
-  bookingsId    Int?
-
-  @@unique([period, createdDate, paymentMethod])
 }
 
 enum ChannelTypeEnum {

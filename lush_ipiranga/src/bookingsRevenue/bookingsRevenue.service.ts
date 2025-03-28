@@ -43,10 +43,12 @@ export class BookingsRevenueService {
           },
         },
         select: {
+          id: true,
           priceRental: true,
           idTypeOriginBooking: true,
           dateService: true,
           startDate: true,
+          rentalApartmentId: true,
         },
       }),
       this.prisma.prismaLocal.originBooking.findMany({
@@ -57,6 +59,31 @@ export class BookingsRevenueService {
         },
         select: {
           typeOrigin: true,
+        },
+      }),
+      this.prisma.prismaLocal.newRelease.findMany({
+        where: {
+          deletionDate: {
+            equals: null,
+          },
+          releaseType: {
+            equals: 'RESERVA',
+          },
+        },
+        select: {
+          halfPaymentId: true,
+          originalsId: true,
+        },
+      }),
+      this.prisma.prismaLocal.halfPayment.findMany({
+        where: {
+          deletionDate: {
+            equals: null,
+          },
+        },
+        select: {
+          id: true, // Adicione o id para o mapeamento
+          name: true,
         },
       }),
     ]);
@@ -102,6 +129,8 @@ export class BookingsRevenueService {
       const formattedBookingsRevenueData = {
         totalAllValue: this.formatCurrency(totalAllValue.toNumber()),
       };
+
+      console.log('totalAllValue:', formattedBookingsRevenueData);
 
       return formattedBookingsRevenueData;
     } catch (error) {
@@ -336,6 +365,78 @@ export class BookingsRevenueService {
     }
   }
 
+  private async calculateRevenueByPaymentMethod(
+    startDate: Date,
+    endDate: Date,
+    period: PeriodEnum,
+  ): Promise<any> {
+    const companyId = 1; // Defina o ID da empresa conforme necessário
+
+    // Ajustar a data final para não incluir a data atual
+    const adjustedEndDate = new Date(endDate);
+    if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
+    } else if (period === PeriodEnum.LAST_6_M) {
+      adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1); // Para LAST_6_M, subtrair um mês
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
+    }
+
+    // Buscar todas as reservas e os novos lançamentos
+    const [allBookings, originBookings, newReleases, halfPayments] =
+      await this.fetchKpiData(startDate, endDate);
+
+    if (!allBookings || allBookings.length === 0) {
+      throw new NotFoundException('No bookings found.');
+    }
+
+    // Cria um mapa para associar halfPaymentId ao name
+    const halfPaymentMap = new Map<number, string>();
+    for (const halfPayment of halfPayments) {
+      halfPaymentMap.set(halfPayment.id, halfPayment.name);
+    }
+
+    // Inicializa um objeto para armazenar os totais por meio de pagamento
+    const revenueByPaymentMethod = new Map<string, Prisma.Decimal>(); // Mapeia o nome do meio de pagamento
+
+    // Calcular o total de priceRental por meio de pagamento
+    for (const booking of allBookings) {
+      const matchingNewRelease = newReleases.find(
+        (release) => release.originalsId === booking.id, // Comparando booking.id com release.originalsId
+      );
+
+      if (matchingNewRelease) {
+        const halfPaymentId = matchingNewRelease.halfPaymentId;
+        const paymentName = halfPaymentMap.get(halfPaymentId); // Obtém o nome do meio de pagamento
+
+        // Inicializa o total para o meio de pagamento se não existir
+        if (!revenueByPaymentMethod.has(paymentName)) {
+          revenueByPaymentMethod.set(paymentName, new Prisma.Decimal(0));
+        }
+
+        // Acumula o valor atual ao total existente
+        const currentTotal = revenueByPaymentMethod.get(paymentName);
+        revenueByPaymentMethod.set(
+          paymentName,
+          currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
+        );
+      }
+    }
+
+    // Monta o resultado total agregado
+    const totalResults = {};
+    for (const [paymentName, totalValue] of revenueByPaymentMethod.entries()) {
+      totalResults[paymentName] = {
+        total: this.formatCurrency(totalValue.toNumber()), // Formata o total em reais
+      };
+    }
+
+    // Retornar os resultados calculados
+    return {
+      totalResults,
+      createdDate: adjustedEndDate,
+    };
+  }
+
   @Cron('0 0 * * *', { disabled: true })
   async handleCron() {
     const timezone = 'America/Sao_Paulo'; // Defina seu fuso horário
@@ -344,11 +445,12 @@ export class BookingsRevenueService {
     const currentDate = moment().tz(timezone).toDate();
 
     // Últimos 7 dias
-    const endDateLast7Days = currentDate;
+    const endDateLast7Days = new Date(currentDate);
+    endDateLast7Days.setDate(endDateLast7Days.getDate() - 1); // Exclui o dia de hoje
     endDateLast7Days.setHours(23, 59, 59, 999);
 
-    const startDateLast7Days = new Date(currentDate);
-    startDateLast7Days.setDate(startDateLast7Days.getDate() - 7);
+    const startDateLast7Days = new Date(endDateLast7Days);
+    startDateLast7Days.setDate(startDateLast7Days.getDate() - 6); // Vai 6 dias para trás
     startDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -410,6 +512,12 @@ export class BookingsRevenueService {
       PeriodEnum.LAST_7_D,
     );
 
+    await this.calculateRevenueByPaymentMethod(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
+
     const endTimeLast7Days = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
@@ -418,11 +526,12 @@ export class BookingsRevenueService {
     );
 
     // Últimos 30 dias
-    const endDateLast30Days = currentDate;
+    const endDateLast30Days = new Date(currentDate);
+    endDateLast30Days.setDate(endDateLast30Days.getDate() - 1); // Exclui o dia de hoje
     endDateLast30Days.setHours(23, 59, 59, 999);
 
-    const startDateLast30Days = new Date(currentDate);
-    startDateLast30Days.setDate(startDateLast30Days.getDate() - 30);
+    const startDateLast30Days = new Date(endDateLast30Days);
+    startDateLast30Days.setDate(startDateLast30Days.getDate() - 29); // Vai 29 dias para trás
     startDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -482,11 +591,12 @@ export class BookingsRevenueService {
     );
 
     // Últimos 6 meses (180 dias)
-    const endDateLast6Months = currentDate;
+    const endDateLast6Months = new Date(currentDate);
+    endDateLast6Months.setDate(endDateLast6Months.getDate() - 1); // Exclui o dia de hoje
     endDateLast6Months.setHours(23, 59, 59, 999);
 
-    const startDateLast6Months = new Date(currentDate);
-    startDateLast6Months.setMonth(startDateLast6Months.getMonth() - 6);
+    const startDateLast6Months = new Date(endDateLast6Months);
+    startDateLast6Months.setMonth(startDateLast6Months.getMonth() - 6); // Vai 6 meses para trás
     startDateLast6Months.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado

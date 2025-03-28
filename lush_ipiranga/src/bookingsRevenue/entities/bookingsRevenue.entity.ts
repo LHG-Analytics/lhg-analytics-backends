@@ -1,4 +1,5 @@
 import {
+  ChannelTypeEnum,
   PeriodEnum,
   Prisma,
   RentalTypeEnum,
@@ -13,4 +14,42 @@ export class BookingsRevenue
   totalAllValue: Prisma.Decimal;
   createdDate: Date;
   companyId: number;
+}
+
+export class BookingsRevenueByChannelType
+  implements Prisma.BookingsByChannelTypeUncheckedCreateInput
+{
+  id?: number;
+  period?: PeriodEnum;
+  rentalType?: RentalTypeEnum;
+  totalValue: Prisma.Decimal;
+  createdDate: Date;
+  companyId: number;
+  channelType?: ChannelTypeEnum;
+  totalAllValue: Prisma.Decimal;
+}
+
+export class BookingsRevenueByPeriod
+  implements Prisma.BookingsRevenueByPeriodUncheckedCreateInput
+{
+  id?: number;
+  period?: PeriodEnum;
+  rentalType?: RentalTypeEnum;
+  totalValue: Prisma.Decimal;
+  createdDate: Date;
+  companyId: number;
+  channelType?: ChannelTypeEnum;
+}
+
+export class BookingsRevenueByPayment
+  implements Prisma.BookingsRevenueByPaymentUncheckedCreateInput
+{
+  id?: number;
+  period?: PeriodEnum;
+  rentalType?: RentalTypeEnum;
+  channelType?: ChannelTypeEnum;
+  totalValue: Prisma.Decimal;
+  createdDate: Date;
+  companyId: number;
+  paymentMethod: string;
 }
