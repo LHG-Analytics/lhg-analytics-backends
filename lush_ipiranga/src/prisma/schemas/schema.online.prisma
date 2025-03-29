@@ -9,45 +9,46 @@ datasource db {
 }
 
 model Company {
-  id                                 Int                                  @id @default(autoincrement())
-  name                               String
-  kpiRevenues                        KpiRevenue[]
-  kpiTotalRentals                    KpiTotalRentals[]
-  kpiTicketAverages                  KpiTicketAverage[]
-  kpiAlos                            KpiAlos[]
-  KpiOccupancyRates                  KpiOccupancyRate[]
-  KpiGiros                           KpiGiro[]
-  KpiRevpars                         KpiRevpar[]
-  KpiTrevpars                        KpiTrevpar[]
-  KpiOccupancyRatesByWeek            KpiOccupancyRateByWeek[]
-  KpiGiroByWeek                      KpiGiroByWeek[]
-  KpiOccupancyRatesByPeriod          KpiOccupancyRateByPeriod[]
-  KpiOccupancyRatesBySuiteCategory   KpiOccupancyRateBySuiteCategory[]
-  KpiRevenuesByRentalType            KpiRevenueByRentalType[]
-  KpiRevenueByPeriod                 KpiRevenueByPeriod[]
-  KpiTotalRentalsByPeriod            KpiTotalRentalsByPeriod[]
-  KpiRevparsByPeriod                 KpiRevparByPeriod[]
-  KpiTicketAveragesByPeriod          KpiTicketAverageByPeriod[]
-  KpiTrevparsByPeriod                KpiTrevparByPeriod[]
-  Cleanings                          Cleanings[]
-  CleaningsByPeriod                  CleaningsByPeriod[]
-  CleaningsByWeek                    CleaningsByWeek[]
-  Inspections                        Inspections[]
-  Governance                         Governance?
-  CleaningsByPeriodShift             CleaningsByPeriodShift[]
-  Bookings                           Bookings[]
-  BookingsTotalRentalsByRentalType   BookingsTotalRentalsByRentalType[]
-  BookingsByChannelType              BookingsByChannelType[]
-  BookingsTicketAverage              BookingsTicketAverage[]
-  BookingsRevenue                    BookingsRevenue[]
-  BookingsRepresentativeness         BookingsRepresentativeness[]
-  BookingsRepresentativenessByPeriod BookingsRepresentativenessByPeriod[]
-  BookingsTotalRentals               BookingsTotalRentals[]
-  BookingsTotalRentalsByPeriod       BookingsTotalRentalsByPeriod[]
-  BookingsRevenueByPeriod            BookingsRevenueByPeriod[]
-  BookingsTotalRentalsByChannelType  BookingsTotalRentalsByChannelType[]
-  BookingsTicketAverageByChannelType BookingsTicketAverageByChannelType[]
-  BookingsRevenueByPayment           BookingsRevenueByPayment[]
+  id                                      Int                                       @id @default(autoincrement())
+  name                                    String
+  kpiRevenues                             KpiRevenue[]
+  kpiTotalRentals                         KpiTotalRentals[]
+  kpiTicketAverages                       KpiTicketAverage[]
+  kpiAlos                                 KpiAlos[]
+  KpiOccupancyRates                       KpiOccupancyRate[]
+  KpiGiros                                KpiGiro[]
+  KpiRevpars                              KpiRevpar[]
+  KpiTrevpars                             KpiTrevpar[]
+  KpiOccupancyRatesByWeek                 KpiOccupancyRateByWeek[]
+  KpiGiroByWeek                           KpiGiroByWeek[]
+  KpiOccupancyRatesByPeriod               KpiOccupancyRateByPeriod[]
+  KpiOccupancyRatesBySuiteCategory        KpiOccupancyRateBySuiteCategory[]
+  KpiRevenuesByRentalType                 KpiRevenueByRentalType[]
+  KpiRevenueByPeriod                      KpiRevenueByPeriod[]
+  KpiTotalRentalsByPeriod                 KpiTotalRentalsByPeriod[]
+  KpiRevparsByPeriod                      KpiRevparByPeriod[]
+  KpiTicketAveragesByPeriod               KpiTicketAverageByPeriod[]
+  KpiTrevparsByPeriod                     KpiTrevparByPeriod[]
+  Cleanings                               Cleanings[]
+  CleaningsByPeriod                       CleaningsByPeriod[]
+  CleaningsByWeek                         CleaningsByWeek[]
+  Inspections                             Inspections[]
+  Governance                              Governance?
+  CleaningsByPeriodShift                  CleaningsByPeriodShift[]
+  Bookings                                Bookings[]
+  BookingsTotalRentalsByRentalType        BookingsTotalRentalsByRentalType[]
+  BookingsByChannelType                   BookingsByChannelType[]
+  BookingsTicketAverage                   BookingsTicketAverage[]
+  BookingsRevenue                         BookingsRevenue[]
+  BookingsRepresentativeness              BookingsRepresentativeness[]
+  BookingsRepresentativenessByPeriod      BookingsRepresentativenessByPeriod[]
+  BookingsTotalRentals                    BookingsTotalRentals[]
+  BookingsTotalRentalsByPeriod            BookingsTotalRentalsByPeriod[]
+  BookingsRevenueByPeriod                 BookingsRevenueByPeriod[]
+  BookingsTotalRentalsByChannelType       BookingsTotalRentalsByChannelType[]
+  BookingsTicketAverageByChannelType      BookingsTicketAverageByChannelType[]
+  BookingsRevenueByPayment                BookingsRevenueByPayment[]
+  BookingsRepresentativenessByChannelType BookingsRepresentativenessByChannelType[]
 }
 
 model Governance {
@@ -403,21 +404,22 @@ model Inspections {
 }
 
 model Bookings {
-  id                                 Int                                  @id @default(autoincrement())
-  companyId                          Int
-  company                            Company?                             @relation(fields: [companyId], references: [id])
-  bookingsTotalRentalsByRentalType   BookingsTotalRentalsByRentalType[]
-  bookingsByChannelType              BookingsByChannelType[]
-  bookingsTicketAverage              BookingsTicketAverage[]
-  bookingsRevenue                    BookingsRevenue[]
-  bookingsRepresentativeness         BookingsRepresentativeness[]
-  bookingsRepresentativenessByPeriod BookingsRepresentativenessByPeriod[]
-  bookingsTotalRentals               BookingsTotalRentals[]
-  bookingsTotalRentalsByPeriod       BookingsTotalRentalsByPeriod[]
-  bookingsRevenueByPeriod            BookingsRevenueByPeriod[]
-  BookingsTotalRentalsByChannelType  BookingsTotalRentalsByChannelType[]
-  BookingsTicketAverageByChannelType BookingsTicketAverageByChannelType[]
-  BookingsRevenueByPayment           BookingsRevenueByPayment[]
+  id                                      Int                                       @id @default(autoincrement())
+  companyId                               Int
+  company                                 Company?                                  @relation(fields: [companyId], references: [id])
+  bookingsTotalRentalsByRentalType        BookingsTotalRentalsByRentalType[]
+  bookingsByChannelType                   BookingsByChannelType[]
+  bookingsTicketAverage                   BookingsTicketAverage[]
+  bookingsRevenue                         BookingsRevenue[]
+  bookingsRepresentativeness              BookingsRepresentativeness[]
+  bookingsRepresentativenessByPeriod      BookingsRepresentativenessByPeriod[]
+  bookingsTotalRentals                    BookingsTotalRentals[]
+  bookingsTotalRentalsByPeriod            BookingsTotalRentalsByPeriod[]
+  bookingsRevenueByPeriod                 BookingsRevenueByPeriod[]
+  BookingsTotalRentalsByChannelType       BookingsTotalRentalsByChannelType[]
+  BookingsTicketAverageByChannelType      BookingsTicketAverageByChannelType[]
+  BookingsRevenueByPayment                BookingsRevenueByPayment[]
+  BookingsRepresentativenessByChannelType BookingsRepresentativenessByChannelType[]
 }
 
 model BookingsRevenue {
@@ -507,22 +509,39 @@ model BookingsRepresentativeness {
   createdDate                DateTime
   period                     PeriodEnum?
   totalAllRepresentativeness Decimal     @db.Decimal(10, 2)
-  representativenessGoal     Decimal     @db.Decimal(10, 2)
   companyId                  Int
   company                    Company?    @relation(fields: [companyId], references: [id])
   bookings                   Bookings?   @relation(fields: [bookingsId], references: [id])
   bookingsId                 Int?
+
+  @@unique([period, createdDate])
 }
 
 model BookingsRepresentativenessByPeriod {
-  id                         Int         @id @default(autoincrement())
-  createdDate                DateTime
-  period                     PeriodEnum?
-  totalAllRepresentativeness Decimal     @db.Decimal(10, 2)
-  companyId                  Int
-  company                    Company?    @relation(fields: [companyId], references: [id])
-  bookings                   Bookings?   @relation(fields: [bookingsId], references: [id])
-  bookingsId                 Int?
+  id                      Int         @id @default(autoincrement())
+  createdDate             DateTime
+  period                  PeriodEnum?
+  totalRepresentativeness Decimal     @db.Decimal(10, 2)
+  companyId               Int
+  company                 Company?    @relation(fields: [companyId], references: [id])
+  bookings                Bookings?   @relation(fields: [bookingsId], references: [id])
+  bookingsId              Int?
+
+  @@unique([period, createdDate])
+}
+
+model BookingsRepresentativenessByChannelType {
+  id                      Int              @id @default(autoincrement())
+  createdDate             DateTime
+  period                  PeriodEnum?
+  channelType             ChannelTypeEnum?
+  totalRepresentativeness Decimal          @db.Decimal(10, 2)
+  companyId               Int
+  company                 Company?         @relation(fields: [companyId], references: [id])
+  bookings                Bookings?        @relation(fields: [bookingsId], references: [id])
+  bookingsId              Int?
+
+  @@unique([period, createdDate, channelType])
 }
 
 model BookingsTotalRentals {
