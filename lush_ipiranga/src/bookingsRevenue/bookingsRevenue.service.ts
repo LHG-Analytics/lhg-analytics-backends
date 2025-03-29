@@ -11,7 +11,12 @@ import {
   Prisma,
 } from '../../dist/generated/client-online';
 import { PrismaService } from '../prisma/prisma.service';
-import { BookingsRevenue } from './entities/bookingsRevenue.entity';
+import {
+  BookingsRevenue,
+  BookingsRevenueByChannelType,
+  BookingsRevenueByPayment,
+  BookingsRevenueByPeriod,
+} from './entities/bookingsRevenue.entity';
 
 @Injectable()
 export class BookingsRevenueService {
@@ -249,26 +254,13 @@ export class BookingsRevenueService {
 
     // Inserir ou atualizar os resultados na tabela BookingsByChannelType
     for (const [channelType, totalValue] of revenueByChannelType.entries()) {
-      await this.prisma.prismaOnline.bookingsByChannelType.upsert({
-        where: {
-          period_createdDate_channelType: {
-            period: period,
-            channelType: channelType,
-            createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
-          },
-        },
-        create: {
-          period: period,
-          channelType: channelType,
-          totalValue: totalValue,
-          totalAllValue: totalAllValue,
-          createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
-          companyId: companyId,
-        },
-        update: {
-          totalValue: totalValue,
-          totalAllValue: totalAllValue,
-        },
+      await this.insertBookingsRevenueByChannelType({
+        channelType,
+        period,
+        totalValue,
+        totalAllValue,
+        createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
+        companyId,
       });
     }
 
@@ -288,6 +280,26 @@ export class BookingsRevenueService {
     return result;
   }
 
+  private async insertBookingsRevenueByChannelType(
+    data: BookingsRevenueByChannelType,
+  ): Promise<BookingsRevenueByChannelType> {
+    return this.prisma.prismaOnline.bookingsByChannelType.upsert({
+      where: {
+        period_createdDate_channelType: {
+          period: data.period,
+          createdDate: data.createdDate,
+          channelType: data.channelType,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
+  }
+
   private async calculateTotalBookingRevenueByPeriod(
     startDate: Date,
     endDate: Date,
@@ -295,6 +307,7 @@ export class BookingsRevenueService {
   ): Promise<any> {
     try {
       const results: { [key: string]: any } = {}; // Armazenar resultados
+      const companyId = 1;
 
       // Ajustar a endDate para o final do dia anterior
       const adjustedEndDate = new Date(endDate);
@@ -346,6 +359,14 @@ export class BookingsRevenueService {
           totalValue: formattedTotalValue,
         };
 
+        // Inserir a receita de reservas no banco de dados
+        await this.insertBookingsRevenueByPeriod({
+          totalValue: totalValueForCurrentPeriod,
+          createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+          period: period || null,
+          companyId,
+        });
+
         currentDate = new Date(nextDate);
       }
 
@@ -363,6 +384,25 @@ export class BookingsRevenueService {
         `Failed to calculate total booking revenue by period: ${error.message}`,
       );
     }
+  }
+
+  private async insertBookingsRevenueByPeriod(
+    data: BookingsRevenueByPeriod,
+  ): Promise<BookingsRevenueByPeriod> {
+    return this.prisma.prismaOnline.bookingsRevenueByPeriod.upsert({
+      where: {
+        period_createdDate: {
+          period: data.period,
+          createdDate: data.createdDate,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
   }
 
   private async calculateRevenueByPaymentMethod(
@@ -422,7 +462,18 @@ export class BookingsRevenueService {
       }
     }
 
-    // Monta o resultado total agregado
+    // Monta o resultado total agregado e insere no banco de dados
+    for (const [paymentName, totalValue] of revenueByPaymentMethod.entries()) {
+      await this.insertBookingsRevenueByPaymentMethod({
+        totalValue,
+        createdDate: adjustedEndDate, // Data de criação
+        period: period,
+        paymentMethod: paymentName, // Nome do meio de pagamento
+        companyId,
+      });
+    }
+
+    // Monta o resultado total para retorno
     const totalResults = {};
     for (const [paymentName, totalValue] of revenueByPaymentMethod.entries()) {
       totalResults[paymentName] = {
@@ -430,11 +481,32 @@ export class BookingsRevenueService {
       };
     }
 
+    console.log('Total Result by payment:', totalResults);
     // Retornar os resultados calculados
     return {
       totalResults,
       createdDate: adjustedEndDate,
     };
+  }
+
+  private async insertBookingsRevenueByPaymentMethod(
+    data: BookingsRevenueByPayment,
+  ): Promise<BookingsRevenueByPayment> {
+    return this.prisma.prismaOnline.bookingsRevenueByPayment.upsert({
+      where: {
+        period_createdDate_paymentMethod: {
+          period: data.period,
+          createdDate: data.createdDate,
+          paymentMethod: data.paymentMethod,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
   }
 
   @Cron('0 0 * * *', { disabled: true })

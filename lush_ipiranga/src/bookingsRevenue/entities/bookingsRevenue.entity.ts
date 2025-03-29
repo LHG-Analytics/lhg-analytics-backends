@@ -10,7 +10,6 @@ export class BookingsRevenue
 {
   id?: number;
   period?: PeriodEnum;
-  rentalType?: RentalTypeEnum;
   totalAllValue: Prisma.Decimal;
   createdDate: Date;
   companyId: number;
@@ -21,7 +20,6 @@ export class BookingsRevenueByChannelType
 {
   id?: number;
   period?: PeriodEnum;
-  rentalType?: RentalTypeEnum;
   totalValue: Prisma.Decimal;
   createdDate: Date;
   companyId: number;
@@ -34,7 +32,6 @@ export class BookingsRevenueByPeriod
 {
   id?: number;
   period?: PeriodEnum;
-  rentalType?: RentalTypeEnum;
   totalValue: Prisma.Decimal;
   createdDate: Date;
   companyId: number;
@@ -46,7 +43,6 @@ export class BookingsRevenueByPayment
 {
   id?: number;
   period?: PeriodEnum;
-  rentalType?: RentalTypeEnum;
   channelType?: ChannelTypeEnum;
   totalValue: Prisma.Decimal;
   createdDate: Date;
