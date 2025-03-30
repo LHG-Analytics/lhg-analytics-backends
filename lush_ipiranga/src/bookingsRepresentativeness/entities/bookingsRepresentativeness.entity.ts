@@ -1,4 +1,8 @@
-import { PeriodEnum, Prisma } from '../../../dist/generated/client-online';
+import {
+  ChannelTypeEnum,
+  PeriodEnum,
+  Prisma,
+} from '../../../dist/generated/client-online';
 
 export class BookingsRepresentativeness
   implements Prisma.BookingsRepresentativenessUncheckedCreateInput
@@ -15,6 +19,17 @@ export class BookingsRepresentativenessByPeriod
 {
   id?: number;
   period?: PeriodEnum;
+  totalRepresentativeness: Prisma.Decimal;
+  createdDate: Date;
+  companyId: number;
+}
+
+export class BookingsRepresentativenessByChannelType
+  implements Prisma.BookingsRepresentativenessByChannelTypeUncheckedCreateInput
+{
+  id?: number;
+  period?: PeriodEnum;
+  channelType?: ChannelTypeEnum;
   totalRepresentativeness: Prisma.Decimal;
   createdDate: Date;
   companyId: number;
