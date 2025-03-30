@@ -7,13 +7,14 @@ import { Cron } from '@nestjs/schedule';
 import * as moment from 'moment-timezone';
 import {
   PeriodEnum,
+  ChannelTypeEnum,
   Prisma,
-  RentalTypeEnum,
 } from '../../dist/generated/client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   BookingsRepresentativeness,
   BookingsRepresentativenessByPeriod,
+  BookingsRepresentativenessByChannelType,
 } from './entities/bookingsRepresentativeness.entity';
 
 @Injectable()
@@ -358,6 +359,187 @@ export class BookingsRepresentativenessService {
     });
   }
 
+  private async calculateBookingsRepresentativenessByChannelType(
+    startDate: Date,
+    endDate: Date,
+    period: PeriodEnum,
+  ): Promise<any> {
+    try {
+      const companyId = 1;
+
+      // Ajustar a endDate para o final do dia anterior
+      const adjustedEndDate = new Date(endDate);
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Subtrai um dia
+      adjustedEndDate.setUTCHours(23, 59, 59, 999); // Define o final do dia
+
+      // Buscar todas as receitas de reservas e os tipos de origem
+      const [totalSaleDirect, allRentalApartments, allBookingsRevenue] =
+        await Promise.all([
+          this.calculateTotalSaleDirect(startDate, endDate),
+          this.prisma.prismaLocal.rentalApartment.findMany({
+            where: {
+              checkIn: {
+                gte: startDate,
+                lte: endDate,
+              },
+              endOccupationType: 'FINALIZADA',
+            },
+          }),
+          this.prisma.prismaLocal.booking.findMany({
+            where: {
+              dateService: {
+                gte: startDate,
+                lte: endDate,
+              },
+              canceled: {
+                equals: null,
+              },
+              priceRental: {
+                not: null,
+              },
+              rentalApartmentId: {
+                not: null,
+              },
+            },
+            select: {
+              id: true,
+              priceRental: true,
+              idTypeOriginBooking: true,
+              dateService: true,
+              startDate: true,
+              rentalApartmentId: true,
+            },
+          }),
+        ]);
+
+      if (!allBookingsRevenue || allBookingsRevenue.length === 0) {
+        throw new NotFoundException('No booking revenue found.');
+      }
+
+      // Mapa para armazenar os totais por channelType
+      const revenueByChannelType = new Map<ChannelTypeEnum, Prisma.Decimal>([
+        [ChannelTypeEnum.INTERNAL, new Prisma.Decimal(0)],
+        [ChannelTypeEnum.GUIA_GO, new Prisma.Decimal(0)],
+        [ChannelTypeEnum.GUIA_SCHEDULED, new Prisma.Decimal(0)],
+        [ChannelTypeEnum.WEBSITE_IMMEDIATE, new Prisma.Decimal(0)],
+        [ChannelTypeEnum.WEBSITE_SCHEDULED, new Prisma.Decimal(0)],
+        [ChannelTypeEnum.BOOKING, new Prisma.Decimal(0)],
+        [ChannelTypeEnum.EXPEDIA, new Prisma.Decimal(0)],
+      ]);
+
+      // Função para determinar o channelType com base no idTypeOriginBooking e na dateService
+      const getChannelType = (
+        idTypeOriginBooking: number,
+        dateService: Date,
+        startDate: Date,
+      ): ChannelTypeEnum | null => {
+        switch (idTypeOriginBooking) {
+          case 1: // SISTEMA
+            return ChannelTypeEnum.INTERNAL;
+          case 3: // GUIA_DE_MOTEIS
+            return dateService.toDateString() === startDate.toDateString()
+              ? ChannelTypeEnum.GUIA_GO
+              : ChannelTypeEnum.GUIA_SCHEDULED;
+          case 4: // RESERVA_API
+            return dateService.toDateString() === startDate.toDateString()
+              ? ChannelTypeEnum.WEBSITE_IMMEDIATE
+              : ChannelTypeEnum.WEBSITE_SCHEDULED;
+          case 6: // INTERNA
+            return ChannelTypeEnum.INTERNAL;
+          case 7: // BOOKING
+            return ChannelTypeEnum.BOOKING;
+          case 8: // EXPEDIA
+            return ChannelTypeEnum.EXPEDIA;
+          default:
+            return null; // Para outros casos, retorna null
+        }
+      };
+
+      // Calcular o total de priceRental por channelType
+      allBookingsRevenue.forEach((booking) => {
+        const channelType = getChannelType(
+          booking.idTypeOriginBooking,
+          booking.dateService,
+          booking.startDate,
+        ); // Mapeia o idTypeOriginBooking para channelType
+
+        if (channelType) {
+          // Acumula o valor atual ao total existente
+          const currentTotal = revenueByChannelType.get(channelType);
+          revenueByChannelType.set(
+            channelType,
+            currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
+          );
+        }
+      });
+
+      // Calcular a receita total (vendas diretas + locações)
+      const totalRevenue = totalSaleDirect.plus(
+        allRentalApartments.reduce((total, apartment) => {
+          return total.plus(new Prisma.Decimal(apartment.totalValue || 0)); // Adiciona 0 se totalValue for nulo
+        }, new Prisma.Decimal(0)),
+      );
+
+      // Calcular a representatividade para cada canal
+      const representativenessByChannel = {};
+      for (const [channelType, totalValue] of revenueByChannelType.entries()) {
+        const representativeness = totalValue.isZero() // Se a receita do canal for 0
+          ? 0
+          : totalRevenue.isZero() // Se a receita total for 0
+            ? 0
+            : totalValue.dividedBy(totalRevenue).toNumber();
+        representativenessByChannel[channelType] =
+          this.formatPercentage(representativeness);
+
+        // Inserir ou atualizar os resultados na tabela BookingsByChannelType
+        await this.insertBookingsRepresentativenessByChannelType({
+          channelType,
+          period,
+          totalRepresentativeness: new Prisma.Decimal(representativeness), // Armazenar a representatividade
+          createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
+          companyId,
+        });
+      }
+
+      console.log('representativenessByChannel:', representativenessByChannel);
+
+      // Preparar o retorno no formato desejado
+      return {
+        representativenessByChannel,
+      };
+    } catch (error) {
+      console.error(
+        'Erro ao calcular a representatividade de bookings por canal:',
+        error,
+      );
+      throw new BadRequestException(
+        `Failed to calculate bookings representativeness by channel: ${error.message}`,
+      );
+    }
+  }
+
+  private async insertBookingsRepresentativenessByChannelType(
+    data: BookingsRepresentativenessByChannelType,
+  ): Promise<BookingsRepresentativenessByChannelType> {
+    return this.prisma.prismaOnline.bookingsRepresentativenessByChannelType.upsert(
+      {
+        where: {
+          period_createdDate_channelType: {
+            period: data.period,
+            createdDate: data.createdDate,
+            channelType: data.channelType,
+          },
+        },
+        create: {
+          ...data,
+        },
+        update: {
+          ...data,
+        },
+      },
+    );
+  }
+
   @Cron('0 0 * * *', { disabled: true })
   async handleCron() {
     const timezone = 'America/Sao_Paulo'; // Defina seu fuso horário
@@ -422,6 +604,12 @@ export class BookingsRepresentativenessService {
     );
 
     await this.calculateBookingsRepresentativenessByPeriod(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
+
+    await this.calculateBookingsRepresentativenessByChannelType(
       parsedStartDateLast7Days,
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
@@ -496,6 +684,11 @@ export class BookingsRepresentativenessService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
+    await this.calculateBookingsRepresentativenessByChannelType(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
 
     const endTimeLast30Days = moment()
       .tz(timezone)
@@ -562,6 +755,11 @@ export class BookingsRepresentativenessService {
       PeriodEnum.LAST_6_M,
     );
     await this.calculateBookingsRepresentativenessByPeriod(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateBookingsRepresentativenessByChannelType(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
