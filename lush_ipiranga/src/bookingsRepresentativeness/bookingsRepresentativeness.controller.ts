@@ -6,7 +6,12 @@ import {
   HttpStatus,
   Query,
 } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiNotFoundResponse,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { PeriodEnum } from '../../dist/generated/client-online';
 import { BookingsRepresentativenessService } from './bookingsRepresentativeness.service';
 import { BookingsRepresentativeness } from './entities/bookingsRepresentativeness.entity';
@@ -110,18 +115,18 @@ export class BookingsRepresentativenessController {
     return date;
   }
 
-  /*@Get('run-cron-job')
+  @Get('run-cron-job')
   @HttpCode(HttpStatus.OK)
   @ApiNotFoundResponse({ description: 'No Booking Revenue found.' })
   @ApiBadRequestResponse({ description: 'Failed to run the cron job.' })
   async runCronJob(): Promise<any> {
     try {
       // Chama o método do serviço que executa as operações do cron job
-      return await this.bookingsRevenueService.handleCron();
+      return await this.bookingsRepresentativenessService.handleCron();
     } catch (error) {
       throw new BadRequestException(
         `Failed to run the cron job: ${error.message}`,
       );
     }
-  }*/
+  }
 }

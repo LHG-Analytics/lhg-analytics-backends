@@ -654,6 +654,21 @@ export class BookingsRevenueService {
       previousParsedEndDateLast30DaysParsed,
       PeriodEnum.LAST_30_D,
     );
+    await this.calculateRevenueByChannelType(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
+    await this.calculateTotalBookingRevenueByPeriod(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
+    await this.calculateRevenueByPaymentMethod(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
 
     const endTimeLast30Days = moment()
       .tz(timezone)
@@ -717,6 +732,21 @@ export class BookingsRevenueService {
     await this.findAllBookingsRevenue(
       previousParsedStartDateLast6Months,
       previousParsedEndDateLast6MonthsParsed,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateRevenueByChannelType(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateTotalBookingRevenueByPeriod(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateRevenueByPaymentMethod(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
 
