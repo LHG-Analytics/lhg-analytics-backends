@@ -24,6 +24,7 @@ import { BookingsRevenueModule } from './bookingsRevenue/bookingsRevenue.module'
 import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de autenticação
 import { BookingsTotalRentalsModule } from './bookingsTotalRentals/bookingsTotalRentals.module';
 import { BookingsTicketAverageModule } from './bookingsTicketAverage/bookingsTicketAverage.module';
+import { BookingsRepresentativenessModule } from './bookingsRepresentativeness/bookingsRepresentativeness.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { BookingsTicketAverageModule } from './bookingsTicketAverage/bookingsTic
     BookingsRevenueModule,
     BookingsTotalRentalsModule,
     BookingsTicketAverageModule,
+    BookingsRepresentativenessModule,
   ],
   controllers: [AppController],
   providers: [

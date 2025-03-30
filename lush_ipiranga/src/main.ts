@@ -46,6 +46,7 @@ async function bootstrap() {
       .addTag('BookingsRevenue')
       .addTag('BookingsTotalRentals')
       .addTag('BookingsTicketAverage')
+      .addTag('BookingsRepresentativeness')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig, {
