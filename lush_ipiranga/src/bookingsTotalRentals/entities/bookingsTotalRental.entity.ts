@@ -43,6 +43,7 @@ export class BookingsTotalRentalByChannelType
   period?: PeriodEnum;
   channelType?: ChannelTypeEnum;
   totalBookings: number;
+  totalAllBookings: number;
   createdDate: Date;
   companyId: number;
 }

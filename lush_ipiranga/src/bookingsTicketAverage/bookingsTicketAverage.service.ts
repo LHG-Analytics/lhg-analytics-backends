@@ -192,7 +192,7 @@ export class BookingsTicketAverageService {
           return dateService.toDateString() === startDate.toDateString()
             ? ChannelTypeEnum.WEBSITE_IMMEDIATE
             : ChannelTypeEnum.WEBSITE_SCHEDULED;
-        case 6: //INTERNA
+        case 6: // INTERNA
           return ChannelTypeEnum.INTERNAL;
         case 7: // BOOKING
           return ChannelTypeEnum.BOOKING;
@@ -221,6 +221,9 @@ export class BookingsTicketAverageService {
 
     // Monta o resultado total agregado
     const totalResults = {};
+    let totalCount = 0;
+    let totalSum = new Prisma.Decimal(0);
+
     for (const [channel, { total, count }] of Object.entries(channelTotals)) {
       const average = count > 0 ? total.dividedBy(count).toNumber() : 0;
       totalResults[channel] = {
@@ -228,14 +231,23 @@ export class BookingsTicketAverageService {
         average: this.formatCurrency(average), // Formata a média em reais
         count,
       };
+
+      // Acumula o total e a contagem para o cálculo da média total
+      totalCount += count;
+      totalSum = totalSum.plus(total);
     }
+
+    // Calcular a média total de todos os canais
+    const totalAllTicketAverage =
+      totalCount > 0 ? totalSum.dividedBy(totalCount).toNumber() : 0;
 
     // Inserir no banco de dados para cada tipo de canal
     for (const [channel, { total, count }] of Object.entries(channelTotals)) {
       const average = count > 0 ? total.dividedBy(count).toNumber() : 0;
 
       await this.insertBookingsTicketAverageByChannelType({
-        totalAllTicketAverage: new Prisma.Decimal(average),
+        totalAllTicketAverage: new Prisma.Decimal(totalAllTicketAverage),
+        totalTicketAverage: new Prisma.Decimal(average),
         period: period,
         createdDate: adjustedEndDate,
         companyId,

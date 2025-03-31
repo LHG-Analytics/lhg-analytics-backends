@@ -1,3 +1,4 @@
+import { DecimalJsLike } from 'dist/generated/client-online/runtime/library';
 import {
   ChannelTypeEnum,
   PeriodEnum,
@@ -21,6 +22,7 @@ export class BookingsTicketAverageByChannelType
   channelType?: ChannelTypeEnum;
   period?: PeriodEnum;
   createdDate: Date;
+  totalTicketAverage: Prisma.Decimal;
   totalAllTicketAverage: Prisma.Decimal;
   companyId: number;
 }

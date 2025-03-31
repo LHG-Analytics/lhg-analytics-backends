@@ -1,3 +1,4 @@
+import { DecimalJsLike } from 'dist/generated/client-online/runtime/library';
 import {
   ChannelTypeEnum,
   PeriodEnum,
@@ -31,6 +32,7 @@ export class BookingsRepresentativenessByChannelType
   period?: PeriodEnum;
   channelType?: ChannelTypeEnum;
   totalRepresentativeness: Prisma.Decimal;
+  totalAllRepresentativeness: Prisma.Decimal;
   createdDate: Date;
   companyId: number;
 }

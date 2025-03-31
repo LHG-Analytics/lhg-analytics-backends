@@ -44,9 +44,6 @@ export class BookingsTotalRentalsService {
             gte: startDate,
             lte: endDate,
           },
-          rentalApartmentId: {
-            not: null, // Considerar apenas reservas onde rentalApartmentId não é nulo
-          },
           canceled: {
             equals: null,
           },
@@ -124,11 +121,11 @@ export class BookingsTotalRentalsService {
             gte: startDate,
             lte: endDate,
           },
-          rentalApartmentId: {
-            not: null, // Considerar apenas reservas onde rentalApartmentId não é nulo
-          },
           canceled: {
             equals: null,
+          },
+          rentalApartmentId: {
+            not: null,
           },
         },
         include: {
@@ -152,8 +149,8 @@ export class BookingsTotalRentalsService {
 
       // Processa cada reserva para contar o tipo de locação
       for (const booking of allBookings) {
-        const checkIn = booking.rentalApartment.checkIn; // Acessa checkIn do apartamento
-        const checkOut = booking.rentalApartment.checkOut; // Acessa checkOut do apartamento
+        const checkIn = booking.rentalApartment?.checkIn; // Acessa checkIn do apartamento
+        const checkOut = booking.rentalApartment?.checkOut; // Acessa checkOut do apartamento
 
         // Determina o tipo de locação
         const rentalType = this.determineRentalPeriod(
@@ -346,9 +343,6 @@ export class BookingsTotalRentalsService {
             gte: startDate,
             lte: endDate,
           },
-          rentalApartmentId: {
-            not: null, // Considerar apenas reservas onde rentalApartmentId não é nulo
-          },
           canceled: {
             equals: null,
           },
@@ -390,7 +384,7 @@ export class BookingsTotalRentalsService {
             return dateService.toDateString() === startDate.toDateString()
               ? ChannelTypeEnum.WEBSITE_IMMEDIATE
               : ChannelTypeEnum.WEBSITE_SCHEDULED;
-          case 6: //INTERNA
+          case 6: // INTERNA
             return ChannelTypeEnum.INTERNAL;
           case 7: // BOOKING
             return ChannelTypeEnum.BOOKING;
@@ -415,6 +409,12 @@ export class BookingsTotalRentalsService {
         }
       }
 
+      // Calcular o total de reservas
+      const totalAllBookings = Object.values(channelCounts).reduce(
+        (total, count) => total + count,
+        0,
+      );
+
       // Monta o resultado total agregado
       const totalResult = {
         totalBookingsByChannel: channelCounts, // Total de reservas por canal
@@ -427,7 +427,8 @@ export class BookingsTotalRentalsService {
         const channelTypeEnum = type as ChannelTypeEnum; // Fazendo a conversão
 
         await this.insertBookingsTotalRentalsByChannelType({
-          totalBookings: count,
+          totalBookings: count, // Contagem de reservas por canal
+          totalAllBookings, // Total de reservas de todos os canais
           companyId,
           period: period,
           createdDate: adjustedEndDate,

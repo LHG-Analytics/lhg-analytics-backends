@@ -16,15 +16,15 @@ export class BookingsRevenue
 }
 
 export class BookingsRevenueByChannelType
-  implements Prisma.BookingsByChannelTypeUncheckedCreateInput
+  implements Prisma.BookingsRevenueByChannelTypeUncheckedCreateInput
 {
   id?: number;
   period?: PeriodEnum;
   totalValue: Prisma.Decimal;
+  totalAllValue: Prisma.Decimal;
   createdDate: Date;
   companyId: number;
   channelType?: ChannelTypeEnum;
-  totalAllValue: Prisma.Decimal;
 }
 
 export class BookingsRevenueByPeriod

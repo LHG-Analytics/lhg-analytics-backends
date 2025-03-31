@@ -38,8 +38,6 @@ async function bootstrap() {
       .addTag('KpiGiro')
       .addTag('KpiRevpar')
       .addTag('KpiTrevpar')
-      .addTag('Company')
-      .addTag('Governance')
       .addTag('Cleanings')
       .addTag('Inspections')
       .addTag('CronJobs')
@@ -47,6 +45,9 @@ async function bootstrap() {
       .addTag('BookingsTotalRentals')
       .addTag('BookingsTicketAverage')
       .addTag('BookingsRepresentativeness')
+      .addTag('Company')
+      .addTag('Governance')
+      .addTag('Bookings')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig, {

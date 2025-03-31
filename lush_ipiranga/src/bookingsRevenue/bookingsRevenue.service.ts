@@ -43,9 +43,6 @@ export class BookingsRevenueService {
           priceRental: {
             not: null,
           },
-          rentalApartmentId: {
-            not: null,
-          },
         },
         select: {
           id: true,
@@ -215,7 +212,7 @@ export class BookingsRevenueService {
           return dateService.toDateString() === startDate.toDateString()
             ? ChannelTypeEnum.WEBSITE_IMMEDIATE
             : ChannelTypeEnum.WEBSITE_SCHEDULED;
-        case 6: //INTERNA
+        case 6: // INTERNA
           return ChannelTypeEnum.INTERNAL;
         case 7: // BOOKING
           return ChannelTypeEnum.BOOKING;
@@ -258,7 +255,7 @@ export class BookingsRevenueService {
         channelType,
         period,
         totalValue,
-        totalAllValue,
+        totalAllValue, // O totalAllValue é o mesmo para todos os channelTypes
         createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
         companyId,
       });
@@ -283,7 +280,7 @@ export class BookingsRevenueService {
   private async insertBookingsRevenueByChannelType(
     data: BookingsRevenueByChannelType,
   ): Promise<BookingsRevenueByChannelType> {
-    return this.prisma.prismaOnline.bookingsByChannelType.upsert({
+    return this.prisma.prismaOnline.bookingsRevenueByChannelType.upsert({
       where: {
         period_createdDate_channelType: {
           period: data.period,
@@ -333,10 +330,29 @@ export class BookingsRevenueService {
         }
 
         // Buscar todas as receitas de reservas para o período atual
-        const [allBookingsRevenue] = await this.fetchKpiData(
-          currentDate,
-          nextDate,
-        );
+        const allBookingsRevenue =
+          await this.prisma.prismaLocal.booking.findMany({
+            where: {
+              dateService: {
+                gte: currentDate,
+                lte: nextDate,
+              },
+              canceled: {
+                equals: null,
+              },
+              priceRental: {
+                not: null,
+              },
+            },
+            select: {
+              id: true,
+              priceRental: true,
+              idTypeOriginBooking: true,
+              dateService: true,
+              startDate: true,
+              rentalApartmentId: true,
+            },
+          });
 
         let totalValueForCurrentPeriod = new Prisma.Decimal(0);
 
@@ -362,7 +378,7 @@ export class BookingsRevenueService {
         // Inserir a receita de reservas no banco de dados
         await this.insertBookingsRevenueByPeriod({
           totalValue: totalValueForCurrentPeriod,
-          createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+          createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
           period: period || null,
           companyId,
         });

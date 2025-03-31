@@ -103,9 +103,6 @@ export class BookingsRepresentativenessService {
           priceRental: {
             not: null,
           },
-          rentalApartmentId: {
-            not: null,
-          },
         },
         select: {
           id: true,
@@ -267,9 +264,6 @@ export class BookingsRepresentativenessService {
                 priceRental: {
                   not: null,
                 },
-                rentalApartmentId: {
-                  not: null,
-                },
               },
               select: {
                 id: true,
@@ -282,7 +276,12 @@ export class BookingsRepresentativenessService {
             }),
           ]);
 
-        // Calcular o total de rentalApartment
+        // Calcular a receita total de reservas para o período atual
+        const totalAllValue = allBookingsRevenue.reduce((total, booking) => {
+          return total.plus(new Prisma.Decimal(booking.priceRental || 0)); // Adiciona 0 se priceRental for nulo
+        }, new Prisma.Decimal(0));
+
+        // Calcular a receita total de locação para o período atual
         const totalValueForRentalApartments = allRentalApartments.reduce(
           (total, apartment) => {
             return total.plus(new Prisma.Decimal(apartment.totalValue || 0)); // Adiciona 0 se totalValue for nulo
@@ -290,25 +289,20 @@ export class BookingsRepresentativenessService {
           new Prisma.Decimal(0),
         );
 
-        // Calcular a receita total de bookings
-        const totalAllValue = allBookingsRevenue.reduce((total, booking) => {
-          return total.plus(new Prisma.Decimal(booking.priceRental || 0)); // Adiciona 0 se priceRental for nulo
-        }, new Prisma.Decimal(0));
-
-        // Calcular a receita total
+        // Calcular a receita total (vendas diretas + locação)
         const totalRevenue = totalSaleDirect.plus(
           totalValueForRentalApartments,
         );
 
         // Calcular a representatividade
-        const representativeness = totalAllValue
-          .dividedBy(totalRevenue)
-          .toNumber();
+        const representativeness = totalRevenue.isZero()
+          ? 0
+          : totalAllValue.dividedBy(totalRevenue).toNumber();
 
         // Inserir a representatividade no banco de dados
         await this.insertBookingsRepresentativenessByPeriod({
           totalRepresentativeness: new Prisma.Decimal(representativeness),
-          createdDate: adjustedEndDate, // Data de criação
+          createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)), // Data de criação
           period: period,
           companyId,
         });
@@ -317,7 +311,7 @@ export class BookingsRepresentativenessService {
         const dateKey = currentDate.toISOString().split('T')[0]; // Usando toISOString para formatar a data
         results[dateKey] = {
           representativeness: this.formatPercentage(representativeness), // Formatar representatividade
-          createdDate: adjustedEndDate, // Data de criação
+          createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)), // Data de criação
         };
 
         currentDate = new Date(nextDate);
@@ -395,9 +389,6 @@ export class BookingsRepresentativenessService {
                 equals: null,
               },
               priceRental: {
-                not: null,
-              },
-              rentalApartmentId: {
                 not: null,
               },
             },
@@ -482,20 +473,37 @@ export class BookingsRepresentativenessService {
 
       // Calcular a representatividade para cada canal
       const representativenessByChannel = {};
-      for (const [channelType, totalValue] of revenueByChannelType.entries()) {
-        const representativeness = totalValue.isZero() // Se a receita do canal for 0
-          ? 0
-          : totalRevenue.isZero() // Se a receita total for 0
-            ? 0
-            : totalValue.dividedBy(totalRevenue).toNumber();
-        representativenessByChannel[channelType] =
-          this.formatPercentage(representativeness);
+      let totalAllRepresentativeness = new Prisma.Decimal(0); // Inicializa a representatividade total
 
-        // Inserir ou atualizar os resultados na tabela BookingsByChannelType
+      for (const [channelType, totalValue] of revenueByChannelType.entries()) {
+        const representativeness = totalRevenue.isZero() // Se a receita total for 0
+          ? 0
+          : totalValue.dividedBy(totalRevenue).toNumber(); // Receita do canal dividido pela receita total
+
+        representativenessByChannel[channelType] = representativeness;
+
+        // Acumula a representatividade total
+        totalAllRepresentativeness = totalAllRepresentativeness.plus(
+          new Prisma.Decimal(totalValue.toNumber()),
+        );
+      }
+
+      // Calcular o totalAllRepresentativeness
+      const finalTotalAllRepresentativeness = totalAllRepresentativeness
+        .dividedBy(totalRevenue)
+        .toNumber();
+
+      // Inserir ou atualizar os resultados na tabela BookingsByChannelType
+      for (const channelType of revenueByChannelType.keys()) {
         await this.insertBookingsRepresentativenessByChannelType({
           channelType,
           period,
-          totalRepresentativeness: new Prisma.Decimal(representativeness), // Armazenar a representatividade
+          totalRepresentativeness: new Prisma.Decimal(
+            representativenessByChannel[channelType],
+          ), // Armazenar a representatividade
+          totalAllRepresentativeness: new Prisma.Decimal(
+            finalTotalAllRepresentativeness,
+          ), // Armazenar a representatividade total
           createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
           companyId,
         });

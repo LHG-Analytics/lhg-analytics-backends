@@ -1,0 +1,19 @@
+import { Prisma } from '../../../dist/generated/client-online';
+
+export class Booking implements Prisma.BookingsUncheckedCreateInput {
+  id?: number;
+  BookingsRepresentativenessByChannelType?: Prisma.BookingsRepresentativenessByChannelTypeUncheckedCreateNestedManyWithoutBookingsInput;
+  BookingsRevenueByPayment?: Prisma.BookingsRevenueByPaymentUncheckedCreateNestedManyWithoutBookingsInput;
+  BookingsTicketAverageByChannelType?: Prisma.BookingsTicketAverageByChannelTypeUncheckedCreateNestedManyWithoutBookingsInput;
+  BookingsTotalRentalsByChannelType?: Prisma.BookingsTotalRentalsByChannelTypeUncheckedCreateNestedManyWithoutBookingsInput;
+  bookingsByChannelType?: Prisma.BookingsByChannelTypeUncheckedCreateNestedManyWithoutBookingsInput;
+  bookingsRepresentativeness?: Prisma.BookingsRepresentativenessUncheckedCreateNestedManyWithoutBookingsInput;
+  bookingsRepresentativenessByPeriod?: Prisma.BookingsRepresentativenessByPeriodUncheckedCreateNestedManyWithoutBookingsInput;
+  bookingsRevenue?: Prisma.BookingsRevenueUncheckedCreateNestedManyWithoutBookingsInput;
+  bookingsRevenueByPeriod?: Prisma.BookingsRevenueByPeriodUncheckedCreateNestedManyWithoutBookingsInput;
+  bookingsTicketAverage?: Prisma.BookingsTicketAverageUncheckedCreateNestedManyWithoutBookingsInput;
+  bookingsTotalRentals?: Prisma.BookingsTotalRentalsUncheckedCreateNestedManyWithoutBookingsInput;
+  bookingsTotalRentalsByPeriod?: Prisma.BookingsTotalRentalsByPeriodUncheckedCreateNestedManyWithoutBookingsInput;
+  bookingsTotalRentalsByRentalType?: Prisma.BookingsTotalRentalsByRentalTypeUncheckedCreateNestedManyWithoutBookingsInput;
+  companyId: number;
+}
