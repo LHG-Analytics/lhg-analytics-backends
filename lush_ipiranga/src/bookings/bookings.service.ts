@@ -114,7 +114,6 @@ export class BookingsService {
       BookingsTotalRentalsByChannelType,
       BookingsTicketAverageByChannelType,
       BookingsRepresentativenessByChannelType,
-      suiteCategory,
     ] = await this.prisma.prismaOnline.$transaction([
       this.prisma.prismaOnline.bookingsRevenue.findMany({
         where: {
@@ -277,6 +276,7 @@ export class BookingsService {
           period: true,
           channelType: true,
           totalValue: true,
+          totalAllValue: true,
         },
         orderBy: {
           createdDate: 'desc',
@@ -359,6 +359,7 @@ export class BookingsService {
           channelType: true,
           period: true,
           totalBookings: true,
+          totalAllBookings: true,
         },
         orderBy: {
           createdDate: 'desc',
@@ -375,6 +376,7 @@ export class BookingsService {
           createdDate: true,
           channelType: true,
           period: true,
+          totalTicketAverage: true,
           totalAllTicketAverage: true,
         },
         orderBy: {
@@ -394,29 +396,13 @@ export class BookingsService {
             channelType: true,
             period: true,
             totalRepresentativeness: true,
+            totalAllRepresentativeness: true,
           },
           orderBy: {
             createdDate: 'desc',
           },
         },
       ),
-      this.prisma.prismaLocal.suiteCategory.findMany({
-        where: {
-          description: {
-            in: [
-              'LUSH',
-              'LUSH POP',
-              'LUSH HIDRO',
-              'LUSH LOUNGE',
-              'LUSH SPA',
-              'LUSH CINE',
-              'LUSH SPLASH',
-              'LUSH SPA SPLASH',
-              'CASA LUSH',
-            ],
-          },
-        },
-      }),
     ]);
 
     // Montando o retorno de BigNumbers
@@ -492,32 +478,68 @@ export class BookingsService {
       series: BookingsTotalRentalsByPeriod.map((item) => item.totalBookings),
     };
 
-    function sumByChannel(data, key) {
-      return data.reduce((acc, item) => {
-        acc[item.channelType] = (acc[item.channelType] || 0) + item[key];
-        acc['Total de reservas'] = (acc['Total de reservas'] || 0) + item[key];
-        return acc;
-      }, {});
+    const kpiTableByChannelType = {
+      bookingsTotalRentalsByChannelType: {},
+      bookingsRevenueByChannelType: {},
+      bookingsTicketAverageByChannelType: {},
+      bookingsRepresentativenessByChannelType: {},
+    };
+
+    // Preencher bookingsTotalRentalsByChannelType
+    BookingsTotalRentalsByChannelType.forEach((item) => {
+      kpiTableByChannelType.bookingsTotalRentalsByChannelType[
+        item.channelType
+      ] = item.totalBookings;
+    });
+
+    // Adiciona o total de bookings
+    if (BookingsTotalRentalsByChannelType.length > 0) {
+      kpiTableByChannelType.bookingsTotalRentalsByChannelType[
+        'TOTALALLBOOKINGS'
+      ] = BookingsTotalRentalsByChannelType[0].totalAllBookings;
     }
 
-    const kpiTableByChannelType = {
-      bookingsTotalRentalsByChannelType: sumByChannel(
-        BookingsTotalRentalsByChannelType,
-        'totalBookings',
-      ),
-      bookingsRevenueByChannelType: sumByChannel(
-        BookingsRevenueByChannelType,
-        'totalValue',
-      ),
-      bookingsTicketAverageByChannelType: sumByChannel(
-        BookingsTicketAverageByChannelType,
-        'totalAllTicketAverage',
-      ),
-      bookingsRepresentativenessByChannelType: sumByChannel(
-        BookingsRepresentativenessByChannelType,
-        'totalRepresentativeness',
-      ),
-    };
+    // Preencher bookingsRevenueByChannelType
+    BookingsRevenueByChannelType.forEach((item) => {
+      kpiTableByChannelType.bookingsRevenueByChannelType[item.channelType] =
+        Number(item.totalValue); // Garantir que seja um número
+    });
+
+    // Adiciona o total de revenue
+    if (BookingsRevenueByChannelType.length > 0) {
+      kpiTableByChannelType.bookingsRevenueByChannelType['TOTALALLVALUE'] =
+        Number(BookingsRevenueByChannelType[0].totalAllValue); // Garantir que seja um número
+    }
+
+    // Preencher bookingsTicketAverageByChannelType
+    BookingsTicketAverageByChannelType.forEach((item) => {
+      kpiTableByChannelType.bookingsTicketAverageByChannelType[
+        item.channelType
+      ] = Number(item.totalTicketAverage); // Garantir que seja um número
+    });
+
+    // Adiciona o total de ticket average
+    if (BookingsTicketAverageByChannelType.length > 0) {
+      kpiTableByChannelType.bookingsTicketAverageByChannelType[
+        'TOTALALLTICKETAVERAGE'
+      ] = Number(BookingsTicketAverageByChannelType[0].totalAllTicketAverage); // Garantir que seja um número
+    }
+
+    // Preencher bookingsRepresentativenessByChannelType
+    BookingsRepresentativenessByChannelType.forEach((item) => {
+      kpiTableByChannelType.bookingsRepresentativenessByChannelType[
+        item.channelType
+      ] = Number(item.totalRepresentativeness); // Garantir que seja um número
+    });
+
+    // Adiciona o total de representatividade
+    if (BookingsRepresentativenessByChannelType.length > 0) {
+      kpiTableByChannelType.bookingsRepresentativenessByChannelType[
+        'TOTALALLREPRESENTATIVENESS'
+      ] = Number(
+        BookingsRepresentativenessByChannelType[0].totalAllRepresentativeness,
+      ); // Garantir que seja um número
+    }
 
     return {
       Company: 'Lush Ipiranga',
