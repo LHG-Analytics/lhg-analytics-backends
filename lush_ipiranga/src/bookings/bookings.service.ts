@@ -633,7 +633,7 @@ export class BookingsService {
       series: BookingsRevenueByPeriod.map((item) => Number(item.totalValue)),
     };
 
-    const representationOfReservesByPeriod = {
+    const representativenessOfReservesByPeriod = {
       categories: BookingsRepresentativenessByPeriod.map((item) =>
         moment
           .utc(item.createdDate)
@@ -796,7 +796,8 @@ export class BookingsService {
       BillingPerChannel: billingPerChannel,
       ReservationsByRentalType: reservationsByRentalType,
       BillingOfReservationsByPeriod: billingOfReservationsByPeriod,
-      RepresentationOfReservesByPeriod: representationOfReservesByPeriod,
+      RepresentativenessOfReservesByPeriod:
+        representativenessOfReservesByPeriod,
       NumberOfReservationsPerPeriod: numberOfReservationsPerPeriod,
       KpiTableByChannelType: [kpiTableByChannelType],
       BigNumbersEcommerce: [bigNumbersEcommerce],
