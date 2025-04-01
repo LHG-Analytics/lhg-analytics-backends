@@ -142,9 +142,6 @@ export class BookingsTicketAverageService {
         priceRental: {
           not: null,
         },
-        rentalApartmentId: {
-          not: null,
-        },
       },
       include: {
         originBooking: true, // Inclui os dados da origem da reserva
@@ -349,6 +346,11 @@ export class BookingsTicketAverageService {
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
     );
+    await this.calculateBookingsTicketAverageByChannelType(
+      previousParsedStartDateLast7Days,
+      previousParsedEndDateLast7DaysParsed,
+      PeriodEnum.LAST_7_D,
+    );
 
     const endTimeLast7Days = moment()
       .tz(timezone)
@@ -419,6 +421,11 @@ export class BookingsTicketAverageService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
+    await this.calculateBookingsTicketAverageByChannelType(
+      previousParsedStartDateLast30Days,
+      previousParsedEndDateLast30DaysParsed,
+      PeriodEnum.LAST_30_D,
+    );
 
     const endTimeLast30Days = moment()
       .tz(timezone)
@@ -487,6 +494,11 @@ export class BookingsTicketAverageService {
     await this.calculateBookingsTicketAverageByChannelType(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateBookingsTicketAverageByChannelType(
+      previousParsedStartDateLast6Months,
+      previousParsedEndDateLast6MonthsParsed,
       PeriodEnum.LAST_6_M,
     );
 

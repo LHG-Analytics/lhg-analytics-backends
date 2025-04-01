@@ -623,6 +623,12 @@ export class BookingsRepresentativenessService {
       PeriodEnum.LAST_7_D,
     );
 
+    await this.calculateBookingsRepresentativenessByChannelType(
+      previousParsedStartDateLast7Days,
+      previousParsedEndDateLast7DaysParsed,
+      PeriodEnum.LAST_7_D,
+    );
+
     const endTimeLast7Days = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
@@ -695,6 +701,11 @@ export class BookingsRepresentativenessService {
     await this.calculateBookingsRepresentativenessByChannelType(
       parsedStartDateLast30Days,
       parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
+    await this.calculateBookingsRepresentativenessByChannelType(
+      previousParsedStartDateLast30Days,
+      previousParsedEndDateLast30DaysParsed,
       PeriodEnum.LAST_30_D,
     );
 
@@ -770,6 +781,11 @@ export class BookingsRepresentativenessService {
     await this.calculateBookingsRepresentativenessByChannelType(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateBookingsRepresentativenessByChannelType(
+      previousParsedStartDateLast6Months,
+      previousParsedEndDateLast6MonthsParsed,
       PeriodEnum.LAST_6_M,
     );
 

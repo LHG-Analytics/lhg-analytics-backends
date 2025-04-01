@@ -1,8 +1,8 @@
 import {
-  PeriodEnum,
-  RentalTypeEnum,
-  Prisma,
   ChannelTypeEnum,
+  PeriodEnum,
+  Prisma,
+  RentalTypeEnum,
 } from '../../../dist/generated/client-online';
 
 export class BookingsTotalRental
@@ -44,6 +44,17 @@ export class BookingsTotalRentalByChannelType
   channelType?: ChannelTypeEnum;
   totalBookings: number;
   totalAllBookings: number;
+  createdDate: Date;
+  companyId: number;
+}
+
+export class BookingsTotalRentalsByPeriodEcommerce
+  implements Prisma.BookingsTotalRentalsByPeriodEcommerceUncheckedCreateInput
+{
+  id?: number;
+  period?: PeriodEnum;
+  channelType?: ChannelTypeEnum;
+  totalBookings: number;
   createdDate: Date;
   companyId: number;
 }

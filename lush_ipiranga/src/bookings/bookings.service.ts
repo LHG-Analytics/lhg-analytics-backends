@@ -114,6 +114,16 @@ export class BookingsService {
       BookingsTotalRentalsByChannelType,
       BookingsTicketAverageByChannelType,
       BookingsRepresentativenessByChannelType,
+      BookingsRevenueByChannelTypeEcommerce,
+      BookingsRevenueByChannelTypeEcommercePrevious,
+      BookingsTotalRentalsByChannelTypeEcommerce,
+      BookingsTotalRentalsByChannelTypeEcommercePrevious,
+      BookingsTicketAverageByChannelTypeEcommerce,
+      BookingsTicketAverageByChannelTypeEcommercePrevious,
+      BookingsRepresentativenessByChannelTypeEcommerce,
+      BookingsRepresentativenessByChannelTypeEcommercePrevious,
+      BookingsTotalRentalsByPeriodEcommerce,
+      BookingsRevenueByPeriodEcommerce,
     ] = await this.prisma.prismaOnline.$transaction([
       this.prisma.prismaOnline.bookingsRevenue.findMany({
         where: {
@@ -403,6 +413,152 @@ export class BookingsService {
           },
         },
       ),
+      this.prisma.prismaOnline.bookingsRevenueByChannelType.aggregate({
+        _sum: {
+          totalValue: true,
+        },
+        where: {
+          period: period,
+          createdDate: {
+            gte: startDate,
+          },
+          channelType: {
+            in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
+          },
+        },
+      }),
+      this.prisma.prismaOnline.bookingsRevenueByChannelType.aggregate({
+        _sum: {
+          totalValue: true,
+        },
+        where: {
+          period: period,
+          createdDate: {
+            gte: startDatePrevious,
+            lte: endDatePrevious,
+          },
+          channelType: {
+            in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
+          },
+        },
+      }),
+      this.prisma.prismaOnline.bookingsTotalRentalsByChannelType.aggregate({
+        _sum: {
+          totalBookings: true,
+        },
+        where: {
+          period: period,
+          createdDate: {
+            gte: startDate,
+          },
+          channelType: {
+            in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
+          },
+        },
+      }),
+      this.prisma.prismaOnline.bookingsTotalRentalsByChannelType.aggregate({
+        _sum: {
+          totalBookings: true,
+        },
+        where: {
+          period: period,
+          createdDate: {
+            gte: startDatePrevious,
+            lte: endDatePrevious,
+          },
+          channelType: {
+            in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
+          },
+        },
+      }),
+      this.prisma.prismaOnline.bookingsTicketAverageByChannelType.aggregate({
+        _sum: {
+          totalTicketAverage: true,
+        },
+        where: {
+          period: period,
+          createdDate: {
+            gte: startDate,
+          },
+          channelType: {
+            in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
+          },
+        },
+      }),
+      this.prisma.prismaOnline.bookingsTicketAverageByChannelType.aggregate({
+        _sum: {
+          totalTicketAverage: true,
+        },
+        where: {
+          period: period,
+          createdDate: {
+            gte: startDatePrevious,
+            lte: endDatePrevious,
+          },
+          channelType: {
+            in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
+          },
+        },
+      }),
+      this.prisma.prismaOnline.bookingsRepresentativenessByChannelType.aggregate(
+        {
+          _sum: {
+            totalRepresentativeness: true,
+          },
+          where: {
+            period: period,
+            createdDate: {
+              gte: startDate,
+            },
+            channelType: {
+              in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
+            },
+          },
+        },
+      ),
+      this.prisma.prismaOnline.bookingsRepresentativenessByChannelType.aggregate(
+        {
+          _sum: {
+            totalRepresentativeness: true,
+          },
+          where: {
+            period: period,
+            createdDate: {
+              gte: startDatePrevious,
+              lte: endDatePrevious,
+            },
+            channelType: {
+              in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
+            },
+          },
+        },
+      ),
+      this.prisma.prismaOnline.bookingsTotalRentalsByPeriodEcommerce.findMany({
+        where: {
+          period: period,
+          createdDate: {
+            gte: startDate,
+          },
+        },
+        select: {
+          totalBookings: true,
+          createdDate: true,
+          period: true,
+        },
+      }),
+      this.prisma.prismaOnline.bookingsRevenueByPeriodEcommerce.findMany({
+        where: {
+          period: period,
+          createdDate: {
+            gte: startDate,
+          },
+        },
+        select: {
+          totalValue: true,
+          createdDate: true,
+          period: true,
+        },
+      }),
     ]);
 
     // Montando o retorno de BigNumbers
@@ -442,40 +598,57 @@ export class BookingsService {
 
     const paymentMethods = {
       categories: BookingsRevenueByPayment.map((item) => item.paymentMethod),
-      series: BookingsRevenueByPayment.map((item) => item.totalValue),
+      series: BookingsRevenueByPayment.map((item) => Number(item.totalValue)),
     };
 
     const billingPerChannel = {
       categories: BookingsRevenueByChannelType.map((item) => item.channelType),
-      series: BookingsRevenueByChannelType.map((item) => item.totalValue),
+      series: BookingsRevenueByChannelType.map((item) =>
+        Number(item.totalValue),
+      ),
     };
 
     const reservationsByRentalType = {
       categories: BookingsTotalRentalsByRentalType.map(
         (item) => item.rentalType,
       ),
-      series: BookingsTotalRentalsByRentalType.map(
-        (item) => item.totalBookings,
+      series: BookingsTotalRentalsByRentalType.map((item) =>
+        Number(item.totalBookings),
       ),
     };
 
     const billingOfReservationsByPeriod = {
-      categories: BookingsRevenueByPeriod.map((item) => item.createdDate),
-      series: BookingsRevenueByPeriod.map((item) => item.totalValue),
+      categories: BookingsRevenueByPeriod.map((item) =>
+        moment
+          .utc(item.createdDate)
+          .tz('America/Sao_Paulo')
+          .format('DD/MM/YYYY'),
+      ),
+      series: BookingsRevenueByPeriod.map((item) => Number(item.totalValue)),
     };
 
     const representationOfReservesByPeriod = {
-      categories: BookingsRepresentativenessByPeriod.map(
-        (item) => item.createdDate,
+      categories: BookingsRepresentativenessByPeriod.map((item) =>
+        moment
+          .utc(item.createdDate)
+          .tz('America/Sao_Paulo')
+          .format('DD/MM/YYYY'),
       ),
-      series: BookingsRepresentativenessByPeriod.map(
-        (item) => item.totalRepresentativeness,
+      series: BookingsRepresentativenessByPeriod.map((item) =>
+        Number(item.totalRepresentativeness),
       ),
     };
 
     const numberOfReservationsPerPeriod = {
-      categories: BookingsTotalRentalsByPeriod.map((item) => item.createdDate),
-      series: BookingsTotalRentalsByPeriod.map((item) => item.totalBookings),
+      categories: BookingsTotalRentalsByPeriod.map((item) =>
+        moment
+          .utc(item.createdDate)
+          .tz('America/Sao_Paulo')
+          .format('DD/MM/YYYY'),
+      ),
+      series: BookingsTotalRentalsByPeriod.map((item) =>
+        Number(item.totalBookings),
+      ),
     };
 
     const kpiTableByChannelType = {
@@ -489,14 +662,14 @@ export class BookingsService {
     BookingsTotalRentalsByChannelType.forEach((item) => {
       kpiTableByChannelType.bookingsTotalRentalsByChannelType[
         item.channelType
-      ] = item.totalBookings;
+      ] = Number(item.totalBookings);
     });
 
     // Adiciona o total de bookings
     if (BookingsTotalRentalsByChannelType.length > 0) {
       kpiTableByChannelType.bookingsTotalRentalsByChannelType[
         'TOTALALLBOOKINGS'
-      ] = BookingsTotalRentalsByChannelType[0].totalAllBookings;
+      ] = Number(BookingsTotalRentalsByChannelType[0].totalAllBookings);
     }
 
     // Preencher bookingsRevenueByChannelType
@@ -541,6 +714,75 @@ export class BookingsService {
       ); // Garantir que seja um número
     }
 
+    // Montando o retorno de BigNumbers do E-commerce
+    const bigNumbersEcommerce = {
+      currentDate: {
+        // Itera sobre cada item e acumula o totalValue
+        totalAllValue: Number(
+          BookingsRevenueByChannelTypeEcommerce._sum.totalValue || 0,
+        ),
+
+        totalAllBookings: Number(
+          BookingsTotalRentalsByChannelTypeEcommerce._sum.totalBookings || 0,
+        ),
+        totalAllTicketAverage: Number(
+          BookingsTicketAverageByChannelTypeEcommerce._sum.totalTicketAverage.dividedBy(
+            2,
+          ) || 0,
+        ),
+
+        totalAllRepresentativeness: Number(
+          BookingsRepresentativenessByChannelTypeEcommerce._sum
+            .totalRepresentativeness || 0,
+        ),
+      },
+
+      PreviousDate: {
+        totalAllValuePreviousData: Number(
+          BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue || 0,
+        ),
+
+        totalAllBookingsPreviousData: Number(
+          BookingsTotalRentalsByChannelTypeEcommercePrevious._sum
+            .totalBookings || 0,
+        ),
+        totalAllTicketAveragePreviousData: Number(
+          BookingsTicketAverageByChannelTypeEcommercePrevious._sum.totalTicketAverage.dividedBy(
+            2,
+          ) || 0,
+        ),
+
+        totalAllRepresentativenessPreviousData: Number(
+          BookingsRepresentativenessByChannelTypeEcommercePrevious._sum
+            .totalRepresentativeness ?? 0,
+        ),
+      },
+    };
+
+    const reservationsOfEcommerceByPeriod = {
+      categories: BookingsTotalRentalsByPeriodEcommerce.map((item) =>
+        moment
+          .utc(item.createdDate)
+          .tz('America/Sao_Paulo')
+          .format('DD/MM/YYYY'),
+      ),
+      series: BookingsTotalRentalsByPeriodEcommerce.map((item) =>
+        Number(item.totalBookings),
+      ),
+    };
+
+    const billingOfEcommerceByPeriod = {
+      categories: BookingsRevenueByPeriodEcommerce.map((item) =>
+        moment
+          .utc(item.createdDate)
+          .tz('America/Sao_Paulo')
+          .format('DD/MM/YYYY'),
+      ),
+      series: BookingsRevenueByPeriodEcommerce.map((item) =>
+        Number(item.totalValue),
+      ),
+    };
+
     return {
       Company: 'Lush Ipiranga',
       BigNumbers: [bigNumbers],
@@ -551,6 +793,9 @@ export class BookingsService {
       RepresentationOfReservesByPeriod: representationOfReservesByPeriod,
       NumberOfReservationsPerPeriod: numberOfReservationsPerPeriod,
       KpiTableByChannelType: [kpiTableByChannelType],
+      BigNumbersEcommerce: [bigNumbersEcommerce],
+      ReservationsOfEcommerceByPeriod: reservationsOfEcommerceByPeriod,
+      BillingOfEcommerceByPeriod: billingOfEcommerceByPeriod,
     };
   }
 }

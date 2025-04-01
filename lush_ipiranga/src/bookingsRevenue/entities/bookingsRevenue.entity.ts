@@ -35,7 +35,6 @@ export class BookingsRevenueByPeriod
   totalValue: Prisma.Decimal;
   createdDate: Date;
   companyId: number;
-  channelType?: ChannelTypeEnum;
 }
 
 export class BookingsRevenueByPayment
@@ -48,4 +47,15 @@ export class BookingsRevenueByPayment
   createdDate: Date;
   companyId: number;
   paymentMethod: string;
+}
+
+export class BookingsRevenueByPeriodEcommerce
+  implements Prisma.BookingsRevenueByPeriodEcommerceUncheckedCreateInput
+{
+  id?: number;
+  period?: PeriodEnum;
+  totalValue: Prisma.Decimal;
+  createdDate: Date;
+  companyId: number;
+  channelType?: ChannelTypeEnum;
 }

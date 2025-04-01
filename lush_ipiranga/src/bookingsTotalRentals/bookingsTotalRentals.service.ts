@@ -15,6 +15,7 @@ import {
   BookingsTotalRentalByRentalType,
   BookingsTotalRentalByPeriod,
   BookingsTotalRentalByChannelType,
+  BookingsTotalRentalsByPeriodEcommerce,
 } from './entities/bookingsTotalRental.entity';
 import * as moment from 'moment-timezone';
 
@@ -466,6 +467,117 @@ export class BookingsTotalRentalsService {
     });
   }
 
+  private async calculateTotalBookingsByPeriodEcommerce(
+    startDate: Date,
+    endDate: Date,
+    period: PeriodEnum,
+  ): Promise<any> {
+    try {
+      const results: { [key: string]: any } = {}; // Armazenar resultados
+
+      let currentDate = new Date(startDate);
+      currentDate.setUTCHours(6, 0, 0, 0); // Início do dia contábil às 06:00:00
+
+      while (currentDate < endDate) {
+        let nextDate = new Date(currentDate);
+
+        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+          // Para LAST_7_D e LAST_30_D, iteração diária
+          nextDate.setDate(nextDate.getDate() + 1);
+          nextDate.setUTCHours(5, 59, 59, 999); // Fim do dia contábil às 05:59:59 do próximo dia
+        } else if (period === PeriodEnum.LAST_6_M) {
+          // Para LAST_6_M, iteração mensal
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          nextDate.setUTCHours(5, 59, 59, 999); // Fim do mês contábil
+        }
+
+        // Consultar as reservas no período
+        const allBookings = await this.prisma.prismaLocal.booking.findMany({
+          where: {
+            dateService: {
+              gte: currentDate,
+              lte: nextDate,
+            },
+            rentalApartmentId: {
+              not: null, // Considerar apenas reservas onde rentalApartmentId não é nulo
+            },
+            canceled: {
+              equals: null,
+            },
+            idTypeOriginBooking: {
+              equals: 4,
+            },
+          },
+        });
+
+        // Contar o total de reservas
+        const totalBookingsForCurrentPeriod = allBookings.length;
+
+        // Adicionar o resultado ao objeto de resultados
+        const dateKey = currentDate.toISOString().split('T')[0]; // Formatar a data para YYYY-MM-DD
+        results[dateKey] = {
+          totalBookings: totalBookingsForCurrentPeriod,
+        };
+
+        let createdDateWithTime;
+        if (period === PeriodEnum.LAST_6_M) {
+          // Cria uma nova instância de Date, subtraindo 1 dia de currentDate
+          createdDateWithTime = new Date(currentDate);
+          createdDateWithTime.setDate(createdDateWithTime.getDate() - 1); // Remove 1 dia
+          createdDateWithTime.setUTCHours(5, 59, 59, 999); // Define a hora
+        } else {
+          createdDateWithTime = new Date(currentDate);
+          createdDateWithTime.setUTCHours(5, 59, 59, 999);
+        }
+
+        // Inserir os dados no banco de dados
+        await this.insertBookingsTotalRentalsByPeriodEcommerce({
+          totalBookings: totalBookingsForCurrentPeriod,
+          period: period,
+          createdDate: createdDateWithTime,
+          companyId: 1,
+        });
+
+        currentDate = new Date(nextDate);
+      }
+
+      // Formatar o resultado final
+      const totalBookingsForThePeriod = Object.keys(results).map((date) => ({
+        [date]: results[date],
+      }));
+
+      return {
+        TotalBookingsForThePeriod: totalBookingsForThePeriod,
+      };
+    } catch (error) {
+      console.error('Erro ao calcular o total de reservas por período:', error);
+      throw new BadRequestException(
+        `Failed to calculate total bookings by period: ${error.message}`,
+      );
+    }
+  }
+
+  async insertBookingsTotalRentalsByPeriodEcommerce(
+    data: BookingsTotalRentalsByPeriodEcommerce,
+  ): Promise<BookingsTotalRentalsByPeriodEcommerce> {
+    return this.prisma.prismaOnline.bookingsTotalRentalsByPeriodEcommerce.upsert(
+      {
+        where: {
+          period_createdDate: {
+            period: data.period,
+            createdDate: data.createdDate,
+          },
+        },
+        create: {
+          ...data,
+        },
+        update: {
+          ...data,
+        },
+      },
+    );
+  }
+
   @Cron('0 0 * * *', { disabled: true })
   async handleCron() {
     const timezone = 'America/Sao_Paulo'; // Defina seu fuso horário
@@ -539,6 +651,16 @@ export class BookingsTotalRentalsService {
       PeriodEnum.LAST_7_D,
     );
     await this.bookingsTotalRentalsByChannelType(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
+    await this.bookingsTotalRentalsByChannelType(
+      previousParsedStartDateLast7Days,
+      previousParsedEndDateLast7DaysParsed,
+      PeriodEnum.LAST_7_D,
+    );
+    await this.calculateTotalBookingsByPeriodEcommerce(
       parsedStartDateLast7Days,
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
@@ -623,6 +745,16 @@ export class BookingsTotalRentalsService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
+    await this.bookingsTotalRentalsByChannelType(
+      previousParsedStartDateLast30Days,
+      previousParsedEndDateLast30DaysParsed,
+      PeriodEnum.LAST_30_D,
+    );
+    await this.calculateTotalBookingsByPeriodEcommerce(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
 
     const endTimeLast30Days = moment()
       .tz(timezone)
@@ -699,6 +831,16 @@ export class BookingsTotalRentalsService {
       PeriodEnum.LAST_6_M,
     );
     await this.bookingsTotalRentalsByChannelType(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.bookingsTotalRentalsByChannelType(
+      previousParsedStartDateLast6Months,
+      previousParsedEndDateLast6MonthsParsed,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateTotalBookingsByPeriodEcommerce(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
