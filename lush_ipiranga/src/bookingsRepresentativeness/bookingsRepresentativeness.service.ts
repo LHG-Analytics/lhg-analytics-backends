@@ -595,7 +595,7 @@ export class BookingsRepresentativenessService {
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(
-      `Início CronJob BookingRevenue - últimos 7 dias: ${startTimeLast7Days}`,
+      `Início CronJob BookingRepresentativeness - últimos 7 dias: ${startTimeLast7Days}`,
     );
 
     // Chamar a função para o período atual
@@ -633,7 +633,7 @@ export class BookingsRepresentativenessService {
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(
-      `Final CronJob BookingRevenue - últimos 7 dias: ${endTimeLast7Days}`,
+      `Final CronJob BookingRepresentativeness - últimos 7 dias: ${endTimeLast7Days}`,
     );
 
     // Últimos 30 dias
@@ -678,7 +678,7 @@ export class BookingsRepresentativenessService {
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(
-      `Início CronJob BookingRevenue - últimos 30 dias: ${startTimeLast30Days}`,
+      `Início CronJob BookingRepresentativeness - últimos 30 dias: ${startTimeLast30Days}`,
     );
 
     // Chamar a função para o período atual
@@ -713,7 +713,7 @@ export class BookingsRepresentativenessService {
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(
-      `Final CronJob BookingRevenue - últimos 30 dias: ${endTimeLast30Days}`,
+      `Final CronJob BookingRepresentativeness - últimos 30 dias: ${endTimeLast30Days}`,
     );
 
     // Últimos 6 meses (180 dias)
@@ -758,7 +758,7 @@ export class BookingsRepresentativenessService {
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(
-      `Início CronJob BookingRevenue - últimos 6 meses: ${startTimeLast6Months}`,
+      `Início CronJob BookingRepresentativeness - últimos 6 meses: ${startTimeLast6Months}`,
     );
 
     // Chamar a função para o período atual
@@ -793,7 +793,7 @@ export class BookingsRepresentativenessService {
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(
-      `Final CronJob BookingRevenue - últimos 6 meses: ${endTimeLast6Months}`,
+      `Final CronJob BookingRepresentativeness - últimos 6 meses: ${endTimeLast6Months}`,
     );
   }
 

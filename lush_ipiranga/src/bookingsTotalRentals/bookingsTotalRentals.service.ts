@@ -247,9 +247,6 @@ export class BookingsTotalRentalsService {
               gte: currentDate,
               lte: nextDate,
             },
-            rentalApartmentId: {
-              not: null, // Considerar apenas reservas onde rentalApartmentId não é nulo
-            },
             canceled: {
               equals: null,
             },

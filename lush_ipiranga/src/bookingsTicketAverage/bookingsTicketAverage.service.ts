@@ -50,9 +50,6 @@ export class BookingsTicketAverageService {
         priceRental: {
           not: null,
         },
-        rentalApartmentId: {
-          not: null,
-        },
       },
       select: {
         priceRental: true,

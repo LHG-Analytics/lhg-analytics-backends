@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
-import { PeriodEnum } from '../../dist/generated/client-online';
+import { PeriodEnum, Prisma } from '../../dist/generated/client-online';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -804,5 +804,137 @@ export class BookingsService {
       ReservationsOfEcommerceByPeriod: reservationsOfEcommerceByPeriod,
       BillingOfEcommerceByPeriod: billingOfEcommerceByPeriod,
     };
+  }
+
+  private async calculateTotalSaleDirect(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<Prisma.Decimal> {
+    const stockOutItems = await this.prisma.prismaLocal.stockOutItem.findMany({
+      where: {
+        stockOuts: {
+          createdDate: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        canceled: null,
+        typePriceSale: {
+          not: null,
+        },
+      },
+      include: {
+        stockOuts: {
+          include: {
+            saleDirect: true,
+            sale: {
+              select: {
+                discount: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return stockOutItems.reduce((totalSaleDirect, stockOutItem) => {
+      const stockOut = stockOutItem.stockOuts;
+
+      if (stockOut && stockOut.saleDirect) {
+        const saleDirects = Array.isArray(stockOut.saleDirect)
+          ? stockOut.saleDirect
+          : [stockOut.saleDirect];
+        const discountSale = stockOut.sale?.discount
+          ? new Prisma.Decimal(stockOut.sale.discount)
+          : new Prisma.Decimal(0);
+
+        saleDirects.forEach((saleDirect) => {
+          if (saleDirect && stockOutItem.stockOutId === saleDirect.stockOutId) {
+            const itemTotal = new Prisma.Decimal(stockOutItem.priceSale).times(
+              new Prisma.Decimal(stockOutItem.quantity),
+            );
+            totalSaleDirect = totalSaleDirect.plus(
+              itemTotal.minus(discountSale),
+            );
+          }
+        });
+      }
+
+      return totalSaleDirect;
+    }, new Prisma.Decimal(0));
+  }
+
+  private async fetchKpiData(startDate: Date, endDate: Date) {
+    return await Promise.all([
+      this.prisma.prismaLocal.booking.findMany({
+        where: {
+          dateService: {
+            gte: startDate,
+            lte: endDate,
+          },
+          canceled: {
+            equals: null,
+          },
+          priceRental: {
+            not: null,
+          },
+        },
+        select: {
+          id: true,
+          priceRental: true,
+          idTypeOriginBooking: true,
+          dateService: true,
+          startDate: true,
+          rentalApartmentId: true,
+          originBooking: true,
+          rentalApartment: true,
+        },
+      }),
+      this.prisma.prismaLocal.originBooking.findMany({
+        where: {
+          deletionDate: {
+            equals: null,
+          },
+        },
+        select: {
+          typeOrigin: true,
+        },
+      }),
+      this.prisma.prismaLocal.newRelease.findMany({
+        where: {
+          deletionDate: {
+            equals: null,
+          },
+          releaseType: {
+            equals: 'RESERVA',
+          },
+        },
+        select: {
+          halfPaymentId: true,
+          originalsId: true,
+        },
+      }),
+      this.prisma.prismaLocal.halfPayment.findMany({
+        where: {
+          deletionDate: {
+            equals: null,
+          },
+        },
+        select: {
+          id: true, // Adicione o id para o mapeamento
+          name: true,
+        },
+      }),
+      this.calculateTotalSaleDirect(startDate, endDate),
+      this.prisma.prismaLocal.rentalApartment.findMany({
+        where: {
+          checkIn: {
+            gte: startDate,
+            lte: endDate,
+          },
+          endOccupationType: 'FINALIZADA',
+        },
+      }),
+    ]);
   }
 }
