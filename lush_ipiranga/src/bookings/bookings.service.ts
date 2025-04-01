@@ -545,6 +545,9 @@ export class BookingsService {
           createdDate: true,
           period: true,
         },
+        orderBy: {
+          createdDate: 'desc',
+        },
       }),
       this.prisma.prismaOnline.bookingsRevenueByPeriodEcommerce.findMany({
         where: {
@@ -557,6 +560,9 @@ export class BookingsService {
           totalValue: true,
           createdDate: true,
           period: true,
+        },
+        orderBy: {
+          createdDate: 'desc',
         },
       }),
     ]);
