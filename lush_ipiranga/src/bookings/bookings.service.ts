@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { PeriodEnum, Prisma } from '../../dist/generated/client-online';
 import { PrismaService } from '../prisma/prisma.service';
@@ -296,7 +296,7 @@ export class BookingsService {
         where: {
           period: period,
           createdDate: {
-            gte: startDate,
+            gte: endDate,
           },
         },
         select: {
@@ -936,5 +936,26 @@ export class BookingsService {
         },
       }),
     ]);
+  }
+
+  async calculateKpisByDateRange(startDate: Date, endDate: Date): Promise<any> {
+    try {
+      console.log('startDate:', startDate);
+      console.log('endDate:', endDate);
+
+      const timezone = 'America/Sao_Paulo';
+
+      const [
+        allBookings,
+        originBookings,
+        newRelease,
+        halfPayment,
+        totalSaleDirect,
+        allRentalApartments,
+      ] = await this.fetchKpiData(startDate, endDate);
+    } catch (error) {
+      console.error('Erro ao calcular os KPIs:', error);
+      throw new BadRequestException();
+    }
   }
 }
