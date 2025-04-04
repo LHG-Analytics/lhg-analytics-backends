@@ -1,6 +1,15 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import * as moment from 'moment-timezone';
-import { PeriodEnum, Prisma } from '../../dist/generated/client-online';
+import {
+  ChannelTypeEnum,
+  PeriodEnum,
+  Prisma,
+  RentalTypeEnum,
+} from '../../dist/generated/client-online';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -908,8 +917,12 @@ export class BookingsService {
           releaseType: {
             equals: 'RESERVA',
           },
+          maturity: {
+            equals: null,
+          },
         },
         select: {
+          value: true,
           halfPaymentId: true,
           originalsId: true,
         },
@@ -948,14 +961,289 @@ export class BookingsService {
       const [
         allBookings,
         originBookings,
-        newRelease,
-        halfPayment,
+        newReleases,
+        halfPayments,
         totalSaleDirect,
         allRentalApartments,
       ] = await this.fetchKpiData(startDate, endDate);
+
+      if (!allBookings || allBookings.length === 0) {
+        throw new NotFoundException('No booking revenue found.');
+      }
+
+      // Calcular o total da receita de reservas
+      const totalAllValue = allBookings.reduce((total, bookings) => {
+        return total.plus(new Prisma.Decimal(bookings.priceRental));
+      }, new Prisma.Decimal(0));
+
+      // Calcular o total de reservas
+      const totalAllBookings = allBookings.length;
+
+      // Calcular o total do ticket médio de reservas
+      const totalAllTicketAverage = Number(totalAllValue) / totalAllBookings;
+
+      // Calcular a receita geral de locações
+      const totalValueForRentalApartments = allRentalApartments.reduce(
+        (total, apartment) => {
+          return total.plus(new Prisma.Decimal(apartment.totalValue || 0)); // Adiciona 0 se totalValue for nulo
+        },
+        new Prisma.Decimal(0),
+      );
+
+      // Calcular a receita total somando as vendas diretas com as locações gerais
+      const totalRevenue = totalSaleDirect.plus(totalValueForRentalApartments);
+
+      // Calcular o total de representatividade
+      const totalAllRepresentativeness = totalAllValue.dividedBy(totalRevenue);
+
+      const bigNumbers = {
+        currentDate: {
+          totalAllValue: Number(totalAllValue),
+          totalAllBookings: Number(totalAllBookings),
+          totalAllTicketAverage: Number(totalAllTicketAverage.toFixed(2)),
+          totalAllRepresentativeness: Number(
+            totalAllRepresentativeness.toFixed(2),
+          ),
+        },
+      };
+
+      // Cria um mapa para associar halfPaymentId ao name
+      const halfPaymentMap = new Map<number, string>();
+      for (const halfPayment of halfPayments) {
+        halfPaymentMap.set(halfPayment.id, halfPayment.name);
+      }
+
+      // Inicializa um objeto para armazenar os totais por meio de pagamento
+      const revenueByPaymentMethod = new Map<string, Prisma.Decimal>(); // Mapeia o nome do meio de pagamento
+
+      // Calcular o total de priceRental por meio de pagamento
+      for (const booking of allBookings) {
+        const matchingNewRelease = newReleases.find(
+          (release) => release.originalsId === booking.id, // Comparando booking.id com release.originalsId
+        );
+
+        if (matchingNewRelease) {
+          const halfPaymentId = matchingNewRelease.halfPaymentId;
+          const paymentName = halfPaymentMap.get(halfPaymentId); // Obtém o nome do meio de pagamento
+
+          // Inicializa o total para o meio de pagamento se não existir
+          if (!revenueByPaymentMethod.has(paymentName)) {
+            revenueByPaymentMethod.set(paymentName, new Prisma.Decimal(0));
+          }
+
+          // Acumula o valor atual ao total existente
+          const currentTotal = revenueByPaymentMethod.get(paymentName);
+          revenueByPaymentMethod.set(
+            paymentName,
+            currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
+          );
+        }
+      }
+
+      const paymentMethods = {
+        categories: [],
+        series: [],
+      };
+
+      for (const [
+        paymentName,
+        totalValue,
+      ] of revenueByPaymentMethod.entries()) {
+        // Adiciona o nome do método de pagamento à array de categorias
+        paymentMethods.categories.push(paymentName);
+
+        // Adiciona o valor total à array de séries
+        paymentMethods.series.push(totalValue.toNumber()); // Converte para número, se necessário
+      }
+
+      // Mapa para armazenar os totais por channelType
+      const revenueByChannelType = new Map<ChannelTypeEnum, Prisma.Decimal>([
+        [ChannelTypeEnum.INTERNAL, new Prisma.Decimal(0)],
+        [ChannelTypeEnum.GUIA_GO, new Prisma.Decimal(0)],
+        [ChannelTypeEnum.GUIA_SCHEDULED, new Prisma.Decimal(0)],
+        [ChannelTypeEnum.WEBSITE_IMMEDIATE, new Prisma.Decimal(0)],
+        [ChannelTypeEnum.WEBSITE_SCHEDULED, new Prisma.Decimal(0)],
+        [ChannelTypeEnum.BOOKING, new Prisma.Decimal(0)],
+        [ChannelTypeEnum.EXPEDIA, new Prisma.Decimal(0)],
+      ]);
+
+      // Função para determinar o channelType com base no idTypeOriginBooking e na dateService
+      const getChannelType = (
+        idTypeOriginBooking: number,
+        dateService: Date,
+        startDate: Date,
+      ): ChannelTypeEnum | null => {
+        switch (idTypeOriginBooking) {
+          case 1: // SISTEMA
+            return ChannelTypeEnum.INTERNAL;
+          case 3: // GUIA_DE_MOTEIS
+            return dateService.toDateString() === startDate.toDateString()
+              ? ChannelTypeEnum.GUIA_GO
+              : ChannelTypeEnum.GUIA_SCHEDULED;
+          case 4: // RESERVA_API
+            return dateService.toDateString() === startDate.toDateString()
+              ? ChannelTypeEnum.WEBSITE_IMMEDIATE
+              : ChannelTypeEnum.WEBSITE_SCHEDULED;
+          case 6: // INTERNA
+            return ChannelTypeEnum.INTERNAL;
+          case 7: // BOOKING
+            return ChannelTypeEnum.BOOKING;
+          case 8: // EXPEDIA
+            return ChannelTypeEnum.EXPEDIA;
+          default:
+            return null; // Para outros casos, retorna null
+        }
+      };
+
+      // Calcular o total de priceRental por channelType
+      allBookings.forEach((booking) => {
+        const channelType = getChannelType(
+          booking.idTypeOriginBooking,
+          booking.dateService,
+          booking.startDate,
+        ); // Mapeia o idTypeOriginBooking para channelType
+
+        if (channelType) {
+          // Acumula o valor atual ao total existente
+          const currentTotal = revenueByChannelType.get(channelType);
+          revenueByChannelType.set(
+            channelType,
+            currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
+          );
+        }
+      });
+
+      // Preparar o retorno no formato desejado
+      const categories = Array.from(revenueByChannelType.keys());
+      const series = Array.from(revenueByChannelType.values()).map(
+        (value) => value.toNumber() || 0, // Garantir que valores nulos sejam convertidos para R$0,00
+      );
+
+      const billingPerChannel = {
+        categories,
+        series,
+      };
+
+      // Inicializa um contador para cada tipo de locação
+      const rentalCounts = {
+        [RentalTypeEnum.THREE_HOURS]: 0,
+        [RentalTypeEnum.SIX_HOURS]: 0,
+        [RentalTypeEnum.TWELVE_HOURS]: 0,
+        [RentalTypeEnum.DAY_USE]: 0,
+        [RentalTypeEnum.OVERNIGHT]: 0,
+        [RentalTypeEnum.DAILY]: 0,
+      };
+
+      // Inicializa as arrays para categorias e séries
+      const categoriesBookings = [];
+      const seriesBookings = [];
+
+      // Processa cada reserva para contar o tipo de locação
+      for (const booking of allBookings) {
+        const checkIn = booking.rentalApartment?.checkIn; // Acessa checkIn do apartamento
+        const checkOut = booking.rentalApartment?.checkOut; // Acessa checkOut do apartamento
+
+        // Determina o tipo de locação
+        const rentalType = this.determineRentalPeriod(
+          checkIn,
+          checkOut,
+          allBookings,
+        );
+
+        // Incrementa o contador para o tipo de locação correspondente
+        if (rentalCounts[rentalType] !== undefined) {
+          rentalCounts[rentalType]++;
+        }
+      }
+
+      // Preenche as arrays de categorias e séries com os resultados
+      for (const rentalType in rentalCounts) {
+        categoriesBookings.push(rentalType);
+        seriesBookings.push(rentalCounts[rentalType]);
+      }
+
+      // Cria o objeto final
+      const reservationsByRentalType = {
+        categoriesBookings,
+        seriesBookings,
+      };
+
+      return {
+        Company: 'Lush Ipiranga',
+        BigNumbers: [bigNumbers],
+        PaymentMethods: paymentMethods,
+        BillingPerChannel: billingPerChannel,
+        ReservationsByRentalType: reservationsByRentalType,
+      };
     } catch (error) {
       console.error('Erro ao calcular os KPIs:', error);
       throw new BadRequestException();
     }
+  }
+
+  private determineRentalPeriod(
+    checkIn: Date,
+    checkOut: Date,
+    Booking: any,
+  ): string {
+    const occupationTimeSeconds = this.calculateOccupationTime(
+      checkIn,
+      checkOut,
+    );
+
+    // Convertendo check-in e check-out para objetos Date
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+
+    const checkInHour = checkInDate.getHours();
+    const checkOutHour = checkOutDate.getHours();
+    const checkOutMinutes = checkOutDate.getMinutes();
+
+    // Verificação por horas de ocupação (3, 6 e 12 horas)
+    if (occupationTimeSeconds <= 3 * 3600 + 15 * 60) {
+      return 'THREE_HOURS';
+    } else if (occupationTimeSeconds <= 6 * 3600 + 15 * 60) {
+      return 'SIX_HOURS';
+    } else if (occupationTimeSeconds <= 12 * 3600 + 15 * 60) {
+      return 'TWELVE_HOURS';
+    }
+
+    // Se houver reservas, calcular os tipos adicionais
+    if (Booking && Array.isArray(Booking) && Booking.length > 0) {
+      // Regra para Day Use
+      if (checkInHour >= 13 && checkOutHour <= 19 && checkOutMinutes <= 15) {
+        return 'DAY_USE';
+      }
+
+      // Regra para Overnight
+      const overnightMinimumStaySeconds = 12 * 3600 + 15 * 60;
+      if (
+        checkInHour >= 20 &&
+        checkInHour <= 23 &&
+        checkOutHour >= 8 &&
+        (checkOutHour < 12 || (checkOutHour === 12 && checkOutMinutes <= 15)) &&
+        occupationTimeSeconds >= overnightMinimumStaySeconds
+      ) {
+        return 'OVERNIGHT';
+      }
+
+      // Verificação para Diária
+      if (
+        occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
+        (checkInHour <= 15 &&
+          (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
+      ) {
+        return 'DAILY';
+      }
+    }
+
+    // Caso nenhuma condição acima seja satisfeita, retorna 12 horas como padrão
+    return 'TWELVE_HOURS';
+  }
+
+  private calculateOccupationTime(checkIn: Date, checkOut: Date): number {
+    const checkInTime = new Date(checkIn).getTime();
+    const checkOutTime = new Date(checkOut).getTime();
+    return (checkOutTime - checkInTime) / 1000; // Tempo em segundos
   }
 }
