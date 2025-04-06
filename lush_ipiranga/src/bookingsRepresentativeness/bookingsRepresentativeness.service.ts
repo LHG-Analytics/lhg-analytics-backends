@@ -165,7 +165,7 @@ export class BookingsRepresentativenessService {
       // Inserir a representatividade no banco de dados
       await this.insertBookingsRepresentativeness({
         totalAllRepresentativeness: new Prisma.Decimal(representativeness),
-        createdDate: adjustedEndDate, // Data de criação
+        createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
         period: period,
         companyId,
       });

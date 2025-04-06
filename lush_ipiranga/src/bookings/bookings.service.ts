@@ -139,6 +139,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -172,6 +173,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -205,6 +207,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -238,6 +241,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -270,7 +274,8 @@ export class BookingsService {
         where: {
           period: period,
           createdDate: {
-            gte: endDate,
+            gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -287,7 +292,8 @@ export class BookingsService {
         where: {
           period: period,
           createdDate: {
-            gte: endDate,
+            gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -305,7 +311,8 @@ export class BookingsService {
         where: {
           period: period,
           createdDate: {
-            gte: endDate,
+            gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -323,6 +330,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -339,6 +347,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -355,6 +364,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -371,6 +381,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -389,6 +400,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -408,6 +420,7 @@ export class BookingsService {
             period: period,
             createdDate: {
               gte: startDate,
+              lte: endDate,
             },
           },
           select: {
@@ -430,6 +443,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
           channelType: {
             in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
@@ -459,6 +473,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
           channelType: {
             in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
@@ -488,6 +503,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
           channelType: {
             in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
@@ -518,6 +534,7 @@ export class BookingsService {
             period: period,
             createdDate: {
               gte: startDate,
+              lte: endDate,
             },
             channelType: {
               in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
@@ -547,6 +564,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -563,6 +581,7 @@ export class BookingsService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {

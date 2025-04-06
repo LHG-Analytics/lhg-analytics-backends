@@ -133,7 +133,7 @@ export class BookingsRevenueService {
         totalAllValue: this.formatCurrency(totalAllValue.toNumber()),
       };
 
-      console.log('totalAllValue:', formattedBookingsRevenueData);
+      console.log('totalAllValue findAll:', formattedBookingsRevenueData);
 
       return formattedBookingsRevenueData;
     } catch (error) {
@@ -275,6 +275,7 @@ export class BookingsRevenueService {
       },
     };
 
+    console.log('result byChannelType:', result);
     return result;
   }
 
@@ -483,7 +484,7 @@ export class BookingsRevenueService {
     for (const [paymentName, totalValue] of revenueByPaymentMethod.entries()) {
       await this.insertBookingsRevenueByPaymentMethod({
         totalValue,
-        createdDate: adjustedEndDate, // Data de criação
+        createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
         period: period,
         paymentMethod: paymentName, // Nome do meio de pagamento
         companyId,
