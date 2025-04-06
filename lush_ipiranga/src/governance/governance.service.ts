@@ -46,7 +46,7 @@ export class GovernanceService {
         });
 
         // Período anterior: 7 dias antes do início do período atual
-        startDatePrevious = startDate.clone().subtract(7, 'days');
+        startDatePrevious = startDate.clone().subtract(6, 'days');
         endDatePrevious = startDate.clone();
         break;
 
@@ -60,7 +60,7 @@ export class GovernanceService {
         });
 
         // Período anterior: 30 dias antes do início do período atual
-        startDatePrevious = startDate.clone().subtract(30, 'days');
+        startDatePrevious = startDate.clone().subtract(29, 'days');
         endDatePrevious = startDate.clone();
         break;
 

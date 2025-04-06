@@ -127,12 +127,10 @@ export class BookingsService {
       BookingsRevenueByChannelTypeEcommercePrevious,
       BookingsTotalRentalsByChannelTypeEcommerce,
       BookingsTotalRentalsByChannelTypeEcommercePrevious,
-      BookingsTicketAverageByChannelTypeEcommerce,
-      BookingsTicketAverageByChannelTypeEcommercePrevious,
-      BookingsRepresentativenessByChannelTypeEcommerce,
-      BookingsRepresentativenessByChannelTypeEcommercePrevious,
       BookingsTotalRentalsByPeriodEcommerce,
       BookingsRevenueByPeriodEcommerce,
+      KpiRevenue,
+      KpiRevenuePreviousData,
     ] = await this.prisma.prismaOnline.$transaction([
       this.prisma.prismaOnline.bookingsRevenue.findMany({
         where: {
@@ -311,8 +309,7 @@ export class BookingsService {
         where: {
           period: period,
           createdDate: {
-            gte: startDate,
-            lte: endDate,
+            gte: endDate,
           },
         },
         select: {
@@ -472,8 +469,7 @@ export class BookingsService {
         where: {
           period: period,
           createdDate: {
-            gte: startDate,
-            lte: endDate,
+            gte: endDate,
           },
           channelType: {
             in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
@@ -495,70 +491,6 @@ export class BookingsService {
           },
         },
       }),
-      this.prisma.prismaOnline.bookingsTicketAverageByChannelType.aggregate({
-        _sum: {
-          totalTicketAverage: true,
-        },
-        where: {
-          period: period,
-          createdDate: {
-            gte: startDate,
-            lte: endDate,
-          },
-          channelType: {
-            in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
-          },
-        },
-      }),
-      this.prisma.prismaOnline.bookingsTicketAverageByChannelType.aggregate({
-        _sum: {
-          totalTicketAverage: true,
-        },
-        where: {
-          period: period,
-          createdDate: {
-            gte: startDatePrevious,
-            lte: endDatePrevious,
-          },
-          channelType: {
-            in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
-          },
-        },
-      }),
-      this.prisma.prismaOnline.bookingsRepresentativenessByChannelType.aggregate(
-        {
-          _sum: {
-            totalRepresentativeness: true,
-          },
-          where: {
-            period: period,
-            createdDate: {
-              gte: startDate,
-              lte: endDate,
-            },
-            channelType: {
-              in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
-            },
-          },
-        },
-      ),
-      this.prisma.prismaOnline.bookingsRepresentativenessByChannelType.aggregate(
-        {
-          _sum: {
-            totalRepresentativeness: true,
-          },
-          where: {
-            period: period,
-            createdDate: {
-              gte: startDatePrevious,
-              lte: endDatePrevious,
-            },
-            channelType: {
-              in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
-            },
-          },
-        },
-      ),
       this.prisma.prismaOnline.bookingsTotalRentalsByPeriodEcommerce.findMany({
         where: {
           period: period,
@@ -588,6 +520,37 @@ export class BookingsService {
           totalValue: true,
           createdDate: true,
           period: true,
+        },
+        orderBy: {
+          createdDate: 'desc',
+        },
+      }),
+      this.prisma.prismaOnline.kpiRevenue.findMany({
+        where: {
+          period: period,
+          createdDate: {
+            gte: startDate, // Filtra pela data inicial
+          },
+        },
+        select: {
+          totalAllValue: true,
+          createdDate: true,
+        },
+        orderBy: {
+          createdDate: 'desc',
+        },
+      }),
+      this.prisma.prismaOnline.kpiRevenue.findMany({
+        where: {
+          period: period,
+          createdDate: {
+            gte: startDatePrevious,
+            lte: endDatePrevious,
+          },
+        },
+        select: {
+          totalAllValue: true,
+          createdDate: true,
         },
         orderBy: {
           createdDate: 'desc',
@@ -760,14 +723,19 @@ export class BookingsService {
           BookingsTotalRentalsByChannelTypeEcommerce._sum.totalBookings || 0,
         ),
         totalAllTicketAverage: Number(
-          BookingsTicketAverageByChannelTypeEcommerce._sum.totalTicketAverage.dividedBy(
-            2,
-          ) || 0,
+          (
+            BookingsRevenueByChannelTypeEcommerce._sum.totalValue.dividedBy(
+              BookingsTotalRentalsByChannelTypeEcommerce._sum.totalBookings,
+            ) || 0
+          ).toFixed(2),
         ),
 
         totalAllRepresentativeness: Number(
-          BookingsRepresentativenessByChannelTypeEcommerce._sum
-            .totalRepresentativeness || 0,
+          (
+            BookingsRevenueByChannelTypeEcommerce._sum.totalValue.dividedBy(
+              KpiRevenue[0].totalAllValue,
+            ) || 0
+          ).toFixed(2),
         ),
       },
 
@@ -781,14 +749,20 @@ export class BookingsService {
             .totalBookings || 0,
         ),
         totalAllTicketAveragePreviousData: Number(
-          BookingsTicketAverageByChannelTypeEcommercePrevious._sum.totalTicketAverage.dividedBy(
-            2,
-          ) || 0,
+          (
+            BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue.dividedBy(
+              BookingsTotalRentalsByChannelTypeEcommercePrevious._sum
+                .totalBookings,
+            ) || 0
+          ).toFixed(2),
         ),
 
         totalAllRepresentativenessPreviousData: Number(
-          BookingsRepresentativenessByChannelTypeEcommercePrevious._sum
-            .totalRepresentativeness ?? 0,
+          (
+            BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue.dividedBy(
+              KpiRevenuePreviousData[0].totalAllValue,
+            ) || 0
+          ).toFixed(2),
         ),
       },
     };

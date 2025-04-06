@@ -481,11 +481,11 @@ export class BookingsTotalRentalsService {
         if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
-          nextDate.setUTCHours(5, 59, 59, 999); // Fim do dia contábil às 05:59:59 do próximo dia
+          nextDate.setUTCHours(23, 59, 59, 999); // Fim do dia contábil às 05:59:59 do próximo dia
         } else if (period === PeriodEnum.LAST_6_M) {
           // Para LAST_6_M, iteração mensal
           nextDate.setMonth(nextDate.getMonth() + 1);
-          nextDate.setUTCHours(5, 59, 59, 999); // Fim do mês contábil
+          nextDate.setUTCHours(23, 59, 59, 999); // Fim do mês contábil
         }
 
         // Consultar as reservas no período
@@ -494,9 +494,6 @@ export class BookingsTotalRentalsService {
             dateService: {
               gte: currentDate,
               lte: nextDate,
-            },
-            rentalApartmentId: {
-              not: null, // Considerar apenas reservas onde rentalApartmentId não é nulo
             },
             canceled: {
               equals: null,
@@ -542,6 +539,8 @@ export class BookingsTotalRentalsService {
       const totalBookingsForThePeriod = Object.keys(results).map((date) => ({
         [date]: results[date],
       }));
+
+      console.log('totalBookingsForThePeriod:', totalBookingsForThePeriod);
 
       return {
         TotalBookingsForThePeriod: totalBookingsForThePeriod,
