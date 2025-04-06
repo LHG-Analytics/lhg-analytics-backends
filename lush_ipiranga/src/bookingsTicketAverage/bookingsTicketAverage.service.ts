@@ -3,18 +3,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
+import * as moment from 'moment-timezone';
 import {
   ChannelTypeEnum,
   PeriodEnum,
   Prisma,
 } from '../../dist/generated/client-online';
-import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   BookingsTicketAverage,
   BookingsTicketAverageByChannelType,
 } from './entities/bookingsTicketAverage.entity';
-import * as moment from 'moment-timezone';
 
 @Injectable()
 export class BookingsTicketAverageService {
