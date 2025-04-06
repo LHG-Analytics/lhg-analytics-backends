@@ -869,8 +869,8 @@ export class BookingsTotalRentalsService {
     );
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
-    parsedStartDate.setUTCHours(6, 0, 0, 0); // Define início às 06:00
-    parsedEndDate.setUTCHours(5, 59, 59, 999); // Define final às 05:59:59.999
+    parsedStartDate.setUTCHours(0, 0, 0, 0); // Define início às 06:00
+    parsedEndDate.setUTCHours(23, 59, 59, 999); // Define final às 05:59:59.999
 
     return { startDate: parsedStartDate, endDate: parsedEndDate };
   }
