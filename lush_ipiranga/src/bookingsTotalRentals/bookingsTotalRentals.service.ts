@@ -43,7 +43,7 @@ export class BookingsTotalRentalsService {
         where: {
           dateService: {
             gte: startDate,
-            lte: endDate,
+            lte: adjustedEndDate,
           },
           canceled: {
             equals: null,
@@ -120,7 +120,7 @@ export class BookingsTotalRentalsService {
         where: {
           dateService: {
             gte: startDate,
-            lte: endDate,
+            lte: adjustedEndDate,
           },
           canceled: {
             equals: null,
@@ -339,7 +339,7 @@ export class BookingsTotalRentalsService {
         where: {
           dateService: {
             gte: startDate,
-            lte: endDate,
+            lte: adjustedEndDate,
           },
           canceled: {
             equals: null,

@@ -30,13 +30,13 @@ export class BookingsRevenueService {
     });
   }
 
-  private async fetchKpiData(startDate: Date, endDate: Date) {
+  private async fetchKpiData(startDate: Date, adjustedEndDate: Date) {
     return await Promise.all([
       this.prisma.prismaLocal.booking.findMany({
         where: {
           dateService: {
             gte: startDate,
-            lte: endDate,
+            lte: adjustedEndDate,
           },
           canceled: {
             equals: null,
@@ -98,8 +98,11 @@ export class BookingsRevenueService {
     period?: PeriodEnum,
   ): Promise<any> {
     try {
+      console.log('startDate TESTE:', startDate);
+      console.log('endDate TESTE:', endDate);
       const companyId = 1;
 
+      // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
       if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
@@ -109,7 +112,10 @@ export class BookingsRevenueService {
       }
 
       // Buscar todas as receitas de reservas no intervalo de datas
-      const [allBookingsRevenue] = await this.fetchKpiData(startDate, endDate);
+      const [allBookingsRevenue] = await this.fetchKpiData(
+        startDate,
+        adjustedEndDate,
+      );
 
       if (!allBookingsRevenue || allBookingsRevenue.length === 0) {
         throw new NotFoundException('No booking revenue found.');
@@ -117,8 +123,10 @@ export class BookingsRevenueService {
 
       // Calcular o total de priceRental
       const totalAllValue = allBookingsRevenue.reduce((total, booking) => {
-        return total.plus(new Prisma.Decimal(booking.priceRental));
+        return total.plus(Number(booking.priceRental));
       }, new Prisma.Decimal(0));
+
+      console.log('totalAllValue:', totalAllValue);
 
       // Inserir a receita de reservas no banco de dados
       await this.insertBookingsRevenue({
@@ -177,7 +185,10 @@ export class BookingsRevenueService {
     }
 
     // Buscar todas as receitas de reservas e os tipos de origem
-    const [allBookingsRevenue] = await this.fetchKpiData(startDate, endDate);
+    const [allBookingsRevenue] = await this.fetchKpiData(
+      startDate,
+      adjustedEndDate,
+    );
 
     if (!allBookingsRevenue || allBookingsRevenue.length === 0) {
       throw new NotFoundException('No booking revenue found.');
@@ -438,7 +449,7 @@ export class BookingsRevenueService {
 
     // Buscar todas as reservas e os novos lançamentos
     const [allBookings, originBookings, newReleases, halfPayments] =
-      await this.fetchKpiData(startDate, endDate);
+      await this.fetchKpiData(startDate, adjustedEndDate);
 
     if (!allBookings || allBookings.length === 0) {
       throw new NotFoundException('No bookings found.');

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   ChannelTypeEnum,
   PeriodEnum,
@@ -23,71 +27,94 @@ export class BookingsTicketAverageService {
     });
   }
 
+  private async fetchKpiData(startDate: Date, adjustedEndDate: Date) {
+    return await Promise.all([
+      this.prisma.prismaLocal.booking.findMany({
+        where: {
+          dateService: {
+            gte: startDate,
+            lte: adjustedEndDate,
+          },
+          canceled: {
+            equals: null,
+          },
+          priceRental: {
+            not: null,
+          },
+        },
+        select: {
+          id: true,
+          priceRental: true,
+          idTypeOriginBooking: true,
+          dateService: true,
+          startDate: true,
+          rentalApartmentId: true,
+        },
+      }),
+    ]);
+  }
+
   async findAllBookingsTicketAverage(
     startDate: Date,
     endDate: Date,
     period?: PeriodEnum,
   ): Promise<any> {
-    const companyId = 1; // Defina o ID da empresa conforme necessário
+    try {
+      console.log('startDate TESTE:', startDate);
+      console.log('endDate TESTE:', endDate);
+      const companyId = 1; // Defina o ID da empresa conforme necessário
 
-    // Ajustar a data final para não incluir a data atual
-    const adjustedEndDate = new Date(endDate);
-    if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
-      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
-    } else if (period === PeriodEnum.LAST_6_M) {
-      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      const adjustedEndDate = new Date(endDate);
+      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
+      } else if (period === PeriodEnum.LAST_6_M) {
+        adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1); // Para LAST_6_M, subtrair um mês
+        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
+      }
+
+      const [allBookings] = await this.fetchKpiData(startDate, adjustedEndDate);
+
+      if (!allBookings || allBookings.length === 0) {
+        throw new NotFoundException('No bookings found.');
+      }
+
+      // Calcular o total de priceRental
+      const totalPriceRental = allBookings.reduce((total, booking) => {
+        return total.plus(Number(booking.priceRental));
+      }, new Prisma.Decimal(0));
+
+      console.log('totalPriceRental do ticketAverage:', totalPriceRental);
+
+      let totalBookings = allBookings.length;
+
+      // Calcular a média
+      const averageTicket =
+        totalBookings > 0 ? Number(totalPriceRental) / totalBookings : 0;
+
+      console.log('totalBookings do ticketAverage:', totalBookings);
+
+      // Monta o resultado total
+      const totalResult = {
+        totalAllTicketAverage: this.formatCurrency(averageTicket), // Formata o valor em reais
+        totalBookings: totalBookings,
+        createdDate: adjustedEndDate, // Ajusta a data para o final do período
+      };
+
+      // Inserir no banco de dados
+      await this.insertBookingsTicketAverage({
+        totalAllTicketAverage: new Prisma.Decimal(averageTicket),
+        period: period,
+        createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+        companyId,
+      });
+
+      return totalResult;
+    } catch (error) {
+      console.error('Erro ao buscar Bookings TicketAverage data:', error);
+      throw new BadRequestException(
+        `Failed to fetch Bookings TicketAverage data: ${error.message}`,
+      );
     }
-
-    const allBookings = await this.prisma.prismaLocal.booking.findMany({
-      where: {
-        dateService: {
-          gte: startDate,
-          lte: endDate,
-        },
-        canceled: {
-          equals: null,
-        },
-        priceRental: {
-          not: null,
-        },
-      },
-      select: {
-        priceRental: true,
-      },
-    });
-
-    if (!allBookings || allBookings.length === 0) {
-      throw new NotFoundException('No bookings found.');
-    }
-
-    let totalPriceRental = 0;
-    let totalBookings = allBookings.length;
-
-    // Soma todos os valores de priceRental
-    for (const booking of allBookings) {
-      totalPriceRental += booking.priceRental; // Supondo que priceRental é um número
-    }
-
-    // Calcular a média
-    const averageTicket =
-      totalBookings > 0 ? Number(totalPriceRental) / totalBookings : 0;
-
-    // Monta o resultado total
-    const totalResult = {
-      totalAllTicketAverage: this.formatCurrency(averageTicket), // Formata o valor em reais
-      totalBookings: totalBookings,
-      createdDate: adjustedEndDate, // Ajusta a data para o final do período
-    };
-
-    // Inserir no banco de dados
-    await this.insertBookingsTicketAverage({
-      totalAllTicketAverage: new Prisma.Decimal(averageTicket),
-      period: period,
-      createdDate: adjustedEndDate,
-      companyId,
-    });
-
-    return totalResult;
   }
 
   async insertBookingsTicketAverage(
@@ -128,7 +155,7 @@ export class BookingsTicketAverageService {
       where: {
         dateService: {
           gte: startDate,
-          lte: endDate,
+          lte: adjustedEndDate,
         },
         canceled: {
           equals: null,

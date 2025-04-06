@@ -79,14 +79,14 @@ export class BookingsRepresentativenessService {
     }, new Prisma.Decimal(0));
   }
 
-  private async fetchKpiData(startDate: Date, endDate: Date) {
+  private async fetchKpiData(startDate: Date, adjustedEndDate: Date) {
     return await Promise.all([
-      this.calculateTotalSaleDirect(startDate, endDate),
+      this.calculateTotalSaleDirect(startDate, adjustedEndDate),
       this.prisma.prismaLocal.rentalApartment.findMany({
         where: {
           checkIn: {
             gte: startDate,
-            lte: endDate,
+            lte: adjustedEndDate,
           },
           endOccupationType: 'FINALIZADA',
         },
@@ -95,7 +95,7 @@ export class BookingsRepresentativenessService {
         where: {
           dateService: {
             gte: startDate,
-            lte: endDate,
+            lte: adjustedEndDate,
           },
           canceled: {
             equals: null,
@@ -135,7 +135,7 @@ export class BookingsRepresentativenessService {
 
       // Buscar todas as receitas de reservas e apartamentos
       const [totalSaleDirect, allRentalApartments, allBookingsRevenue] =
-        await this.fetchKpiData(startDate, endDate);
+        await this.fetchKpiData(startDate, adjustedEndDate);
 
       if (!allRentalApartments || allRentalApartments.length === 0) {
         throw new NotFoundException('No rental apartments found.');
@@ -362,12 +362,12 @@ export class BookingsRepresentativenessService {
       // Buscar todas as receitas de reservas e os tipos de origem
       const [totalSaleDirect, allRentalApartments, allBookingsRevenue] =
         await Promise.all([
-          this.calculateTotalSaleDirect(startDate, endDate),
+          this.calculateTotalSaleDirect(startDate, adjustedEndDate),
           this.prisma.prismaLocal.rentalApartment.findMany({
             where: {
               checkIn: {
                 gte: startDate,
-                lte: endDate,
+                lte: adjustedEndDate,
               },
               endOccupationType: 'FINALIZADA',
             },
@@ -376,7 +376,7 @@ export class BookingsRepresentativenessService {
             where: {
               dateService: {
                 gte: startDate,
-                lte: endDate,
+                lte: adjustedEndDate,
               },
               canceled: {
                 equals: null,
