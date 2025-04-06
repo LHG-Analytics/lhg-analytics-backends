@@ -38,9 +38,6 @@ export class BookingsTicketAverageService {
           canceled: {
             equals: null,
           },
-          priceRental: {
-            not: null,
-          },
         },
         select: {
           id: true,
