@@ -133,8 +133,6 @@ export class BookingsRevenueService {
         totalAllValue: this.formatCurrency(totalAllValue.toNumber()),
       };
 
-      console.log('totalAllValue findAll:', formattedBookingsRevenueData);
-
       return formattedBookingsRevenueData;
     } catch (error) {
       console.error('Erro ao buscar Bookings Revenue data:', error);
@@ -275,7 +273,6 @@ export class BookingsRevenueService {
       },
     };
 
-    console.log('result byChannelType:', result);
     return result;
   }
 
@@ -499,7 +496,6 @@ export class BookingsRevenueService {
       };
     }
 
-    console.log('Total Result by payment:', totalResults);
     // Retornar os resultados calculados
     return {
       totalResults,

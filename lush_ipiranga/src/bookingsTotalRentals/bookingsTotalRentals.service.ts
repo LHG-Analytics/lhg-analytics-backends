@@ -540,8 +540,6 @@ export class BookingsTotalRentalsService {
         [date]: results[date],
       }));
 
-      console.log('totalBookingsForThePeriod:', totalBookingsForThePeriod);
-
       return {
         TotalBookingsForThePeriod: totalBookingsForThePeriod,
       };

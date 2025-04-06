@@ -87,9 +87,6 @@ export class BookingsTicketAverageService {
       companyId,
     });
 
-    // Log para verificar o resultado
-    console.log('Total Result:', totalResult);
-
     return totalResult;
   }
 
@@ -249,7 +246,6 @@ export class BookingsTicketAverageService {
       });
     }
 
-    console.log('totalResult ticketAverageByChannelType:', totalResults);
     return {
       totalResults,
       createdDate: adjustedEndDate,
@@ -323,7 +319,7 @@ export class BookingsTicketAverageService {
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(
-      `Início CronJob BookingsTotalRentals - últimos 7 dias: ${startTimeLast7Days}`,
+      `Início CronJob BookingsTicketAverage - últimos 7 dias: ${startTimeLast7Days}`,
     );
 
     // Chamar a função para o período atual
@@ -353,7 +349,7 @@ export class BookingsTicketAverageService {
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(
-      `Final CronJob BookingsTotalRentals - últimos 7 dias: ${endTimeLast7Days}`,
+      `Final CronJob BookingsTicketAverage - últimos 7 dias: ${endTimeLast7Days}`,
     );
 
     // Últimos 30 dias
@@ -398,7 +394,7 @@ export class BookingsTicketAverageService {
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(
-      `Início CronJob BookingsTotalRentals - últimos 30 dias: ${startTimeLast30Days}`,
+      `Início CronJob BookingsTicketAverage - últimos 30 dias: ${startTimeLast30Days}`,
     );
 
     // Chamar a função para o período atual
@@ -428,7 +424,7 @@ export class BookingsTicketAverageService {
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(
-      `Final CronJob BookingsTotalRentals - últimos 30 dias: ${endTimeLast30Days}`,
+      `Final CronJob BookingsTicketAverage - últimos 30 dias: ${endTimeLast30Days}`,
     );
 
     // Últimos 6 meses (180 dias)
@@ -473,7 +469,7 @@ export class BookingsTicketAverageService {
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(
-      `Início CronJob BookingsTotalRentals - últimos 6 meses: ${startTimeLast6Months}`,
+      `Início CronJob BookingsTicketAverage - últimos 6 meses: ${startTimeLast6Months}`,
     );
 
     // Chamar a função para o período atual
@@ -503,7 +499,7 @@ export class BookingsTicketAverageService {
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(
-      `Final CronJob BookingsTotalRentals - últimos 6 meses: ${endTimeLast6Months}`,
+      `Final CronJob BookingsTicketAverage - últimos 6 meses: ${endTimeLast6Months}`,
     );
   }
 

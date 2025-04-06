@@ -170,11 +170,6 @@ export class BookingsRepresentativenessService {
         companyId,
       });
 
-      console.log(
-        'totalAllRepresentativeness:',
-        this.formatPercentage(representativeness),
-      );
-
       // Retornar apenas o totalAllRepresentativeness e createdDate
       return {
         totalAllRepresentativeness: this.formatPercentage(representativeness),
@@ -316,8 +311,6 @@ export class BookingsRepresentativenessService {
 
         currentDate = new Date(nextDate);
       }
-
-      console.log('BookingRepresentativenessByDate:', results);
 
       // Retornar apenas o resultado final
       return {
@@ -508,8 +501,6 @@ export class BookingsRepresentativenessService {
           companyId,
         });
       }
-
-      console.log('representativenessByChannel:', representativenessByChannel);
 
       // Preparar o retorno no formato desejado
       return {
