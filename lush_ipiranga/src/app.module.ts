@@ -21,11 +21,11 @@ import { CleaningsModule } from './cleanings/cleanings.module';
 import { ApartmentInspectionModule } from './apartmentInspection/apartment-inspection.module';
 import { GovernanceModule } from './governance/governance.module';
 import { BookingsRevenueModule } from './bookingsRevenue/bookingsRevenue.module';
-import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de autenticação
 import { BookingsTotalRentalsModule } from './bookingsTotalRentals/bookingsTotalRentals.module';
 import { BookingsTicketAverageModule } from './bookingsTicketAverage/bookingsTicketAverage.module';
 import { BookingsRepresentativenessModule } from './bookingsRepresentativeness/bookingsRepresentativeness.module';
 import { BookingsModule } from './bookings/bookings.module';
+import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de autenticação
 
 @Module({
   imports: [

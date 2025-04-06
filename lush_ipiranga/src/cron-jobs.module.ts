@@ -11,6 +11,10 @@ import { KpiTotalRentalsService } from './kpiTotalRentals/kpiTotalRentals.servic
 import { KpiTrevparService } from './kpiTrevpar/kpiTrevpar.service';
 import { CleaningsService } from './cleanings/cleanings.service';
 import { ApartmentInspectionService } from './apartmentInspection/apartment-inspection.service';
+import { BookingsTotalRentalsService } from './bookingsTotalRentals/bookingsTotalRentals.service';
+import { BookingsTicketAverageService } from './bookingsTicketAverage/bookingsTicketAverage.service';
+import { BookingsRepresentativenessService } from './bookingsRepresentativeness/bookingsRepresentativeness.service';
+import { BookingsRevenueService } from './bookingsRevenue/bookingsRevenue.service';
 
 @Module({
   imports: [],
@@ -27,6 +31,10 @@ import { ApartmentInspectionService } from './apartmentInspection/apartment-insp
     KpiTrevparService,
     CleaningsService,
     ApartmentInspectionService,
+    BookingsRevenueService,
+    BookingsTotalRentalsService,
+    BookingsTicketAverageService,
+    BookingsRepresentativenessService,
   ],
 })
 export class CronJobsModule {}

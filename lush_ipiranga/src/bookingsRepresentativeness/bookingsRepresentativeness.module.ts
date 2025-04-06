@@ -5,5 +5,6 @@ import { BookingsRepresentativenessController } from './bookingsRepresentativene
 @Module({
   controllers: [BookingsRepresentativenessController],
   providers: [BookingsRepresentativenessService],
+  exports: [BookingsRepresentativenessService],
 })
 export class BookingsRepresentativenessModule {}

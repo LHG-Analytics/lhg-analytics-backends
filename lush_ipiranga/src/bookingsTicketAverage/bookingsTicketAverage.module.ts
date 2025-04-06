@@ -5,5 +5,6 @@ import { BookingsTicketAverageController } from './bookingsTicketAverage.control
 @Module({
   controllers: [BookingsTicketAverageController],
   providers: [BookingsTicketAverageService],
+  exports: [BookingsTicketAverageService],
 })
 export class BookingsTicketAverageModule {}
