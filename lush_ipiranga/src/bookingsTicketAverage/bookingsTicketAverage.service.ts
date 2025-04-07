@@ -264,7 +264,7 @@ export class BookingsTicketAverageService {
         totalAllTicketAverage: new Prisma.Decimal(totalAllTicketAverage),
         totalTicketAverage: new Prisma.Decimal(average),
         period: period,
-        createdDate: adjustedEndDate,
+        createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
         companyId,
         channelType: channel as ChannelTypeEnum, // Passa o tipo convertido
       });

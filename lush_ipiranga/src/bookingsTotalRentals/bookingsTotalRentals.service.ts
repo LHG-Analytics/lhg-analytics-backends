@@ -69,7 +69,7 @@ export class BookingsTotalRentalsService {
         totalAllBookings,
         companyId,
         period: period || null,
-        createdDate: adjustedEndDate,
+        createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
       });
 
       return {
@@ -182,7 +182,7 @@ export class BookingsTotalRentalsService {
           totalBookings: count,
           companyId,
           period: period,
-          createdDate: adjustedEndDate,
+          createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
           rentalType: rentalTypeEnum, // Passa o tipo convertido
         });
       }
@@ -226,63 +226,95 @@ export class BookingsTotalRentalsService {
       const results: { [key: string]: any } = {}; // Armazenar resultados
 
       let currentDate = new Date(startDate);
-      currentDate.setUTCHours(6, 0, 0, 0); // Início do dia contábil às 06:00:00
+      currentDate.setUTCHours(0, 0, 0, 0); // Início do dia contábil às 00:00:00
 
-      while (currentDate < endDate) {
-        let nextDate = new Date(currentDate);
+      // Ajustar endDate para o final do dia anterior
+      let adjustedEndDate = new Date(endDate);
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Um dia antes
+      adjustedEndDate.setUTCHours(23, 59, 59, 999); // Fim do dia contábil
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
-          // Para LAST_7_D e LAST_30_D, iteração diária
-          nextDate.setDate(nextDate.getDate() + 1);
-          nextDate.setUTCHours(5, 59, 59, 999); // Fim do dia contábil às 05:59:59 do próximo dia
-        } else if (period === PeriodEnum.LAST_6_M) {
-          // Para LAST_6_M, iteração mensal
-          nextDate.setMonth(nextDate.getMonth() + 1);
-          nextDate.setUTCHours(5, 59, 59, 999); // Fim do mês contábil
-        }
+      if (period === PeriodEnum.LAST_6_M) {
+        // Para LAST_6_M, iteração mensal
+        for (let i = 0; i < 6; i++) {
+          // Define currentDate como o dia atual menos um dia
+          currentDate.setMonth(currentDate.getMonth() - 1); // Retrocede um mês
+          const monthStartDate = new Date(currentDate);
+          monthStartDate.setUTCHours(0, 0, 0, 0); // Início do mês
 
-        // Consultar as reservas no período
-        const allBookings = await this.prisma.prismaLocal.booking.findMany({
-          where: {
-            dateService: {
-              gte: currentDate,
-              lte: nextDate,
+          const monthEndDate = new Date(currentDate);
+          monthEndDate.setUTCHours(23, 59, 59, 999); // Fim do mês
+
+          // Consultar as reservas no período
+          const allBookings = await this.prisma.prismaLocal.booking.findMany({
+            where: {
+              dateService: {
+                gte: monthStartDate,
+                lte: monthEndDate,
+              },
+              canceled: {
+                equals: null,
+              },
             },
-            canceled: {
-              equals: null,
-            },
-          },
-        });
+          });
 
-        // Contar o total de reservas
-        const totalBookingsForCurrentPeriod = allBookings.length;
+          // Contar o total de reservas
+          const totalBookingsForCurrentPeriod = allBookings.length;
 
-        // Adicionar o resultado ao objeto de resultados
-        const dateKey = currentDate.toISOString().split('T')[0]; // Formatar a data para YYYY-MM-DD
-        results[dateKey] = {
-          totalBookings: totalBookingsForCurrentPeriod,
-        };
+          // Adicionar o resultado ao objeto de resultados
+          const dateKey = monthStartDate.toISOString().split('T')[0]; // Formatar a data para YYYY-MM-DD
+          results[dateKey] = {
+            totalBookings: totalBookingsForCurrentPeriod,
+          };
 
-        let createdDateWithTime;
-        if (period === PeriodEnum.LAST_6_M) {
-          // Cria uma nova instância de Date, subtraindo 1 dia de currentDate
-          createdDateWithTime = new Date(currentDate);
-          createdDateWithTime.setDate(createdDateWithTime.getDate() - 1); // Remove 1 dia
-          createdDateWithTime.setUTCHours(5, 59, 59, 999); // Define a hora
-        } else {
-          createdDateWithTime = new Date(currentDate);
-          createdDateWithTime.setUTCHours(5, 59, 59, 999);
+          // Inserir os dados no banco de dados
+          await this.insertBookingsTotalRentalsByPeriod({
+            totalBookings: totalBookingsForCurrentPeriod,
+            period: period,
+            createdDate: new Date(monthEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+            companyId: 1,
+          });
         }
+      } else {
+        // Para LAST_7_D e LAST_30_D, iteração diária
+        while (currentDate <= adjustedEndDate) {
+          // Definir nextDate como o final do dia atual
+          let nextDate = new Date(currentDate);
+          nextDate.setUTCHours(23, 59, 59, 999); // Fim do dia contábil
 
-        // Inserir os dados no banco de dados
-        await this.insertBookingsTotalRentalsByPeriod({
-          totalBookings: totalBookingsForCurrentPeriod,
-          period: period,
-          createdDate: createdDateWithTime,
-          companyId: 1,
-        });
+          // Consultar as reservas no período
+          const allBookings = await this.prisma.prismaLocal.booking.findMany({
+            where: {
+              dateService: {
+                gte: currentDate,
+                lte: nextDate,
+              },
+              canceled: {
+                equals: null,
+              },
+            },
+          });
 
-        currentDate = new Date(nextDate);
+          // Contar o total de reservas
+          const totalBookingsForCurrentPeriod = allBookings.length;
+
+          // Adicionar o resultado ao objeto de resultados
+          const dateKey = currentDate.toISOString().split('T')[0]; // Formatar a data para YYYY-MM-DD
+          results[dateKey] = {
+            totalBookings: totalBookingsForCurrentPeriod,
+          };
+
+          // Inserir os dados no banco de dados
+          await this.insertBookingsTotalRentalsByPeriod({
+            totalBookings: totalBookingsForCurrentPeriod,
+            period: period,
+            createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+            companyId: 1,
+          });
+
+          // Atualiza currentDate para o próximo dia
+          currentDate.setDate(currentDate.getDate() + 1); // Avança para o próximo dia
+          currentDate.setUTCHours(0, 0, 0, 0); // Reinicia para o início do próximo dia
+        }
       }
 
       // Formatar o resultado final
@@ -430,7 +462,7 @@ export class BookingsTotalRentalsService {
           totalAllBookings, // Total de reservas de todos os canais
           companyId,
           period: period,
-          createdDate: adjustedEndDate,
+          createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
           channelType: channelTypeEnum, // Passa o tipo convertido
         });
       }
