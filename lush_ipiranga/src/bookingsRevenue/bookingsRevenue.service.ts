@@ -105,7 +105,6 @@ export class BookingsRevenueService {
       if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
-        adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1); // Para LAST_6_M, subtrair um mês
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       }
 
@@ -173,10 +172,11 @@ export class BookingsRevenueService {
     const companyId = 1;
 
     const adjustedEndDate = new Date(endDate);
-    if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
-      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
-    } else if (period === PeriodEnum.LAST_6_M) {
-      adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1); // Para LAST_6_M, subtrair um mês
+    if (
+      period === PeriodEnum.LAST_7_D ||
+      period === PeriodEnum.LAST_30_D ||
+      period === PeriodEnum.LAST_6_M
+    ) {
       adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
     }
 
@@ -255,6 +255,10 @@ export class BookingsRevenueService {
       new Prisma.Decimal(0),
     );
 
+    // Definir a data de criação como a data ajustada
+    const createdDate = new Date(adjustedEndDate);
+    createdDate.setUTCHours(5, 59, 59, 999); // Ajusta a hora para 05:59
+
     // Inserir ou atualizar os resultados na tabela BookingsByChannelType
     for (const [channelType, totalValue] of revenueByChannelType.entries()) {
       await this.insertBookingsRevenueByChannelType({
@@ -262,7 +266,7 @@ export class BookingsRevenueService {
         period,
         totalValue,
         totalAllValue, // O totalAllValue é o mesmo para todos os channelTypes
-        createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
+        createdDate, // Usar a data de criação ajustada
         companyId,
       });
     }
@@ -438,9 +442,6 @@ export class BookingsRevenueService {
     const adjustedEndDate = new Date(endDate);
     if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
       adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
-    } else if (period === PeriodEnum.LAST_6_M) {
-      adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1); // Para LAST_6_M, subtrair um mês
-      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
     }
 
     // Buscar todas as reservas e os novos lançamentos
@@ -486,9 +487,13 @@ export class BookingsRevenueService {
 
     // Monta o resultado total agregado e insere no banco de dados
     for (const [paymentName, totalValue] of revenueByPaymentMethod.entries()) {
+      let createdDate = new Date(); // Data atual
+      createdDate.setDate(createdDate.getDate() - 1); // Define como o dia anterior
+      createdDate.setUTCHours(5, 59, 59, 999); // Ajusta a hora para 05:59
+
       await this.insertBookingsRevenueByPaymentMethod({
         totalValue,
-        createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
+        createdDate,
         period: period,
         paymentMethod: paymentName, // Nome do meio de pagamento
         companyId,

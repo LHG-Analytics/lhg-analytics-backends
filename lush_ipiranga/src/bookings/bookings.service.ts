@@ -202,7 +202,7 @@ export class BookingsService {
         where: {
           period: period,
           createdDate: {
-            gte: endDate,
+            gte: startDate,
           },
         },
         select: {
@@ -235,7 +235,7 @@ export class BookingsService {
         where: {
           period: period,
           createdDate: {
-            gte: endDate,
+            gte: startDate,
           },
         },
         select: {
@@ -433,8 +433,7 @@ export class BookingsService {
         where: {
           period: period,
           createdDate: {
-            gte: startDate,
-            lte: endDate,
+            gte: endDate,
           },
           channelType: {
             in: ['WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'], // Filtra apenas os canais desejados
@@ -717,19 +716,20 @@ export class BookingsService {
           BookingsTotalRentalsByChannelTypeEcommerce._sum.totalBookings || 0,
         ),
         totalAllTicketAverage: Number(
-          (
-            BookingsRevenueByChannelTypeEcommerce._sum.totalValue.dividedBy(
-              BookingsTotalRentalsByChannelTypeEcommerce._sum.totalBookings,
-            ) || 0
-          ).toFixed(2),
+          BookingsRevenueByChannelTypeEcommerce._sum.totalValue
+            .dividedBy(
+              BookingsTotalRentalsByChannelTypeEcommerce._sum.totalBookings ||
+                1, // Usar 1 como divisor padrão para evitar divisão por zero
+            )
+            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
         ),
 
         totalAllRepresentativeness: Number(
-          (
-            BookingsRevenueByChannelTypeEcommerce._sum.totalValue.dividedBy(
-              KpiRevenue[0].totalAllValue,
-            ) || 0
-          ).toFixed(2),
+          BookingsRevenueByChannelTypeEcommerce._sum.totalValue
+            .dividedBy(
+              KpiRevenue[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
+            )
+            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
         ),
       },
 
@@ -743,20 +743,20 @@ export class BookingsService {
             .totalBookings || 0,
         ),
         totalAllTicketAveragePreviousData: Number(
-          (
-            BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue.dividedBy(
+          BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue
+            .dividedBy(
               BookingsTotalRentalsByChannelTypeEcommercePrevious._sum
-                .totalBookings,
-            ) || 0
-          ).toFixed(2),
+                .totalBookings || 1, // Usar 1 como divisor padrão para evitar divisão por zero
+            )
+            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
         ),
 
         totalAllRepresentativenessPreviousData: Number(
-          (
-            BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue.dividedBy(
-              KpiRevenuePreviousData[0].totalAllValue,
-            ) || 0
-          ).toFixed(2),
+          BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue
+            .dividedBy(
+              KpiRevenuePreviousData[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
+            )
+            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
         ),
       },
     };
@@ -981,7 +981,9 @@ export class BookingsService {
       const totalRevenue = totalSaleDirect.plus(totalValueForRentalApartments);
 
       // Calcular o total de representatividade
-      const totalAllRepresentativeness = totalAllValue.dividedBy(totalRevenue);
+      const totalAllRepresentativeness = totalRevenue
+        ? totalAllValue.dividedBy(totalRevenue)
+        : new Prisma.Decimal(0);
 
       const bigNumbers = {
         currentDate: {
