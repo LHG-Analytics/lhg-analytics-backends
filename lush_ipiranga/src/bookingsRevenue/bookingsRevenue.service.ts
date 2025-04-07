@@ -98,8 +98,6 @@ export class BookingsRevenueService {
     period?: PeriodEnum,
   ): Promise<any> {
     try {
-      console.log('startDate TESTE:', startDate);
-      console.log('endDate TESTE:', endDate);
       const companyId = 1;
 
       // Ajustar a data final para não incluir a data atual
@@ -125,8 +123,6 @@ export class BookingsRevenueService {
       const totalAllValue = allBookingsRevenue.reduce((total, booking) => {
         return total.plus(Number(booking.priceRental));
       }, new Prisma.Decimal(0));
-
-      console.log('totalAllValue:', totalAllValue);
 
       // Inserir a receita de reservas no banco de dados
       await this.insertBookingsRevenue({

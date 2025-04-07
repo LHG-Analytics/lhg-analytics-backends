@@ -57,8 +57,6 @@ export class BookingsTicketAverageService {
     period?: PeriodEnum,
   ): Promise<any> {
     try {
-      console.log('startDate TESTE:', startDate);
-      console.log('endDate TESTE:', endDate);
       const companyId = 1; // Defina o ID da empresa conforme necessário
 
       const adjustedEndDate = new Date(endDate);
@@ -77,18 +75,19 @@ export class BookingsTicketAverageService {
 
       // Calcular o total de priceRental
       const totalPriceRental = allBookings.reduce((total, booking) => {
-        return total.plus(Number(booking.priceRental));
+        const price = booking.priceRental
+          ? new Prisma.Decimal(booking.priceRental)
+          : new Prisma.Decimal(0);
+        return total.plus(price);
       }, new Prisma.Decimal(0));
-
-      console.log('totalPriceRental do ticketAverage:', totalPriceRental);
 
       let totalBookings = allBookings.length;
 
-      // Calcular a média
+      // Calcular a média usando Prisma.Decimal
       const averageTicket =
-        totalBookings > 0 ? Number(totalPriceRental) / totalBookings : 0;
-
-      console.log('totalBookings do ticketAverage:', totalBookings);
+        totalBookings > 0
+          ? totalPriceRental.dividedBy(totalBookings).toNumber()
+          : 0;
 
       // Monta o resultado total
       const totalResult = {
@@ -227,9 +226,11 @@ export class BookingsTicketAverageService {
       );
 
       if (channelType) {
-        channelTotals[channelType].total = channelTotals[
-          channelType
-        ].total.plus(new Prisma.Decimal(booking.priceRental));
+        const priceRental = booking.priceRental
+          ? new Prisma.Decimal(booking.priceRental)
+          : new Prisma.Decimal(0);
+        channelTotals[channelType].total =
+          channelTotals[channelType].total.plus(priceRental);
         channelTotals[channelType].count++;
       }
     }
