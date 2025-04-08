@@ -70,7 +70,7 @@ export class BookingsService {
 
       case PeriodEnum.LAST_6_M:
         // Período atual: últimos 6 meses
-        startDate = endDate.clone().subtract(6, 'months').set({
+        startDate = endDate.clone().subtract(5, 'months').set({
           hour: 5,
           minute: 59,
           second: 59,

@@ -207,15 +207,23 @@ export class BookingsRevenueService {
       dateService: Date,
       startDate: Date,
     ): ChannelTypeEnum | null => {
+      const isSameDate = (date1: Date, date2: Date) => {
+        return (
+          date1.getFullYear() === date2.getFullYear() &&
+          date1.getMonth() === date2.getMonth() &&
+          date1.getDate() === date2.getDate()
+        );
+      };
+
       switch (idTypeOriginBooking) {
         case 1: // SISTEMA
           return ChannelTypeEnum.INTERNAL;
         case 3: // GUIA_DE_MOTEIS
-          return dateService.toDateString() === startDate.toDateString()
+          return isSameDate(dateService, startDate)
             ? ChannelTypeEnum.GUIA_GO
             : ChannelTypeEnum.GUIA_SCHEDULED;
         case 4: // RESERVA_API
-          return dateService.toDateString() === startDate.toDateString()
+          return isSameDate(dateService, startDate)
             ? ChannelTypeEnum.WEBSITE_IMMEDIATE
             : ChannelTypeEnum.WEBSITE_SCHEDULED;
         case 6: // INTERNA

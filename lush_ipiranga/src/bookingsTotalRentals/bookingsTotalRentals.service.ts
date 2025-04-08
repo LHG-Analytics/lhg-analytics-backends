@@ -361,10 +361,13 @@ export class BookingsTotalRentalsService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+
+      if (
+        period === PeriodEnum.LAST_7_D ||
+        period === PeriodEnum.LAST_30_D ||
+        period === PeriodEnum.LAST_6_M
+      ) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
-      } else if (period === PeriodEnum.LAST_6_M) {
-        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
       }
 
       const allBookings = await this.prisma.prismaLocal.booking.findMany({
@@ -377,8 +380,10 @@ export class BookingsTotalRentalsService {
             equals: null,
           },
         },
-        include: {
+        select: {
           originBooking: true, // Inclui os dados da origem da reserva
+          startDate: true,
+          dateService: true,
         },
       });
 
@@ -403,15 +408,23 @@ export class BookingsTotalRentalsService {
         dateService: Date,
         startDate: Date,
       ): ChannelTypeEnum | null => {
+        const isSameDate = (date1: Date, date2: Date) => {
+          return (
+            date1.getFullYear() === date2.getFullYear() &&
+            date1.getMonth() === date2.getMonth() &&
+            date1.getDate() === date2.getDate()
+          );
+        };
+
         switch (idTypeOriginBooking) {
           case 1: // SISTEMA
             return ChannelTypeEnum.INTERNAL;
           case 3: // GUIA_DE_MOTEIS
-            return dateService.toDateString() === startDate.toDateString()
+            return isSameDate(dateService, startDate)
               ? ChannelTypeEnum.GUIA_GO
               : ChannelTypeEnum.GUIA_SCHEDULED;
           case 4: // RESERVA_API
-            return dateService.toDateString() === startDate.toDateString()
+            return isSameDate(dateService, startDate)
               ? ChannelTypeEnum.WEBSITE_IMMEDIATE
               : ChannelTypeEnum.WEBSITE_SCHEDULED;
           case 6: // INTERNA
@@ -430,7 +443,7 @@ export class BookingsTotalRentalsService {
         const channelType = getChannelType(
           booking.originBooking.id, // Acessa o idTypeOriginBooking da reserva
           booking.dateService, // Acessa a data do serviço
-          startDate, // Passa a data de início
+          booking.startDate, // Passa a data de início
         );
 
         // Incrementa o contador para o tipo de canal correspondente
@@ -505,66 +518,101 @@ export class BookingsTotalRentalsService {
       const results: { [key: string]: any } = {}; // Armazenar resultados
 
       let currentDate = new Date(startDate);
-      currentDate.setUTCHours(6, 0, 0, 0); // Início do dia contábil às 06:00:00
+      currentDate.setUTCHours(0, 0, 0, 0); // Início do dia contábil às 06:00:00
 
-      while (currentDate < endDate) {
-        let nextDate = new Date(currentDate);
+      // Ajustar endDate para o final do dia anterior
+      let adjustedEndDate = new Date(endDate);
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Um dia antes
+      adjustedEndDate.setUTCHours(23, 59, 59, 999); // Fim do dia contábil
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
-          // Para LAST_7_D e LAST_30_D, iteração diária
-          nextDate.setDate(nextDate.getDate() + 1);
-          nextDate.setUTCHours(23, 59, 59, 999); // Fim do dia contábil às 05:59:59 do próximo dia
-        } else if (period === PeriodEnum.LAST_6_M) {
-          // Para LAST_6_M, iteração mensal
-          nextDate.setMonth(nextDate.getMonth() + 1);
-          nextDate.setUTCHours(23, 59, 59, 999); // Fim do mês contábil
+      if (period === PeriodEnum.LAST_6_M) {
+        // Para LAST_6_M, iteração mensal
+        for (let i = 0; i < 6; i++) {
+          // Define currentDate como o dia atual menos um dia
+          currentDate.setMonth(currentDate.getMonth() - 1); // Retrocede um mês
+          const monthStartDate = new Date(currentDate);
+          monthStartDate.setUTCHours(0, 0, 0, 0); // Início do mês
+
+          const monthEndDate = new Date(currentDate);
+          monthEndDate.setUTCHours(23, 59, 59, 999); // Fim do mês
+
+          // Consultar as reservas no período
+          const allBookings = await this.prisma.prismaLocal.booking.findMany({
+            where: {
+              dateService: {
+                gte: monthStartDate,
+                lte: monthEndDate,
+              },
+              canceled: {
+                equals: null,
+              },
+              idTypeOriginBooking: {
+                equals: 4,
+              },
+            },
+          });
+
+          // Contar o total de reservas
+          const totalBookingsForCurrentPeriod = allBookings.length;
+
+          // Adicionar o resultado ao objeto de resultados
+          const dateKey = monthStartDate.toISOString().split('T')[0]; // Formatar a data para YYYY-MM-DD
+          results[dateKey] = {
+            totalBookings: totalBookingsForCurrentPeriod,
+          };
+
+          // Inserir os dados no banco de dados
+          await this.insertBookingsTotalRentalsByPeriodEcommerce({
+            totalBookings: totalBookingsForCurrentPeriod,
+            period: period,
+            createdDate: new Date(monthEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+            companyId: 1,
+          });
         }
+      } else {
+        // Para LAST_7_D e LAST_30_D, iteração diária
+        while (currentDate <= adjustedEndDate) {
+          // Definir nextDate como o final do dia atual
+          let nextDate = new Date(currentDate);
+          nextDate.setUTCHours(23, 59, 59, 999); // Fim do dia contábil
 
-        // Consultar as reservas no período
-        const allBookings = await this.prisma.prismaLocal.booking.findMany({
-          where: {
-            dateService: {
-              gte: currentDate,
-              lte: nextDate,
+          // Consultar as reservas no período
+          const allBookings = await this.prisma.prismaLocal.booking.findMany({
+            where: {
+              dateService: {
+                gte: currentDate,
+                lte: nextDate,
+              },
+              canceled: {
+                equals: null,
+              },
+              idTypeOriginBooking: {
+                equals: 4,
+              },
             },
-            canceled: {
-              equals: null,
-            },
-            idTypeOriginBooking: {
-              equals: 4,
-            },
-          },
-        });
+          });
 
-        // Contar o total de reservas
-        const totalBookingsForCurrentPeriod = allBookings.length;
+          // Contar o total de reservas
+          const totalBookingsForCurrentPeriod = allBookings.length;
 
-        // Adicionar o resultado ao objeto de resultados
-        const dateKey = currentDate.toISOString().split('T')[0]; // Formatar a data para YYYY-MM-DD
-        results[dateKey] = {
-          totalBookings: totalBookingsForCurrentPeriod,
-        };
+          // Adicionar o resultado ao objeto de resultados
+          const dateKey = currentDate.toISOString().split('T')[0]; // Formatar a data para YYYY-MM-DD
+          results[dateKey] = {
+            totalBookings: totalBookingsForCurrentPeriod,
+          };
 
-        let createdDateWithTime;
-        if (period === PeriodEnum.LAST_6_M) {
-          // Cria uma nova instância de Date, subtraindo 1 dia de currentDate
-          createdDateWithTime = new Date(currentDate);
-          createdDateWithTime.setDate(createdDateWithTime.getDate() - 1); // Remove 1 dia
-          createdDateWithTime.setUTCHours(5, 59, 59, 999); // Define a hora
-        } else {
-          createdDateWithTime = new Date(currentDate);
-          createdDateWithTime.setUTCHours(5, 59, 59, 999);
+          // Inserir os dados no banco de dados
+          await this.insertBookingsTotalRentalsByPeriodEcommerce({
+            totalBookings: totalBookingsForCurrentPeriod,
+            period: period,
+            createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+            companyId: 1,
+          });
+
+          // Atualiza currentDate para o próximo dia
+          currentDate.setDate(currentDate.getDate() + 1); // Avança para o próximo dia
+          currentDate.setUTCHours(0, 0, 0, 0); // Reinicia para o início do próximo dia
         }
-
-        // Inserir os dados no banco de dados
-        await this.insertBookingsTotalRentalsByPeriodEcommerce({
-          totalBookings: totalBookingsForCurrentPeriod,
-          period: period,
-          createdDate: createdDateWithTime,
-          companyId: 1,
-        });
-
-        currentDate = new Date(nextDate);
       }
 
       // Formatar o resultado final
