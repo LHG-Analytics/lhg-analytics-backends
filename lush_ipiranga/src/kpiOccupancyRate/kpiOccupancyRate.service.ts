@@ -862,7 +862,6 @@ export class KpiOccupancyRateService {
     endDate: Date,
     period: PeriodEnum,
   ): Promise<void> {
-    console.log('Início da função calculateOccupancyRateByWeek');
     try {
       const occupancyByCategoryAndDay: { [key: string]: any } = {};
       const timezone = 'America/Sao_Paulo';
