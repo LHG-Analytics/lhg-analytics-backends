@@ -319,7 +319,7 @@ export class BookingsTicketAverageService {
     const currentDate = moment().tz(timezone).toDate();
 
     // Últimos 7 dias
-    const endDateLast7Days = new Date(currentDate);
+    const endDateLast7Days = currentDate;
     endDateLast7Days.setDate(endDateLast7Days.getDate() - 1); // Exclui o dia de hoje
     endDateLast7Days.setHours(23, 59, 59, 999);
 
