@@ -59,8 +59,8 @@ export class BookingsTicketAverageService {
     try {
       const companyId = 1; // Defina o ID da empresa conforme necessário
 
-      console.log('startDate do ticketAverage ChannelType:', startDate);
-      console.log('endDate do ticketAverage ChannelType:', endDate);
+      console.log('startDate do findAllBookingsTicketAverage:', startDate);
+      console.log('endDate do findAllBookingsTicketAverage:', endDate);
 
       const adjustedEndDate = new Date(endDate);
       if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
@@ -319,7 +319,6 @@ export class BookingsTicketAverageService {
 
     // Últimos 7 dias
     const endDateLast7Days = new Date(currentDate);
-    endDateLast7Days.setDate(endDateLast7Days.getDate() - 1); // Exclui o dia de hoje
     endDateLast7Days.setHours(23, 59, 59, 999);
 
     const startDateLast7Days = new Date(endDateLast7Days);
@@ -339,7 +338,7 @@ export class BookingsTicketAverageService {
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
     previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
+      previousStartDateLast7Days.getDate() - 6,
     );
     previousStartDateLast7Days.setHours(0, 0, 0, 0);
 
@@ -392,7 +391,6 @@ export class BookingsTicketAverageService {
 
     // Últimos 30 dias
     const endDateLast30Days = new Date(currentDate);
-    endDateLast30Days.setDate(endDateLast30Days.getDate() - 1); // Exclui o dia de hoje
     endDateLast30Days.setHours(23, 59, 59, 999);
 
     const startDateLast30Days = new Date(endDateLast30Days);
@@ -414,7 +412,7 @@ export class BookingsTicketAverageService {
       previousParsedEndDateLast30Days,
     );
     previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
+      previousStartDateLast30Days.getDate() - 29,
     );
     previousStartDateLast30Days.setHours(0, 0, 0, 0);
 
@@ -467,7 +465,6 @@ export class BookingsTicketAverageService {
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = new Date(currentDate);
-    endDateLast6Months.setDate(endDateLast6Months.getDate() - 1); // Exclui o dia de hoje
     endDateLast6Months.setHours(23, 59, 59, 999);
 
     const startDateLast6Months = new Date(endDateLast6Months);
