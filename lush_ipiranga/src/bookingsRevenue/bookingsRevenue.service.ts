@@ -678,12 +678,11 @@ export class BookingsRevenueService {
     const currentDate = moment().tz(timezone).toDate();
 
     // Últimos 7 dias
-    const endDateLast7Days = new Date(currentDate);
-    endDateLast7Days.setDate(endDateLast7Days.getDate() - 1); // Exclui o dia de hoje
-    endDateLast7Days.setHours(23, 59, 59, 999);
+    const endDateLast7Days = currentDate;
+    endDateLast7Days.setUTCHours(23, 59, 59, 999);
 
     const startDateLast7Days = new Date(endDateLast7Days);
-    startDateLast7Days.setDate(startDateLast7Days.getDate() - 6); // Vai 6 dias para trás
+    startDateLast7Days.setDate(startDateLast7Days.getDate() - 7); // Vai 6 dias para trás
     startDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -772,11 +771,10 @@ export class BookingsRevenueService {
 
     // Últimos 30 dias
     const endDateLast30Days = new Date(currentDate);
-    endDateLast30Days.setDate(endDateLast30Days.getDate() - 1); // Exclui o dia de hoje
-    endDateLast30Days.setHours(23, 59, 59, 999);
+    endDateLast30Days.setUTCHours(23, 59, 59, 999);
 
     const startDateLast30Days = new Date(endDateLast30Days);
-    startDateLast30Days.setDate(startDateLast30Days.getDate() - 29); // Vai 29 dias para trás
+    startDateLast30Days.setDate(startDateLast30Days.getDate() - 30); // Vai 29 dias para trás
     startDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -862,8 +860,7 @@ export class BookingsRevenueService {
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = new Date(currentDate);
-    endDateLast6Months.setDate(endDateLast6Months.getDate() - 1); // Exclui o dia de hoje
-    endDateLast6Months.setHours(23, 59, 59, 999);
+    endDateLast6Months.setUTCHours(23, 59, 59, 999);
 
     const startDateLast6Months = new Date(endDateLast6Months);
     startDateLast6Months.setMonth(startDateLast6Months.getMonth() - 6); // Vai 6 meses para trás
