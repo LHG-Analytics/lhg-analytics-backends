@@ -371,8 +371,7 @@ export class BookingsService {
         where: {
           period: period,
           createdDate: {
-            gte: startDate,
-            lte: endDate,
+            gte: endDate,
           },
         },
         select: {
@@ -390,8 +389,7 @@ export class BookingsService {
         where: {
           period: period,
           createdDate: {
-            gte: startDate,
-            lte: endDate,
+            gte: endDate,
           },
         },
         select: {
@@ -410,8 +408,7 @@ export class BookingsService {
           where: {
             period: period,
             createdDate: {
-              gte: startDate,
-              lte: endDate,
+              gte: endDate,
             },
           },
           select: {
