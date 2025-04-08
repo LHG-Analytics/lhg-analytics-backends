@@ -59,6 +59,9 @@ export class BookingsTicketAverageService {
     try {
       const companyId = 1; // Defina o ID da empresa conforme necessário
 
+      console.log('startDate do ticketAverage ChannelType:', startDate);
+      console.log('endDate do ticketAverage ChannelType:', endDate);
+
       const adjustedEndDate = new Date(endDate);
       if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
@@ -139,7 +142,7 @@ export class BookingsTicketAverageService {
     const companyId = 1; // Defina o ID da empresa conforme necessário
 
     console.log('startDate do ticketAverage ChannelType:', startDate);
-    console.log('startDate do ticketAverage ChannelType:', endDate);
+    console.log('endDate do ticketAverage ChannelType:', endDate);
     // Ajustar a data final para não incluir a data atual
     const adjustedEndDate = new Date(endDate);
     console.log(
