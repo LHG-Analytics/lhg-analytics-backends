@@ -784,6 +784,7 @@ export class CleaningsService {
 
     // Obter a data atual no fuso horário correto
     const currentDate = moment().tz(timezone).toDate();
+    console.log('currentDate do handleCron:', currentDate);
 
     // Últimos 7 dias
     const endDateLast7Days = currentDate;
