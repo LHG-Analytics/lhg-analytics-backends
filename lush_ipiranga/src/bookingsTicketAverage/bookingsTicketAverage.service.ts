@@ -65,10 +65,7 @@ export class BookingsTicketAverageService {
       const adjustedEndDate = new Date(endDate);
       if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
-        console.log(
-          'adjustedEndDate do findAllBookingsTicketAverage:',
-          adjustedEndDate,
-        );
+        console.log('endDate do findAllBookingsTicketAverage:', endDate);
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       }
@@ -317,12 +314,12 @@ export class BookingsTicketAverageService {
     console.log('currentDate do handleCron:', currentDate);
 
     // Últimos 7 dias
-    const endDateLast7Days = new Date(currentDate);
-    endDateLast7Days.setDate(endDateLast7Days.getDate() - 1); // Exclui o dia de hoje
-    endDateLast7Days.setHours(23, 59, 59, 999);
+    const endDateLast7Days = currentDate;
+    endDateLast7Days.setUTCHours(23, 59, 59, 999);
+    console.log('endDateLast7Days do handleCron:', endDateLast7Days);
 
     const startDateLast7Days = new Date(endDateLast7Days);
-    startDateLast7Days.setDate(startDateLast7Days.getDate() - 6); // Vai 6 dias para trás
+    startDateLast7Days.setDate(startDateLast7Days.getDate() - 7); // Vai 6 dias para trás
     startDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
