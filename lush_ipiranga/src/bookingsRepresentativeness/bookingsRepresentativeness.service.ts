@@ -230,6 +230,8 @@ export class BookingsRepresentativenessService {
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
         } else if (period === PeriodEnum.LAST_6_M) {
           // Para LAST_6_M, iteração mensal
+          currentDate.setDate(currentDate.getDate() - 1); // Subtrai um dia
+          currentDate.setUTCHours(23, 59, 59, 999);
           nextDate.setMonth(nextDate.getMonth() + 1);
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo mês
         }
@@ -355,10 +357,14 @@ export class BookingsRepresentativenessService {
     try {
       const companyId = 1;
 
-      // Ajustar a endDate para o final do dia anterior
       const adjustedEndDate = new Date(endDate);
-      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Subtrai um dia
-      adjustedEndDate.setUTCHours(23, 59, 59, 999); // Define o final do dia
+      if (
+        period === PeriodEnum.LAST_7_D ||
+        period === PeriodEnum.LAST_30_D ||
+        period === PeriodEnum.LAST_6_M
+      ) {
+        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
+      }
 
       // Buscar todas as receitas de reservas e os tipos de origem
       const [totalSaleDirect, allRentalApartments, allBookingsRevenue] =

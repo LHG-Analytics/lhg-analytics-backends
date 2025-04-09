@@ -60,12 +60,9 @@ export class BookingsTicketAverageService {
     try {
       const companyId = 1; // Defina o ID da empresa conforme necessário
 
-      console.log('startDate do findAllBookingsTicketAverage:', startDate);
-
       const adjustedEndDate = new Date(endDate);
       if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
-        console.log('endDate do findAllBookingsTicketAverage:', endDate);
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       }

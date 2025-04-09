@@ -343,6 +343,8 @@ export class BookingsRevenueService {
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
         } else if (period === PeriodEnum.LAST_6_M) {
           // Para LAST_6_M, iteração mensal
+          currentDate.setDate(currentDate.getDate() - 1); // Subtrai um dia
+          currentDate.setUTCHours(23, 59, 59, 999);
           nextDate.setMonth(nextDate.getMonth() + 1);
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo mês
         }
@@ -571,6 +573,8 @@ export class BookingsRevenueService {
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
         } else if (period === PeriodEnum.LAST_6_M) {
           // Para LAST_6_M, iteração mensal
+          currentDate.setDate(currentDate.getDate() - 1); // Subtrai um dia
+          currentDate.setUTCHours(23, 59, 59, 999);
           nextDate.setMonth(nextDate.getMonth() + 1);
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo mês
         }
