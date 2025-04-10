@@ -103,6 +103,15 @@ export class BookingsService {
     console.log('startDatePrevious:', startDatePrevious);
     console.log('endDatePrevious:', endDatePrevious);
 
+    // Função de filtro para LAST_6_M
+    const filterByDayOfMonth = (data, dayOfMonth) => {
+      return data.filter((item) => {
+        const createdDate = moment
+          .utc(item.createdDate)
+          .tz('America/Sao_Paulo');
+        return createdDate.date() === dayOfMonth; // Verifica se o dia do mês é o mesmo
+      });
+    };
     // Consultas para buscar os dados de KPIs com base nas datas selecionadas
 
     const [
@@ -604,36 +613,67 @@ export class BookingsService {
       ),
     };
 
+    // Aplicar o filtro se o período for LAST_6_M
+    let filteredDataRevenuePeriod = BookingsRevenueByPeriod;
+    if (period === PeriodEnum.LAST_6_M) {
+      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      filteredDataRevenuePeriod = filterByDayOfMonth(
+        BookingsRevenueByPeriod,
+        dayOfMonth,
+      );
+    }
+
     const billingOfReservationsByPeriod = {
-      categories: BookingsRevenueByPeriod.map((item) =>
+      categories: filteredDataRevenuePeriod.map((item) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: BookingsRevenueByPeriod.map((item) => Number(item.totalValue)),
+      series: filteredDataRevenuePeriod.map((item) => Number(item.totalValue)),
     };
 
+    // Aplicar o filtro se o período for LAST_6_M
+    let filteredDataRepresentativenessPeriod =
+      BookingsRepresentativenessByPeriod;
+    if (period === PeriodEnum.LAST_6_M) {
+      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      filteredDataRepresentativenessPeriod = filterByDayOfMonth(
+        BookingsRepresentativenessByPeriod,
+        dayOfMonth,
+      );
+    }
+
     const representativenessOfReservesByPeriod = {
-      categories: BookingsRepresentativenessByPeriod.map((item) =>
+      categories: filteredDataRepresentativenessPeriod.map((item) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: BookingsRepresentativenessByPeriod.map((item) =>
+      series: filteredDataRepresentativenessPeriod.map((item) =>
         Number(item.totalRepresentativeness),
       ),
     };
 
+    // Aplicar o filtro se o período for LAST_6_M
+    let filteredDataTotalRentalsPeriod = BookingsTotalRentalsByPeriod;
+    if (period === PeriodEnum.LAST_6_M) {
+      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      filteredDataTotalRentalsPeriod = filterByDayOfMonth(
+        BookingsTotalRentalsByPeriod,
+        dayOfMonth,
+      );
+    }
+
     const numberOfReservationsPerPeriod = {
-      categories: BookingsTotalRentalsByPeriod.map((item) =>
+      categories: filteredDataTotalRentalsPeriod.map((item) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: BookingsTotalRentalsByPeriod.map((item) =>
+      series: filteredDataTotalRentalsPeriod.map((item) =>
         Number(item.totalBookings),
       ),
     };
@@ -758,26 +798,47 @@ export class BookingsService {
       },
     };
 
+    // Aplicar o filtro se o período for LAST_6_M
+    let filteredDataTotalRentalsByPeriodEcommerce =
+      BookingsTotalRentalsByPeriodEcommerce;
+    if (period === PeriodEnum.LAST_6_M) {
+      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      filteredDataTotalRentalsByPeriodEcommerce = filterByDayOfMonth(
+        BookingsTotalRentalsByPeriodEcommerce,
+        dayOfMonth,
+      );
+    }
+
     const reservationsOfEcommerceByPeriod = {
-      categories: BookingsTotalRentalsByPeriodEcommerce.map((item) =>
+      categories: filteredDataTotalRentalsByPeriodEcommerce.map((item) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: BookingsTotalRentalsByPeriodEcommerce.map((item) =>
+      series: filteredDataTotalRentalsByPeriodEcommerce.map((item) =>
         Number(item.totalBookings),
       ),
     };
 
+    // Aplicar o filtro se o período for LAST_6_M
+    let filteredDataRevenueByPeriodEcommerce = BookingsRevenueByPeriodEcommerce;
+    if (period === PeriodEnum.LAST_6_M) {
+      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      filteredDataRevenueByPeriodEcommerce = filterByDayOfMonth(
+        BookingsRevenueByPeriodEcommerce,
+        dayOfMonth,
+      );
+    }
+
     const billingOfEcommerceByPeriod = {
-      categories: BookingsRevenueByPeriodEcommerce.map((item) =>
+      categories: filteredDataRevenueByPeriodEcommerce.map((item) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: BookingsRevenueByPeriodEcommerce.map((item) =>
+      series: filteredDataRevenueByPeriodEcommerce.map((item) =>
         Number(item.totalValue),
       ),
     };
