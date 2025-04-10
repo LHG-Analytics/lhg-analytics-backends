@@ -1215,12 +1215,53 @@ export class BookingsService {
         seriesBookings,
       };
 
+      const billingOfReservationsByPeriod = {
+        categories: [],
+        series: [],
+      };
+
+      // Supondo que você tenha startDate e endDate definidos como moment.js
+      const currentDate = moment(startDate).utc();
+      const finalDate = moment(endDate).utc();
+
+      // Iterar sobre as datas do período
+      while (currentDate.isSameOrBefore(finalDate, 'day')) {
+        const dateKey = currentDate.format('DD/MM/YYYY'); // Formata a data como "DD/MM/YYYY"
+        let totalValueForCurrentDate = new Prisma.Decimal(0); // Inicializa o total para a data atual
+
+        // Calcular o total para a data atual
+        allBookings.forEach((booking) => {
+          const bookingDate = moment.utc(booking.dateService);
+
+          // Se a data do booking corresponder à data atual, soma o priceRental
+          if (bookingDate.isSame(currentDate, 'day')) {
+            totalValueForCurrentDate = totalValueForCurrentDate.plus(
+              new Prisma.Decimal(booking.priceRental || 0),
+            );
+          }
+        });
+
+        // Adiciona a data e o total ao objeto de retorno
+        billingOfReservationsByPeriod.categories.push(dateKey);
+        billingOfReservationsByPeriod.series.push(
+          totalValueForCurrentDate.toNumber(),
+        ); // Converte para número
+
+        // Avança para o próximo dia
+        currentDate.add(1, 'day');
+      }
+
+      // Inverter a ordem das categorias e séries para ficar em ordem decrescente
+      billingOfReservationsByPeriod.categories.reverse();
+      billingOfReservationsByPeriod.series.reverse();
+
       return {
         Company: 'Lush Ipiranga',
         BigNumbers: [bigNumbers],
         PaymentMethods: paymentMethods,
         BillingPerChannel: billingPerChannel,
         ReservationsByRentalType: reservationsByRentalType,
+        BillingOfReservationsByPeriod: billingOfReservationsByPeriod,
       };
     } catch (error) {
       console.error('Erro ao calcular os KPIs:', error);
