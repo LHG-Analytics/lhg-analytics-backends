@@ -918,6 +918,15 @@ export class BookingsService {
     }, new Prisma.Decimal(0));
   }
 
+  private async calculateTotalSaleDirectForDate(
+    date: Date,
+  ): Promise<Prisma.Decimal> {
+    const startOfDay = moment(date).startOf('day').toDate();
+    const endOfDay = moment(date).endOf('day').toDate();
+
+    return await this.calculateTotalSaleDirect(startOfDay, endOfDay);
+  }
+
   private async fetchKpiData(startDate: Date, endDate: Date) {
     return await Promise.all([
       this.prisma.prismaLocal.booking.findMany({
@@ -993,6 +1002,7 @@ export class BookingsService {
           endOccupationType: 'FINALIZADA',
         },
       }),
+      this.calculateTotalSaleDirectForDate(startDate),
     ]);
   }
 
@@ -1255,6 +1265,82 @@ export class BookingsService {
       billingOfReservationsByPeriod.categories.reverse();
       billingOfReservationsByPeriod.series.reverse();
 
+      const representativenessOfReservesByPeriod = {
+        categories: [],
+        series: [],
+      };
+
+      // Ajustar a endDate para o início do dia seguinte
+      const adjustedEndDate = moment(endDate).utc().startOf('day'); // Define o início do dia da endDate
+
+      // Iniciar currentDate no início do dia da startDate
+      let currentDateRep = moment(startDate).utc().startOf('day'); // Início do dia contábil às 00:00:00
+
+      // Iterar sobre as datas do período
+      while (currentDateRep.isSameOrBefore(adjustedEndDate, 'day')) {
+        const nextDateRep = currentDateRep.clone().add(1, 'day'); // Clona currentDateRep e avança um dia
+
+        const dateKey = currentDateRep.format('DD/MM/YYYY'); // Formata a data como "DD/MM/YYYY"
+
+        // Calcular a receita total de reservas para a data atual
+        const totalAllValue = allBookings.reduce((total, booking) => {
+          const bookingDate = moment.utc(booking.dateService);
+
+          return bookingDate.isBetween(currentDateRep, nextDateRep, null, '[]')
+            ? total.plus(new Prisma.Decimal(booking.priceRental || 0)) // Adiciona 0 se priceRental for nulo
+            : total;
+        }, new Prisma.Decimal(0));
+
+        // Calcular a receita total de locação para a data atual
+        const totalValueForRentalApartments = allRentalApartments.reduce(
+          (total, apartment) => {
+            const apartmentDate = moment.utc(apartment.checkIn);
+
+            return apartmentDate.isBetween(
+              currentDateRep,
+              nextDateRep,
+              null,
+              '[]',
+            )
+              ? total.plus(new Prisma.Decimal(apartment.totalValue || 0)) // Adiciona 0 se totalValue for nulo
+              : total;
+          },
+          new Prisma.Decimal(0),
+        );
+
+        // Calcular a receita total de vendas diretas para a data atual
+        const totalSaleDirectForDate =
+          await this.calculateTotalSaleDirectForDate(currentDateRep.toDate());
+
+        // Calcular a receita total combinada (vendas diretas + locação)
+        const totalRevenue = totalValueForRentalApartments.plus(
+          totalSaleDirectForDate,
+        );
+
+        // Calcular a representatividade
+        const representativeness =
+          totalRevenue && !totalRevenue.isZero()
+            ? Number(totalAllValue.dividedBy(totalRevenue).toFixed(2))
+            : 0; // Se totalRevenue for null ou zero, retorna 0
+
+        // Adiciona a data e a representatividade ao objeto de retorno
+        representativenessOfReservesByPeriod.categories.push(dateKey);
+        representativenessOfReservesByPeriod.series.push(representativeness);
+
+        // Exibe os resultados conforme solicitado
+        console.log(`totalAllValue: ${totalAllValue.toString()}`);
+        console.log(`totalRevenue: ${totalRevenue.toString()}`);
+        console.log(`currentDate: ${currentDateRep.toISOString()}`);
+        console.log(`nextDate: ${nextDateRep.toISOString()}`);
+
+        // Avança para o próximo dia
+        currentDateRep = nextDateRep; // Atualiza currentDateRep para o próximo dia
+      }
+
+      // Inverter a ordem das categorias e séries para ficar em ordem decrescente
+      representativenessOfReservesByPeriod.categories.reverse();
+      representativenessOfReservesByPeriod.series.reverse();
+
       return {
         Company: 'Lush Ipiranga',
         BigNumbers: [bigNumbers],
@@ -1262,6 +1348,8 @@ export class BookingsService {
         BillingPerChannel: billingPerChannel,
         ReservationsByRentalType: reservationsByRentalType,
         BillingOfReservationsByPeriod: billingOfReservationsByPeriod,
+        RepresentativenessOfReservesByPeriod:
+          representativenessOfReservesByPeriod,
       };
     } catch (error) {
       console.error('Erro ao calcular os KPIs:', error);

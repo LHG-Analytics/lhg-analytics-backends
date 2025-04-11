@@ -215,17 +215,37 @@ export class BookingsRevenueService {
         );
       };
 
+      // Função para verificar se a diferença entre duas datas é de até 1 hora
+      const isWithinOneHour = (date1: Date, date2: Date) => {
+        const differenceInMilliseconds = Math.abs(
+          date1.getTime() - date2.getTime(),
+        );
+        return differenceInMilliseconds <= 3600000; // 1 hora em milissegundos
+      };
+
       switch (idTypeOriginBooking) {
         case 1: // SISTEMA
           return ChannelTypeEnum.INTERNAL;
         case 3: // GUIA_DE_MOTEIS
-          return isSameDate(dateService, startDate)
-            ? ChannelTypeEnum.GUIA_GO
-            : ChannelTypeEnum.GUIA_SCHEDULED;
+          if (isWithinOneHour(dateService, startDate)) {
+            // Se a diferença for de até 1 hora, retorna GUIA_GO
+            return ChannelTypeEnum.GUIA_GO;
+          } else {
+            // Se não estiver dentro de 1 hora, verifica se são do mesmo dia
+            return isSameDate(dateService, startDate)
+              ? ChannelTypeEnum.GUIA_GO
+              : ChannelTypeEnum.GUIA_SCHEDULED;
+          }
         case 4: // RESERVA_API
-          return isSameDate(dateService, startDate)
-            ? ChannelTypeEnum.WEBSITE_IMMEDIATE
-            : ChannelTypeEnum.WEBSITE_SCHEDULED;
+          if (isWithinOneHour(dateService, startDate)) {
+            // Se a diferença for de até 1 hora, retorna WEBSITE_IMMEDIATE
+            return ChannelTypeEnum.WEBSITE_IMMEDIATE;
+          } else {
+            // Se não estiver dentro de 1 hora, verifica se são do mesmo dia
+            return isSameDate(dateService, startDate)
+              ? ChannelTypeEnum.WEBSITE_IMMEDIATE
+              : ChannelTypeEnum.WEBSITE_SCHEDULED;
+          }
         case 6: // INTERNA
           return ChannelTypeEnum.INTERNAL;
         case 7: // BOOKING

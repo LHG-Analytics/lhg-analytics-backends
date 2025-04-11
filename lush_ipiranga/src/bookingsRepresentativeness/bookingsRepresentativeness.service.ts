@@ -277,6 +277,7 @@ export class BookingsRepresentativenessService {
         const totalAllValue = allBookingsRevenue.reduce((total, booking) => {
           return total.plus(new Prisma.Decimal(booking.priceRental || 0)); // Adiciona 0 se priceRental for nulo
         }, new Prisma.Decimal(0));
+        console.log('totalAllValue:', totalAllValue);
 
         // Calcular a receita total de locação para o período atual
         const totalValueForRentalApartments = allRentalApartments.reduce(
@@ -291,12 +292,15 @@ export class BookingsRepresentativenessService {
           totalValueForRentalApartments,
         );
 
+        console.log('totalRevenue:', totalRevenue);
         // Calcular a representatividade
         const representativeness =
           totalRevenue && !totalRevenue.isZero()
             ? totalAllValue.dividedBy(totalRevenue).toNumber()
             : 0; // Se totalRevenue for null ou zero, retorna 0
 
+        console.log('currentDate:', currentDate);
+        console.log('nextDate:', nextDate);
         // Inserir a representatividade no banco de dados
         await this.insertBookingsRepresentativenessByPeriod({
           totalRepresentativeness: new Prisma.Decimal(representativeness),
@@ -424,17 +428,45 @@ export class BookingsRepresentativenessService {
         dateService: Date,
         startDate: Date,
       ): ChannelTypeEnum | null => {
+        const isSameDate = (date1: Date, date2: Date) => {
+          return (
+            date1.getFullYear() === date2.getFullYear() &&
+            date1.getMonth() === date2.getMonth() &&
+            date1.getDate() === date2.getDate()
+          );
+        };
+
+        // Função para verificar se a diferença entre duas datas é de até 1 hora
+        const isWithinOneHour = (date1: Date, date2: Date) => {
+          const differenceInMilliseconds = Math.abs(
+            date1.getTime() - date2.getTime(),
+          );
+          return differenceInMilliseconds <= 3600000; // 1 hora em milissegundos
+        };
+
         switch (idTypeOriginBooking) {
           case 1: // SISTEMA
             return ChannelTypeEnum.INTERNAL;
           case 3: // GUIA_DE_MOTEIS
-            return dateService.toDateString() === startDate.toDateString()
-              ? ChannelTypeEnum.GUIA_GO
-              : ChannelTypeEnum.GUIA_SCHEDULED;
+            if (isWithinOneHour(dateService, startDate)) {
+              // Se a diferença for de até 1 hora, retorna GUIA_GO
+              return ChannelTypeEnum.GUIA_GO;
+            } else {
+              // Se não estiver dentro de 1 hora, verifica se são do mesmo dia
+              return isSameDate(dateService, startDate)
+                ? ChannelTypeEnum.GUIA_GO
+                : ChannelTypeEnum.GUIA_SCHEDULED;
+            }
           case 4: // RESERVA_API
-            return dateService.toDateString() === startDate.toDateString()
-              ? ChannelTypeEnum.WEBSITE_IMMEDIATE
-              : ChannelTypeEnum.WEBSITE_SCHEDULED;
+            if (isWithinOneHour(dateService, startDate)) {
+              // Se a diferença for de até 1 hora, retorna WEBSITE_IMMEDIATE
+              return ChannelTypeEnum.WEBSITE_IMMEDIATE;
+            } else {
+              // Se não estiver dentro de 1 hora, verifica se são do mesmo dia
+              return isSameDate(dateService, startDate)
+                ? ChannelTypeEnum.WEBSITE_IMMEDIATE
+                : ChannelTypeEnum.WEBSITE_SCHEDULED;
+            }
           case 6: // INTERNA
             return ChannelTypeEnum.INTERNAL;
           case 7: // BOOKING
