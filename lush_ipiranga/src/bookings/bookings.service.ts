@@ -1007,7 +1007,11 @@ export class BookingsService {
         where: {
           checkIn: {
             gte: startDate,
-            lte: endDate,
+            lte: moment
+              .utc(endDate)
+              .add(1, 'day')
+              .set({ hour: 5, minute: 59, second: 59 })
+              .toDate(),
           },
           endOccupationType: 'FINALIZADA',
         },
@@ -1343,28 +1347,36 @@ export class BookingsService {
       const adjustedEndDate = moment(endDate).utc().startOf('day'); // Define o início do dia da endDate
 
       // Iniciar currentDate no início do dia da startDate
-      let currentDateRep = moment(startDate)
-        .utc()
-        .startOf('day')
-        .set({ hour: 6, minute: 0, second: 0 }); // Início do dia contábil às 06:00:00
+      let currentDateRep = moment(startDate).utc().startOf('day'); // Início do dia contábil às 00:00:00
 
       // Iterar sobre as datas do período
       while (currentDateRep.isSameOrBefore(adjustedEndDate, 'day')) {
-        const nextDateRep = currentDateRep
-          .clone()
-          .add(1, 'day')
-          .set({ hour: 5, minute: 59, second: 59 }); // Fim do dia contábil às 05:59:59 do próximo dia
-
         const dateKey = currentDateRep.format('DD/MM/YYYY'); // Formata a data como "DD/MM/YYYY"
+
+        // Definir o intervalo para reservas e representatividade (00:00 a 23:59)
+        const startOfDay = currentDateRep.clone().startOf('day'); // 00:00
+        const endOfDay = currentDateRep.clone().endOf('day'); // 23:59
 
         // Calcular a receita total de reservas para a data atual
         const totalAllValue = allBookings.reduce((total, booking) => {
           const bookingDate = moment.utc(booking.dateService);
 
-          return bookingDate.isBetween(currentDateRep, nextDateRep, null, '[]')
+          return bookingDate.isSameOrAfter(startOfDay) &&
+            bookingDate.isSameOrBefore(endOfDay)
             ? total.plus(new Prisma.Decimal(booking.priceRental || 0)) // Adiciona 0 se priceRental for nulo
             : total;
         }, new Prisma.Decimal(0));
+
+        console.log('RECEITA DE RESERVAS DO PERIODO:', totalAllValue);
+
+        // Definir o intervalo para locação e vendas diretas (06:00 a 05:59)
+        const rentalStartDate = currentDateRep
+          .clone()
+          .set({ hour: 6, minute: 0, second: 0 }); // 06:00
+        const rentalEndDate = currentDateRep
+          .clone()
+          .add(1, 'day')
+          .set({ hour: 5, minute: 59, second: 59 }); // 05:59 do dia seguinte
 
         // Calcular a receita total de locação para a data atual
         const totalValueForRentalApartments = allRentalApartments.reduce(
@@ -1373,7 +1385,8 @@ export class BookingsService {
 
             // Verifica se a data do check-in do apartamento está dentro do intervalo
             if (
-              apartmentDate.isBetween(currentDateRep, nextDateRep, null, '[]')
+              apartmentDate.isSameOrAfter(rentalStartDate) &&
+              apartmentDate.isSameOrBefore(rentalEndDate)
             ) {
               let priceSale = new Prisma.Decimal(0);
               let discountSale = new Prisma.Decimal(0);
@@ -1414,14 +1427,20 @@ export class BookingsService {
           new Prisma.Decimal(0),
         );
 
+        console.log(
+          'RECEITA DE LOCACAO DO PERIODO:',
+          totalValueForRentalApartments,
+        );
+
         // Calcular a receita total de vendas diretas para a data atual
         const totalSaleDirectForDate =
-          await this.calculateTotalSaleDirectForDate(currentDateRep.toDate());
+          await this.calculateTotalSaleDirectForDate(rentalStartDate.toDate());
 
         // Calcular a receita total combinada (vendas diretas + locação)
         const totalRevenue = totalValueForRentalApartments.plus(
           totalSaleDirectForDate,
         );
+        console.log('RECEITA TOTAL DO PERIODO:', totalRevenue);
 
         // Calcular a representatividade
         const representativeness =
@@ -1433,8 +1452,10 @@ export class BookingsService {
         representativenessOfReservesByPeriod.categories.push(dateKey);
         representativenessOfReservesByPeriod.series.push(representativeness);
 
+        console.log('currentDateRep:', currentDateRep);
+
         // Avança para o próximo dia
-        currentDateRep = nextDateRep; // Atualiza currentDateRep para o próximo dia
+        currentDateRep = currentDateRep.add(1, 'day'); // Atualiza currentDateRep para o próximo dia
       }
 
       // Inverter a ordem das categorias e séries para ficar em ordem decrescente
