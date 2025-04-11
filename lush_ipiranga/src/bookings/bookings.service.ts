@@ -928,32 +928,35 @@ export class BookingsService {
   }
 
   private async fetchKpiData(startDate: Date, endDate: Date) {
-    return await Promise.all([
-      this.prisma.prismaLocal.booking.findMany({
-        where: {
-          dateService: {
-            gte: startDate,
-            lte: endDate,
-          },
-          canceled: {
-            equals: null,
-          },
-          priceRental: {
-            not: null,
-          },
+    // Busca os bookings
+    const allBookings = await this.prisma.prismaLocal.booking.findMany({
+      where: {
+        dateService: {
+          gte: startDate,
+          lte: endDate,
         },
-        select: {
-          id: true,
-          priceRental: true,
-          idTypeOriginBooking: true,
-          dateService: true,
-          startDate: true,
-          rentalApartmentId: true,
-          originBooking: true,
-          rentalApartment: true,
+        canceled: {
+          equals: null,
         },
-      }),
-      this.prisma.prismaLocal.originBooking.findMany({
+        priceRental: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        priceRental: true,
+        idTypeOriginBooking: true,
+        dateService: true,
+        startDate: true,
+        rentalApartmentId: true,
+        originBooking: true,
+        rentalApartment: true,
+      },
+    });
+
+    // Busca os originBookings
+    const originBookings = await this.prisma.prismaLocal.originBooking.findMany(
+      {
         where: {
           deletionDate: {
             equals: null,
@@ -962,38 +965,45 @@ export class BookingsService {
         select: {
           typeOrigin: true,
         },
-      }),
-      this.prisma.prismaLocal.newRelease.findMany({
-        where: {
-          deletionDate: {
-            equals: null,
-          },
-          releaseType: {
-            equals: 'RESERVA',
-          },
-          maturity: {
-            equals: null,
-          },
+      },
+    );
+
+    // Busca os newReleases
+    const newReleases = await this.prisma.prismaLocal.newRelease.findMany({
+      where: {
+        deletionDate: {
+          equals: null,
         },
-        select: {
-          value: true,
-          halfPaymentId: true,
-          originalsId: true,
+        releaseType: {
+          equals: 'RESERVA',
         },
-      }),
-      this.prisma.prismaLocal.halfPayment.findMany({
-        where: {
-          deletionDate: {
-            equals: null,
-          },
+        maturity: {
+          equals: null,
         },
-        select: {
-          id: true, // Adicione o id para o mapeamento
-          name: true,
+      },
+      select: {
+        value: true,
+        halfPaymentId: true,
+        originalsId: true,
+      },
+    });
+
+    // Busca os halfPayments
+    const halfPayments = await this.prisma.prismaLocal.halfPayment.findMany({
+      where: {
+        deletionDate: {
+          equals: null,
         },
-      }),
-      this.calculateTotalSaleDirect(startDate, endDate),
-      this.prisma.prismaLocal.rentalApartment.findMany({
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    // Busca os rentalApartments
+    const allRentalApartments =
+      await this.prisma.prismaLocal.rentalApartment.findMany({
         where: {
           checkIn: {
             gte: startDate,
@@ -1001,9 +1011,67 @@ export class BookingsService {
           },
           endOccupationType: 'FINALIZADA',
         },
-      }),
-      this.calculateTotalSaleDirectForDate(startDate),
-    ]);
+        select: {
+          checkIn: true,
+          totalValue: true,
+          saleLease: true,
+          permanenceValueLiquid: true,
+        },
+      });
+
+    // Coleta todos os stockOutIds antes de fazer as consultas
+    const stockOutIds: number[] = [];
+    for (const rentalApartment of allRentalApartments) {
+      const saleLease = rentalApartment.saleLease;
+      if (saleLease && saleLease.stockOutId) {
+        stockOutIds.push(saleLease.stockOutId);
+      }
+    }
+
+    // Busca todos os stockOuts de uma vez, se houver algum
+    const stockOuts =
+      stockOutIds.length > 0
+        ? await this.prisma.prismaLocal.stockOut.findMany({
+            where: { id: { in: stockOutIds } },
+            include: {
+              stockOutItem: {
+                where: {
+                  canceled: null,
+                },
+                select: {
+                  id: true,
+                  priceSale: true,
+                  quantity: true,
+                  stockOutId: true,
+                },
+              },
+              sale: {
+                select: {
+                  discount: true,
+                },
+              },
+            },
+          })
+        : [];
+
+    const stockOutMap = new Map(
+      stockOuts.map((stockOut) => [stockOut.id, stockOut]),
+    );
+
+    const totalSaleDirect = await this.calculateTotalSaleDirect(
+      startDate,
+      endDate,
+    );
+
+    return {
+      allBookings,
+      originBookings,
+      newReleases,
+      halfPayments,
+      allRentalApartments,
+      stockOutMap,
+      totalSaleDirect,
+    };
   }
 
   async calculateKpisByDateRange(startDate: Date, endDate: Date): Promise<any> {
@@ -1013,14 +1081,15 @@ export class BookingsService {
 
       const timezone = 'America/Sao_Paulo';
 
-      const [
+      const {
         allBookings,
         originBookings,
         newReleases,
         halfPayments,
-        totalSaleDirect,
         allRentalApartments,
-      ] = await this.fetchKpiData(startDate, endDate);
+        stockOutMap,
+        totalSaleDirect,
+      } = await this.fetchKpiData(startDate, endDate);
 
       if (!allBookings || allBookings.length === 0) {
         throw new NotFoundException('No booking revenue found.');
@@ -1274,11 +1343,17 @@ export class BookingsService {
       const adjustedEndDate = moment(endDate).utc().startOf('day'); // Define o início do dia da endDate
 
       // Iniciar currentDate no início do dia da startDate
-      let currentDateRep = moment(startDate).utc().startOf('day'); // Início do dia contábil às 00:00:00
+      let currentDateRep = moment(startDate)
+        .utc()
+        .startOf('day')
+        .set({ hour: 6, minute: 0, second: 0 }); // Início do dia contábil às 06:00:00
 
       // Iterar sobre as datas do período
       while (currentDateRep.isSameOrBefore(adjustedEndDate, 'day')) {
-        const nextDateRep = currentDateRep.clone().add(1, 'day'); // Clona currentDateRep e avança um dia
+        const nextDateRep = currentDateRep
+          .clone()
+          .add(1, 'day')
+          .set({ hour: 5, minute: 59, second: 59 }); // Fim do dia contábil às 05:59:59 do próximo dia
 
         const dateKey = currentDateRep.format('DD/MM/YYYY'); // Formata a data como "DD/MM/YYYY"
 
@@ -1296,14 +1371,45 @@ export class BookingsService {
           (total, apartment) => {
             const apartmentDate = moment.utc(apartment.checkIn);
 
-            return apartmentDate.isBetween(
-              currentDateRep,
-              nextDateRep,
-              null,
-              '[]',
-            )
-              ? total.plus(new Prisma.Decimal(apartment.totalValue || 0)) // Adiciona 0 se totalValue for nulo
-              : total;
+            // Verifica se a data do check-in do apartamento está dentro do intervalo
+            if (
+              apartmentDate.isBetween(currentDateRep, nextDateRep, null, '[]')
+            ) {
+              let priceSale = new Prisma.Decimal(0);
+              let discountSale = new Prisma.Decimal(0);
+
+              // Lógica para calcular o priceSale
+              if (apartment.saleLease && apartment.saleLease.stockOutId) {
+                const stockOutSaleLease = stockOutMap.get(
+                  apartment.saleLease.stockOutId,
+                );
+                if (stockOutSaleLease) {
+                  if (Array.isArray(stockOutSaleLease.stockOutItem)) {
+                    priceSale = stockOutSaleLease.stockOutItem.reduce(
+                      (acc, current) =>
+                        acc.plus(
+                          new Prisma.Decimal(current.priceSale).times(
+                            new Prisma.Decimal(current.quantity),
+                          ),
+                        ),
+                      new Prisma.Decimal(0),
+                    );
+                    discountSale = stockOutSaleLease.sale?.discount
+                      ? new Prisma.Decimal(stockOutSaleLease.sale.discount)
+                      : new Prisma.Decimal(0);
+                    priceSale = priceSale.minus(discountSale);
+                  }
+                }
+              }
+
+              const permanenceValueLiquid = apartment.permanenceValueLiquid
+                ? new Prisma.Decimal(apartment.permanenceValueLiquid)
+                : new Prisma.Decimal(0);
+
+              // Soma priceSale e permanenceValueLiquid
+              return total.plus(priceSale).plus(permanenceValueLiquid);
+            }
+            return total; // Retorna o total inalterado se não estiver no intervalo
           },
           new Prisma.Decimal(0),
         );

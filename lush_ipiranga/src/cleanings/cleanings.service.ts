@@ -27,9 +27,6 @@ export class CleaningsService {
     try {
       const companyId = 1; // Defina o ID da empresa conforme necessário
 
-      console.log('startDate do findAllCleanings:', startDate);
-      console.log('endDate do findAllCleanings:', endDate);
-
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
       if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
@@ -784,7 +781,6 @@ export class CleaningsService {
 
     // Obter a data atual no fuso horário correto
     const currentDate = moment().tz(timezone).toDate();
-    console.log('currentDate do handleCron:', currentDate);
 
     // Últimos 7 dias
     const endDateLast7Days = currentDate;
