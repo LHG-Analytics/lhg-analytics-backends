@@ -1367,8 +1367,6 @@ export class BookingsService {
             : total;
         }, new Prisma.Decimal(0));
 
-        console.log('RECEITA DE RESERVAS DO PERIODO:', totalAllValue);
-
         // Definir o intervalo para locação e vendas diretas (06:00 a 05:59)
         const rentalStartDate = currentDateRep
           .clone()
@@ -1427,11 +1425,6 @@ export class BookingsService {
           new Prisma.Decimal(0),
         );
 
-        console.log(
-          'RECEITA DE LOCACAO DO PERIODO:',
-          totalValueForRentalApartments,
-        );
-
         // Calcular a receita total de vendas diretas para a data atual
         const totalSaleDirectForDate =
           await this.calculateTotalSaleDirectForDate(rentalStartDate.toDate());
@@ -1440,7 +1433,6 @@ export class BookingsService {
         const totalRevenue = totalValueForRentalApartments.plus(
           totalSaleDirectForDate,
         );
-        console.log('RECEITA TOTAL DO PERIODO:', totalRevenue);
 
         // Calcular a representatividade
         const representativeness =
@@ -1451,8 +1443,6 @@ export class BookingsService {
         // Adiciona a data e a representatividade ao objeto de retorno
         representativenessOfReservesByPeriod.categories.push(dateKey);
         representativenessOfReservesByPeriod.series.push(representativeness);
-
-        console.log('currentDateRep:', currentDateRep);
 
         // Avança para o próximo dia
         currentDateRep = currentDateRep.add(1, 'day'); // Atualiza currentDateRep para o próximo dia
@@ -1509,6 +1499,48 @@ export class BookingsService {
       numberOfReservationsPerPeriod.categories.reverse();
       numberOfReservationsPerPeriod.series.reverse();
 
+      const kpiTableByChannelType = {
+        bookingsTotalRentalsByChannelType: {},
+        bookingsRevenueByChannelType: {},
+        bookingsTicketAverageByChannelType: {},
+        bookingsRepresentativenessByChannelType: {},
+      };
+
+      const channelCounts = {
+        [ChannelTypeEnum.WEBSITE_SCHEDULED]: 0,
+        [ChannelTypeEnum.WEBSITE_IMMEDIATE]: 0,
+        [ChannelTypeEnum.INTERNAL]: 0,
+        [ChannelTypeEnum.GUIA_GO]: 0,
+        [ChannelTypeEnum.GUIA_SCHEDULED]: 0,
+        [ChannelTypeEnum.BOOKING]: 0,
+        [ChannelTypeEnum.EXPEDIA]: 0,
+      };
+
+      for (const booking of allBookings) {
+        const channelType = getChannelType(
+          booking.originBooking.id, // Acessa o idTypeOriginBooking da reserva
+          booking.dateService, // Acessa a data do serviço
+          booking.startDate, // Passa a data de início
+        );
+
+        // Incrementa o contador para o tipo de canal correspondente
+        if (channelType && channelCounts[channelType] !== undefined) {
+          channelCounts[channelType]++;
+        }
+      }
+
+      // Calcular o total de reservas
+      const totalAllBookingsChannelType = Object.values(channelCounts).reduce(
+        (total, count) => total + count,
+        0,
+      );
+
+      // Preenche o objeto kpiTableByChannelType com os dados calculados
+      kpiTableByChannelType.bookingsTotalRentalsByChannelType = {
+        ...channelCounts,
+        TOTALALLBOOKINGS: totalAllBookingsChannelType,
+      };
+
       return {
         Company: 'Lush Ipiranga',
         BigNumbers: [bigNumbers],
@@ -1519,6 +1551,7 @@ export class BookingsService {
         RepresentativenessOfReservesByPeriod:
           representativenessOfReservesByPeriod,
         NumberOfReservationsPerPeriod: numberOfReservationsPerPeriod,
+        KpiTableByChannelType: [kpiTableByChannelType],
       };
     } catch (error) {
       console.error('Erro ao calcular os KPIs:', error);
