@@ -277,7 +277,6 @@ export class BookingsRepresentativenessService {
         const totalAllValue = allBookingsRevenue.reduce((total, booking) => {
           return total.plus(new Prisma.Decimal(booking.priceRental || 0)); // Adiciona 0 se priceRental for nulo
         }, new Prisma.Decimal(0));
-        console.log('totalAllValue:', totalAllValue);
 
         // Calcular a receita total de locação para o período atual
         const totalValueForRentalApartments = allRentalApartments.reduce(
@@ -292,15 +291,12 @@ export class BookingsRepresentativenessService {
           totalValueForRentalApartments,
         );
 
-        console.log('totalRevenue:', totalRevenue);
         // Calcular a representatividade
         const representativeness =
           totalRevenue && !totalRevenue.isZero()
             ? totalAllValue.dividedBy(totalRevenue).toNumber()
             : 0; // Se totalRevenue for null ou zero, retorna 0
 
-        console.log('currentDate:', currentDate);
-        console.log('nextDate:', nextDate);
         // Inserir a representatividade no banco de dados
         await this.insertBookingsRepresentativenessByPeriod({
           totalRepresentativeness: new Prisma.Decimal(representativeness),
