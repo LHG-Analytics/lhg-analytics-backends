@@ -1327,12 +1327,6 @@ export class BookingsService {
         representativenessOfReservesByPeriod.categories.push(dateKey);
         representativenessOfReservesByPeriod.series.push(representativeness);
 
-        // Exibe os resultados conforme solicitado
-        console.log(`totalAllValue: ${totalAllValue.toString()}`);
-        console.log(`totalRevenue: ${totalRevenue.toString()}`);
-        console.log(`currentDate: ${currentDateRep.toISOString()}`);
-        console.log(`nextDate: ${nextDateRep.toISOString()}`);
-
         // Avança para o próximo dia
         currentDateRep = nextDateRep; // Atualiza currentDateRep para o próximo dia
       }
@@ -1340,6 +1334,53 @@ export class BookingsService {
       // Inverter a ordem das categorias e séries para ficar em ordem decrescente
       representativenessOfReservesByPeriod.categories.reverse();
       representativenessOfReservesByPeriod.series.reverse();
+
+      const numberOfReservationsPerPeriod = {
+        categories: [],
+        series: [],
+      };
+
+      // Ajustar a endDate para o início do dia seguinte
+      const adjustedEndDateBooking = moment(endDate).utc().startOf('day'); // Define o início do dia da endDate
+
+      // Iniciar currentDate no início do dia da startDate
+      let currentDateBooking = moment(startDate).utc().startOf('day'); // Início do dia contábil às 00:00:00
+
+      // Iterar sobre as datas do período
+      while (currentDateBooking.isSameOrBefore(adjustedEndDateBooking, 'day')) {
+        const nextDateBooking = currentDateBooking.clone().add(1, 'day'); // Clona currentDateRep e avança um dia
+
+        const dateKey = currentDateBooking.format('DD/MM/YYYY'); // Formata a data como "YYYY-MM-DD"
+
+        // Contar o total de reservas para a data atual
+        const totalBookingsForCurrentPeriod = allBookings.reduce(
+          (total, booking) => {
+            const bookingDate = moment.utc(booking.dateService);
+            return bookingDate.isBetween(
+              currentDateBooking,
+              nextDateBooking,
+              null,
+              '[]',
+            )
+              ? total + 1 // Incrementa o total se a data do booking estiver no intervalo
+              : total;
+          },
+          0,
+        );
+
+        // Adiciona o resultado ao objeto de resultados
+        numberOfReservationsPerPeriod.categories.push(dateKey);
+        numberOfReservationsPerPeriod.series.push(
+          totalBookingsForCurrentPeriod,
+        );
+
+        // Avança para o próximo dia
+        currentDateBooking = nextDateBooking; // Atualiza currentDateRep para o próximo dia
+      }
+
+      // Inverter a ordem das categorias e séries para ficar em ordem decrescente
+      numberOfReservationsPerPeriod.categories.reverse();
+      numberOfReservationsPerPeriod.series.reverse();
 
       return {
         Company: 'Lush Ipiranga',
@@ -1350,6 +1391,7 @@ export class BookingsService {
         BillingOfReservationsByPeriod: billingOfReservationsByPeriod,
         RepresentativenessOfReservesByPeriod:
           representativenessOfReservesByPeriod,
+        NumberOfReservationsPerPeriod: numberOfReservationsPerPeriod,
       };
     } catch (error) {
       console.error('Erro ao calcular os KPIs:', error);
