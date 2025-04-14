@@ -11,6 +11,10 @@ import { KpiTrevparService } from './kpiTrevpar/kpiTrevpar.service';
 import { CleaningsService } from './cleanings/cleanings.service';
 import { ApartmentInspectionService } from './apartmentInspection/apartment-inspection.service';
 import * as moment from 'moment-timezone';
+import { BookingsRevenueService } from './bookingsRevenue/bookingsRevenue.service';
+import { BookingsTotalRentalsService } from './bookingsTotalRentals/bookingsTotalRentals.service';
+import { BookingsTicketAverageService } from './bookingsTicketAverage/bookingsTicketAverage.service';
+import { BookingsRepresentativenessService } from './bookingsRepresentativeness/bookingsRepresentativeness.service';
 
 @Injectable()
 export class CronJobsService {
@@ -27,9 +31,13 @@ export class CronJobsService {
     private readonly kpiTrevparService: KpiTrevparService,
     private readonly cleaningsService: CleaningsService,
     private readonly apartmentInspectionService: ApartmentInspectionService,
+    private readonly bookingsRevenue: BookingsRevenueService,
+    private readonly bookingsTotalRental: BookingsTotalRentalsService,
+    private readonly bookingsTicketAverage: BookingsTicketAverageService,
+    private readonly bookingsRepresentativeness: BookingsRepresentativenessService,
   ) {}
 
-  @Cron('0 0,6 * * *', { timeZone: 'America/Sao_Paulo' })
+  @Cron('0 0,6,16 * * *', { timeZone: 'America/Sao_Paulo' })
   async scheduleDailyJobs() {
     if (this.isJobRunning) {
       console.log('O cron job já está em execução. Ignorando nova execução.');
@@ -53,6 +61,10 @@ export class CronJobsService {
       await this.kpiOccupancyRateService.handleCron();
       await this.cleaningsService.handleCron();
       await this.apartmentInspectionService.handleCron();
+      await this.bookingsRevenue.handleCron();
+      await this.bookingsTotalRental.handleCron();
+      await this.bookingsTicketAverage.handleCron();
+      await this.bookingsRepresentativeness.handleCron();
     } catch (error) {
       console.error('Erro ao executar os cron jobs:', error);
     } finally {

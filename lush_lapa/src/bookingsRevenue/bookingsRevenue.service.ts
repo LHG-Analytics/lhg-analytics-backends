@@ -11,7 +11,13 @@ import {
   Prisma,
 } from '../../dist/generated/client-online';
 import { PrismaService } from '../prisma/prisma.service';
-import { BookingsRevenue } from './entities/bookingsRevenue.entity';
+import {
+  BookingsRevenue,
+  BookingsRevenueByChannelType,
+  BookingsRevenueByPayment,
+  BookingsRevenueByPeriod,
+  BookingsRevenueByPeriodEcommerce,
+} from './entities/bookingsRevenue.entity';
 
 @Injectable()
 export class BookingsRevenueService {
@@ -24,13 +30,13 @@ export class BookingsRevenueService {
     });
   }
 
-  private async fetchKpiData(startDate: Date, endDate: Date) {
+  private async fetchKpiData(startDate: Date, adjustedEndDate: Date) {
     return await Promise.all([
       this.prisma.prismaLocal.booking.findMany({
         where: {
           dateService: {
             gte: startDate,
-            lte: endDate,
+            lte: adjustedEndDate,
           },
           canceled: {
             equals: null,
@@ -38,15 +44,14 @@ export class BookingsRevenueService {
           priceRental: {
             not: null,
           },
-          rentalApartmentId: {
-            not: null,
-          },
         },
         select: {
+          id: true,
           priceRental: true,
           idTypeOriginBooking: true,
           dateService: true,
           startDate: true,
+          rentalApartmentId: true,
         },
       }),
       this.prisma.prismaLocal.originBooking.findMany({
@@ -57,6 +62,31 @@ export class BookingsRevenueService {
         },
         select: {
           typeOrigin: true,
+        },
+      }),
+      this.prisma.prismaLocal.newRelease.findMany({
+        where: {
+          deletionDate: {
+            equals: null,
+          },
+          releaseType: {
+            equals: 'RESERVA',
+          },
+        },
+        select: {
+          halfPaymentId: true,
+          originalsId: true,
+        },
+      }),
+      this.prisma.prismaLocal.halfPayment.findMany({
+        where: {
+          deletionDate: {
+            equals: null,
+          },
+        },
+        select: {
+          id: true, // Adicione o id para o mapeamento
+          name: true,
         },
       }),
     ]);
@@ -70,16 +100,19 @@ export class BookingsRevenueService {
     try {
       const companyId = 1;
 
+      // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
       if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
-        adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1); // Para LAST_6_M, subtrair um mês
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       }
 
       // Buscar todas as receitas de reservas no intervalo de datas
-      const [allBookingsRevenue] = await this.fetchKpiData(startDate, endDate);
+      const [allBookingsRevenue] = await this.fetchKpiData(
+        startDate,
+        adjustedEndDate,
+      );
 
       if (!allBookingsRevenue || allBookingsRevenue.length === 0) {
         throw new NotFoundException('No booking revenue found.');
@@ -87,7 +120,7 @@ export class BookingsRevenueService {
 
       // Calcular o total de priceRental
       const totalAllValue = allBookingsRevenue.reduce((total, booking) => {
-        return total.plus(new Prisma.Decimal(booking.priceRental));
+        return total.plus(Number(booking.priceRental));
       }, new Prisma.Decimal(0));
 
       // Inserir a receita de reservas no banco de dados
@@ -139,15 +172,19 @@ export class BookingsRevenueService {
     const companyId = 1;
 
     const adjustedEndDate = new Date(endDate);
-    if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
-      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
-    } else if (period === PeriodEnum.LAST_6_M) {
-      adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1); // Para LAST_6_M, subtrair um mês
+    if (
+      period === PeriodEnum.LAST_7_D ||
+      period === PeriodEnum.LAST_30_D ||
+      period === PeriodEnum.LAST_6_M
+    ) {
       adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
     }
 
     // Buscar todas as receitas de reservas e os tipos de origem
-    const [allBookingsRevenue] = await this.fetchKpiData(startDate, endDate);
+    const [allBookingsRevenue] = await this.fetchKpiData(
+      startDate,
+      adjustedEndDate,
+    );
 
     if (!allBookingsRevenue || allBookingsRevenue.length === 0) {
       throw new NotFoundException('No booking revenue found.');
@@ -170,17 +207,47 @@ export class BookingsRevenueService {
       dateService: Date,
       startDate: Date,
     ): ChannelTypeEnum | null => {
+      const isSameDate = (date1: Date, date2: Date) => {
+        return (
+          date1.getFullYear() === date2.getFullYear() &&
+          date1.getMonth() === date2.getMonth() &&
+          date1.getDate() === date2.getDate()
+        );
+      };
+
+      // Função para verificar se a diferença entre duas datas é de até 1 hora
+      const isWithinOneHour = (date1: Date, date2: Date) => {
+        const differenceInMilliseconds = Math.abs(
+          date1.getTime() - date2.getTime(),
+        );
+        return differenceInMilliseconds <= 3600000; // 1 hora em milissegundos
+      };
+
       switch (idTypeOriginBooking) {
         case 1: // SISTEMA
           return ChannelTypeEnum.INTERNAL;
         case 3: // GUIA_DE_MOTEIS
-          return dateService.toDateString() === startDate.toDateString()
-            ? ChannelTypeEnum.GUIA_GO
-            : ChannelTypeEnum.GUIA_SCHEDULED;
+          if (isWithinOneHour(dateService, startDate)) {
+            // Se a diferença for de até 1 hora, retorna GUIA_GO
+            return ChannelTypeEnum.GUIA_GO;
+          } else {
+            // Se não estiver dentro de 1 hora, verifica se são do mesmo dia
+            return isSameDate(dateService, startDate)
+              ? ChannelTypeEnum.GUIA_GO
+              : ChannelTypeEnum.GUIA_SCHEDULED;
+          }
         case 4: // RESERVA_API
-          return dateService.toDateString() === startDate.toDateString()
-            ? ChannelTypeEnum.WEBSITE_IMMEDIATE
-            : ChannelTypeEnum.WEBSITE_SCHEDULED;
+          if (isWithinOneHour(dateService, startDate)) {
+            // Se a diferença for de até 1 hora, retorna WEBSITE_IMMEDIATE
+            return ChannelTypeEnum.WEBSITE_IMMEDIATE;
+          } else {
+            // Se não estiver dentro de 1 hora, verifica se são do mesmo dia
+            return isSameDate(dateService, startDate)
+              ? ChannelTypeEnum.WEBSITE_IMMEDIATE
+              : ChannelTypeEnum.WEBSITE_SCHEDULED;
+          }
+        case 6: // INTERNA
+          return ChannelTypeEnum.INTERNAL;
         case 7: // BOOKING
           return ChannelTypeEnum.BOOKING;
         case 8: // EXPEDIA
@@ -216,28 +283,19 @@ export class BookingsRevenueService {
       new Prisma.Decimal(0),
     );
 
+    // Definir a data de criação como a data ajustada
+    const createdDate = new Date(adjustedEndDate);
+    createdDate.setUTCHours(5, 59, 59, 999); // Ajusta a hora para 05:59
+
     // Inserir ou atualizar os resultados na tabela BookingsByChannelType
     for (const [channelType, totalValue] of revenueByChannelType.entries()) {
-      await this.prisma.prismaOnline.bookingsByChannelType.upsert({
-        where: {
-          period_createdDate_channelType: {
-            period: period,
-            channelType: channelType,
-            createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
-          },
-        },
-        create: {
-          period: period,
-          channelType: channelType,
-          totalValue: totalValue,
-          totalAllValue: totalAllValue,
-          createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
-          companyId: companyId,
-        },
-        update: {
-          totalValue: totalValue,
-          totalAllValue: totalAllValue,
-        },
+      await this.insertBookingsRevenueByChannelType({
+        channelType,
+        period,
+        totalValue,
+        totalAllValue, // O totalAllValue é o mesmo para todos os channelTypes
+        createdDate, // Usar a data de criação ajustada
+        companyId,
       });
     }
 
@@ -254,9 +312,27 @@ export class BookingsRevenueService {
       },
     };
 
-    console.log('result channel:', result);
-
     return result;
+  }
+
+  private async insertBookingsRevenueByChannelType(
+    data: BookingsRevenueByChannelType,
+  ): Promise<BookingsRevenueByChannelType> {
+    return this.prisma.prismaOnline.bookingsRevenueByChannelType.upsert({
+      where: {
+        period_createdDate_channelType: {
+          period: data.period,
+          createdDate: data.createdDate,
+          channelType: data.channelType,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
   }
 
   private async calculateTotalBookingRevenueByPeriod(
@@ -266,14 +342,12 @@ export class BookingsRevenueService {
   ): Promise<any> {
     try {
       const results: { [key: string]: any } = {}; // Armazenar resultados
+      const companyId = 1;
 
       // Ajustar a endDate para o final do dia anterior
       const adjustedEndDate = new Date(endDate);
       adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Subtrai um dia
       adjustedEndDate.setUTCHours(23, 59, 59, 999); // Define o final do dia
-
-      console.log('startDateByPeriod', startDate);
-      console.log('adjustedEndDateByPeriod', adjustedEndDate);
 
       // Iniciar currentDate no início do dia da startDate
       let currentDate = new Date(startDate);
@@ -289,15 +363,36 @@ export class BookingsRevenueService {
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
         } else if (period === PeriodEnum.LAST_6_M) {
           // Para LAST_6_M, iteração mensal
+          currentDate.setDate(currentDate.getDate() - 1); // Subtrai um dia
+          currentDate.setUTCHours(23, 59, 59, 999);
           nextDate.setMonth(nextDate.getMonth() + 1);
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo mês
         }
 
         // Buscar todas as receitas de reservas para o período atual
-        const [allBookingsRevenue] = await this.fetchKpiData(
-          currentDate,
-          nextDate,
-        );
+        const allBookingsRevenue =
+          await this.prisma.prismaLocal.booking.findMany({
+            where: {
+              dateService: {
+                gte: currentDate,
+                lte: nextDate,
+              },
+              canceled: {
+                equals: null,
+              },
+              priceRental: {
+                not: null,
+              },
+            },
+            select: {
+              id: true,
+              priceRental: true,
+              idTypeOriginBooking: true,
+              dateService: true,
+              startDate: true,
+              rentalApartmentId: true,
+            },
+          });
 
         let totalValueForCurrentPeriod = new Prisma.Decimal(0);
 
@@ -320,6 +415,14 @@ export class BookingsRevenueService {
           totalValue: formattedTotalValue,
         };
 
+        // Inserir a receita de reservas no banco de dados
+        await this.insertBookingsRevenueByPeriod({
+          totalValue: totalValueForCurrentPeriod,
+          createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+          period: period || null,
+          companyId,
+        });
+
         currentDate = new Date(nextDate);
       }
 
@@ -327,8 +430,6 @@ export class BookingsRevenueService {
       const totalBookingRevenueByDate = Object.keys(results).map((date) => ({
         [date]: results[date],
       }));
-
-      console.log('totalBookingRevenueByDate:', totalBookingRevenueByDate);
 
       return {
         BookingRevenueByDate: totalBookingRevenueByDate,
@@ -341,6 +442,258 @@ export class BookingsRevenueService {
     }
   }
 
+  private async insertBookingsRevenueByPeriod(
+    data: BookingsRevenueByPeriod,
+  ): Promise<BookingsRevenueByPeriod> {
+    return this.prisma.prismaOnline.bookingsRevenueByPeriod.upsert({
+      where: {
+        period_createdDate: {
+          period: data.period,
+          createdDate: data.createdDate,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
+  }
+
+  private async calculateRevenueByPaymentMethod(
+    startDate: Date,
+    endDate: Date,
+    period: PeriodEnum,
+  ): Promise<any> {
+    const companyId = 1; // Defina o ID da empresa conforme necessário
+
+    // Ajustar a data final para não incluir a data atual
+    const adjustedEndDate = new Date(endDate);
+    if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
+    }
+
+    // Buscar todas as reservas e os novos lançamentos
+    const [allBookings, originBookings, newReleases, halfPayments] =
+      await this.fetchKpiData(startDate, adjustedEndDate);
+
+    if (!allBookings || allBookings.length === 0) {
+      throw new NotFoundException('No bookings found.');
+    }
+
+    // Cria um mapa para associar halfPaymentId ao name
+    const halfPaymentMap = new Map<number, string>();
+    for (const halfPayment of halfPayments) {
+      halfPaymentMap.set(halfPayment.id, halfPayment.name);
+    }
+
+    // Inicializa um objeto para armazenar os totais por meio de pagamento
+    const revenueByPaymentMethod = new Map<string, Prisma.Decimal>(); // Mapeia o nome do meio de pagamento
+
+    // Calcular o total de priceRental por meio de pagamento
+    for (const booking of allBookings) {
+      const matchingNewRelease = newReleases.find(
+        (release) => release.originalsId === booking.id, // Comparando booking.id com release.originalsId
+      );
+
+      if (matchingNewRelease) {
+        const halfPaymentId = matchingNewRelease.halfPaymentId;
+        const paymentName = halfPaymentMap.get(halfPaymentId); // Obtém o nome do meio de pagamento
+
+        // Inicializa o total para o meio de pagamento se não existir
+        if (!revenueByPaymentMethod.has(paymentName)) {
+          revenueByPaymentMethod.set(paymentName, new Prisma.Decimal(0));
+        }
+
+        // Acumula o valor atual ao total existente
+        const currentTotal = revenueByPaymentMethod.get(paymentName);
+        revenueByPaymentMethod.set(
+          paymentName,
+          currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
+        );
+      }
+    }
+
+    // Monta o resultado total agregado e insere no banco de dados
+    for (const [paymentName, totalValue] of revenueByPaymentMethod.entries()) {
+      let createdDate = new Date(); // Data atual
+      createdDate.setDate(createdDate.getDate() - 1); // Define como o dia anterior
+      createdDate.setUTCHours(5, 59, 59, 999); // Ajusta a hora para 05:59
+
+      await this.insertBookingsRevenueByPaymentMethod({
+        totalValue,
+        createdDate,
+        period: period,
+        paymentMethod: paymentName, // Nome do meio de pagamento
+        companyId,
+      });
+    }
+
+    // Monta o resultado total para retorno
+    const totalResults = {};
+    for (const [paymentName, totalValue] of revenueByPaymentMethod.entries()) {
+      totalResults[paymentName] = {
+        total: this.formatCurrency(totalValue.toNumber()), // Formata o total em reais
+      };
+    }
+
+    // Retornar os resultados calculados
+    return {
+      totalResults,
+      createdDate: adjustedEndDate,
+    };
+  }
+
+  private async insertBookingsRevenueByPaymentMethod(
+    data: BookingsRevenueByPayment,
+  ): Promise<BookingsRevenueByPayment> {
+    return this.prisma.prismaOnline.bookingsRevenueByPayment.upsert({
+      where: {
+        period_createdDate_paymentMethod: {
+          period: data.period,
+          createdDate: data.createdDate,
+          paymentMethod: data.paymentMethod,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
+  }
+
+  private async calculateTotalBookingRevenueByPeriodEcommerce(
+    startDate: Date,
+    endDate: Date,
+    period: PeriodEnum,
+  ): Promise<any> {
+    try {
+      const results: { [key: string]: any } = {}; // Armazenar resultados
+      const companyId = 1;
+
+      // Ajustar a endDate para o final do dia anterior
+      const adjustedEndDate = new Date(endDate);
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Subtrai um dia
+      adjustedEndDate.setUTCHours(23, 59, 59, 999); // Define o final do dia
+
+      // Iniciar currentDate no início do dia da startDate
+      let currentDate = new Date(startDate);
+      currentDate.setUTCHours(0, 0, 0, 0); // Início do dia contábil às 00:00:00
+
+      while (currentDate <= adjustedEndDate) {
+        // Use <= para incluir o último dia
+        let nextDate = new Date(currentDate);
+
+        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+          // Para LAST_7_D e LAST_30_D, iteração diária
+          nextDate.setDate(nextDate.getDate() + 1);
+          nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
+        } else if (period === PeriodEnum.LAST_6_M) {
+          // Para LAST_6_M, iteração mensal
+          currentDate.setDate(currentDate.getDate() - 1); // Subtrai um dia
+          currentDate.setUTCHours(23, 59, 59, 999);
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo mês
+        }
+
+        // Buscar todas as receitas de reservas para o período atual
+        const allBookingsRevenue =
+          await this.prisma.prismaLocal.booking.findMany({
+            where: {
+              dateService: {
+                gte: currentDate,
+                lte: nextDate,
+              },
+              canceled: {
+                equals: null,
+              },
+              priceRental: {
+                not: null,
+              },
+              idTypeOriginBooking: {
+                equals: 4,
+              },
+            },
+            select: {
+              id: true,
+              priceRental: true,
+              idTypeOriginBooking: true,
+              dateService: true,
+              startDate: true,
+              rentalApartmentId: true,
+            },
+          });
+
+        let totalValueForCurrentPeriod = new Prisma.Decimal(0);
+
+        // Calcular o total para o período atual
+        allBookingsRevenue.forEach((booking) => {
+          // Certifique-se de que priceRental é um Decimal
+          totalValueForCurrentPeriod = totalValueForCurrentPeriod.plus(
+            new Prisma.Decimal(booking.priceRental || 0), // Adiciona 0 se priceRental for nulo
+          );
+        });
+
+        // Formatar o totalValue
+        const formattedTotalValue = this.formatCurrency(
+          totalValueForCurrentPeriod.toNumber() || 0,
+        );
+
+        // Adicionar o resultado ao objeto de resultados
+        const dateKey = currentDate.toISOString().split('T')[0]; // Usando toISOString para formatar a data
+        results[dateKey] = {
+          totalValue: formattedTotalValue,
+        };
+
+        // Inserir a receita de reservas no banco de dados
+        await this.insertBookingsRevenueByPeriodEcommerce({
+          totalValue: totalValueForCurrentPeriod,
+          createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+          period: period || null,
+          companyId,
+        });
+
+        currentDate = new Date(nextDate);
+      }
+
+      // Formatar o resultado final
+      const totalBookingRevenueByDate = Object.keys(results).map((date) => ({
+        [date]: results[date],
+      }));
+
+      return {
+        BookingRevenueByDate: totalBookingRevenueByDate,
+      };
+    } catch (error) {
+      console.error('Erro ao calcular a receita total por período:', error);
+      throw new BadRequestException(
+        `Failed to calculate total booking revenue by period: ${error.message}`,
+      );
+    }
+  }
+
+  private async insertBookingsRevenueByPeriodEcommerce(
+    data: BookingsRevenueByPeriodEcommerce,
+  ): Promise<BookingsRevenueByPeriodEcommerce> {
+    return this.prisma.prismaOnline.bookingsRevenueByPeriodEcommerce.upsert({
+      where: {
+        period_createdDate: {
+          period: data.period,
+          createdDate: data.createdDate,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
+  }
+
   @Cron('0 0 * * *', { disabled: true })
   async handleCron() {
     const timezone = 'America/Sao_Paulo'; // Defina seu fuso horário
@@ -350,10 +703,10 @@ export class BookingsRevenueService {
 
     // Últimos 7 dias
     const endDateLast7Days = currentDate;
-    endDateLast7Days.setHours(23, 59, 59, 999);
+    endDateLast7Days.setUTCHours(23, 59, 59, 999);
 
-    const startDateLast7Days = new Date(currentDate);
-    startDateLast7Days.setDate(startDateLast7Days.getDate() - 7);
+    const startDateLast7Days = new Date(endDateLast7Days);
+    startDateLast7Days.setDate(startDateLast7Days.getDate() - 7); // Vai 6 dias para trás
     startDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -409,7 +762,25 @@ export class BookingsRevenueService {
       PeriodEnum.LAST_7_D,
     );
 
+    await this.calculateRevenueByChannelType(
+      previousParsedStartDateLast7Days,
+      previousParsedEndDateLast7DaysParsed,
+      PeriodEnum.LAST_7_D,
+    );
+
     await this.calculateTotalBookingRevenueByPeriod(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
+
+    await this.calculateRevenueByPaymentMethod(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
+
+    await this.calculateTotalBookingRevenueByPeriodEcommerce(
       parsedStartDateLast7Days,
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
@@ -423,11 +794,11 @@ export class BookingsRevenueService {
     );
 
     // Últimos 30 dias
-    const endDateLast30Days = currentDate;
-    endDateLast30Days.setHours(23, 59, 59, 999);
+    const endDateLast30Days = new Date(currentDate);
+    endDateLast30Days.setUTCHours(23, 59, 59, 999);
 
-    const startDateLast30Days = new Date(currentDate);
-    startDateLast30Days.setDate(startDateLast30Days.getDate() - 30);
+    const startDateLast30Days = new Date(endDateLast30Days);
+    startDateLast30Days.setDate(startDateLast30Days.getDate() - 30); // Vai 29 dias para trás
     startDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -478,6 +849,31 @@ export class BookingsRevenueService {
       previousParsedEndDateLast30DaysParsed,
       PeriodEnum.LAST_30_D,
     );
+    await this.calculateRevenueByChannelType(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
+    await this.calculateRevenueByChannelType(
+      previousParsedStartDateLast30Days,
+      previousParsedEndDateLast30DaysParsed,
+      PeriodEnum.LAST_30_D,
+    );
+    await this.calculateTotalBookingRevenueByPeriod(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
+    await this.calculateRevenueByPaymentMethod(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
+    await this.calculateTotalBookingRevenueByPeriodEcommerce(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
 
     const endTimeLast30Days = moment()
       .tz(timezone)
@@ -487,11 +883,11 @@ export class BookingsRevenueService {
     );
 
     // Últimos 6 meses (180 dias)
-    const endDateLast6Months = currentDate;
-    endDateLast6Months.setHours(23, 59, 59, 999);
+    const endDateLast6Months = new Date(currentDate);
+    endDateLast6Months.setUTCHours(23, 59, 59, 999);
 
-    const startDateLast6Months = new Date(currentDate);
-    startDateLast6Months.setMonth(startDateLast6Months.getMonth() - 6);
+    const startDateLast6Months = new Date(endDateLast6Months);
+    startDateLast6Months.setMonth(startDateLast6Months.getMonth() - 6); // Vai 6 meses para trás
     startDateLast6Months.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -540,6 +936,31 @@ export class BookingsRevenueService {
     await this.findAllBookingsRevenue(
       previousParsedStartDateLast6Months,
       previousParsedEndDateLast6MonthsParsed,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateRevenueByChannelType(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateRevenueByChannelType(
+      previousParsedStartDateLast6Months,
+      previousParsedEndDateLast6MonthsParsed,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateTotalBookingRevenueByPeriod(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateRevenueByPaymentMethod(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateTotalBookingRevenueByPeriodEcommerce(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
 
