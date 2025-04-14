@@ -954,16 +954,32 @@ export class BookingsService {
       },
     });
 
-    // Busca os originBookings
-    const originBookings = await this.prisma.prismaLocal.originBooking.findMany(
+    const allBookingsEcommerce = await this.prisma.prismaLocal.booking.findMany(
       {
         where: {
-          deletionDate: {
+          dateService: {
+            gte: startDate,
+            lte: endDate,
+          },
+          canceled: {
             equals: null,
+          },
+          priceRental: {
+            not: null,
+          },
+          idTypeOriginBooking: {
+            equals: 4,
           },
         },
         select: {
-          typeOrigin: true,
+          id: true,
+          priceRental: true,
+          idTypeOriginBooking: true,
+          dateService: true,
+          startDate: true,
+          rentalApartmentId: true,
+          originBooking: true,
+          rentalApartment: true,
         },
       },
     );
@@ -1069,7 +1085,7 @@ export class BookingsService {
 
     return {
       allBookings,
-      originBookings,
+      allBookingsEcommerce,
       newReleases,
       halfPayments,
       allRentalApartments,
@@ -1083,11 +1099,9 @@ export class BookingsService {
       console.log('startDate:', startDate);
       console.log('endDate:', endDate);
 
-      const timezone = 'America/Sao_Paulo';
-
       const {
         allBookings,
-        originBookings,
+        allBookingsEcommerce,
         newReleases,
         halfPayments,
         allRentalApartments,
@@ -1720,6 +1734,102 @@ export class BookingsService {
         },
       };
 
+      const reservationsOfEcommerceByPeriod = {
+        categories: [],
+        series: [],
+      };
+
+      // Ajustar a endDate para o início do dia seguinte
+      const adjustedEndDateBookingEcommerce = moment(endDate)
+        .utc()
+        .startOf('day'); // Define o início do dia da endDate
+
+      // Iniciar currentDate no início do dia da startDate
+      let currentDateBookingEcommerce = moment(startDate).utc().startOf('day'); // Início do dia contábil às 00:00:00
+
+      // Iterar sobre as datas do período
+      while (
+        currentDateBookingEcommerce.isSameOrBefore(
+          adjustedEndDateBookingEcommerce,
+          'day',
+        )
+      ) {
+        const nextDateBookingEcommerce = currentDateBookingEcommerce
+          .clone()
+          .add(1, 'day'); // Clona currentDateRep e avança um dia
+
+        const dateKey = currentDateBookingEcommerce.format('DD/MM/YYYY'); // Formata a data como "YYYY-MM-DD"
+
+        // Contar o total de reservas para a data atual
+        const totalBookingsForCurrentPeriod = allBookingsEcommerce.reduce(
+          (total, booking) => {
+            const bookingDate = moment.utc(booking.dateService);
+            return bookingDate.isBetween(
+              currentDateBookingEcommerce,
+              nextDateBookingEcommerce,
+              null,
+              '[]',
+            )
+              ? total + 1 // Incrementa o total se a data do booking estiver no intervalo
+              : total;
+          },
+          0,
+        );
+
+        // Adiciona o resultado ao objeto de resultados
+        reservationsOfEcommerceByPeriod.categories.push(dateKey);
+        reservationsOfEcommerceByPeriod.series.push(
+          totalBookingsForCurrentPeriod,
+        );
+
+        // Avança para o próximo dia
+        currentDateBookingEcommerce = nextDateBookingEcommerce; // Atualiza currentDateRep para o próximo dia
+      }
+
+      // Inverter a ordem das categorias e séries para ficar em ordem decrescente
+      reservationsOfEcommerceByPeriod.categories.reverse();
+      reservationsOfEcommerceByPeriod.series.reverse();
+
+      const billingOfEcommerceByPeriod = {
+        categories: [],
+        series: [],
+      };
+
+      // Supondo que você tenha startDate e endDate definidos como moment.js
+      const currentDateEcommerce = moment(startDate).utc();
+      const finalDateEcommerce = moment(endDate).utc();
+
+      // Iterar sobre as datas do período
+      while (currentDateEcommerce.isSameOrBefore(finalDateEcommerce, 'day')) {
+        const dateKey = currentDateEcommerce.format('DD/MM/YYYY'); // Formata a data como "DD/MM/YYYY"
+        let totalValueForCurrentDate = new Prisma.Decimal(0); // Inicializa o total para a data atual
+
+        // Calcular o total para a data atual
+        allBookingsEcommerce.forEach((booking) => {
+          const bookingDate = moment.utc(booking.dateService);
+
+          // Se a data do booking corresponder à data atual, soma o priceRental
+          if (bookingDate.isSame(currentDateEcommerce, 'day')) {
+            totalValueForCurrentDate = totalValueForCurrentDate.plus(
+              new Prisma.Decimal(booking.priceRental || 0),
+            );
+          }
+        });
+
+        // Adiciona a data e o total ao objeto de retorno
+        billingOfEcommerceByPeriod.categories.push(dateKey);
+        billingOfEcommerceByPeriod.series.push(
+          totalValueForCurrentDate.toNumber(),
+        ); // Converte para número
+
+        // Avança para o próximo dia
+        currentDateEcommerce.add(1, 'day');
+      }
+
+      // Inverter a ordem das categorias e séries para ficar em ordem decrescente
+      billingOfEcommerceByPeriod.categories.reverse();
+      billingOfEcommerceByPeriod.series.reverse();
+
       return {
         Company: 'Lush Ipiranga',
         BigNumbers: [bigNumbers],
@@ -1732,6 +1842,8 @@ export class BookingsService {
         NumberOfReservationsPerPeriod: numberOfReservationsPerPeriod,
         KpiTableByChannelType: [kpiTableByChannelType],
         BigNumbersEcommerce: [bigNumbersEcommerce],
+        ReservationsOfEcommerceByPeriod: reservationsOfEcommerceByPeriod,
+        BillingOfEcommerceByPeriod: billingOfEcommerceByPeriod,
       };
     } catch (error) {
       console.error('Erro ao calcular os KPIs:', error);
