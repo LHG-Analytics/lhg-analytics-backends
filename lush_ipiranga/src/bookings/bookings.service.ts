@@ -1668,6 +1668,58 @@ export class BookingsService {
         ),
       };
 
+      const bigNumbersEcommerce = {
+        currentDate: {
+          // Captura a soma de totalAllValue
+          totalAllValue: Number(
+            kpiTableByChannelType.bookingsRevenueByChannelType[
+              ChannelTypeEnum.WEBSITE_IMMEDIATE
+            ] +
+              kpiTableByChannelType.bookingsRevenueByChannelType[
+                ChannelTypeEnum.WEBSITE_SCHEDULED
+              ],
+          ),
+          // Captura a soma de totalAllBookings
+          totalAllBookings: Number(
+            kpiTableByChannelType.bookingsTotalRentalsByChannelType[
+              ChannelTypeEnum.WEBSITE_IMMEDIATE
+            ] +
+              kpiTableByChannelType.bookingsTotalRentalsByChannelType[
+                ChannelTypeEnum.WEBSITE_SCHEDULED
+              ],
+          ),
+          // Captura a soma de totalAllTicketAverage
+          totalAllTicketAverage: (function () {
+            const totalValue =
+              kpiTableByChannelType.bookingsRevenueByChannelType[
+                ChannelTypeEnum.WEBSITE_IMMEDIATE
+              ] +
+              kpiTableByChannelType.bookingsRevenueByChannelType[
+                ChannelTypeEnum.WEBSITE_SCHEDULED
+              ];
+            const totalBookings =
+              kpiTableByChannelType.bookingsTotalRentalsByChannelType[
+                ChannelTypeEnum.WEBSITE_IMMEDIATE
+              ] +
+              kpiTableByChannelType.bookingsTotalRentalsByChannelType[
+                ChannelTypeEnum.WEBSITE_SCHEDULED
+              ];
+            return totalBookings > 0
+              ? Number((totalValue / totalBookings).toFixed(2))
+              : 0; // Evita divisão por zero
+          })(),
+          // Captura a soma de totalAllRepresentativeness
+          totalAllRepresentativeness: Number(
+            kpiTableByChannelType.bookingsRepresentativenessByChannelType[
+              ChannelTypeEnum.WEBSITE_IMMEDIATE
+            ] +
+              kpiTableByChannelType.bookingsRepresentativenessByChannelType[
+                ChannelTypeEnum.WEBSITE_SCHEDULED
+              ],
+          ),
+        },
+      };
+
       return {
         Company: 'Lush Ipiranga',
         BigNumbers: [bigNumbers],
@@ -1679,6 +1731,7 @@ export class BookingsService {
           representativenessOfReservesByPeriod,
         NumberOfReservationsPerPeriod: numberOfReservationsPerPeriod,
         KpiTableByChannelType: [kpiTableByChannelType],
+        BigNumbersEcommerce: [bigNumbersEcommerce],
       };
     } catch (error) {
       console.error('Erro ao calcular os KPIs:', error);
