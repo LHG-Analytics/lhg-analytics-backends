@@ -1534,39 +1534,138 @@ export class BookingsService {
         bookingsRepresentativenessByChannelType: {},
       };
 
-      const channelCounts = {
-        [ChannelTypeEnum.WEBSITE_SCHEDULED]: 0,
-        [ChannelTypeEnum.WEBSITE_IMMEDIATE]: 0,
-        [ChannelTypeEnum.INTERNAL]: 0,
-        [ChannelTypeEnum.GUIA_GO]: 0,
-        [ChannelTypeEnum.GUIA_SCHEDULED]: 0,
-        [ChannelTypeEnum.BOOKING]: 0,
-        [ChannelTypeEnum.EXPEDIA]: 0,
+      // Inicializa o objeto para armazenar contagem e receita
+      const channelData = {
+        [ChannelTypeEnum.EXPEDIA]: { count: 0, revenue: new Prisma.Decimal(0) },
+        [ChannelTypeEnum.BOOKING]: { count: 0, revenue: new Prisma.Decimal(0) },
+        [ChannelTypeEnum.GUIA_SCHEDULED]: {
+          count: 0,
+          revenue: new Prisma.Decimal(0),
+        },
+        [ChannelTypeEnum.GUIA_GO]: { count: 0, revenue: new Prisma.Decimal(0) },
+        [ChannelTypeEnum.INTERNAL]: {
+          count: 0,
+          revenue: new Prisma.Decimal(0),
+        },
+        [ChannelTypeEnum.WEBSITE_IMMEDIATE]: {
+          count: 0,
+          revenue: new Prisma.Decimal(0),
+        },
+        [ChannelTypeEnum.WEBSITE_SCHEDULED]: {
+          count: 0,
+          revenue: new Prisma.Decimal(0),
+        },
       };
 
+      // Processa cada reserva para contar o tipo de canal e calcular a receita
       for (const booking of allBookings) {
         const channelType = getChannelType(
-          booking.originBooking.id, // Acessa o idTypeOriginBooking da reserva
-          booking.dateService, // Acessa a data do serviço
-          booking.startDate, // Passa a data de início
+          booking.originBooking.id,
+          booking.dateService,
+          booking.startDate,
         );
 
-        // Incrementa o contador para o tipo de canal correspondente
-        if (channelType && channelCounts[channelType] !== undefined) {
-          channelCounts[channelType]++;
+        // Incrementa o contador e a receita para o tipo de canal correspondente
+        if (channelType && channelData[channelType]) {
+          channelData[channelType].count++;
+          channelData[channelType].revenue = channelData[
+            channelType
+          ].revenue.plus(new Prisma.Decimal(booking.priceRental || 0));
         }
       }
 
       // Calcular o total de reservas
-      const totalAllBookingsChannelType = Object.values(channelCounts).reduce(
-        (total, count) => total + count,
+      const totalAllBookingsChannelType = Object.values(channelData).reduce(
+        (total, { count }) => total + count,
         0,
+      );
+
+      // Calcular o total de todos os canais
+      const totalAllValueChannelType = Object.values(channelData).reduce(
+        (total, { revenue }) => total.plus(revenue),
+        new Prisma.Decimal(0),
       );
 
       // Preenche o objeto kpiTableByChannelType com os dados calculados
       kpiTableByChannelType.bookingsTotalRentalsByChannelType = {
-        ...channelCounts,
+        ...Object.fromEntries(
+          Object.entries(channelData).map(([key, { count }]) => [key, count]),
+        ),
         TOTALALLBOOKINGS: totalAllBookingsChannelType,
+      };
+
+      kpiTableByChannelType.bookingsRevenueByChannelType = {
+        ...Object.fromEntries(
+          Object.entries(channelData).map(([key, { revenue }]) => [
+            key,
+            revenue.toNumber(),
+          ]),
+        ),
+        TOTALALLREVENUE: totalAllValueChannelType.toNumber(),
+      };
+
+      // Calcular a média total de todos os canais
+      const totalCount = totalAllBookingsChannelType;
+      const totalSum = totalAllValueChannelType;
+
+      const totalAllTicketAverageByChannelType =
+        totalCount > 0 ? totalSum.dividedBy(totalCount).toNumber() : 0;
+
+      // Calcular o ticket médio por canal
+      kpiTableByChannelType.bookingsTicketAverageByChannelType = {
+        ...Object.fromEntries(
+          Object.entries(channelData).map(([key, { count, revenue }]) => {
+            const average = count > 0 ? revenue.dividedBy(count).toNumber() : 0;
+            return [key, Number(average.toFixed(2))];
+          }),
+        ),
+        TOTALALLTICKETAVERAGE: Number(
+          totalAllTicketAverageByChannelType.toFixed(2),
+        ),
+      };
+
+      // Calcular a receita total (vendas diretas + locações)
+      const totalAllRevenue = totalSaleDirect.plus(
+        allRentalApartments.reduce((total, apartment) => {
+          return total.plus(new Prisma.Decimal(apartment.totalValue || 0)); // Adiciona 0 se totalValue for nulo
+        }, new Prisma.Decimal(0)),
+      );
+
+      // Calcular a representatividade para cada canal
+      const representativenessByChannel = {};
+      let totalAllRepresentativenessByChannelType = new Prisma.Decimal(0); // Inicializa a representatividade total
+
+      for (const [channelType, { revenue }] of Object.entries(channelData)) {
+        const representativeness =
+          totalAllRevenue && !totalAllRevenue.isZero() // Se a receita total for 0 ou null
+            ? revenue.dividedBy(totalAllRevenue).toNumber() // Receita do canal dividido pela receita total
+            : 0; // Se totalRevenue for null ou zero , retorna 0
+
+        representativenessByChannel[channelType] = Number(
+          representativeness.toFixed(2),
+        );
+
+        // Acumula a representatividade total
+        totalAllRepresentativenessByChannelType =
+          totalAllRepresentativenessByChannelType.plus(
+            revenue || new Prisma.Decimal(0),
+          ); // Se revenue for null, usa 0
+      }
+
+      // Calcular o totalAllRepresentativeness
+      const finalTotalAllRepresentativeness =
+        totalAllRevenue && !totalAllRevenue.isZero()
+          ? totalAllRepresentativenessByChannelType
+              .dividedBy(totalAllRevenue)
+              .toNumber()
+          : 0;
+
+      // Adiciona a representatividade ao objeto kpiTableByChannelType
+      kpiTableByChannelType.bookingsRepresentativenessByChannelType = {
+        ...representativenessByChannel,
+        TOTALALLREPRESENTATIVENESS: Number(
+          finalTotalAllRepresentativeness.toFixed(2),
+        ),
       };
 
       return {
