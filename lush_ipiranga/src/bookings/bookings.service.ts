@@ -935,15 +935,18 @@ export class BookingsService {
           gte: startDate,
           lte: endDate,
         },
-        canceled: {
-          equals: null,
-        },
-        priceRental: {
-          not: null,
-        },
+        OR: [
+          {
+            canceled: null, // Locações onde canceled é null
+          },
+          {
+            noShow: true, // E noShow deve ser true
+          },
+        ],
       },
       select: {
         id: true,
+        discountBooking: true,
         priceRental: true,
         idTypeOriginBooking: true,
         dateService: true,
@@ -961,15 +964,14 @@ export class BookingsService {
             gte: startDate,
             lte: endDate,
           },
-          canceled: {
-            equals: null,
-          },
-          priceRental: {
-            not: null,
-          },
-          idTypeOriginBooking: {
-            equals: 4,
-          },
+          OR: [
+            {
+              canceled: null, // Locações onde canceled é null
+            },
+            {
+              noShow: true, // E noShow deve ser true
+            },
+          ],
         },
         select: {
           id: true,
@@ -993,7 +995,7 @@ export class BookingsService {
         releaseType: {
           equals: 'RESERVA',
         },
-        maturity: {
+        accountPayReceiveId: {
           equals: null,
         },
       },
@@ -1113,9 +1115,49 @@ export class BookingsService {
         throw new NotFoundException('No booking revenue found.');
       }
 
-      // Calcular o total da receita de reservas
-      const totalAllValue = allBookings.reduce((total, bookings) => {
-        return total.plus(new Prisma.Decimal(bookings.priceRental));
+      // Calcular o total de priceRental baseado no newRelease
+      const totalAllValue = allBookings.reduce((total, booking) => {
+        // Verifica se o id do booking está presente no newRelease
+        const matchingRelease = newReleases.find(
+          (release) => release.originalsId === booking.id,
+        );
+
+        if (matchingRelease) {
+          // Se o value do newRelease for 0
+          if (Number(matchingRelease.value) === 0) {
+            // Verifica se há um discountBooking
+            const discount = booking.discountBooking || 0; // Supondo que discountBooking seja uma propriedade do booking
+            const adjustedPriceRental =
+              Number(booking.priceRental || 0) - Number(discount); // Subtrai o desconto do priceRental
+            return total.plus(
+              adjustedPriceRental > 0 ? adjustedPriceRental : 0,
+            ); // Adiciona ao total, garantindo que não seja negativo
+          }
+          // Caso contrário, usa o value do newRelease
+          return total.plus(Number(matchingRelease.value));
+        }
+
+        // Se não houver correspondência pelo id, verifica pelo rentalApartmentId
+        const matchingReleaseByApartment = newReleases.find(
+          (release) => release.originalsId === booking.rentalApartmentId,
+        );
+
+        if (matchingReleaseByApartment) {
+          // Se o value do newRelease for 0
+          if (Number(matchingReleaseByApartment.value) === 0) {
+            const discount = booking.discountBooking || 0; // Supondo que discountBooking seja uma propriedade do booking
+            const adjustedPriceRental =
+              Number(booking.priceRental || 0) - Number(discount); // Subtrai o desconto do priceRental
+            return total.plus(
+              adjustedPriceRental > 0 ? adjustedPriceRental : 0,
+            ); // Adiciona ao total, garantindo que não seja negativo
+          }
+          // Caso contrário, usa o value do newRelease
+          return total.plus(Number(matchingReleaseByApartment.value));
+        }
+
+        // Se não houver correspondência, usa o priceRental do booking
+        return total.plus(Number(booking.priceRental || 0)); // Garante que priceRental não seja null
       }, new Prisma.Decimal(0));
 
       // Calcular o total de reservas
@@ -1179,7 +1221,7 @@ export class BookingsService {
           const currentTotal = revenueByPaymentMethod.get(paymentName);
           revenueByPaymentMethod.set(
             paymentName,
-            currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
+            currentTotal.plus(new Prisma.Decimal(booking.priceRental || 0)),
           );
         }
       }
@@ -1280,7 +1322,7 @@ export class BookingsService {
           const currentTotal = revenueByChannelType.get(channelType);
           revenueByChannelType.set(
             channelType,
-            currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
+            currentTotal.plus(new Prisma.Decimal(booking.priceRental || 0)),
           );
         }
       });

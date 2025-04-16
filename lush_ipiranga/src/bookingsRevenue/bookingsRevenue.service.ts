@@ -54,16 +54,6 @@ export class BookingsRevenueService {
           rentalApartmentId: true,
         },
       }),
-      this.prisma.prismaLocal.originBooking.findMany({
-        where: {
-          deletionDate: {
-            equals: null,
-          },
-        },
-        select: {
-          typeOrigin: true,
-        },
-      }),
       this.prisma.prismaLocal.newRelease.findMany({
         where: {
           deletionDate: {
@@ -72,8 +62,12 @@ export class BookingsRevenueService {
           releaseType: {
             equals: 'RESERVA',
           },
+          accountPayReceiveId: {
+            equals: null,
+          },
         },
         select: {
+          value: true,
           halfPaymentId: true,
           originalsId: true,
         },
@@ -87,6 +81,16 @@ export class BookingsRevenueService {
         select: {
           id: true, // Adicione o id para o mapeamento
           name: true,
+        },
+      }),
+      this.prisma.prismaLocal.originBooking.findMany({
+        where: {
+          deletionDate: {
+            equals: null,
+          },
+        },
+        select: {
+          typeOrigin: true,
         },
       }),
     ]);
@@ -109,7 +113,7 @@ export class BookingsRevenueService {
       }
 
       // Buscar todas as receitas de reservas no intervalo de datas
-      const [allBookingsRevenue] = await this.fetchKpiData(
+      const [allBookingsRevenue, newRelease] = await this.fetchKpiData(
         startDate,
         adjustedEndDate,
       );
@@ -118,8 +122,23 @@ export class BookingsRevenueService {
         throw new NotFoundException('No booking revenue found.');
       }
 
-      // Calcular o total de priceRental
+      // Calcular o total de priceRental baseado no newRelease
       const totalAllValue = allBookingsRevenue.reduce((total, booking) => {
+        // Verifica se o id do booking está presente no newRelease
+        const matchingRelease = newRelease.find(
+          (release) => release.originalsId === booking.id,
+        );
+
+        if (matchingRelease) {
+          // Se o value do newRelease for 0, usa o priceRental do booking
+          if (Number(matchingRelease.value) === 0) {
+            return total.plus(Number(booking.priceRental));
+          }
+          // Caso contrário, usa o value do newRelease
+          return total.plus(Number(matchingRelease.value));
+        }
+
+        // Se não houver correspondência, usa o priceRental do booking
         return total.plus(Number(booking.priceRental));
       }, new Prisma.Decimal(0));
 
@@ -475,8 +494,10 @@ export class BookingsRevenueService {
     }
 
     // Buscar todas as reservas e os novos lançamentos
-    const [allBookings, originBookings, newReleases, halfPayments] =
-      await this.fetchKpiData(startDate, adjustedEndDate);
+    const [allBookings, newReleases, halfPayments] = await this.fetchKpiData(
+      startDate,
+      adjustedEndDate,
+    );
 
     if (!allBookings || allBookings.length === 0) {
       throw new NotFoundException('No bookings found.');
