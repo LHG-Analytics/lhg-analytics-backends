@@ -1306,9 +1306,10 @@ export class BookingsService {
         [RentalTypeEnum.DAILY]: 0,
       };
 
-      // Inicializa as arrays para categorias e séries
-      const categoriesBookings = [];
-      const seriesBookings = [];
+      const reservationsByRentalType = {
+        categories: [],
+        series: [],
+      };
 
       // Processa cada reserva para contar o tipo de locação
       for (const booking of allBookings) {
@@ -1330,15 +1331,9 @@ export class BookingsService {
 
       // Preenche as arrays de categorias e séries com os resultados
       for (const rentalType in rentalCounts) {
-        categoriesBookings.push(rentalType);
-        seriesBookings.push(rentalCounts[rentalType]);
+        reservationsByRentalType.categories.push(rentalType);
+        reservationsByRentalType.series.push(rentalCounts[rentalType]);
       }
-
-      // Cria o objeto final
-      const reservationsByRentalType = {
-        categoriesBookings,
-        seriesBookings,
-      };
 
       const billingOfReservationsByPeriod = {
         categories: [],
