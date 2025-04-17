@@ -1662,7 +1662,7 @@ export class BookingsService {
             revenue.toNumber(),
           ]),
         ),
-        TOTALALLREVENUE: totalAllValueChannelType.toNumber(),
+        TOTALALLVALUE: totalAllValueChannelType.toNumber(),
       };
 
       // Calcular a média total de todos os canais
