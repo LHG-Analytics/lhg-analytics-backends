@@ -975,6 +975,7 @@ export class BookingsService {
         },
         select: {
           id: true,
+          discountBooking: true,
           priceRental: true,
           idTypeOriginBooking: true,
           dateService: true,
@@ -1154,6 +1155,14 @@ export class BookingsService {
           }
           // Caso contrário, usa o value do newRelease
           return total.plus(Number(matchingReleaseByApartment.value));
+        }
+
+        // Se não houver correspondência e o idTypeOriginBooking for 7 ou 8, não soma o priceRental
+        if (
+          booking.idTypeOriginBooking === 7 ||
+          booking.idTypeOriginBooking === 8
+        ) {
+          return total; // Não soma nada
         }
 
         // Se não houver correspondência, usa o priceRental do booking

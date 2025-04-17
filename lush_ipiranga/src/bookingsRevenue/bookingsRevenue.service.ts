@@ -52,6 +52,7 @@ export class BookingsRevenueService {
           dateService: true,
           startDate: true,
           rentalApartmentId: true,
+          discountBooking: true,
         },
       }),
       this.prisma.prismaLocal.newRelease.findMany({
@@ -130,18 +131,50 @@ export class BookingsRevenueService {
         );
 
         if (matchingRelease) {
-          // Se o value do newRelease for 0, usa o priceRental do booking
+          // Se o value do newRelease for 0
           if (Number(matchingRelease.value) === 0) {
-            return total.plus(Number(booking.priceRental));
+            // Verifica se há um discountBooking
+            const discount = booking.discountBooking || 0; // Supondo que discountBooking seja uma propriedade do booking
+            const adjustedPriceRental =
+              Number(booking.priceRental || 0) - Number(discount); // Subtrai o desconto do priceRental
+            return total.plus(
+              adjustedPriceRental > 0 ? adjustedPriceRental : 0,
+            ); // Adiciona ao total, garantindo que não seja negativo
           }
           // Caso contrário, usa o value do newRelease
           return total.plus(Number(matchingRelease.value));
         }
 
-        // Se não houver correspondência, usa o priceRental do booking
-        return total.plus(Number(booking.priceRental));
-      }, new Prisma.Decimal(0));
+        // Se não houver correspondência pelo id, verifica pelo rentalApartmentId
+        const matchingReleaseByApartment = newRelease.find(
+          (release) => release.originalsId === booking.rentalApartmentId,
+        );
 
+        if (matchingReleaseByApartment) {
+          // Se o value do newRelease for 0
+          if (Number(matchingReleaseByApartment.value) === 0) {
+            const discount = booking.discountBooking || 0; // Supondo que discountBooking seja uma propriedade do booking
+            const adjustedPriceRental =
+              Number(booking.priceRental || 0) - Number(discount); // Subtrai o desconto do priceRental
+            return total.plus(
+              adjustedPriceRental > 0 ? adjustedPriceRental : 0,
+            ); // Adiciona ao total, garantindo que não seja negativo
+          }
+          // Caso contrário, usa o value do newRelease
+          return total.plus(Number(matchingReleaseByApartment.value));
+        }
+
+        // Se não houver correspondência e o idTypeOriginBooking for 7 ou 8, não soma o priceRental
+        if (
+          booking.idTypeOriginBooking === 7 ||
+          booking.idTypeOriginBooking === 8
+        ) {
+          return total; // Não soma nada
+        }
+
+        // Se não houver correspondência, usa o priceRental do booking
+        return total.plus(Number(booking.priceRental || 0)); // Garante que priceRental não seja null
+      }, new Prisma.Decimal(0));
       // Inserir a receita de reservas no banco de dados
       await this.insertBookingsRevenue({
         totalAllValue,
