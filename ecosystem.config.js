@@ -52,6 +52,22 @@ module.exports = {
         PORT: 3003, // Rodando localmente
       },
     },
+    {
+      name: "andar_de_cima",
+      script: "./andar_de_cima/dist/main.js",
+      env: {
+        NODE_ENV: "production",
+        DATABASE_URL_LOCAL_ANDAR_DE_CIMA:
+          process.env.DATABASE_URL_LOCAL_ANDAR_DE_CIMA,
+        DATABASE_URL_ONLINE_ANDAR_DE_CIMA:
+          process.env.DATABASE_URL_ONLINE_ANDAR_DE_CIMA,
+        SERVICE_PREFIX: "andar_de_cima",
+        PORT: 3004, // Rodando localmente
+      },
+      env_production: {
+        PORT: 3004, // Rodando localmente
+      },
+    },
   ],
   post_deploy: ["npm install --legacy-peer-deps", "npm install -g pm2"],
 };

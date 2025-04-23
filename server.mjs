@@ -25,6 +25,8 @@ app.use("/lush_lapa", proxyConfig("http://localhost:3002"));
 
 app.use("/tout", proxyConfig("http://localhost:3003"));
 
+app.use("/andar_de_cima", proxyConfig("http://localhost:3004"));
+
 const port = process.env.PORT || 3000;
 app.listen(port, "0.0.0.0", () => {
   console.log(`🚀 Proxy rodando na porta ${port}`);
