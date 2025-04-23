@@ -38,6 +38,20 @@ module.exports = {
         PORT: 3002, // Rodando localmente
       },
     },
+    {
+      name: "tout",
+      script: "./tout/dist/main.js",
+      env: {
+        NODE_ENV: "production",
+        DATABASE_URL_LOCAL_TOUT: process.env.DATABASE_URL_LOCAL_TOUT,
+        DATABASE_URL_ONLINE_TOUT: process.env.DATABASE_URL_ONLINE_TOUT,
+        SERVICE_PREFIX: "tout",
+        PORT: 3003, // Rodando localmente
+      },
+      env_production: {
+        PORT: 3003, // Rodando localmente
+      },
+    },
   ],
   post_deploy: ["npm install --legacy-peer-deps", "npm install -g pm2"],
 };
