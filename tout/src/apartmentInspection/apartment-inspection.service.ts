@@ -44,7 +44,7 @@ export class ApartmentInspectionService {
               employee: {
                 role: {
                   id: {
-                    equals: 24,
+                    equals: 2,
                   },
                 },
               },
