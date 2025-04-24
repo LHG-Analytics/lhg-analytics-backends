@@ -48,7 +48,9 @@ export class CronJobsService {
     const startTime = moment()
       .tz('America/Sao_Paulo')
       .format('DD-MM-YYYY HH:mm:ss');
-    console.log(`Início da execução dos CronJobs: ${startTime}`);
+    console.log(
+      `Início da execução dos CronJobs do Andar de Cima: ${startTime}`,
+    );
 
     try {
       await this.kpiAlosService.handleCron();
@@ -66,7 +68,7 @@ export class CronJobsService {
       await this.bookingsTicketAverage.handleCron();
       await this.bookingsRepresentativeness.handleCron();
     } catch (error) {
-      console.error('Erro ao executar os cron jobs:', error);
+      console.error('Erro ao executar os CronJobs do Andar de Cima:', error);
     } finally {
       this.isJobRunning = false; // Define a flag como false no final
     }
@@ -74,6 +76,6 @@ export class CronJobsService {
     const endTime = moment()
       .tz('America/Sao_Paulo')
       .format('DD-MM-YYYY HH:mm:ss');
-    console.log(`Fim da execução dos CronJobs: ${endTime}`);
+    console.log(`Fim da execução dos CronJobs do Andar de Cima: ${endTime}`);
   }
 }
