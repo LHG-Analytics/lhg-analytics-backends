@@ -9,48 +9,70 @@ datasource db {
 }
 
 model Company {
-  id                                      Int                                       @id @default(autoincrement())
-  name                                    String
-  kpiRevenues                             KpiRevenue[]
-  kpiTotalRentals                         KpiTotalRentals[]
-  kpiTicketAverages                       KpiTicketAverage[]
-  kpiAlos                                 KpiAlos[]
-  KpiOccupancyRates                       KpiOccupancyRate[]
-  KpiGiros                                KpiGiro[]
-  KpiRevpars                              KpiRevpar[]
-  KpiTrevpars                             KpiTrevpar[]
-  KpiOccupancyRatesByWeek                 KpiOccupancyRateByWeek[]
-  KpiGiroByWeek                           KpiGiroByWeek[]
-  KpiOccupancyRatesByPeriod               KpiOccupancyRateByPeriod[]
-  KpiOccupancyRatesBySuiteCategory        KpiOccupancyRateBySuiteCategory[]
-  KpiRevenuesByRentalType                 KpiRevenueByRentalType[]
-  KpiRevenueByPeriod                      KpiRevenueByPeriod[]
-  KpiTotalRentalsByPeriod                 KpiTotalRentalsByPeriod[]
-  KpiRevparsByPeriod                      KpiRevparByPeriod[]
-  KpiTicketAveragesByPeriod               KpiTicketAverageByPeriod[]
-  KpiTrevparsByPeriod                     KpiTrevparByPeriod[]
-  Cleanings                               Cleanings[]
-  CleaningsByPeriod                       CleaningsByPeriod[]
-  CleaningsByWeek                         CleaningsByWeek[]
-  Inspections                             Inspections[]
-  Governance                              Governance?
-  CleaningsByPeriodShift                  CleaningsByPeriodShift[]
-  Bookings                                Bookings[]
-  BookingsTotalRentalsByRentalType        BookingsTotalRentalsByRentalType[]
-  BookingsRevenueByChannelType            BookingsRevenueByChannelType[]
-  BookingsTicketAverage                   BookingsTicketAverage[]
-  BookingsRevenue                         BookingsRevenue[]
-  BookingsRepresentativeness              BookingsRepresentativeness[]
-  BookingsRepresentativenessByPeriod      BookingsRepresentativenessByPeriod[]
-  BookingsTotalRentals                    BookingsTotalRentals[]
-  BookingsTotalRentalsByPeriod            BookingsTotalRentalsByPeriod[]
-  BookingsRevenueByPeriod                 BookingsRevenueByPeriod[]
-  BookingsTotalRentalsByChannelType       BookingsTotalRentalsByChannelType[]
-  BookingsTicketAverageByChannelType      BookingsTicketAverageByChannelType[]
-  BookingsRevenueByPayment                BookingsRevenueByPayment[]
-  BookingsRepresentativenessByChannelType BookingsRepresentativenessByChannelType[]
-  BookingsTotalRentalsByPeriodEcommerce   BookingsTotalRentalsByPeriodEcommerce[]
-  BookingsRevenueByPeriodEcommerce        BookingsRevenueByPeriodEcommerce[]
+  id                                            Int                                             @id @default(autoincrement())
+  name                                          String
+  kpiRevenues                                   KpiRevenue[]
+  kpiTotalRentals                               KpiTotalRentals[]
+  kpiTicketAverages                             KpiTicketAverage[]
+  kpiAlos                                       KpiAlos[]
+  KpiOccupancyRates                             KpiOccupancyRate[]
+  KpiGiros                                      KpiGiro[]
+  KpiRevpars                                    KpiRevpar[]
+  KpiTrevpars                                   KpiTrevpar[]
+  KpiOccupancyRatesByWeek                       KpiOccupancyRateByWeek[]
+  KpiGiroByWeek                                 KpiGiroByWeek[]
+  KpiOccupancyRatesByPeriod                     KpiOccupancyRateByPeriod[]
+  KpiOccupancyRatesBySuiteCategory              KpiOccupancyRateBySuiteCategory[]
+  KpiRevenuesByRentalType                       KpiRevenueByRentalType[]
+  KpiRevenueByPeriod                            KpiRevenueByPeriod[]
+  KpiTotalRentalsByPeriod                       KpiTotalRentalsByPeriod[]
+  KpiRevparsByPeriod                            KpiRevparByPeriod[]
+  KpiTicketAveragesByPeriod                     KpiTicketAverageByPeriod[]
+  KpiTrevparsByPeriod                           KpiTrevparByPeriod[]
+  Cleanings                                     Cleanings[]
+  CleaningsByPeriod                             CleaningsByPeriod[]
+  CleaningsByWeek                               CleaningsByWeek[]
+  Inspections                                   Inspections[]
+  Governance                                    Governance?
+  CleaningsByPeriodShift                        CleaningsByPeriodShift[]
+  Bookings                                      Bookings[]
+  BookingsTotalRentalsByRentalType              BookingsTotalRentalsByRentalType[]
+  BookingsRevenueByChannelType                  BookingsRevenueByChannelType[]
+  BookingsTicketAverage                         BookingsTicketAverage[]
+  BookingsRevenue                               BookingsRevenue[]
+  BookingsRepresentativeness                    BookingsRepresentativeness[]
+  BookingsRepresentativenessByPeriod            BookingsRepresentativenessByPeriod[]
+  BookingsTotalRentals                          BookingsTotalRentals[]
+  BookingsTotalRentalsByPeriod                  BookingsTotalRentalsByPeriod[]
+  BookingsRevenueByPeriod                       BookingsRevenueByPeriod[]
+  BookingsTotalRentalsByChannelType             BookingsTotalRentalsByChannelType[]
+  BookingsTicketAverageByChannelType            BookingsTicketAverageByChannelType[]
+  BookingsRevenueByPayment                      BookingsRevenueByPayment[]
+  BookingsRepresentativenessByChannelType       BookingsRepresentativenessByChannelType[]
+  BookingsTotalRentalsByPeriodEcommerce         BookingsTotalRentalsByPeriodEcommerce[]
+  BookingsRevenueByPeriodEcommerce              BookingsRevenueByPeriodEcommerce[]
+  Restaurant                                    Restaurant[]
+  RestaurantRevenue                             RestaurantRevenue[]
+  RestaurantRevenueByPeriod                     RestaurantRevenueByPeriod[]
+  RestaurantRevenueByFoodCategory               RestaurantRevenueByFoodCategory[]
+  RestaurantRevenueByDrinkCategory              RestaurantRevenueByDrinkCategory[]
+  RestaurantSales                               RestaurantSales[]
+  RestaurantSalesRanking                        RestaurantSalesRanking[]
+  RestaurantSalesPercentGroup                   RestaurantSalesPercentGroup[]
+  RestaurantRevenueByFoodCategoryPercent        RestaurantRevenueByFoodCategoryPercent[]
+  RestaurantRevenueByDrinkCategoryPercent       RestaurantRevenueByDrinkCategoryPercent[]
+  RestaurantRevenueByOthersCategory             RestaurantRevenueByOthersCategory[]
+  RestaurantRevenueByOthersCategoryPercent      RestaurantRevenueByOthersCategoryPercent[]
+  RestaurantSalesByFoodCategory                 RestaurantSalesByFoodCategory[]
+  RestaurantSalesByFoodCategoryPercent          RestaurantSalesByFoodCategoryPercent[]
+  RestaurantSalesByDrinkCategory                RestaurantSalesByDrinkCategory[]
+  RestaurantSalesByDrinkCategoryPercent         RestaurantSalesByDrinkCategoryPercent[]
+  RestaurantSalesByOthersCategory               RestaurantSalesByOthersCategory[]
+  RestaurantSalesByOthersCategoryPercent        RestaurantSalesByOthersCategoryPercent[]
+  RestaurantTicketAverage                       RestaurantTicketAverage[]
+  RestaurantTicketAverageByTotalRentals         RestaurantTicketAverageByTotalRentals[]
+  RestaurantTicketAverageByTotalRentalsByPeriod RestaurantTicketAverageByTotalRentalsByPeriod[]
+  RestaurantRevenueByPeriodPercent              RestaurantRevenueByPeriodPercent[]
 }
 
 model Governance {
@@ -633,6 +655,320 @@ model BookingsTotalRentalsByChannelType {
   @@unique([period, createdDate, channelType])
 }
 
+model Restaurant {
+  id                                            Int                                             @id @default(autoincrement())
+  companyId                                     Int
+  company                                       Company?                                        @relation(fields: [companyId], references: [id])
+  RestaurantRevenue                             RestaurantRevenue[]
+  RestaurantRevenueByPeriod                     RestaurantRevenueByPeriod[]
+  RestaurantRevenueByFoodCategory               RestaurantRevenueByFoodCategory[]
+  RestaurantRevenueByDrinkCategory              RestaurantRevenueByDrinkCategory[]
+  RestaurantSales                               RestaurantSales[]
+  RestaurantSalesRanking                        RestaurantSalesRanking[]
+  RestaurantSalesPercentGroup                   RestaurantSalesPercentGroup[]
+  RestaurantRevenueByFoodCategoryPercent        RestaurantRevenueByFoodCategoryPercent[]
+  RestaurantRevenueByDrinkCategoryPercent       RestaurantRevenueByDrinkCategoryPercent[]
+  RestaurantRevenueByOthersCategory             RestaurantRevenueByOthersCategory[]
+  RestaurantRevenueByOthersCategoryPercent      RestaurantRevenueByOthersCategoryPercent[]
+  RestaurantSalesByFoodCategory                 RestaurantSalesByFoodCategory[]
+  RestaurantSalesByFoodCategoryPercent          RestaurantSalesByFoodCategoryPercent[]
+  RestaurantSalesByDrinkCategory                RestaurantSalesByDrinkCategory[]
+  RestaurantSalesByDrinkCategoryPercent         RestaurantSalesByDrinkCategoryPercent[]
+  RestaurantSalesByOthersCategory               RestaurantSalesByOthersCategory[]
+  RestaurantSalesByOthersCategoryPercent        RestaurantSalesByOthersCategoryPercent[]
+  RestaurantTicketAverage                       RestaurantTicketAverage[]
+  RestaurantTicketAverageByTotalRentals         RestaurantTicketAverageByTotalRentals[]
+  RestaurantTicketAverageByTotalRentalsByPeriod RestaurantTicketAverageByTotalRentalsByPeriod[]
+  RestaurantRevenueByPeriodPercent              RestaurantRevenueByPeriodPercent[]
+}
+
+model RestaurantRevenue {
+  id            Int         @id @default(autoincrement())
+  period        PeriodEnum?
+  totalAllValue Decimal     @db.Decimal(10, 2)
+  createdDate   DateTime
+  companyId     Int
+  company       Company?    @relation(fields: [companyId], references: [id])
+  restaurantId  Int
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate])
+}
+
+model RestaurantRevenueByPeriod {
+  id           Int         @id @default(autoincrement())
+  period       PeriodEnum?
+  totalValue   Decimal     @db.Decimal(10, 2)
+  createdDate  DateTime
+  companyId    Int
+  company      Company?    @relation(fields: [companyId], references: [id])
+  restaurantId Int
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate])
+}
+
+model RestaurantRevenueByPeriodPercent {
+  id                Int         @id @default(autoincrement())
+  period            PeriodEnum?
+  totalValuePercent Decimal     @db.Decimal(10, 2)
+  createdDate       DateTime
+  companyId         Int
+  company           Company?    @relation(fields: [companyId], references: [id])
+  restaurantId      Int
+  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate])
+}
+
+model RestaurantRevenueByFoodCategory {
+  id           Int         @id @default(autoincrement())
+  period       PeriodEnum?
+  totalValue   Decimal     @db.Decimal(10, 2)
+  createdDate  DateTime
+  foodCategory String
+  companyId    Int
+  company      Company?    @relation(fields: [companyId], references: [id])
+  restaurantId Int
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, foodCategory])
+}
+
+model RestaurantRevenueByFoodCategoryPercent {
+  id                Int         @id @default(autoincrement())
+  period            PeriodEnum?
+  totalValuePercent Decimal     @db.Decimal(10, 2)
+  createdDate       DateTime
+  foodCategory      String
+  companyId         Int
+  company           Company?    @relation(fields: [companyId], references: [id])
+  restaurantId      Int
+  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, foodCategory])
+}
+
+model RestaurantRevenueByDrinkCategory {
+  id            Int         @id @default(autoincrement())
+  period        PeriodEnum?
+  totalValue    Decimal     @db.Decimal(10, 2)
+  createdDate   DateTime
+  drinkCategory String
+  companyId     Int
+  company       Company?    @relation(fields: [companyId], references: [id])
+  restaurantId  Int
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, drinkCategory])
+}
+
+model RestaurantRevenueByDrinkCategoryPercent {
+  id                Int         @id @default(autoincrement())
+  period            PeriodEnum?
+  totalValuePercent Decimal     @db.Decimal(10, 2)
+  createdDate       DateTime
+  drinkCategory     String
+  companyId         Int
+  company           Company?    @relation(fields: [companyId], references: [id])
+  restaurantId      Int
+  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, drinkCategory])
+}
+
+model RestaurantRevenueByOthersCategory {
+  id             Int         @id @default(autoincrement())
+  period         PeriodEnum?
+  totalValue     Decimal     @db.Decimal(10, 2)
+  createdDate    DateTime
+  othersCategory String
+  companyId      Int
+  company        Company?    @relation(fields: [companyId], references: [id])
+  restaurantId   Int
+  restaurant     Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, othersCategory])
+}
+
+model RestaurantRevenueByOthersCategoryPercent {
+  id                Int         @id @default(autoincrement())
+  period            PeriodEnum?
+  totalValuePercent Decimal     @db.Decimal(10, 2)
+  createdDate       DateTime
+  othersCategory    String
+  companyId         Int
+  company           Company?    @relation(fields: [companyId], references: [id])
+  restaurantId      Int
+  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, othersCategory])
+}
+
+model RestaurantSales {
+  id            Int         @id @default(autoincrement())
+  period        PeriodEnum?
+  totalAllSales Int
+  createdDate   DateTime
+  companyId     Int
+  company       Company?    @relation(fields: [companyId], references: [id])
+  restaurantId  Int
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate])
+}
+
+model RestaurantSalesRanking {
+  id           Int         @id @default(autoincrement())
+  period       PeriodEnum?
+  totalSales   Int
+  productName  String
+  createdDate  DateTime
+  companyId    Int
+  company      Company?    @relation(fields: [companyId], references: [id])
+  restaurantId Int
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, productName])
+}
+
+model RestaurantSalesPercentGroup {
+  id                Int              @id @default(autoincrement())
+  period            PeriodEnum?
+  totalSalesPercent Decimal          @db.Decimal(10, 2)
+  consumptionGroup  ConsumptionGroup
+  createdDate       DateTime
+  companyId         Int
+  company           Company?         @relation(fields: [companyId], references: [id])
+  restaurantId      Int
+  restaurant        Restaurant?      @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, consumptionGroup])
+}
+
+model RestaurantSalesByFoodCategory {
+  id           Int         @id @default(autoincrement())
+  period       PeriodEnum?
+  totalSales   Int
+  createdDate  DateTime
+  foodCategory String
+  companyId    Int
+  company      Company?    @relation(fields: [companyId], references: [id])
+  restaurantId Int
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, foodCategory])
+}
+
+model RestaurantSalesByFoodCategoryPercent {
+  id                Int         @id @default(autoincrement())
+  period            PeriodEnum?
+  totalSalesPercent Decimal     @db.Decimal(10, 2)
+  createdDate       DateTime
+  foodCategory      String
+  companyId         Int
+  company           Company?    @relation(fields: [companyId], references: [id])
+  restaurantId      Int
+  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, foodCategory])
+}
+
+model RestaurantSalesByDrinkCategory {
+  id            Int         @id @default(autoincrement())
+  period        PeriodEnum?
+  totalSale     Int
+  createdDate   DateTime
+  drinkCategory String
+  companyId     Int
+  company       Company?    @relation(fields: [companyId], references: [id])
+  restaurantId  Int
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, drinkCategory])
+}
+
+model RestaurantSalesByDrinkCategoryPercent {
+  id               Int         @id @default(autoincrement())
+  period           PeriodEnum?
+  totalSalePercent Decimal     @db.Decimal(10, 2)
+  createdDate      DateTime
+  drinkCategory    String
+  companyId        Int
+  company          Company?    @relation(fields: [companyId], references: [id])
+  restaurantId     Int
+  restaurant       Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, drinkCategory])
+}
+
+model RestaurantSalesByOthersCategory {
+  id             Int         @id @default(autoincrement())
+  period         PeriodEnum?
+  totalSales     Int
+  createdDate    DateTime
+  othersCategory String
+  companyId      Int
+  company        Company?    @relation(fields: [companyId], references: [id])
+  restaurantId   Int
+  restaurant     Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, othersCategory])
+}
+
+model RestaurantSalesByOthersCategoryPercent {
+  id                Int         @id @default(autoincrement())
+  period            PeriodEnum?
+  totalSalesPercent Decimal     @db.Decimal(10, 2)
+  createdDate       DateTime
+  othersCategory    String
+  companyId         Int
+  company           Company?    @relation(fields: [companyId], references: [id])
+  restaurantId      Int
+  restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, othersCategory])
+}
+
+model RestaurantTicketAverage {
+  id                    Int         @id @default(autoincrement())
+  period                PeriodEnum?
+  totalAllTicketAverage Decimal     @db.Decimal(10, 2)
+  createdDate           DateTime
+  companyId             Int
+  company               Company?    @relation(fields: [companyId], references: [id])
+  restaurantId          Int
+  restaurant            Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate])
+}
+
+model RestaurantTicketAverageByTotalRentals {
+  id                                  Int         @id @default(autoincrement())
+  period                              PeriodEnum?
+  totalAllTicketAverageByTotalRentals Decimal     @db.Decimal(10, 2)
+  createdDate                         DateTime
+  companyId                           Int
+  company                             Company?    @relation(fields: [companyId], references: [id])
+  restaurantId                        Int
+  restaurant                          Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate])
+}
+
+model RestaurantTicketAverageByTotalRentalsByPeriod {
+  id                               Int         @id @default(autoincrement())
+  period                           PeriodEnum?
+  totalTicketAverageByTotalRentals Decimal     @db.Decimal(10, 2)
+  createdDate                      DateTime
+  companyId                        Int
+  company                          Company?    @relation(fields: [companyId], references: [id])
+  restaurantId                     Int
+  restaurant                       Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate])
+}
+
 enum ChannelTypeEnum {
   WEBSITE_SCHEDULED
   WEBSITE_IMMEDIATE
@@ -662,4 +998,10 @@ enum RentalTypeEnum {
 enum Role {
   ADMIN
   MANAGER
+}
+
+enum ConsumptionGroup {
+  ALIMENTOS
+  BEBIDAS
+  OUTROS
 }
