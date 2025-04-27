@@ -2,7 +2,6 @@ import {
   ChannelTypeEnum,
   PeriodEnum,
   Prisma,
-  RentalTypeEnum,
 } from '../../../dist/generated/client-online';
 
 export class BookingsRevenue

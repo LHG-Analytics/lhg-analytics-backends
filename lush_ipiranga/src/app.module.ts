@@ -27,6 +27,7 @@ import { BookingsRepresentativenessModule } from './bookingsRepresentativeness/b
 import { BookingsModule } from './bookings/bookings.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de autenticação
 import { RestaurantModule } from './restaurant/restaurant.module';
+import { RestaurantRevenueModule } from './restaurantRevenue/restaurantRevenue.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { RestaurantModule } from './restaurant/restaurant.module';
     BookingsRepresentativenessModule,
     BookingsModule,
     RestaurantModule,
+    RestaurantRevenueModule,
   ],
   controllers: [AppController],
   providers: [

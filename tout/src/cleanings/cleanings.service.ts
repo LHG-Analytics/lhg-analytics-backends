@@ -269,17 +269,16 @@ export class CleaningsService {
             },
           });
 
-        if (!cleanings || cleanings.length === 0) {
-          throw new NotFoundException('No cleaning data found.');
-        }
-
         // Contar o total de limpezas para o período atual
         const totalCleaningsForCurrentPeriod = cleanings.length;
 
         // Adicionar o resultado ao objeto de resultados
         const dateKey = currentDate.toISOString().split('T')[0];
         results[dateKey] = {
-          totalCleanings: totalCleaningsForCurrentPeriod,
+          totalCleanings:
+            totalCleaningsForCurrentPeriod > 0
+              ? totalCleaningsForCurrentPeriod
+              : 0,
         };
 
         // Criar data para armazenar no banco de dados

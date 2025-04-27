@@ -245,7 +245,7 @@ export class CleaningsService {
       currentDate.setUTCHours(4, 0, 0, 0); // Início do dia contábil às 06:00:00
 
       while (currentDate < endDate) {
-        const nextDate = new Date(currentDate);
+        let nextDate = new Date(currentDate);
 
         if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
@@ -271,19 +271,8 @@ export class CleaningsService {
               reasonEnd: {
                 equals: 'COMPLETA',
               },
-              employee: {
-                personPaper: {
-                  idResponsibleDeletion: {
-                    equals: null,
-                  },
-                },
-              },
             },
           });
-
-        if (!cleanings || cleanings.length === 0) {
-          throw new NotFoundException('No cleaning data found.');
-        }
 
         // Contar o total de limpezas para o período atual
         const totalCleaningsForCurrentPeriod = cleanings.length;
@@ -291,7 +280,10 @@ export class CleaningsService {
         // Adicionar o resultado ao objeto de resultados
         const dateKey = currentDate.toISOString().split('T')[0];
         results[dateKey] = {
-          totalCleanings: totalCleaningsForCurrentPeriod,
+          totalCleanings:
+            totalCleaningsForCurrentPeriod > 0
+              ? totalCleaningsForCurrentPeriod
+              : 0,
         };
 
         // Criar data para armazenar no banco de dados

@@ -689,7 +689,7 @@ model RestaurantRevenue {
   createdDate   DateTime
   companyId     Int
   company       Company?    @relation(fields: [companyId], references: [id])
-  restaurantId  Int
+  restaurantId  Int?
   restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate])
@@ -702,7 +702,7 @@ model RestaurantRevenueByPeriod {
   createdDate  DateTime
   companyId    Int
   company      Company?    @relation(fields: [companyId], references: [id])
-  restaurantId Int
+  restaurantId Int?
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate])
@@ -715,7 +715,7 @@ model RestaurantRevenueByPeriodPercent {
   createdDate       DateTime
   companyId         Int
   company           Company?    @relation(fields: [companyId], references: [id])
-  restaurantId      Int
+  restaurantId      Int?
   restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate])
@@ -729,7 +729,7 @@ model RestaurantRevenueByFoodCategory {
   foodCategory String
   companyId    Int
   company      Company?    @relation(fields: [companyId], references: [id])
-  restaurantId Int
+  restaurantId Int?
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, foodCategory])
@@ -743,7 +743,7 @@ model RestaurantRevenueByFoodCategoryPercent {
   foodCategory      String
   companyId         Int
   company           Company?    @relation(fields: [companyId], references: [id])
-  restaurantId      Int
+  restaurantId      Int?
   restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, foodCategory])
@@ -757,7 +757,7 @@ model RestaurantRevenueByDrinkCategory {
   drinkCategory String
   companyId     Int
   company       Company?    @relation(fields: [companyId], references: [id])
-  restaurantId  Int
+  restaurantId  Int?
   restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, drinkCategory])
@@ -771,7 +771,7 @@ model RestaurantRevenueByDrinkCategoryPercent {
   drinkCategory     String
   companyId         Int
   company           Company?    @relation(fields: [companyId], references: [id])
-  restaurantId      Int
+  restaurantId      Int?
   restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, drinkCategory])
@@ -785,7 +785,7 @@ model RestaurantRevenueByOthersCategory {
   othersCategory String
   companyId      Int
   company        Company?    @relation(fields: [companyId], references: [id])
-  restaurantId   Int
+  restaurantId   Int?
   restaurant     Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, othersCategory])
@@ -799,7 +799,7 @@ model RestaurantRevenueByOthersCategoryPercent {
   othersCategory    String
   companyId         Int
   company           Company?    @relation(fields: [companyId], references: [id])
-  restaurantId      Int
+  restaurantId      Int?
   restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, othersCategory])
@@ -812,7 +812,7 @@ model RestaurantSales {
   createdDate   DateTime
   companyId     Int
   company       Company?    @relation(fields: [companyId], references: [id])
-  restaurantId  Int
+  restaurantId  Int?
   restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate])
@@ -826,7 +826,7 @@ model RestaurantSalesRanking {
   createdDate  DateTime
   companyId    Int
   company      Company?    @relation(fields: [companyId], references: [id])
-  restaurantId Int
+  restaurantId Int?
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, productName])
@@ -840,7 +840,7 @@ model RestaurantSalesPercentGroup {
   createdDate       DateTime
   companyId         Int
   company           Company?         @relation(fields: [companyId], references: [id])
-  restaurantId      Int
+  restaurantId      Int?
   restaurant        Restaurant?      @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, consumptionGroup])
@@ -854,7 +854,7 @@ model RestaurantSalesByFoodCategory {
   foodCategory String
   companyId    Int
   company      Company?    @relation(fields: [companyId], references: [id])
-  restaurantId Int
+  restaurantId Int?
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, foodCategory])
@@ -868,7 +868,7 @@ model RestaurantSalesByFoodCategoryPercent {
   foodCategory      String
   companyId         Int
   company           Company?    @relation(fields: [companyId], references: [id])
-  restaurantId      Int
+  restaurantId      Int?
   restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, foodCategory])
@@ -882,7 +882,7 @@ model RestaurantSalesByDrinkCategory {
   drinkCategory String
   companyId     Int
   company       Company?    @relation(fields: [companyId], references: [id])
-  restaurantId  Int
+  restaurantId  Int?
   restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, drinkCategory])
@@ -896,7 +896,7 @@ model RestaurantSalesByDrinkCategoryPercent {
   drinkCategory    String
   companyId        Int
   company          Company?    @relation(fields: [companyId], references: [id])
-  restaurantId     Int
+  restaurantId     Int?
   restaurant       Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, drinkCategory])
@@ -910,7 +910,7 @@ model RestaurantSalesByOthersCategory {
   othersCategory String
   companyId      Int
   company        Company?    @relation(fields: [companyId], references: [id])
-  restaurantId   Int
+  restaurantId   Int?
   restaurant     Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, othersCategory])
@@ -924,7 +924,7 @@ model RestaurantSalesByOthersCategoryPercent {
   othersCategory    String
   companyId         Int
   company           Company?    @relation(fields: [companyId], references: [id])
-  restaurantId      Int
+  restaurantId      Int?
   restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, othersCategory])
@@ -937,7 +937,7 @@ model RestaurantTicketAverage {
   createdDate           DateTime
   companyId             Int
   company               Company?    @relation(fields: [companyId], references: [id])
-  restaurantId          Int
+  restaurantId          Int?
   restaurant            Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate])
@@ -950,7 +950,7 @@ model RestaurantTicketAverageByTotalRentals {
   createdDate                         DateTime
   companyId                           Int
   company                             Company?    @relation(fields: [companyId], references: [id])
-  restaurantId                        Int
+  restaurantId                        Int?
   restaurant                          Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate])
@@ -963,7 +963,7 @@ model RestaurantTicketAverageByTotalRentalsByPeriod {
   createdDate                      DateTime
   companyId                        Int
   company                          Company?    @relation(fields: [companyId], references: [id])
-  restaurantId                     Int
+  restaurantId                     Int?
   restaurant                       Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate])
