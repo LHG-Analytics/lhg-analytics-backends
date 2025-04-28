@@ -1,18 +1,18 @@
 {
-    "extends": "../tsconfig.json",
+    "extends": "../../tsconfig.json",
     "compilerOptions": {
         "outDir": "../../dist/auth",
-        "rootDir": "src",
-        "removeComments": true,
-        "sourceMap": true
+        "rootDir": "../../src",
+        "baseUrl": "../../src",
+        "incremental": true
     },
     "include": [
-        "src/**/*"
+        "auth/**/*.ts"
     ],
     "exclude": [
         "node_modules",
-        "test",
         "dist",
-        "src/**/*.spec.ts"
+        "test",
+        "**/*spec.ts"
     ]
 }

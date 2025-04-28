@@ -12,7 +12,7 @@ module.exports = {
     },
     {
       name: "auth",
-      script: "dist/main.js", // caminho do build do auth
+      script: "./dist/auth/main.js", // Caminho correto para o build de auth
       env: {
         NODE_ENV: "production",
         SUPABASE_URL_USERS: process.env.SUPABASE_URL_USERS,
@@ -83,5 +83,9 @@ module.exports = {
       },
     },
   ],
-  post_deploy: ["npm install --legacy-peer-deps", "npm install -g pm2"],
+  post_deploy: [
+    "npm install --legacy-peer-deps",
+    "npm install -g pm2", // Instala o PM2 globalmente
+    "npm run build", // Executa o build para garantir que todos os builds estejam prontos
+  ],
 };
