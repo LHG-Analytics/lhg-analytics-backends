@@ -7,7 +7,7 @@ const proxyConfig = (target) =>
   createProxyMiddleware({
     target,
     changeOrigin: true,
-    logLevel: "debug", // Logs detalhados no terminal
+    logLevel: "debug",
     onProxyReq: (proxyReq, req, res) => {
       console.log(
         `🔄 Proxy encaminhando requisição para: ${target}${req.originalUrl}`
@@ -19,12 +19,10 @@ const proxyConfig = (target) =>
     },
   });
 
+app.use("/auth/api", proxyConfig("http://localhost:3005"));
 app.use("/lush_ipiranga", proxyConfig("http://localhost:3001"));
-
 app.use("/lush_lapa", proxyConfig("http://localhost:3002"));
-
 app.use("/tout", proxyConfig("http://localhost:3003"));
-
 app.use("/andar_de_cima", proxyConfig("http://localhost:3004"));
 
 const port = process.env.PORT || 3000;

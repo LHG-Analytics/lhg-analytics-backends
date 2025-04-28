@@ -11,6 +11,20 @@ module.exports = {
       },
     },
     {
+      name: "auth",
+      script: "dist/main.js", // caminho do build do auth
+      env: {
+        NODE_ENV: "production",
+        SUPABASE_URL_USERS: process.env.SUPABASE_URL_USERS,
+        JWT_SECRET: process.env.JWT_SECRET,
+        JWT_EXPIRATION_TIME: process.env.JWT_EXPIRATION_TIME,
+        PORT_AUTH: 3005, // Porta do serviço de auth
+      },
+      env_production: {
+        PORT_AUTH: 3005, // Porta do serviço de auth
+      },
+    },
+    {
       name: "lush_ipiranga",
       script: "./lush_ipiranga/dist/main.js",
       env: {
