@@ -15,7 +15,7 @@
         "build:lapa": "cd lush_lapa && npm run build",
         "build:tout": "cd tout && npm run build",
         "build:andar_de_cima": "cd andar_de_cima && npm run build",
-        "build:auth": "cd src/auth && npx prisma generate --schema=../../src/prisma/schemas/schema.online.prisma && ./node_modules/.bin/nest build --config nest-cli.json",
+        "build:auth": "cd src/auth && npx prisma generate --schema=../../src/prisma/schemas/schema.online.prisma && npx nest build --config nest-cli.json",
         "start:prod": "pm2-runtime ecosystem.config.js",
         "start:auth": "cd src/auth && npm run start:dev",
         "start:dev": "nest start --watch"

@@ -86,6 +86,7 @@ module.exports = {
   post_deploy: [
     "npm install --legacy-peer-deps", // Instala dependências
     "npm install -g pm2", // Instala o PM2 globalmente
+    "cd src/auth && npm install", // Garante que as dependências do auth sejam instaladas
     "npm run build:auth", // Executa o build de auth separadamente
     "npm run build", // Executa o build geral
   ],
