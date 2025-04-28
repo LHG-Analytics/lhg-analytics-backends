@@ -4,7 +4,7 @@
     "description": "Backend services for LHG Analytics",
     "scripts": {
         "preinstall": "npm install -g pm2",
-        "install-all": "npm install --legacy-peer-deps",
+        "install-all": "npm-run-all install:*",
         "install:ipiranga": "cd lush_ipiranga && npm install --legacy-peer-deps",
         "install:lapa": "cd lush_lapa && npm install --legacy-peer-deps",
         "install:tout": "cd tout && npm install --legacy-peer-deps",
