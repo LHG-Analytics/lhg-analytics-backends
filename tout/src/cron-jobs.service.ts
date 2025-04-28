@@ -37,7 +37,7 @@ export class CronJobsService {
     private readonly bookingsRepresentativeness: BookingsRepresentativenessService,
   ) {}
 
-  @Cron('0 0,6,16 * * *', { timeZone: 'America/Sao_Paulo' })
+  //@Cron('0 0,6,16 * * *', { timeZone: 'America/Sao_Paulo' })
   async scheduleDailyJobs() {
     if (this.isJobRunning) {
       console.log('O cron job já está em execução. Ignorando nova execução.');

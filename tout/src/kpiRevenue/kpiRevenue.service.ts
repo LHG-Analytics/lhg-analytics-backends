@@ -532,12 +532,19 @@ export class KpiRevenueService {
           (ra) => ra.checkIn >= currentDate && ra.checkIn <= nextDate,
         );
 
+        // Inicializa o totalsMap com valores padrão de 0 para cada tipo de locação
         const totalsMap: {
           [rentalType: string]: {
             totalValue: Prisma.Decimal;
             createdDate: Date;
           };
-        } = {};
+        } = Object.keys(rentalTypeMap).reduce((map, rentalType) => {
+          map[rentalType] = {
+            totalValue: new Prisma.Decimal(0),
+            createdDate: currentDate,
+          };
+          return map;
+        }, {});
 
         for (const rentalApartment of currentRentalApartments) {
           const rentalTypeString = this.determineRentalPeriod(
@@ -546,13 +553,6 @@ export class KpiRevenueService {
             rentalApartment.Booking?.length ? rentalApartment.Booking : null,
           );
           const rentalType = rentalTypeMap[rentalTypeString];
-
-          if (!totalsMap[rentalType]) {
-            totalsMap[rentalType] = {
-              totalValue: new Prisma.Decimal(0),
-              createdDate: currentDate,
-            };
-          }
 
           const permanenceValueLiquid = rentalApartment.permanenceValueLiquid
             ? new Prisma.Decimal(rentalApartment.permanenceValueLiquid)
