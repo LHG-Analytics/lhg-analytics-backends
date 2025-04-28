@@ -84,8 +84,9 @@ module.exports = {
     },
   ],
   post_deploy: [
-    "npm install --legacy-peer-deps",
+    "npm install --legacy-peer-deps", // Instala dependências
     "npm install -g pm2", // Instala o PM2 globalmente
-    "npm run build", // Executa o build para garantir que todos os builds estejam prontos
+    "npm run build:auth", // Executa o build de auth separadamente
+    "npm run build", // Executa o build geral
   ],
 };
