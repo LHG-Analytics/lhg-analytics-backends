@@ -11,6 +11,7 @@
         "install:andar_de_cima": "cd andar_de_cima && npm install --legacy-peer-deps",
         "install:auth": "cd src/auth && npm install --legacy-peer-deps",
         "build": "npm-run-all install-all build-all",
+        "build-all": "npm run build:ipiranga && npm run build:lapa && npm run build:tout && npm run build:andar_de_cima && npm run build:auth",
         "build:ipiranga": "cd lush_ipiranga && npm run build",
         "build:lapa": "cd lush_lapa && npm run build",
         "build:tout": "cd tout && npm run build",
