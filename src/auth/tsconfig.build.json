@@ -4,7 +4,12 @@
         "outDir": "../../dist/auth",
         "rootDir": "../../src",
         "baseUrl": "../../src",
-        "incremental": true
+        "incremental": true,
+        "paths": {
+            "@nestjs/*": [
+                "../../node_modules/@nestjs/*"
+            ]
+        }
     },
     "include": [
         "auth/**/*.ts"

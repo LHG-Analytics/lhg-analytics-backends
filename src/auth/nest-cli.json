@@ -1,4 +1,6 @@
 {
+    "collection": "@nestjs/schematics",
+    "sourceRoot": "./",
     "compilerOptions": {
         "tsConfigPath": "./tsconfig.build.json",
         "outputPath": "../../dist/auth"
