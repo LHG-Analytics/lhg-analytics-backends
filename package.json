@@ -2,19 +2,21 @@
     "name": "lhg-analytics-backends",
     "version": "1.0.0",
     "description": "Backend services for LHG Analytics",
+    "private": true,
+    "workspaces": [
+        "lush_ipiranga",
+        "lush_lapa",
+        "tout",
+        "andar_de_cima",
+        "authentication"
+    ],
     "scripts": {
-        "preinstall": "npm install -g pm2",
-        "install-all": "npm install --legacy-peer-deps",
-        "generate:auth": "npx prisma generate --schema=src/prisma/schemas/schema.online.prisma",
-        "build": "npm-run-all install-all build:ipiranga build:lapa build:tout build:andar_de_cima build:auth",
+        "build": "npm-run-all build:*",
         "build:ipiranga": "cd lush_ipiranga && npm run build",
         "build:lapa": "cd lush_lapa && npm run build",
         "build:tout": "cd tout && npm run build",
-        "build:andar_de_cima": "cd andar_de_cima && npm run build",
-        "build:auth": "cd src/auth && npm install --legacy-peer-deps && npm run build",
-        "start:prod": "pm2-runtime ecosystem.config.js",
-        "start:auth": "cd src/auth && npm run start:dev",
-        "start:dev": "nest start --watch"
+        "build:andar": "cd andar_de_cima && npm run build",
+        "build:auth": "cd authentication && npm run build"
     },
     "dependencies": {
         "@nestjs/class-validator": "^0.13.1",
@@ -41,6 +43,7 @@
     "devDependencies": {
         "@nestjs/cli": "^11.0.7",
         "@types/passport-jwt": "^4.0.1",
-        "prisma": "^6.6.0"
+        "prisma": "^6.6.0",
+        "rimraf": "^6.0.1"
     }
 }

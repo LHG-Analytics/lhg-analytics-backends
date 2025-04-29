@@ -19,7 +19,7 @@ const proxyConfig = (target) =>
     },
   });
 
-app.use("/auth/api", proxyConfig("http://localhost:3005"));
+app.use("/auth", proxyConfig("http://localhost:3005"));
 app.use("/lush_ipiranga", proxyConfig("http://localhost:3001"));
 app.use("/lush_lapa", proxyConfig("http://localhost:3002"));
 app.use("/tout", proxyConfig("http://localhost:3003"));

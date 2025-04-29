@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
-import { PrismaService } from "./prisma/prisma.service";
+import { PrismaService } from "../prisma/prisma.service";
 import { ValidationPipe } from "@nestjs/common";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 
