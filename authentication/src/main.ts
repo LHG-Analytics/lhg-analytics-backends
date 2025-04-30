@@ -31,6 +31,7 @@ async function bootstrap() {
         },
         'JWT-auth',
       ) // Permite autenticar endpoints no Swagger
+      .addServer(isProduction ? '/authentication' : '/')
       .addTag('Auth')
       .addTag('Users')
       .build();
