@@ -13,7 +13,7 @@ async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
 
-    app.setGlobalPrefix(`/api`);
+    app.setGlobalPrefix(`auth/api`);
     const isProduction = process.env.NODE_ENV === 'production';
 
     // Configuração do Swagger
@@ -31,14 +31,13 @@ async function bootstrap() {
         },
         'JWT-auth',
       ) // Permite autenticar endpoints no Swagger
-      .addServer(isProduction ? '' : '/')
       .addTag('Auth')
       .addTag('Users')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup('/api', app, document);
-    console.log('Swagger UI disponível em: /api');
+    SwaggerModule.setup('auth/api', app, document);
+    console.log('Swagger UI disponível em: auth/api');
 
     // Inicialize o PrismaService com tratamento de erro
     const prismaService = app.get(PrismaService);
