@@ -37,7 +37,7 @@ async function bootstrap() {
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup('auth/api', app, document);
+    SwaggerModule.setup('/api', app, document);
     console.log('Swagger UI disponível em: /api');
 
     // Inicialize o PrismaService com tratamento de erro
