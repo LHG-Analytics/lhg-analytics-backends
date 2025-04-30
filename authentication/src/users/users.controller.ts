@@ -1,53 +1,56 @@
 import {
-  Controller,
-  Post,
   Body,
+  Controller,
+  Delete,
   Get,
   Param,
   Patch,
-  Delete,
-  UseGuards,
-} from "@nestjs/common";
-import { UsersService } from "./users.service";
-import { RolesGuard } from "../auth/guards/roles.guard";
-import { AuthGuard } from "@nestjs/passport";
-import { Roles } from "../auth/decorators/roles.decorator";
-import { CreateUserDto } from "./dto/create-user.dto";
-import { ApiTags } from "@nestjs/swagger";
+  Post,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UsersService } from './users.service';
 
-@ApiTags("Users")
-@Controller("users")
-@UseGuards(AuthGuard("jwt"), RolesGuard)
+@ApiBearerAuth('JWT-auth')
+@ApiTags('Users')
+@Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  @Roles("admin")
+  @Roles('ADMIN')
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
 
   @Get()
-  @Roles("admin", "gerente_geral")
-  findAll() {
-    return this.usersService.findAll();
+  @Roles('ADMIN', 'GERENTE_GERAL')
+  async findAll() {
+    try {
+      const users = await this.usersService.findAll();
+      return users;
+    } catch (error) {
+      console.error('Erro ao buscar usuários:', error);
+      throw error;
+    }
   }
 
-  @Get("email/:email")
-  @Roles("admin", "gerente_geral")
-  findByEmail(@Param("email") email: string) {
+  @Get('email/:email')
+  @Roles('ADMIN', 'GERENTE_GERAL')
+  findByEmail(@Param('email') email: string) {
     return this.usersService.findByEmail(email);
   }
 
-  @Patch(":id")
-  @Roles("admin")
-  update(@Param("id") id: string, @Body() updateUserDto: any) {
+  @Patch(':id')
+  @Roles('ADMIN')
+  update(@Param('id') id: string, @Body() updateUserDto: any) {
     return this.usersService.update(+id, updateUserDto);
   }
 
-  @Delete(":id")
-  @Roles("admin")
-  remove(@Param("id") id: string) {
+  @Delete(':id')
+  @Roles('ADMIN')
+  remove(@Param('id') id: string) {
     return this.usersService.remove(+id);
   }
 }

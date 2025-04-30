@@ -2,9 +2,9 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-} from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import * as bcrypt from "bcrypt";
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -18,7 +18,7 @@ export class UsersService {
     });
 
     if (existingUser) {
-      throw new ConflictException("O usuário com este email já existe");
+      throw new ConflictException('O usuário com este email já existe');
     }
 
     // Criptografa a senha antes de salvar
@@ -33,9 +33,14 @@ export class UsersService {
     return user;
   }
 
-  // Buscar todos os usuários
   async findAll() {
-    return this.prisma.prismaOnline.user.findMany();
+    try {
+      const users = await this.prisma.prismaOnline.user.findMany();
+      return users;
+    } catch (error) {
+      console.error('Erro ao buscar usuários:', error);
+      throw new Error('Erro ao buscar usuários');
+    }
   }
 
   // Buscar usuário por email com validação
@@ -45,7 +50,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException("Usuário não encontrado");
+      throw new NotFoundException('Usuário não encontrado');
     }
 
     return user;
@@ -58,7 +63,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException("Usuário não encontrado");
+      throw new NotFoundException('Usuário não encontrado');
     }
 
     return user;

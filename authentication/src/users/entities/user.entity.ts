@@ -1,9 +1,9 @@
-import { Exclude } from "class-transformer";
+import { Exclude } from 'class-transformer';
 import {
   Prisma,
   UserRole,
   UserUnit,
-} from "../../../dist/generated/client-online";
+} from '../../../dist/generated/client-online';
 
 export class User implements Prisma.UserUncheckedCreateInput {
   id?: number;

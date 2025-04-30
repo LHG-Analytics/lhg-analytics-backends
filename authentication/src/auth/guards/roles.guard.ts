@@ -1,12 +1,11 @@
 import {
-  Injectable,
   CanActivate,
   ExecutionContext,
+  Injectable,
   ForbiddenException,
-} from "@nestjs/common";
-import { Reflector } from "@nestjs/core";
-import { ROLES_KEY } from "../decorators/roles.decorator";
-import { JwtPayload } from "../interfaces/jwt-payload.interface";
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { ROLES_KEY } from '../decorators/roles.decorator';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -15,24 +14,14 @@ export class RolesGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(
       ROLES_KEY,
-      [context.getHandler(), context.getClass()]
+      [context.getHandler(), context.getClass()],
     );
-    if (!requiredRoles) {
-      return true; // Se não tiver roles definidas, qualquer um pode acessar
-    }
+    if (!requiredRoles) return true;
 
     const { user } = context.switchToHttp().getRequest();
-    console.log("User from request in RolesGuard:", user); // Verifique se o user está aqui
-
-    if (!user) {
-      throw new ForbiddenException("Usuário não autenticado");
-    }
-
-    const payload = user as JwtPayload;
-
-    if (!requiredRoles.includes(payload.role)) {
+    if (!user || !requiredRoles.includes(user.role)) {
       throw new ForbiddenException(
-        "Usuário não tem permissão para acessar essa rota"
+        'Você não tem permissão para acessar esta rota',
       );
     }
 
