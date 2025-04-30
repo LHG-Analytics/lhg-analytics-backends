@@ -55,6 +55,7 @@ async function bootstrap() {
 
     // Configuração de CORS
     const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+      'http://lhg-analytics-backend-bmmd.onrender.com',
       'http://localhost:3005', // Adicionando origem do frontend localmente
       'https://lhg-analytics.vercel.app', // Substitua com a URL do seu frontend
     ];
