@@ -3,7 +3,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
 
-// Apenas o /auth precisa manter o prefixo no destino
+// ⚠️ REMOVE "/auth" antes de enviar para o Nest (que escuta em /api)
 app.use(
   "/auth",
   createProxyMiddleware({
@@ -12,13 +12,12 @@ app.use(
     secure: false,
     logLevel: "debug",
     pathRewrite: {
-      "^/auth": "/auth", // mantém o prefixo no destino
+      "^/auth": "", // remove "/auth" da URL
     },
     onProxyReq: (proxyReq, req, res) => {
       console.log(
-        `🔄 Proxy encaminhando requisição para: http://localhost:3005${req.originalUrl}`
+        `🔄 Proxy encaminhando para: http://localhost:3005${req.originalUrl}`
       );
-      console.log("Headers recebidos no Proxy:", req.headers);
       if (req.headers["authorization"]) {
         proxyReq.setHeader("Authorization", req.headers["authorization"]);
       }
@@ -26,7 +25,7 @@ app.use(
   })
 );
 
-// As outras rotas continuam como estão, sem alteração de pathRewrite
+// As outras unidades permanecem inalteradas
 app.use(
   "/lush_ipiranga",
   createProxyMiddleware({ target: "http://localhost:3001", changeOrigin: true })

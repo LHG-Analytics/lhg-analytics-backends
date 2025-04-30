@@ -6,17 +6,18 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 
-// Carregar variáveis de ambiente do arquivo .env
 config();
 
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
 
-    app.setGlobalPrefix(`auth/api`);
+    // Prefixo interno, o proxy cuidará do "/auth"
+    app.setGlobalPrefix('api');
+
     const isProduction = process.env.NODE_ENV === 'production';
 
-    // Configuração do Swagger
+    // Swagger
     const swaggerConfig = new DocumentBuilder()
       .setTitle('LHG Analytics - Auth Service')
       .setDescription(
@@ -24,38 +25,30 @@ async function bootstrap() {
       )
       .setVersion('1.0')
       .addBearerAuth(
-        {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-        },
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
         'JWT-auth',
-      ) // Permite autenticar endpoints no Swagger
+      )
       .addTag('Auth')
       .addTag('Users')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup('auth/api', app, document);
-    console.log('Swagger UI disponível em: auth/api');
+    SwaggerModule.setup('api', app, document);
+    console.log('✅ Swagger disponível em: /auth/api');
 
-    // Inicialize o PrismaService com tratamento de erro
     const prismaService = app.get(PrismaService);
     try {
       await prismaService.onModuleInit();
-      console.log('Prisma conectado com sucesso.');
+      console.log('✅ Prisma conectado com sucesso.');
     } catch (error) {
-      console.error('Erro ao conectar ao Prisma:', error);
-      process.exit(1); // Encerrar o processo caso o banco não esteja acessível
+      console.error('❌ Erro ao conectar ao Prisma:', error);
+      process.exit(1);
     }
 
-    console.log('JWT_SECRET:', process.env.JWT_SECRET);
-
-    // Configuração de CORS
     const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
       'http://lhg-analytics-backend-bmmd.onrender.com',
-      'http://localhost:3005', // Adicionando origem do frontend localmente
-      'https://lhg-analytics.vercel.app', // Substitua com a URL do seu frontend
+      'http://localhost:3005',
+      'https://lhg-analytics.vercel.app',
     ];
 
     const corsOptions: CorsOptions = {
@@ -71,13 +64,12 @@ async function bootstrap() {
         }
       },
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-      allowedHeaders: ['Authorization', 'Content-Type'], // Certifique-se de incluir Authorization
-      credentials: true, // Se estiver enviando cookies, mantenha true
+      allowedHeaders: ['Authorization', 'Content-Type'],
+      credentials: true,
     };
 
     app.enableCors(corsOptions);
 
-    // ValidationPipe global para validar DTOs automaticamente
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -88,9 +80,9 @@ async function bootstrap() {
 
     const port = process.env.PORT_AUTH || 3005;
     await app.listen(port);
-    console.log(`Auth Service escutando na porta ${port}`);
+    console.log(`✅ Auth Service escutando na porta ${port}`);
   } catch (error) {
-    console.error('Erro durante bootstrap:', error);
+    console.error('❌ Erro durante bootstrap:', error);
   }
 }
 
