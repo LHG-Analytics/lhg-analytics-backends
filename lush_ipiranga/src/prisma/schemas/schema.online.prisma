@@ -58,7 +58,6 @@ model Company {
   RestaurantRevenueByDrinkCategory              RestaurantRevenueByDrinkCategory[]
   RestaurantSales                               RestaurantSales[]
   RestaurantSalesRanking                        RestaurantSalesRanking[]
-  RestaurantSalesPercentGroup                   RestaurantSalesPercentGroup[]
   RestaurantRevenueByFoodCategoryPercent        RestaurantRevenueByFoodCategoryPercent[]
   RestaurantRevenueByDrinkCategoryPercent       RestaurantRevenueByDrinkCategoryPercent[]
   RestaurantRevenueByOthersCategory             RestaurantRevenueByOthersCategory[]
@@ -73,6 +72,7 @@ model Company {
   RestaurantTicketAverageByTotalRentals         RestaurantTicketAverageByTotalRentals[]
   RestaurantTicketAverageByTotalRentalsByPeriod RestaurantTicketAverageByTotalRentalsByPeriod[]
   RestaurantRevenueByPeriodPercent              RestaurantRevenueByPeriodPercent[]
+  RestaurantRevenueByGroupByPeriod              RestaurantRevenueByGroupByPeriod[]
 }
 
 model Governance {
@@ -665,7 +665,6 @@ model Restaurant {
   RestaurantRevenueByDrinkCategory              RestaurantRevenueByDrinkCategory[]
   RestaurantSales                               RestaurantSales[]
   RestaurantSalesRanking                        RestaurantSalesRanking[]
-  RestaurantSalesPercentGroup                   RestaurantSalesPercentGroup[]
   RestaurantRevenueByFoodCategoryPercent        RestaurantRevenueByFoodCategoryPercent[]
   RestaurantRevenueByDrinkCategoryPercent       RestaurantRevenueByDrinkCategoryPercent[]
   RestaurantRevenueByOthersCategory             RestaurantRevenueByOthersCategory[]
@@ -680,6 +679,7 @@ model Restaurant {
   RestaurantTicketAverageByTotalRentals         RestaurantTicketAverageByTotalRentals[]
   RestaurantTicketAverageByTotalRentalsByPeriod RestaurantTicketAverageByTotalRentalsByPeriod[]
   RestaurantRevenueByPeriodPercent              RestaurantRevenueByPeriodPercent[]
+  RestaurantRevenueByGroupByPeriod              RestaurantRevenueByGroupByPeriod[]
 }
 
 model RestaurantRevenue {
@@ -719,6 +719,20 @@ model RestaurantRevenueByPeriodPercent {
   restaurant        Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate])
+}
+
+model RestaurantRevenueByGroupByPeriod {
+  id               Int              @id @default(autoincrement())
+  period           PeriodEnum?
+  totalValue       Decimal          @db.Decimal(10, 2)
+  consumptionGroup ConsumptionGroup
+  createdDate      DateTime
+  companyId        Int
+  company          Company?         @relation(fields: [companyId], references: [id])
+  restaurantId     Int?
+  restaurant       Restaurant?      @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate, consumptionGroup])
 }
 
 model RestaurantRevenueByFoodCategory {
@@ -830,20 +844,6 @@ model RestaurantSalesRanking {
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, productName])
-}
-
-model RestaurantSalesPercentGroup {
-  id                Int              @id @default(autoincrement())
-  period            PeriodEnum?
-  totalSalesPercent Decimal          @db.Decimal(10, 2)
-  consumptionGroup  ConsumptionGroup
-  createdDate       DateTime
-  companyId         Int
-  company           Company?         @relation(fields: [companyId], references: [id])
-  restaurantId      Int?
-  restaurant        Restaurant?      @relation(fields: [restaurantId], references: [id])
-
-  @@unique([period, createdDate, consumptionGroup])
 }
 
 model RestaurantSalesByFoodCategory {
