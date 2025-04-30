@@ -32,7 +32,7 @@ async function bootstrap() {
         },
         'JWT-auth',
       ) // Permite autenticar endpoints no Swagger
-      .addServer(isProduction ? '/auth' : '/')
+      .addServer(isProduction ? '' : '/')
       .addTag('Auth')
       .addTag('Users')
       .build();
@@ -62,10 +62,14 @@ async function bootstrap() {
 
     const corsOptions: CorsOptions = {
       origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-          callback(null, true); // Se a origem estiver na lista ou não houver origem (ex: servidor para servidor)
+        if (
+          !origin ||
+          allowedOrigins.includes(origin) ||
+          origin.startsWith('https://lhg-analytics')
+        ) {
+          callback(null, true);
         } else {
-          callback(new Error('Not allowed by CORS'), false); // Se a origem não estiver na lista
+          callback(new Error('Not allowed by CORS'), false);
         }
       },
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
