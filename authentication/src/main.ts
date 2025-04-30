@@ -28,6 +28,7 @@ async function bootstrap() {
         { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
         'JWT-auth',
       )
+      .addServer(isProduction ? '/auth' : '/')
       .addTag('Auth')
       .addTag('Users')
       .build();
