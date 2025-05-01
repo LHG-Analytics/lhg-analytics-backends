@@ -969,6 +969,11 @@ export class RestaurantRevenueService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
+    await this.calculateRestaurantRevenueByGroupByPeriod(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
 
     const endTimeLast30Days = moment()
       .tz(timezone)
@@ -1039,6 +1044,11 @@ export class RestaurantRevenueService {
       PeriodEnum.LAST_6_M,
     );
     await this.calculateRestaurantRevenueByPeriodPercent(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateRestaurantRevenueByGroupByPeriod(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
