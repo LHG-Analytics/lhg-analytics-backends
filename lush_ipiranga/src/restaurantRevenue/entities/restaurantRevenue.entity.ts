@@ -1,4 +1,8 @@
-import { PeriodEnum, Prisma } from '../../../dist/generated/client-online';
+import {
+  ConsumptionGroup,
+  PeriodEnum,
+  Prisma,
+} from '../../../dist/generated/client-online';
 
 export class RestaurantRevenue
   implements Prisma.RestaurantRevenueUncheckedCreateInput
@@ -28,6 +32,17 @@ export class RestaurantRevenueByPeriodPercent
   createdDate: Date;
   period?: PeriodEnum;
   totalValuePercent: Prisma.Decimal;
+}
+
+export class RestaurantRevenueByGroupByPeriod
+  implements Prisma.RestaurantRevenueByGroupByPeriodUncheckedCreateInput
+{
+  id?: number;
+  companyId: number;
+  totalValue: Prisma.Decimal;
+  createdDate: Date;
+  consumptionGroup: ConsumptionGroup;
+  period?: PeriodEnum;
 }
 
 export class RestaurantRevenueByFoodCategory

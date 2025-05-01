@@ -5,10 +5,15 @@ import {
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as moment from 'moment-timezone';
-import { PeriodEnum, Prisma } from '../../dist/generated/client-online';
+import {
+  ConsumptionGroup,
+  PeriodEnum,
+  Prisma,
+} from '../../dist/generated/client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   RestaurantRevenue,
+  RestaurantRevenueByGroupByPeriod,
   RestaurantRevenueByPeriod,
   RestaurantRevenueByPeriodPercent,
 } from './entities/restaurantRevenue.entity';
@@ -569,6 +574,251 @@ export class RestaurantRevenueService {
     });
   }
 
+  private async calculateRestaurantRevenueByGroupByPeriod(
+    startDate: Date,
+    endDate: Date,
+    period: PeriodEnum,
+  ): Promise<any> {
+    try {
+      const companyId = 1;
+
+      // Ajustar a endDate para o final do dia anterior
+      const adjustedEndDate = new Date(endDate);
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      adjustedEndDate.setUTCHours(23, 59, 59, 999);
+
+      let currentDate = new Date(startDate);
+      currentDate.setUTCHours(0, 0, 0, 0);
+
+      // Estruturas para armazenar categorias e séries
+      const categories: string[] = [];
+      const seriesData: { [key: string]: number[] } = {
+        ALIMENTOS: [],
+        BEBIDAS: [],
+        OUTROS: [],
+      };
+
+      while (currentDate <= adjustedEndDate) {
+        let nextDate = new Date(currentDate);
+
+        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+          nextDate.setDate(nextDate.getDate() + 1);
+          nextDate.setUTCHours(0, 0, 0, 0);
+        } else if (period === PeriodEnum.LAST_6_M) {
+          currentDate.setDate(currentDate.getDate() - 1);
+          currentDate.setUTCHours(23, 59, 59, 999);
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          nextDate.setUTCHours(0, 0, 0, 0);
+        }
+
+        const allRentalApartments =
+          await this.prisma.prismaLocal.rentalApartment.findMany({
+            where: {
+              checkIn: {
+                gte: currentDate,
+                lte: nextDate,
+              },
+              endOccupationType: 'FINALIZADA',
+            },
+            include: {
+              saleLease: true,
+            },
+          });
+
+        const stockOutIds: number[] = [];
+        for (const rentalApartment of allRentalApartments) {
+          const saleLease = rentalApartment.saleLease;
+          if (saleLease && saleLease.stockOutId) {
+            stockOutIds.push(saleLease.stockOutId);
+          }
+        }
+
+        const stockOuts =
+          stockOutIds.length > 0
+            ? await this.prisma.prismaLocal.stockOut.findMany({
+                where: { id: { in: stockOutIds } },
+                include: {
+                  stockOutItem: {
+                    where: {
+                      canceled: null,
+                    },
+                    include: {
+                      productStock: {
+                        include: {
+                          product: {
+                            include: {
+                              typeProduct: {
+                                select: {
+                                  description: true,
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  sale: {
+                    select: {
+                      discount: true,
+                    },
+                  },
+                },
+              })
+            : [];
+
+        const stockOutMap = new Map(
+          stockOuts.map((stockOut) => [stockOut.id, stockOut]),
+        );
+
+        // Resetar os totais para o período atual
+        const totalByGroup = {
+          ALIMENTOS: new Prisma.Decimal(0),
+          BEBIDAS: new Prisma.Decimal(0),
+          OUTROS: new Prisma.Decimal(0),
+        };
+
+        for (const rentalApartment of allRentalApartments) {
+          const saleLease = rentalApartment.saleLease;
+
+          if (saleLease && saleLease.stockOutId) {
+            const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
+            if (stockOutSaleLease) {
+              for (const stockOutItem of stockOutSaleLease.stockOutItem) {
+                const priceSale = new Prisma.Decimal(stockOutItem.priceSale);
+                const quantity = new Prisma.Decimal(stockOutItem.quantity);
+                const discount = stockOutSaleLease.sale?.discount
+                  ? new Prisma.Decimal(stockOutSaleLease.sale.discount)
+                  : new Prisma.Decimal(0);
+
+                const itemTotal = priceSale.times(quantity).minus(discount);
+
+                // Verifica a categoria do produto e acumula no grupo correspondente
+                const productTypeDescription =
+                  stockOutItem.productStock?.product?.typeProduct?.description;
+                if (productTypeDescription) {
+                  if (
+                    [
+                      '07 - CAFE DA MANHA E CHA',
+                      '08 - ADICIONAIS',
+                      '09 - PETISCOS',
+                      '10 - ENTRADAS',
+                      '11 - LAN CHES',
+                      '12 - PRATOS PRINCIPAIS',
+                      '13 - A COMPANHAMENTOS',
+                      '14 - SOBREMESAS',
+                      '15 - BOMBONIERE',
+                    ].includes(productTypeDescription)
+                  ) {
+                    totalByGroup.ALIMENTOS =
+                      totalByGroup.ALIMENTOS.plus(itemTotal);
+                  } else if (
+                    [
+                      '01 - SOFT DRINKS',
+                      '02 - CERVEJAS',
+                      '03 - COQUETEIS',
+                      '04 - DOSES',
+                      '05 - GARRAFAS',
+                      '06 - VINHOS E ESPUMANTES',
+                    ].includes(productTypeDescription)
+                  ) {
+                    totalByGroup.BEBIDAS = totalByGroup.BEBIDAS.plus(itemTotal);
+                  } else {
+                    totalByGroup.OUTROS = totalByGroup.OUTROS.plus(itemTotal);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Adiciona a data atual e os totais nas séries
+        categories.push(currentDate.toLocaleDateString('pt-BR'));
+        seriesData.ALIMENTOS.push(Number(totalByGroup.ALIMENTOS));
+        seriesData.BEBIDAS.push(Number(totalByGroup.BEBIDAS));
+        seriesData.OUTROS.push(Number(totalByGroup.OUTROS));
+
+        // Realizar upsert para cada grupo
+        await this.insertRestaurantRevenueByGroupByPeriod({
+          consumptionGroup: ConsumptionGroup.ALIMENTOS,
+          totalValue: totalByGroup.ALIMENTOS,
+          companyId,
+          createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+          period,
+        });
+
+        await this.insertRestaurantRevenueByGroupByPeriod({
+          consumptionGroup: ConsumptionGroup.BEBIDAS,
+          totalValue: totalByGroup.BEBIDAS,
+          companyId,
+          createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+          period,
+        });
+
+        await this.insertRestaurantRevenueByGroupByPeriod({
+          consumptionGroup: ConsumptionGroup.OUTROS,
+          totalValue: totalByGroup.OUTROS,
+          companyId,
+          createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+          period,
+        });
+
+        // Atualiza a data atual para o próximo período
+        currentDate = new Date(nextDate);
+      }
+
+      const formattedResult = {
+        ALIMENTOS: {
+          CATEGORIES: categories,
+          SERIES: seriesData.ALIMENTOS,
+        },
+        BEBIDAS: {
+          CATEGORIES: categories,
+          SERIES: seriesData.BEBIDAS,
+        },
+        OUTROS: {
+          CATEGORIES: categories,
+          SERIES: seriesData.OUTROS,
+        },
+      };
+
+      console.log(
+        'Formatted Result for ApexCharts:',
+        JSON.stringify(formattedResult, null, 2),
+      );
+
+      return formattedResult;
+    } catch (error) {
+      console.error(
+        'Erro ao calcular a receita do restaurante por grupo e período:',
+        error,
+      );
+      throw new BadRequestException(
+        `Failed to calculate restaurant revenue by group and period: ${error.message}`,
+      );
+    }
+  }
+
+  private async insertRestaurantRevenueByGroupByPeriod(
+    data: RestaurantRevenueByGroupByPeriod,
+  ): Promise<RestaurantRevenueByGroupByPeriod> {
+    return this.prisma.prismaOnline.restaurantRevenueByGroupByPeriod.upsert({
+      where: {
+        period_createdDate_consumptionGroup: {
+          period: data.period,
+          createdDate: data.createdDate,
+          consumptionGroup: data.consumptionGroup,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
+  }
+
   @Cron('0 0 * * *', { disabled: true })
   async handleCron() {
     const timezone = 'America/Sao_Paulo'; // Defina seu fuso horário
@@ -636,6 +886,11 @@ export class RestaurantRevenueService {
       PeriodEnum.LAST_7_D,
     );
     await this.calculateRestaurantRevenueByPeriodPercent(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
+    await this.calculateRestaurantRevenueByGroupByPeriod(
       parsedStartDateLast7Days,
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
