@@ -3,7 +3,6 @@ import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { UserModule } from './user/user.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
 import { KpiAlosModule } from './kpiAlos/kpiAlos.module';
@@ -25,12 +24,10 @@ import { BookingsTotalRentalsModule } from './bookingsTotalRentals/bookingsTotal
 import { BookingsTicketAverageModule } from './bookingsTicketAverage/bookingsTicketAverage.module';
 import { BookingsRepresentativenessModule } from './bookingsRepresentativeness/bookingsRepresentativeness.module';
 import { BookingsModule } from './bookings/bookings.module';
-import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de autenticação
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    UserModule,
     PrismaModule,
     KpiAlosModule,
     KpiRevenueModule,

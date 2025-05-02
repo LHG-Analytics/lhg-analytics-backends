@@ -30,7 +30,6 @@ async function bootstrap() {
       .setVersion('1.0')
       //.addBearerAuth()
       .addServer(isProduction ? '/andar_de_cima' : '/')
-      .addTag('users')
       .addTag('KpiAlos')
       .addTag('KpiRevenue')
       .addTag('KpiTotalRentals')

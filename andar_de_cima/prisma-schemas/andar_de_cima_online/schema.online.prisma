@@ -64,16 +64,6 @@ model Governance {
   cleaningsByPeriodShift CleaningsByPeriodShift[]
 }
 
-model User {
-  id       Int    @id @default(autoincrement())
-  email    String @unique
-  name     String
-  cpf      String @unique
-  password String
-  role     Role?  @default(MANAGER)
-  company  String
-}
-
 model KpiRevenue {
   id                    Int         @id @default(autoincrement())
   suiteCategoryId       Int
@@ -657,9 +647,4 @@ enum RentalTypeEnum {
   DAY_USE
   DAILY
   OVERNIGHT
-}
-
-enum Role {
-  ADMIN
-  MANAGER
 }
