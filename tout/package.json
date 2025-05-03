@@ -7,6 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "generate": "npx prisma generate --schema=./prisma-schemas/tout_online/schema.online.prisma && npx prisma generate --schema=./prisma-schemas/tout_local/schema.local1.prisma",
+    "postinstall": "npm run generate",
     "build": "npm run generate && tsc",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node dist/main.js",
