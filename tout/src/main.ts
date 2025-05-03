@@ -29,7 +29,6 @@ async function bootstrap() {
       .setVersion('1.0')
       //.addBearerAuth()
       .addServer(isProduction ? '/tout' : '/')
-      .addTag('users')
       .addTag('KpiAlos')
       .addTag('KpiRevenue')
       .addTag('KpiTotalRentals')

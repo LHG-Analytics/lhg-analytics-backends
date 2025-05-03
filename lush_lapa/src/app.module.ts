@@ -3,7 +3,6 @@ import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { UserModule } from './user/user.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
 import { KpiAlosModule } from './kpiAlos/kpiAlos.module';
@@ -30,7 +29,6 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de aute
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    UserModule,
     PrismaModule,
     KpiAlosModule,
     KpiRevenueModule,

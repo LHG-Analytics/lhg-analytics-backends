@@ -25,7 +25,6 @@ async function bootstrap() {
       .setVersion('1.0')
       //.addBearerAuth()
       .addServer(isProduction ? '/lush_lapa' : '/')
-      .addTag('users')
       .addTag('KpiAlos')
       .addTag('KpiRevenue')
       .addTag('KpiTotalRentals')
