@@ -1,4 +1,11 @@
 import 'module-alias/register';
+import { addAliases } from 'module-alias';
+import { join } from 'path';
+
+addAliases({
+  '@client-local': join(__dirname, 'generated/client-local'),
+  '@client-online': join(__dirname, 'generated/client-online'),
+});
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
