@@ -3,6 +3,7 @@ module.exports = {
     {
       name: "proxy",
       script: "./server.mjs",
+      node_args: "-r module-alias/register",
       env: {
         PORT: 3000,
       },
@@ -27,6 +28,7 @@ module.exports = {
     {
       name: "lush_ipiranga",
       script: "./lush_ipiranga/dist/main.js",
+      node_args: "-r module-alias/register",
       env: {
         NODE_ENV: "production",
         DATABASE_URL_LOCAL_IPIRANGA: process.env.DATABASE_URL_LOCAL_IPIRANGA,
@@ -41,6 +43,7 @@ module.exports = {
     {
       name: "lush_lapa",
       script: "./lush_lapa/dist/main.js",
+      node_args: "-r module-alias/register",
       env: {
         NODE_ENV: "production",
         DATABASE_URL_LOCAL_LAPA: process.env.DATABASE_URL_LOCAL_LAPA,
@@ -55,6 +58,7 @@ module.exports = {
     {
       name: "tout",
       script: "./tout/dist/main.js",
+      node_args: "-r module-alias/register",
       env: {
         NODE_ENV: "production",
         DATABASE_URL_LOCAL_TOUT: process.env.DATABASE_URL_LOCAL_TOUT,
@@ -69,6 +73,7 @@ module.exports = {
     {
       name: "andar_de_cima",
       script: "./andar_de_cima/dist/main.js",
+      node_args: "-r module-alias/register",
       env: {
         NODE_ENV: "production",
         DATABASE_URL_LOCAL_ANDAR_DE_CIMA:
