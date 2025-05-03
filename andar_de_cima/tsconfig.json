@@ -18,14 +18,11 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      ".prisma/*": [
-        "./.prisma/*"
-      ],
       "@client-online": [
-        "dist/generated/client-online"
+        "src/generated/client-online"
       ],
       "@client-local": [
-        "dist/generated/client-local"
+        "src/generated/client-local"
       ]
     }
   },

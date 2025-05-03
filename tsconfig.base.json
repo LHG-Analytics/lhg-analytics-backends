@@ -1,35 +1,23 @@
+// tsconfig.base.json (RAIZ DO PROJETO)
 {
     "compilerOptions": {
         "module": "commonjs",
-        "declaration": true,
+        "target": "ES2021",
+        "strict": true,
+        "sourceMap": true,
+        "declaration": false,
         "removeComments": true,
         "emitDecoratorMetadata": true,
         "experimentalDecorators": true,
         "allowSyntheticDefaultImports": true,
-        "target": "ES2021",
-        "sourceMap": true,
-        "outDir": "../../dist/auth",
-        "baseUrl": "./",
-        "incremental": true,
         "skipLibCheck": true,
-        "strictNullChecks": false,
-        "noImplicitAny": false,
-        "strictBindCallApply": false,
-        "forceConsistentCasingInFileNames": false,
-        "noFallthroughCasesInSwitch": false,
-        "rootDir": "../../src", // Certificando que inclui toda a pasta src
+        "forceConsistentCasingInFileNames": true,
+        "incremental": true,
+        "baseUrl": ".",
         "paths": {
-            ".prisma/*": [
-                "./.prisma/*"
+            "@/*": [
+                "./*"
             ]
         }
-    },
-    "include": [
-        "../**/*.ts", // Incluir todos os arquivos .ts no diretório src
-        "../prisma/**/*.ts" // Incluir arquivos .ts na pasta src/prisma
-    ],
-    "exclude": [
-        "node_modules",
-        "dist"
-    ]
+    }
 }
