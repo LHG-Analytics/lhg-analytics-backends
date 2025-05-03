@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty } from 'class-validator';
-import { Prisma } from '../../../dist/generated/client-online';
+import { Prisma } from '@client-online';
 
 export class CreateBookingsTicketAverageDto {
   @ApiProperty({

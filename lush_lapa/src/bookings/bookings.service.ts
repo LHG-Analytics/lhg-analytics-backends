@@ -9,7 +9,7 @@ import {
   PeriodEnum,
   Prisma,
   RentalTypeEnum,
-} from '../../dist/generated/client-online';
+} from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()

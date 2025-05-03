@@ -12,7 +12,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { $Enums } from '../../dist/generated/client-online';
+import { $Enums } from '@client-online';
 import { BookingsService } from './bookings.service';
 
 @ApiTags('Bookings')

@@ -24,7 +24,6 @@ import { BookingsTotalRentalsModule } from './bookingsTotalRentals/bookingsTotal
 import { BookingsTicketAverageModule } from './bookingsTicketAverage/bookingsTicketAverage.module';
 import { BookingsRepresentativenessModule } from './bookingsRepresentativeness/bookingsRepresentativeness.module';
 import { BookingsModule } from './bookings/bookings.module';
-import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de autenticação
 
 @Module({
   imports: [

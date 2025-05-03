@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { Moment } from 'moment-timezone';
-import { PeriodEnum } from '../../dist/generated/client-online';
+import { PeriodEnum } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()

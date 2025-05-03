@@ -12,7 +12,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { $Enums } from '../../dist/generated/client-online';
+import { PeriodEnum } from '@client-online';
 import { GovernanceService } from './governance.service';
 
 @ApiTags('Governance')
@@ -26,10 +26,10 @@ export class GovernanceController {
     required: true,
     description: 'Período para o qual o KPI será calculado',
     example: 'LAST_7_D',
-    enum: $Enums.PeriodEnum, // Adiciona o enum como parâmetro na documentação da API
+    enum: PeriodEnum, // Adiciona o enum como parâmetro na documentação da API
   })
   async getAllGovernanceOperationals(
-    @Query('period') period: $Enums.PeriodEnum, // Adiciona o período como parâmetro opcional
+    @Query('period') period: PeriodEnum, // Adiciona o período como parâmetro opcional
   ) {
     if (!period) {
       throw new BadRequestException('The period parameter is required.');

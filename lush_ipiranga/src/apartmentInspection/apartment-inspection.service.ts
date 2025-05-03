@@ -1,10 +1,10 @@
+import { PeriodEnum } from '@client-online';
 import {
   BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PeriodEnum, Prisma } from '../../dist/generated/client-online';
 import { PrismaService } from '../prisma/prisma.service';
 
 import * as moment from 'moment-timezone';

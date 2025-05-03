@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient as PrismaClientLocal } from '../../dist/generated/client-local';
-import { PrismaClient as PrismaClientOnline } from '../../dist/generated/client-online';
+import { PrismaClient as PrismaClientLocal } from '@client-local';
+import { PrismaClient as PrismaClientOnline } from '@client-online';
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {

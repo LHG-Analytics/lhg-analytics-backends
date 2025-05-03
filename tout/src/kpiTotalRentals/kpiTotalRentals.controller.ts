@@ -15,7 +15,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { KpiTotalRentals } from './entities/kpiTotalRental.entity';
-import { PeriodEnum } from '../../dist/generated/client-online';
+import { PeriodEnum } from '@client-online';
 
 @ApiTags('KpiTotalRentals')
 @ApiExtraModels(KpiTotalRentals)

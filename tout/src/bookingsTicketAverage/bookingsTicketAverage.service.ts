@@ -6,11 +6,7 @@ import {
 import { Cron } from '@nestjs/schedule';
 import * as moment from 'moment-timezone';
 import 'moment/locale/pt-br';
-import {
-  ChannelTypeEnum,
-  PeriodEnum,
-  Prisma,
-} from '../../dist/generated/client-online';
+import { ChannelTypeEnum, PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   BookingsTicketAverage,

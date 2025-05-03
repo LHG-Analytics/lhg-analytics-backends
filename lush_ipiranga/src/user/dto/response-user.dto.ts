@@ -1,7 +1,7 @@
 // user-response.dto.ts
 import { IsEmail, IsString, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Role } from '../../../dist/generated/client-online';
+import { Role } from '@client-online';
 
 export class UserResponseDto {
   @ApiProperty({ example: 'example@example.com' })

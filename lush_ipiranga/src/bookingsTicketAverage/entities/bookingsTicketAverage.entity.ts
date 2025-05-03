@@ -1,9 +1,4 @@
-import { DecimalJsLike } from 'dist/generated/client-online/runtime/library';
-import {
-  ChannelTypeEnum,
-  PeriodEnum,
-  Prisma,
-} from '../../../dist/generated/client-online';
+import { ChannelTypeEnum, PeriodEnum, Prisma } from '@client-online';
 
 export class BookingsTicketAverage
   implements Prisma.BookingsTicketAverageUncheckedCreateInput

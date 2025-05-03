@@ -1,8 +1,4 @@
-import {
-  ConsumptionGroup,
-  PeriodEnum,
-  Prisma,
-} from '../../../dist/generated/client-online';
+import { ConsumptionGroup, PeriodEnum, Prisma } from '@client-online';
 
 export class RestaurantRevenue
   implements Prisma.RestaurantRevenueUncheckedCreateInput

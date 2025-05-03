@@ -1,16 +1,16 @@
+import { PeriodEnum, Prisma } from '@client-online';
 import {
   BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { PeriodEnum, Prisma } from '../../dist/generated/client-online';
+import { Cron } from '@nestjs/schedule';
+import * as moment from 'moment-timezone';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   KpiTicketAverage,
   KpiTicketAverageByPeriod,
 } from './entities/kpiTicketAverage.entity';
-import * as moment from 'moment-timezone';
 
 @Injectable()
 export class KpiTicketAverageService {

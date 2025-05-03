@@ -1,8 +1,4 @@
-import {
-  PeriodEnum,
-  Prisma,
-  RentalTypeEnum,
-} from '../../../dist/generated/client-online';
+import { PeriodEnum, Prisma, RentalTypeEnum } from '@client-online';
 
 export class KpiRevenue implements Prisma.KpiRevenueUncheckedCreateInput {
   id?: number;

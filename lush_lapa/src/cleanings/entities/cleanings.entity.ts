@@ -1,4 +1,4 @@
-import { PeriodEnum, Prisma } from '../../../dist/generated/client-online';
+import { PeriodEnum, Prisma } from '@client-online';
 
 export class cleanings implements Prisma.CleaningsUncheckedCreateInput {
   id?: number;

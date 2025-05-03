@@ -6,7 +6,7 @@ import {
   IsString,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Prisma } from '../../../dist/generated/client-online';
+import { Prisma } from '@client-online';
 
 export class CreateCleaningsDto {
   @ApiProperty({ description: 'Nome do funcionário', example: 'João Silva' })

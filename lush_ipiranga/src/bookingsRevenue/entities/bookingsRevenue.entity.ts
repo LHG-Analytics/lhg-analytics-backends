@@ -1,8 +1,4 @@
-import {
-  ChannelTypeEnum,
-  PeriodEnum,
-  Prisma,
-} from '../../../dist/generated/client-online';
+import { ChannelTypeEnum, PeriodEnum, Prisma } from '@client-online';
 
 export class BookingsRevenue
   implements Prisma.BookingsRevenueUncheckedCreateInput

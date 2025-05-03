@@ -1,4 +1,4 @@
-import { Prisma, Role } from '../../../dist/generated/client-online';
+import { Prisma, Role } from '@client-online';
 
 export class User implements Prisma.UserUncheckedCreateInput {
   id?: number;

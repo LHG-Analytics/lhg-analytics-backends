@@ -3,7 +3,7 @@ import {
   PeriodEnum,
   Prisma,
   RentalTypeEnum,
-} from '../../../dist/generated/client-online';
+} from '@client-online';
 
 export class BookingsTotalRental
   implements Prisma.BookingsTotalRentalsUncheckedCreateInput

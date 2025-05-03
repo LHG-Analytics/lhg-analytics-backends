@@ -1,20 +1,19 @@
+import { PeriodEnum } from '@client-online';
 import {
+  BadRequestException,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
-  BadRequestException,
   Query,
 } from '@nestjs/common';
-import { BookingsTotalRentalsService } from './bookingsTotalRentals.service';
 import {
-  ApiTags,
-  ApiNotFoundResponse,
   ApiBadRequestResponse,
-  ApiExtraModels,
+  ApiNotFoundResponse,
   ApiQuery,
+  ApiTags,
 } from '@nestjs/swagger';
-import { PeriodEnum } from '../../dist/generated/client-online';
+import { BookingsTotalRentalsService } from './bookingsTotalRentals.service';
 
 @ApiTags('BookingsTotalRentals')
 @Controller('BookingsTotalRentals')

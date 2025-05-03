@@ -1,6 +1,6 @@
 import { IsInt, IsNotEmpty, IsDecimal, IsDate } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Prisma } from '../../../dist/generated/client-online';
+import { Prisma } from '@client-online';
 
 export class CreateKpiOccupancyRateDto {
   @ApiProperty({ description: 'ID da categoria da suíte', example: 2 })

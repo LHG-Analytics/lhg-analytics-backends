@@ -12,7 +12,7 @@ import {
   ApiBadRequestResponse,
   ApiNotFoundResponse,
 } from '@nestjs/swagger';
-import { PeriodEnum } from '../../dist/generated/client-online';
+import { PeriodEnum } from '@client-online';
 import { BookingsRevenueService } from './bookingsRevenue.service';
 import { BookingsRevenue } from './entities/bookingsRevenue.entity';
 

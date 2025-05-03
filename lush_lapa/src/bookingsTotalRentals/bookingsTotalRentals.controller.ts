@@ -14,7 +14,7 @@ import {
   ApiExtraModels,
   ApiQuery,
 } from '@nestjs/swagger';
-import { PeriodEnum } from '../../dist/generated/client-online';
+import { PeriodEnum } from '@client-online';
 
 @ApiTags('BookingsTotalRentals')
 @Controller('BookingsTotalRentals')

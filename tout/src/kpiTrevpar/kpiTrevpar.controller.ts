@@ -12,7 +12,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { PeriodEnum } from '../../dist/generated/client-online';
+import { PeriodEnum } from '@client-online';
 import { KpiTrevparService } from './kpiTrevpar.service';
 
 @ApiTags('KpiTrevpar')
