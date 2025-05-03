@@ -19,10 +19,10 @@
     "noFallthroughCasesInSwitch": false,
     "paths": {
       "@client-online": [
-        "src/generated/client-online"
+        "dist/generated/client-online"
       ],
       "@client-local": [
-        "src/generated/client-local"
+        "dist/generated/client-local"
       ]
     }
   },
