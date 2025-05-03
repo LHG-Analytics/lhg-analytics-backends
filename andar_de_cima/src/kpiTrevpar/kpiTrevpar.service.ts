@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { PeriodEnum, Prisma } from '../../dist/generated/client-online';
+import { PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import { KpiTrevpar, KpiTrevparByPeriod } from './entities/kpiTrevpar.entity';
 import * as moment from 'moment-timezone';

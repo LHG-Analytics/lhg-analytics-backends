@@ -1,4 +1,4 @@
-import { Prisma } from '../../../dist/generated/client-online';
+import { Prisma } from '@client-online';
 
 export class Booking implements Prisma.BookingsUncheckedCreateInput {
   id?: number;

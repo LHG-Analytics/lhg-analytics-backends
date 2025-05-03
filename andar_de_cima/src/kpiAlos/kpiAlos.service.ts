@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { PeriodEnum } from '../../dist/generated/client-online';
+import { PeriodEnum } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import { KpiAlos } from './entities/kpiAlos.entity';
 import * as moment from 'moment-timezone';

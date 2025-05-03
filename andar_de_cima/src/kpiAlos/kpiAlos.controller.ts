@@ -13,7 +13,7 @@ import {
   ApiNotFoundResponse,
   ApiBadRequestResponse,
 } from '@nestjs/swagger';
-import { PeriodEnum } from '../../dist/generated/client-online';
+import { PeriodEnum } from '@client-online';
 
 @ApiTags('KpiAlos')
 @Controller('KpiAlos')

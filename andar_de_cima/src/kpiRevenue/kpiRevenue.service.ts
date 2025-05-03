@@ -5,11 +5,7 @@ import {
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as moment from 'moment-timezone';
-import {
-  PeriodEnum,
-  Prisma,
-  RentalTypeEnum,
-} from '../../dist/generated/client-online';
+import { PeriodEnum, Prisma, RentalTypeEnum } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   KpiRevenue,

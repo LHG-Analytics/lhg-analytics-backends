@@ -3,11 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  PeriodEnum,
-  RentalTypeEnum,
-  ChannelTypeEnum,
-} from '../../dist/generated/client-online';
+import { PeriodEnum, RentalTypeEnum, ChannelTypeEnum } from '@client-online';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import {

@@ -12,7 +12,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { $Enums } from '../../dist/generated/client-online';
+import { PeriodEnum } from '@client-online';
 import { BookingsService } from './bookings.service';
 
 @ApiTags('Bookings')
@@ -26,10 +26,10 @@ export class BookingsController {
     required: true,
     description: 'Período para o qual o booking será calculado',
     example: 'LAST_7_D',
-    enum: $Enums.PeriodEnum, // Adiciona o enum como parâmetro na documentação da API
+    enum: PeriodEnum, // Adiciona o enum como parâmetro na documentação da API
   })
   async getAllBookings(
-    @Query('period') period: $Enums.PeriodEnum, // Adiciona o período como parâmetro opcional
+    @Query('period') period: PeriodEnum, // Adiciona o período como parâmetro opcional
   ) {
     if (!period) {
       throw new BadRequestException('The period parameter is required.');
