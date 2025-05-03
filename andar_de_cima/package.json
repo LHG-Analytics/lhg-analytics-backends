@@ -37,6 +37,7 @@
     "cpf-cnpj-validator": "^1.0.3",
     "dotenv": "^16.4.5",
     "jsonwebtoken": "^9.0.2",
+    "module-alias": "^2.2.3",
     "moment-timezone": "^0.5.46",
     "npm": "^10.8.2",
     "pg": "^8.11.5",
@@ -72,6 +73,10 @@
     "ts-node-dev": "^2.0.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.6.3"
+  },
+  "_moduleAliases": {
+    "@client-online": "dist/generated/client-online",
+    "@client-local": "dist/generated/client-local"
   },
   "jest": {
     "moduleFileExtensions": [
