@@ -50,6 +50,7 @@ export class RestaurantRevenueByFoodCategory
   foodCategory: string;
   period?: PeriodEnum;
   totalValue: Prisma.Decimal;
+  totalAllValue: Prisma.Decimal;
 }
 
 export class RestaurantRevenueByFoodCategoryPercent
