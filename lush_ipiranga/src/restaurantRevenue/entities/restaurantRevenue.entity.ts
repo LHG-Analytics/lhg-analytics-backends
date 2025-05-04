@@ -73,6 +73,7 @@ export class RestaurantRevenueByDrinkCategory
   drinkCategory: string;
   period?: PeriodEnum;
   totalValue: Prisma.Decimal;
+  totalAllValue: Prisma.Decimal;
 }
 
 export class RestaurantRevenueByDrinkCategoryPercent
@@ -95,6 +96,7 @@ export class RestaurantRevenueByOthersCategory
   othersCategory: string;
   period?: PeriodEnum;
   totalValue: Prisma.Decimal;
+  totalAllValue: Prisma.Decimal;
 }
 
 export class RestaurantRevenueByOthersCategoryPercent

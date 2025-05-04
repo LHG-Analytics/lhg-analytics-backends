@@ -9,8 +9,10 @@ import { ConsumptionGroup, PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   RestaurantRevenue,
+  RestaurantRevenueByDrinkCategory,
   RestaurantRevenueByFoodCategory,
   RestaurantRevenueByGroupByPeriod,
+  RestaurantRevenueByOthersCategory,
   RestaurantRevenueByPeriod,
   RestaurantRevenueByPeriodPercent,
 } from './entities/restaurantRevenue.entity';
@@ -696,9 +698,9 @@ export class RestaurantRevenueService {
                       '08 - ADICIONAIS',
                       '09 - PETISCOS',
                       '10 - ENTRADAS',
-                      '11 - LAN CHES',
+                      '11 - LANCHES',
                       '12 - PRATOS PRINCIPAIS',
-                      '13 - A COMPANHAMENTOS',
+                      '13 - ACOMPANHAMENTOS',
                       '14 - SOBREMESAS',
                       '15 - BOMBONIERE',
                     ].includes(productTypeDescription)
@@ -823,7 +825,7 @@ export class RestaurantRevenueService {
         '12 - PRATOS PRINCIPAIS',
         '13 - ACOMPANHAMENTOS',
         '14 - SOBREMESAS',
-        '15 - BOMBONIERE',
+        '15- BOMBONIERE',
       ];
 
       const revenueByCategory: {
@@ -1042,11 +1044,6 @@ export class RestaurantRevenueService {
         currentDate = nextDate;
       }
 
-      console.log(
-        'revenueByCategory:',
-        JSON.stringify(revenueByCategory, null, 2),
-      );
-
       return revenueByCategory;
     } catch (error) {
       console.error(
@@ -1066,6 +1063,541 @@ export class RestaurantRevenueService {
           period: data.period,
           createdDate: data.createdDate,
           foodCategory: data.foodCategory,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
+  }
+
+  private async calculateRestaurantRevenueByDrinkCategory(
+    startDate: Date,
+    endDate: Date,
+    period?: PeriodEnum,
+  ): Promise<any> {
+    try {
+      const companyId = 1;
+
+      const categories: string[] = [
+        '01 - SOFT DRINKS',
+        '02 - CERVEJAS',
+        '03 - COQUETEIS',
+        '04 - DOSES',
+        '05 - GARRAFAS',
+        '06 - VINHOS E ESPUMANTES',
+      ];
+
+      const revenueByCategory: {
+        [key: string]: {
+          categories: string[];
+          series: number[];
+          total: number;
+        };
+      } = {};
+      categories.forEach((category) => {
+        revenueByCategory[category] = { categories: [], series: [], total: 0 };
+      });
+
+      const adjustedEndDate = new Date(endDate);
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      adjustedEndDate.setUTCHours(23, 59, 59, 999);
+
+      const finalTotalByCategory: { [key: string]: Prisma.Decimal } = {};
+      categories.forEach((category) => {
+        finalTotalByCategory[category] = new Prisma.Decimal(0);
+      });
+
+      // 🔁 1ª PASSAGEM: calcular total final do período inteiro
+      const allRentalApartments =
+        await this.prisma.prismaLocal.rentalApartment.findMany({
+          where: {
+            checkIn: {
+              gte: startDate.toISOString(),
+              lt: adjustedEndDate.toISOString(),
+            },
+            endOccupationType: 'FINALIZADA',
+          },
+          include: {
+            saleLease: true,
+          },
+        });
+
+      const stockOutIds: number[] = [];
+      for (const rentalApartment of allRentalApartments) {
+        const saleLease = rentalApartment.saleLease;
+        if (saleLease?.stockOutId) {
+          stockOutIds.push(saleLease.stockOutId);
+        }
+      }
+
+      const stockOuts =
+        stockOutIds.length > 0
+          ? await this.prisma.prismaLocal.stockOut.findMany({
+              where: { id: { in: stockOutIds } },
+              include: {
+                stockOutItem: {
+                  where: { canceled: null },
+                  include: {
+                    productStock: {
+                      include: {
+                        product: {
+                          include: {
+                            typeProduct: {
+                              select: { description: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                sale: { select: { discount: true } },
+              },
+            })
+          : [];
+
+      const stockOutMap = new Map(stockOuts.map((s) => [s.id, s]));
+
+      for (const rentalApartment of allRentalApartments) {
+        const saleLease = rentalApartment.saleLease;
+        if (saleLease?.stockOutId) {
+          const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
+          if (stockOutSaleLease) {
+            for (const item of stockOutSaleLease.stockOutItem) {
+              const priceSale = new Prisma.Decimal(item.priceSale);
+              const quantity = new Prisma.Decimal(item.quantity);
+              const discount = stockOutSaleLease.sale?.discount
+                ? new Prisma.Decimal(stockOutSaleLease.sale.discount)
+                : new Prisma.Decimal(0);
+              const itemTotal = priceSale.times(quantity).minus(discount);
+
+              const description =
+                item.productStock?.product?.typeProduct?.description;
+              if (description && categories.includes(description)) {
+                finalTotalByCategory[description] =
+                  finalTotalByCategory[description].plus(itemTotal);
+              }
+            }
+          }
+        }
+      }
+
+      // 🔁 2ª PASSAGEM: iterar por dia/mês normalmente
+      let currentDate = new Date(startDate);
+      currentDate.setUTCHours(0, 0, 0, 0);
+
+      while (currentDate <= adjustedEndDate) {
+        let nextDate = new Date(currentDate);
+
+        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+          nextDate.setDate(nextDate.getDate() + 1);
+          nextDate.setUTCHours(0, 0, 0, 0);
+        } else if (period === PeriodEnum.LAST_6_M) {
+          currentDate.setDate(currentDate.getDate() - 1);
+          currentDate.setUTCHours(23, 59, 59, 999);
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          nextDate.setUTCHours(0, 0, 0, 0);
+        }
+
+        const rentals = await this.prisma.prismaLocal.rentalApartment.findMany({
+          where: {
+            checkIn: {
+              gte: currentDate.toISOString(),
+              lt: nextDate.toISOString(),
+            },
+            endOccupationType: 'FINALIZADA',
+          },
+          include: {
+            saleLease: true,
+          },
+        });
+
+        const ids: number[] = [];
+        for (const r of rentals) {
+          if (r.saleLease?.stockOutId) ids.push(r.saleLease.stockOutId);
+        }
+
+        const outs =
+          ids.length > 0
+            ? await this.prisma.prismaLocal.stockOut.findMany({
+                where: { id: { in: ids } },
+                include: {
+                  stockOutItem: {
+                    where: { canceled: null },
+                    include: {
+                      productStock: {
+                        include: {
+                          product: {
+                            include: {
+                              typeProduct: {
+                                select: { description: true },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  sale: { select: { discount: true } },
+                },
+              })
+            : [];
+
+        const outMap = new Map(outs.map((o) => [o.id, o]));
+
+        const totalByCategory: { [key: string]: Prisma.Decimal } = {};
+        categories.forEach((category) => {
+          totalByCategory[category] = new Prisma.Decimal(0);
+        });
+
+        for (const r of rentals) {
+          if (r.saleLease?.stockOutId) {
+            const out = outMap.get(r.saleLease.stockOutId);
+            if (out) {
+              for (const item of out.stockOutItem) {
+                const price = new Prisma.Decimal(item.priceSale);
+                const qty = new Prisma.Decimal(item.quantity);
+                const discount = out.sale?.discount
+                  ? new Prisma.Decimal(out.sale.discount)
+                  : new Prisma.Decimal(0);
+                const total = price.times(qty).minus(discount);
+
+                const desc =
+                  item.productStock?.product?.typeProduct?.description;
+                if (desc && categories.includes(desc)) {
+                  totalByCategory[desc] = totalByCategory[desc].plus(total);
+                }
+              }
+            }
+          }
+        }
+
+        const displayDate = new Date(currentDate);
+
+        for (const category of categories) {
+          revenueByCategory[category].categories.push(
+            displayDate.toISOString().split('T')[0],
+          );
+          revenueByCategory[category].series.push(
+            Number(totalByCategory[category]),
+          );
+          revenueByCategory[category].total += Number(
+            totalByCategory[category],
+          );
+        }
+
+        for (const category of categories) {
+          const createdDate = new Date(displayDate);
+          createdDate.setUTCHours(5, 59, 59, 999);
+
+          await this.insertRestaurantRevenueByDrinkCategory({
+            period,
+            createdDate,
+            drinkCategory: category,
+            totalValue: new Prisma.Decimal(totalByCategory[category]), // dia ou mês
+            totalAllValue: new Prisma.Decimal(finalTotalByCategory[category]), // sempre fixo
+            companyId,
+          });
+        }
+
+        currentDate = nextDate;
+      }
+
+      console.log(
+        'revenueByCategory:',
+        JSON.stringify(revenueByCategory, null, 2),
+      );
+
+      return revenueByCategory;
+    } catch (error) {
+      console.error(
+        'Error fetching restaurant revenue by food category:',
+        error,
+      );
+      throw new Error('Could not fetch revenue data');
+    }
+  }
+
+  private async insertRestaurantRevenueByDrinkCategory(
+    data: RestaurantRevenueByDrinkCategory,
+  ): Promise<RestaurantRevenueByDrinkCategory> {
+    return this.prisma.prismaOnline.restaurantRevenueByDrinkCategory.upsert({
+      where: {
+        period_createdDate_drinkCategory: {
+          period: data.period,
+          createdDate: data.createdDate,
+          drinkCategory: data.drinkCategory,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
+  }
+
+  private async calculateRestaurantRevenueByOthersCategory(
+    startDate: Date,
+    endDate: Date,
+    period?: PeriodEnum,
+  ): Promise<any> {
+    try {
+      const companyId = 1;
+
+      const categories: string[] = [
+        '16 - PRODUTOS EROTICOS',
+        '17 - CONVENIENCIA E HIGIENE',
+        'ITENS EXTRAS',
+        'RESERVAS',
+        'SOUVENIR',
+      ];
+
+      const revenueByCategory: {
+        [key: string]: {
+          categories: string[];
+          series: number[];
+          total: number;
+        };
+      } = {};
+      categories.forEach((category) => {
+        revenueByCategory[category] = { categories: [], series: [], total: 0 };
+      });
+
+      const adjustedEndDate = new Date(endDate);
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      adjustedEndDate.setUTCHours(23, 59, 59, 999);
+
+      const finalTotalByCategory: { [key: string]: Prisma.Decimal } = {};
+      categories.forEach((category) => {
+        finalTotalByCategory[category] = new Prisma.Decimal(0);
+      });
+
+      // 🔁 1ª PASSAGEM: calcular total final do período inteiro
+      const allRentalApartments =
+        await this.prisma.prismaLocal.rentalApartment.findMany({
+          where: {
+            checkIn: {
+              gte: startDate.toISOString(),
+              lt: adjustedEndDate.toISOString(),
+            },
+            endOccupationType: 'FINALIZADA',
+          },
+          include: {
+            saleLease: true,
+          },
+        });
+
+      const stockOutIds: number[] = [];
+      for (const rentalApartment of allRentalApartments) {
+        const saleLease = rentalApartment.saleLease;
+        if (saleLease?.stockOutId) {
+          stockOutIds.push(saleLease.stockOutId);
+        }
+      }
+
+      const stockOuts =
+        stockOutIds.length > 0
+          ? await this.prisma.prismaLocal.stockOut.findMany({
+              where: { id: { in: stockOutIds } },
+              include: {
+                stockOutItem: {
+                  where: { canceled: null },
+                  include: {
+                    productStock: {
+                      include: {
+                        product: {
+                          include: {
+                            typeProduct: {
+                              select: { description: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                sale: { select: { discount: true } },
+              },
+            })
+          : [];
+
+      const stockOutMap = new Map(stockOuts.map((s) => [s.id, s]));
+
+      for (const rentalApartment of allRentalApartments) {
+        const saleLease = rentalApartment.saleLease;
+        if (saleLease?.stockOutId) {
+          const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
+          if (stockOutSaleLease) {
+            for (const item of stockOutSaleLease.stockOutItem) {
+              const priceSale = new Prisma.Decimal(item.priceSale);
+              const quantity = new Prisma.Decimal(item.quantity);
+              const discount = stockOutSaleLease.sale?.discount
+                ? new Prisma.Decimal(stockOutSaleLease.sale.discount)
+                : new Prisma.Decimal(0);
+              const itemTotal = priceSale.times(quantity).minus(discount);
+
+              const description =
+                item.productStock?.product?.typeProduct?.description;
+              if (description && categories.includes(description)) {
+                finalTotalByCategory[description] =
+                  finalTotalByCategory[description].plus(itemTotal);
+              }
+            }
+          }
+        }
+      }
+
+      // 🔁 2ª PASSAGEM: iterar por dia/mês normalmente
+      let currentDate = new Date(startDate);
+      currentDate.setUTCHours(0, 0, 0, 0);
+
+      while (currentDate <= adjustedEndDate) {
+        let nextDate = new Date(currentDate);
+
+        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+          nextDate.setDate(nextDate.getDate() + 1);
+          nextDate.setUTCHours(0, 0, 0, 0);
+        } else if (period === PeriodEnum.LAST_6_M) {
+          currentDate.setDate(currentDate.getDate() - 1);
+          currentDate.setUTCHours(23, 59, 59, 999);
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          nextDate.setUTCHours(0, 0, 0, 0);
+        }
+
+        const rentals = await this.prisma.prismaLocal.rentalApartment.findMany({
+          where: {
+            checkIn: {
+              gte: currentDate.toISOString(),
+              lt: nextDate.toISOString(),
+            },
+            endOccupationType: 'FINALIZADA',
+          },
+          include: {
+            saleLease: true,
+          },
+        });
+
+        const ids: number[] = [];
+        for (const r of rentals) {
+          if (r.saleLease?.stockOutId) ids.push(r.saleLease.stockOutId);
+        }
+
+        const outs =
+          ids.length > 0
+            ? await this.prisma.prismaLocal.stockOut.findMany({
+                where: { id: { in: ids } },
+                include: {
+                  stockOutItem: {
+                    where: { canceled: null },
+                    include: {
+                      productStock: {
+                        include: {
+                          product: {
+                            include: {
+                              typeProduct: {
+                                select: { description: true },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  sale: { select: { discount: true } },
+                },
+              })
+            : [];
+
+        const outMap = new Map(outs.map((o) => [o.id, o]));
+
+        const totalByCategory: { [key: string]: Prisma.Decimal } = {};
+        categories.forEach((category) => {
+          totalByCategory[category] = new Prisma.Decimal(0);
+        });
+
+        for (const r of rentals) {
+          if (r.saleLease?.stockOutId) {
+            const out = outMap.get(r.saleLease.stockOutId);
+            if (out) {
+              for (const item of out.stockOutItem) {
+                const price = new Prisma.Decimal(item.priceSale);
+                const qty = new Prisma.Decimal(item.quantity);
+                const discount = out.sale?.discount
+                  ? new Prisma.Decimal(out.sale.discount)
+                  : new Prisma.Decimal(0);
+                const total = price.times(qty).minus(discount);
+
+                const desc =
+                  item.productStock?.product?.typeProduct?.description;
+                if (desc && categories.includes(desc)) {
+                  totalByCategory[desc] = totalByCategory[desc].plus(total);
+                }
+              }
+            }
+          }
+        }
+
+        const displayDate = new Date(currentDate);
+
+        for (const category of categories) {
+          revenueByCategory[category].categories.push(
+            displayDate.toISOString().split('T')[0],
+          );
+          revenueByCategory[category].series.push(
+            Number(totalByCategory[category]),
+          );
+          revenueByCategory[category].total += Number(
+            totalByCategory[category],
+          );
+        }
+
+        for (const category of categories) {
+          const createdDate = new Date(displayDate);
+          createdDate.setUTCHours(5, 59, 59, 999);
+
+          await this.insertRestaurantRevenueByOthersCategory({
+            period,
+            createdDate,
+            othersCategory: category,
+            totalValue: new Prisma.Decimal(totalByCategory[category]), // dia ou mês
+            totalAllValue: new Prisma.Decimal(finalTotalByCategory[category]), // sempre fixo
+            companyId,
+          });
+        }
+
+        currentDate = nextDate;
+      }
+
+      console.log(
+        'revenueByCategory:',
+        JSON.stringify(revenueByCategory, null, 2),
+      );
+
+      return revenueByCategory;
+    } catch (error) {
+      console.error(
+        'Error fetching restaurant revenue by food category:',
+        error,
+      );
+      throw new Error('Could not fetch revenue data');
+    }
+  }
+
+  private async insertRestaurantRevenueByOthersCategory(
+    data: RestaurantRevenueByOthersCategory,
+  ): Promise<RestaurantRevenueByOthersCategory> {
+    return this.prisma.prismaOnline.restaurantRevenueByOthersCategory.upsert({
+      where: {
+        period_createdDate_othersCategory: {
+          period: data.period,
+          createdDate: data.createdDate,
+          othersCategory: data.othersCategory,
         },
       },
       create: {
@@ -1158,6 +1690,16 @@ export class RestaurantRevenueService {
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
     );
+    await this.calculateRestaurantRevenueByDrinkCategory(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
+    await this.calculateRestaurantRevenueByOthersCategory(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
 
     const endTimeLast7Days = moment()
       .tz(timezone)
@@ -1242,6 +1784,16 @@ export class RestaurantRevenueService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
+    await this.calculateRestaurantRevenueByDrinkCategory(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
+    await this.calculateRestaurantRevenueByOthersCategory(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
 
     const endTimeLast30Days = moment()
       .tz(timezone)
@@ -1322,6 +1874,16 @@ export class RestaurantRevenueService {
       PeriodEnum.LAST_6_M,
     );
     await this.calculateRestaurantRevenueByFoodCategory(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateRestaurantRevenueByDrinkCategory(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateRestaurantRevenueByOthersCategory(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,

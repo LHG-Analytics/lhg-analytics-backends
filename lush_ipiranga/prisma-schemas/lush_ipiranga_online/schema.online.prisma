@@ -768,6 +768,7 @@ model RestaurantRevenueByDrinkCategory {
   id            Int         @id @default(autoincrement())
   period        PeriodEnum?
   totalValue    Decimal     @db.Decimal(10, 2)
+  totalAllValue Decimal     @db.Decimal(10, 2)
   createdDate   DateTime
   drinkCategory String
   companyId     Int
@@ -796,6 +797,7 @@ model RestaurantRevenueByOthersCategory {
   id             Int         @id @default(autoincrement())
   period         PeriodEnum?
   totalValue     Decimal     @db.Decimal(10, 2)
+  totalAllValue  Decimal     @db.Decimal(10, 2)
   createdDate    DateTime
   othersCategory String
   companyId      Int
