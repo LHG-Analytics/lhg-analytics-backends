@@ -2,10 +2,13 @@ import 'module-alias/register';
 import { addAliases } from 'module-alias';
 import { join } from 'path';
 
-addAliases({
-  '@client-local': join(__dirname, 'generated/client-local'),
-  '@client-online': join(__dirname, 'generated/client-online'),
-});
+// Verifica se o ambiente é de produção
+if (process.env.NODE_ENV === 'production') {
+  addAliases({
+    '@client-local': join(__dirname, 'generated/client-local'),
+    '@client-online': join(__dirname, 'generated/client-online'),
+  });
+}
 import { config } from 'dotenv';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';

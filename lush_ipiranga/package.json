@@ -6,12 +6,13 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "clean": "rimraf dist",
     "generate": "npx prisma generate --schema=./prisma-schemas/lush_ipiranga_online/schema.online.prisma && npx prisma generate --schema=./prisma-schemas/lush_ipiranga_local/schema.local1.prisma",
     "postinstall": "npm run generate",
     "build": "npm run generate && tsc -p tsconfig.build.json",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node -r module-alias/register dist/main.js",
-    "start:dev": "nodemon --exec ts-node -r tsconfig-paths/register src/main.ts",
+    "start:dev": "npm run generate && nodemon --exec ts-node -r tsconfig-paths/register src/main.ts",
     "dev": "nodemon --exec ts-node nest start --watch",
     "debug": "nest start --debug --watch",
     "prod": "node -r module-alias/register dist/main.js",
@@ -31,6 +32,7 @@
     "@nestjs/schedule": "^4.1.1",
     "@nestjs/swagger": "^7.3.1",
     "@prisma/client": "^6.7.0",
+    "@types/module-alias": "^2.0.4",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
@@ -74,10 +76,6 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.6.3"
   },
-  "_moduleAliases": {
-    "@client-online": "dist/generated/client-online",
-    "@client-local": "dist/generated/client-local"
-  },
   "jest": {
     "moduleFileExtensions": [
       "js",
@@ -94,5 +92,9 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "_moduleAliases": {
+    "@client-local": "dist/generated/client-local",
+    "@client-online": "dist/generated/client-online"
   }
 }

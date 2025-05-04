@@ -42,119 +42,97 @@ export class RestaurantRevenueService {
     try {
       const companyId = 1;
 
-      // Ajustar a data final para não incluir a data atual
+      // Ajustar a data final para excluir o dia atual
       const adjustedEndDate = new Date(endDate);
       if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
-        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
+        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
       } else if (period === PeriodEnum.LAST_6_M) {
-        adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1); // Para LAST_6_M, subtrair um mês
-        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
+        adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1);
+        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
       }
 
-      // Buscar todas as locações no intervalo de datas
-      const [allRentalApartments] = await this.fetchKpiData(
-        startDate,
-        adjustedEndDate,
-      );
+      // Buscar rentals finalizados no intervalo
+      const [rentals] = await this.fetchKpiData(startDate, adjustedEndDate);
 
-      if (!allRentalApartments || allRentalApartments.length === 0) {
-        throw new NotFoundException('No rental apartments found.');
+      const stockOutIds = rentals
+        .map((r) => r.saleLease?.stockOutId)
+        .filter((id): id is number => id !== null);
+
+      if (!stockOutIds.length) {
+        throw new NotFoundException('No restaurant sales found in the period.');
       }
 
-      // Coletar todos os stockOutSaleLease de uma vez
-      const stockOutIds = allRentalApartments
-        .map((rentalApartment) => rentalApartment.saleLease?.stockOutId)
-        .filter((id) => id !== undefined);
-
-      const stockOutSaleLeases =
-        await this.prisma.prismaLocal.stockOut.findMany({
-          where: { id: { in: stockOutIds } },
-          include: {
-            stockOutItem: {
-              where: { canceled: null },
-              select: {
-                id: true,
-                priceSale: true,
-                quantity: true,
-                stockOutId: true,
-              },
-            },
-            sale: {
-              select: {
-                discount: true,
-              },
-            },
-          },
-        });
-
-      const stockOutMap = new Map<number, any>();
-      stockOutSaleLeases.forEach((stockOut) => {
-        stockOutMap.set(stockOut.id, stockOut);
+      // Agrupar por stockOutId e somar preço * quantidade
+      const stockOutSums = await this.prisma.prismaLocal.stockOutItem.groupBy({
+        by: ['stockOutId'],
+        where: {
+          stockOutId: { in: stockOutIds },
+          canceled: null,
+        },
+        _sum: {
+          priceSale: true,
+          quantity: true,
+        },
       });
 
-      let totalGrossRevenue = new Prisma.Decimal(0); // Inicializa a receita bruta
-      let totalDiscount = new Prisma.Decimal(0); // Inicializa o total de descontos
+      // Buscar descontos aplicados nas vendas
+      const discounts = await this.prisma.prismaLocal.stockOut.findMany({
+        where: {
+          id: { in: stockOutIds },
+          sale: {
+            discount: { not: null },
+          },
+        },
+        select: {
+          id: true,
+          sale: {
+            select: {
+              discount: true,
+            },
+          },
+        },
+      });
 
-      for (const rentalApartment of allRentalApartments) {
-        const saleLease = rentalApartment.saleLease;
+      // Mapear descontos por stockOutId
+      const discountMap = new Map<number, number>();
+      discounts.forEach(({ id, sale }) => {
+        discountMap.set(id, Number(sale.discount) || 0);
+      });
 
-        if (saleLease && saleLease.stockOutId) {
-          const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
+      // Calcular receita bruta e total de descontos
+      let totalGross = 0;
+      let totalDiscount = 0;
 
-          if (
-            stockOutSaleLease &&
-            Array.isArray(stockOutSaleLease.stockOutItem)
-          ) {
-            let itemTotalValue = new Prisma.Decimal(0);
-            let discountSale = new Prisma.Decimal(0);
+      stockOutSums.forEach(({ stockOutId, _sum }) => {
+        const price = Number(_sum.priceSale ?? 0);
+        const qty = Number(_sum.quantity ?? 0);
+        const subtotal = price * qty;
 
-            // Calcular o valor total da venda para este item
-            stockOutSaleLease.stockOutItem.forEach((stockOutItem) => {
-              const priceSale = new Prisma.Decimal(stockOutItem.priceSale || 0);
-              const quantity = new Prisma.Decimal(stockOutItem.quantity || 0);
-              itemTotalValue = itemTotalValue.plus(priceSale.times(quantity));
-            });
+        totalGross += subtotal;
+        totalDiscount += discountMap.get(stockOutId) || 0;
+      });
 
-            // Aplica o desconto se existir
-            discountSale = stockOutSaleLease.sale?.discount
-              ? new Prisma.Decimal(stockOutSaleLease.sale.discount)
-              : new Prisma.Decimal(0);
+      const totalNetRevenue = totalGross - totalDiscount;
 
-            // Acumula a receita bruta e o desconto total
-            totalGrossRevenue = totalGrossRevenue.plus(itemTotalValue);
-            totalDiscount = totalDiscount.plus(discountSale);
-          }
-        }
-      }
-
-      // Calcular a receita líquida
-      const totalNetRevenue = totalGrossRevenue.minus(totalDiscount);
-
-      // Verifica se o totalNetRevenue é zero ou não
-      if (totalNetRevenue.isZero()) {
+      if (totalNetRevenue === 0) {
         console.warn(
           'Total restaurant net revenue is zero. No data will be inserted.',
         );
       }
 
-      // Inserir a receita de restaurante no banco de dados
+      // Inserir a receita no banco online
       await this.insertRestaurantRevenue({
-        totalAllValue: totalNetRevenue.isZero()
-          ? new Prisma.Decimal(0)
-          : totalNetRevenue,
-        createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
-        period: period,
+        totalAllValue: new Prisma.Decimal(totalNetRevenue),
+        createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
+        period,
         companyId,
       });
 
-      // Retornar o total formatado como moeda e o contador de locações
-      const formattedRestaurantRevenueData = {
-        totalRestaurantRevenue: totalNetRevenue.toNumber(), // Converte para número
+      return {
+        totalRestaurantRevenue: totalNetRevenue,
       };
-
-      return formattedRestaurantRevenueData;
     } catch (error) {
-      console.error('Erro ao buscar Restaurant Revenue data:', error);
+      console.error('Erro ao calcular receita do restaurante:', error);
       throw new BadRequestException(
         `Failed to fetch Restaurant Revenue data: ${error.message}`,
       );
@@ -186,141 +164,69 @@ export class RestaurantRevenueService {
     period: PeriodEnum,
   ): Promise<any> {
     try {
-      const results: { [key: string]: any } = {}; // Armazenar resultados
+      const results: { [key: string]: any } = {};
       const companyId = 1;
 
-      // Ajustar a endDate para o final do dia anterior
       const adjustedEndDate = new Date(endDate);
-      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Subtrai um dia
-      adjustedEndDate.setUTCHours(23, 59, 59, 999); // Define o final do dia
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      adjustedEndDate.setUTCHours(23, 59, 59, 999);
 
-      // Iniciar currentDate no início do dia da startDate
       let currentDate = new Date(startDate);
-      currentDate.setUTCHours(0, 0, 0, 0); // Início do dia contábil às 00:00:00
+      currentDate.setUTCHours(0, 0, 0, 0);
 
       while (currentDate <= adjustedEndDate) {
-        // Use <= para incluir o último dia
         let nextDate = new Date(currentDate);
 
         if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
-          // Para LAST_7_D e LAST_30_D, iteração diária
-          nextDate.setDate(nextDate.getDate() + 1);
-          nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
+          nextDate.setDate(currentDate.getDate() + 1);
         } else if (period === PeriodEnum.LAST_6_M) {
-          // Para LAST_6_M, iteração mensal
-          currentDate.setDate(currentDate.getDate() - 1); // Subtrai um dia
-          currentDate.setUTCHours(23, 59, 59, 999);
-          nextDate.setMonth(nextDate.getMonth() + 1);
-          nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo mês
+          nextDate.setMonth(currentDate.getMonth() + 1);
         }
 
-        const allRentalApartments =
-          await this.prisma.prismaLocal.rentalApartment.findMany({
-            where: {
-              checkIn: {
-                gte: currentDate,
-                lte: nextDate,
-              },
-              endOccupationType: 'FINALIZADA',
-            },
-            include: {
-              saleLease: true,
-            },
-          });
-
-        let totalValueForCurrentPeriod = new Prisma.Decimal(0);
-        const stockOutIds: number[] = [];
-
-        // Coleta todos os stockOutIds antes de fazer as consultas
-        for (const rentalApartment of allRentalApartments) {
-          const saleLease = rentalApartment.saleLease;
-
-          if (saleLease && saleLease.stockOutId) {
-            stockOutIds.push(saleLease.stockOutId);
-          }
-        }
-
-        // Busca todos os stockOuts de uma vez, se houver algum
-        const stockOuts =
-          stockOutIds.length > 0
-            ? await this.prisma.prismaLocal.stockOut.findMany({
-                where: { id: { in: stockOutIds } },
-                include: {
-                  stockOutItem: {
-                    where: {
-                      canceled: null,
-                    },
-                    select: {
-                      id: true,
-                      priceSale: true,
-                      quantity: true,
-                      stockOutId: true,
-                    },
-                  },
-                  sale: {
-                    select: {
-                      discount: true,
-                    },
-                  },
-                },
-              })
-            : [];
-
-        const stockOutMap = new Map(
-          stockOuts.map((stockOut) => [stockOut.id, stockOut]),
+        const data = await this.prisma.prismaLocal.$queryRawUnsafe<
+          {
+            totalValue: Prisma.Decimal;
+          }[]
+        >(
+          `
+          SELECT
+            COALESCE(SUM(soi."priceSale" * soi.quantity - COALESCE(s.discount, 0)), 0) AS "totalValue"
+          FROM "RentalApartment" ra
+          LEFT JOIN "SaleLease" sl ON sl.id = ra."saleLeaseId"
+          LEFT JOIN "StockOut" so ON so.id = sl."stockOutId"
+          LEFT JOIN "StockOutItem" soi ON soi."stockOutId" = so.id AND soi."canceled" IS NULL
+          LEFT JOIN "Sale" s ON s.id = so."saleId"
+          WHERE ra."endOccupationType" = 'FINALIZADA'
+          AND ra."checkIn" >= $1
+          AND ra."checkIn" < $2
+          `,
+          currentDate,
+          nextDate,
         );
 
-        for (const rentalApartment of allRentalApartments) {
-          // Lógica para calcular os valores
-          const saleLease = rentalApartment.saleLease;
-          let priceSale = new Prisma.Decimal(0);
-          let discountSale = new Prisma.Decimal(0);
+        const totalValueForCurrentPeriod =
+          data[0]?.totalValue || new Prisma.Decimal(0);
 
-          if (saleLease && saleLease.stockOutId) {
-            const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
-            if (stockOutSaleLease) {
-              if (Array.isArray(stockOutSaleLease.stockOutItem)) {
-                priceSale = stockOutSaleLease.stockOutItem.reduce(
-                  (acc, current) =>
-                    acc.plus(
-                      new Prisma.Decimal(current.priceSale).times(
-                        new Prisma.Decimal(current.quantity),
-                      ),
-                    ),
-                  new Prisma.Decimal(0),
-                );
-                discountSale = stockOutSaleLease.sale?.discount
-                  ? new Prisma.Decimal(stockOutSaleLease.sale.discount)
-                  : new Prisma.Decimal(0);
-                priceSale = priceSale.minus(discountSale);
-              }
-            }
-          }
+        const dateKey =
+          period === PeriodEnum.LAST_6_M
+            ? `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1)
+                .toString()
+                .padStart(2, '0')}`
+            : currentDate.toISOString().split('T')[0];
 
-          totalValueForCurrentPeriod =
-            totalValueForCurrentPeriod.plus(priceSale);
-        }
-
-        // Adicionar o resultado ao objeto de resultados
-        const dateKey = currentDate.toISOString().split('T')[0];
         results[dateKey] = {
           totalValue: totalValueForCurrentPeriod,
         };
 
-        let createdDateWithTime;
-        if (period === 'LAST_6_M') {
-          // Cria uma nova instância de Date, subtraindo 1 dia de currentDate
-          createdDateWithTime = new Date(currentDate); // Cria uma nova instância de Date
-          createdDateWithTime.setDate(createdDateWithTime.getDate() - 1); // Remove 1 dia
-          createdDateWithTime.setUTCHours(5, 59, 59, 999); // Define a hora
-        } else {
-          createdDateWithTime = new Date(currentDate); // Cria uma nova instância de Date
-          createdDateWithTime.setUTCHours(5, 59, 59, 999);
+        const createdDateWithTime = new Date(currentDate);
+        if (period === PeriodEnum.LAST_6_M) {
+          createdDateWithTime.setDate(1); // Começo do mês
         }
+        createdDateWithTime.setUTCHours(5, 59, 59, 999);
 
         await this.insertRestaurantRevenueByPeriod({
-          period: period,
-          createdDate: createdDateWithTime, // Usa a nova data com a hora correta
+          period,
+          createdDate: createdDateWithTime,
           totalValue: totalValueForCurrentPeriod,
           companyId,
         });
@@ -328,7 +234,6 @@ export class RestaurantRevenueService {
         currentDate = new Date(nextDate);
       }
 
-      // Formatar o resultado final
       const totalRestaurantRevenueByPeriod = Object.keys(results).map(
         (date) => ({
           [date]: results[date],
