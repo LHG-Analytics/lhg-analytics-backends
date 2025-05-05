@@ -1516,34 +1516,44 @@ export class CompanyService {
       stockOutItems,
     ] = await this.fetchKpiData(startDate, endDate);
 
-    let totalSaleDirect = stockOutItems.reduce(
-      (totalSaleDirect, stockOutItem) => {
-        const stockOut = stockOutItem.stockOuts;
+    const groupedByStockOut = new Map<
+      number,
+      {
+        items: typeof stockOutItems;
+        discount: Prisma.Decimal;
+      }
+    >();
 
-        if (stockOut && stockOut.saleDirect) {
-          const saleDirects = Array.isArray(stockOut.saleDirect)
-            ? stockOut.saleDirect
-            : [stockOut.saleDirect];
-          const discountSale = stockOut.sale?.discount
-            ? new Prisma.Decimal(stockOut.sale.discount)
-            : new Prisma.Decimal(0);
+    for (const stockOutItem of stockOutItems) {
+      const stockOut = stockOutItem.stockOuts;
 
-          saleDirects.forEach((saleDirect) => {
-            if (
-              saleDirect &&
-              stockOutItem.stockOutId === saleDirect.stockOutId
-            ) {
-              const itemTotal = new Prisma.Decimal(
-                stockOutItem.priceSale,
-              ).times(new Prisma.Decimal(stockOutItem.quantity));
-              totalSaleDirect = totalSaleDirect.plus(
-                itemTotal.minus(discountSale),
-              );
-            }
-          });
-        }
+      if (!stockOut || !stockOut.saleDirect) continue;
 
-        return totalSaleDirect; // Retorna o total acumulado
+      const stockOutId = stockOutItem.stockOutId;
+
+      if (!groupedByStockOut.has(stockOutId)) {
+        const discount = stockOut.sale?.discount
+          ? new Prisma.Decimal(stockOut.sale.discount.toString())
+          : new Prisma.Decimal(0);
+
+        groupedByStockOut.set(stockOutId, {
+          items: [],
+          discount,
+        });
+      }
+
+      groupedByStockOut.get(stockOutId)!.items.push(stockOutItem);
+    }
+
+    const totalSaleDirect = Array.from(groupedByStockOut.values()).reduce(
+      (total, { items, discount }) => {
+        const subtotal = items.reduce((sum, item) => {
+          const price = new Prisma.Decimal(item.priceSale);
+          const quantity = new Prisma.Decimal(item.quantity);
+          return sum.plus(price.times(quantity));
+        }, new Prisma.Decimal(0));
+
+        return total.plus(subtotal.minus(discount));
       },
       new Prisma.Decimal(0),
     );

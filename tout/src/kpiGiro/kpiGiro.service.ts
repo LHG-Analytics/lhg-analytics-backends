@@ -436,7 +436,7 @@ export class KpiGiroService {
     previousStartDateLast7Days.setDate(
       previousStartDateLast7Days.getDate() - 7,
     );
-    previousStartDateLast7Days.setHours(6, 0, 0, 0); // Configuração de horas
+    previousStartDateLast7Days.setHours(0, 0, 0, 0); // Configuração de horas
 
     const startTimeLast7Days = moment()
       .tz(timezone)
@@ -485,7 +485,7 @@ export class KpiGiroService {
     previousStartDateLast30Days.setDate(
       previousStartDateLast30Days.getDate() - 30,
     );
-    previousStartDateLast30Days.setHours(6, 0, 0, 0); // Configuração de horas
+    previousStartDateLast30Days.setHours(0, 0, 0, 0); // Configuração de horas
 
     const startTimeLast30Days = moment()
       .tz(timezone)
@@ -541,7 +541,7 @@ export class KpiGiroService {
     // Ajustar o dia do mês se necessário
     const dayOfMonth = previousParsedEndDateLast6Months.getDate();
     previousStartDateLast6Months.setDate(dayOfMonth);
-    previousStartDateLast6Months.setHours(6, 0, 0, 0); // Configuração de horas
+    previousStartDateLast6Months.setHours(0, 0, 0, 0); // Configuração de horas
 
     // Parse as datas para o formato desejado
     const {
@@ -601,8 +601,8 @@ export class KpiGiroService {
     );
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
-    parsedStartDate.setUTCHours(6, 0, 0, 0);
-    parsedEndDate.setUTCHours(5, 59, 59, 999);
+    parsedStartDate.setUTCHours(0, 0, 0, 0);
+    parsedEndDate.setUTCHours(23, 59, 59, 999);
 
     return { startDate: parsedStartDate, endDate: parsedEndDate };
   }

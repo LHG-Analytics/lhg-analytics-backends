@@ -37,9 +37,6 @@ export class KpiRevenueService {
           },
         },
         canceled: null,
-        typePriceSale: {
-          not: null,
-        },
       },
       include: {
         stockOuts: {
@@ -55,31 +52,51 @@ export class KpiRevenueService {
       },
     });
 
-    return stockOutItems.reduce((totalSaleDirect, stockOutItem) => {
-      const stockOut = stockOutItem.stockOuts;
+    // Agrupa os itens por stockOutId
+    const groupedByStockOut = new Map<
+      string,
+      {
+        items: typeof stockOutItems;
+        discount: Prisma.Decimal;
+      }
+    >();
 
-      if (stockOut && stockOut.saleDirect) {
-        const saleDirects = Array.isArray(stockOut.saleDirect)
-          ? stockOut.saleDirect
-          : [stockOut.saleDirect];
-        const discountSale = stockOut.sale?.discount
+    for (const item of stockOutItems) {
+      const stockOut = item.stockOuts;
+      const stockOutId = item.stockOutId.toString();
+
+      if (!stockOut || !stockOut.saleDirect) continue;
+
+      if (!groupedByStockOut.has(stockOutId)) {
+        const discount = stockOut.sale?.discount
           ? new Prisma.Decimal(stockOut.sale.discount)
           : new Prisma.Decimal(0);
 
-        saleDirects.forEach((saleDirect) => {
-          if (saleDirect && stockOutItem.stockOutId === saleDirect.stockOutId) {
-            const itemTotal = new Prisma.Decimal(stockOutItem.priceSale).times(
-              new Prisma.Decimal(stockOutItem.quantity),
-            );
-            totalSaleDirect = totalSaleDirect.plus(
-              itemTotal.minus(discountSale),
-            );
-          }
+        groupedByStockOut.set(stockOutId, {
+          items: [],
+          discount,
         });
       }
 
-      return totalSaleDirect;
-    }, new Prisma.Decimal(0));
+      groupedByStockOut.get(stockOutId)!.items.push(item);
+    }
+
+    // Soma o total de cada venda direta (com desconto aplicado 1x)
+    let total = new Prisma.Decimal(0);
+
+    for (const { items, discount } of groupedByStockOut.values()) {
+      const subtotal = items.reduce((sum, item) => {
+        const itemTotal = new Prisma.Decimal(item.priceSale).times(
+          new Prisma.Decimal(item.quantity),
+        );
+        return sum.plus(itemTotal);
+      }, new Prisma.Decimal(0));
+
+      const totalWithDiscount = subtotal.minus(discount);
+      total = total.plus(totalWithDiscount);
+    }
+
+    return total;
   }
 
   private async fetchKpiData(startDate: Date, endDate: Date) {

@@ -180,11 +180,11 @@ export class KpiAlosService {
 
     // Últimos 7 dias
     const endDateLast7Days = currentDate;
-    endDateLast7Days.setHours(5, 59, 59, 999);
+    endDateLast7Days.setHours(23, 59, 59, 999);
 
     const startDateLast7Days = new Date(currentDate);
     startDateLast7Days.setDate(startDateLast7Days.getDate() - 7);
-    startDateLast7Days.setHours(6, 0, 0, 0);
+    startDateLast7Days.setHours(0, 0, 0, 0);
 
     const {
       startDate: parsedStartDateLast7Days,
@@ -200,7 +200,7 @@ export class KpiAlosService {
     previousStartDateLast7Days.setDate(
       previousStartDateLast7Days.getDate() - 7,
     );
-    previousStartDateLast7Days.setHours(6, 0, 0, 0); // Configuração de horas
+    previousStartDateLast7Days.setHours(0, 0, 0, 0); // Configuração de horas
 
     // Log para verificar as datas
     const startTimeLast7Days = moment()
@@ -226,11 +226,11 @@ export class KpiAlosService {
 
     // Últimos 30 dias
     const endDateLast30Days = currentDate;
-    endDateLast30Days.setHours(5, 59, 59, 999);
+    endDateLast30Days.setHours(23, 59, 59, 999);
 
     const startDateLast30Days = new Date(currentDate);
     startDateLast30Days.setDate(startDateLast30Days.getDate() - 30);
-    startDateLast30Days.setHours(6, 0, 0, 0);
+    startDateLast30Days.setHours(0, 0, 0, 0);
 
     const {
       startDate: parsedStartDateLast30Days,
@@ -248,7 +248,7 @@ export class KpiAlosService {
     previousStartDateLast30Days.setDate(
       previousStartDateLast30Days.getDate() - 30,
     );
-    previousStartDateLast30Days.setHours(6, 0, 0, 0); // Configuração de horas
+    previousStartDateLast30Days.setHours(0, 0, 0, 0); // Configuração de horas
 
     // Log para verificar as datas
     const startTimeLast30Days = moment()
@@ -276,11 +276,11 @@ export class KpiAlosService {
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = currentDate;
-    endDateLast6Months.setHours(5, 59, 59, 999);
+    endDateLast6Months.setHours(23, 59, 59, 999);
 
     const startDateLast6Months = new Date(currentDate);
     startDateLast6Months.setMonth(startDateLast6Months.getMonth() - 6);
-    startDateLast6Months.setHours(6, 0, 0, 0);
+    startDateLast6Months.setHours(0, 0, 0, 0);
 
     const {
       startDate: parsedStartDateLast6Months,
@@ -298,7 +298,7 @@ export class KpiAlosService {
     previousStartDateLast6Months.setMonth(
       previousStartDateLast6Months.getMonth() - 6,
     );
-    previousStartDateLast6Months.setHours(6, 0, 0, 0); // Configuração de horas
+    previousStartDateLast6Months.setHours(0, 0, 0, 0); // Configuração de horas
 
     // Log para verificar as datas
     const startTimeLast6Months = moment()
@@ -345,8 +345,8 @@ export class KpiAlosService {
     );
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
-    parsedStartDate.setUTCHours(6, 0, 0, 0);
-    parsedEndDate.setUTCHours(5, 59, 59, 999);
+    parsedStartDate.setUTCHours(0, 0, 0, 0);
+    parsedEndDate.setUTCHours(23, 59, 59, 999);
 
     return { startDate: parsedStartDate, endDate: parsedEndDate };
   }
