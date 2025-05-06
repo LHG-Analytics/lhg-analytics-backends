@@ -11,6 +11,7 @@ import {
   RestaurantRevenue,
   RestaurantRevenueByDrinkCategory,
   RestaurantRevenueByFoodCategory,
+  RestaurantRevenueByFoodCategoryPercent,
   RestaurantRevenueByGroupByPeriod,
   RestaurantRevenueByOthersCategory,
   RestaurantRevenueByPeriod,
@@ -1307,11 +1308,6 @@ export class RestaurantRevenueService {
         currentDate = nextDate;
       }
 
-      console.log(
-        'revenueByCategory:',
-        JSON.stringify(revenueByCategory, null, 2),
-      );
-
       return revenueByCategory;
     } catch (error) {
       console.error(
@@ -1574,11 +1570,6 @@ export class RestaurantRevenueService {
         currentDate = nextDate;
       }
 
-      console.log(
-        'revenueByCategory:',
-        JSON.stringify(revenueByCategory, null, 2),
-      );
-
       return revenueByCategory;
     } catch (error) {
       console.error(
@@ -1607,6 +1598,145 @@ export class RestaurantRevenueService {
         ...data,
       },
     });
+  }
+
+  private async calculateRestaurantRevenueByFoodCategoryPercent(
+    startDate: Date,
+    endDate: Date,
+    period: PeriodEnum,
+  ): Promise<any> {
+    try {
+      const companyId = 1;
+
+      const categories: string[] = [
+        '07 - CAFE DA MANHA E CHA',
+        '09 - PETISCOS',
+        '10 - ENTRADAS',
+        '11 - LANCHES',
+        '12 - PRATOS PRINCIPAIS',
+        '13 - ACOMPANHAMENTOS',
+        '14 - SOBREMESAS',
+        '15- BOMBONIERE',
+      ];
+
+      const adjustedEndDate = new Date(endDate);
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      adjustedEndDate.setUTCHours(23, 59, 59, 999);
+
+      const finalTotalByCategory: { [key: string]: Prisma.Decimal } = {};
+      categories.forEach((category) => {
+        finalTotalByCategory[category] = new Prisma.Decimal(0);
+      });
+
+      const rentalApartments =
+        await this.prisma.prismaLocal.rentalApartment.findMany({
+          where: {
+            checkIn: {
+              gte: startDate.toISOString(),
+              lt: adjustedEndDate.toISOString(),
+            },
+            endOccupationType: 'FINALIZADA',
+          },
+          include: { saleLease: true },
+        });
+
+      const stockOutIds: number[] = rentalApartments
+        .map((r) => r.saleLease?.stockOutId)
+        .filter((id): id is number => !!id);
+
+      const stockOuts =
+        stockOutIds.length > 0
+          ? await this.prisma.prismaLocal.stockOut.findMany({
+              where: { id: { in: stockOutIds } },
+              include: {
+                stockOutItem: {
+                  where: { canceled: null },
+                  include: {
+                    productStock: {
+                      include: {
+                        product: {
+                          include: {
+                            typeProduct: {
+                              select: { description: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                sale: { select: { discount: true } },
+              },
+            })
+          : [];
+
+      let totalRevenue = new Prisma.Decimal(0);
+
+      for (const stockOut of stockOuts) {
+        for (const item of stockOut.stockOutItem) {
+          const price = new Prisma.Decimal(item.priceSale);
+          const quantity = new Prisma.Decimal(item.quantity);
+          const discount = stockOut.sale?.discount
+            ? new Prisma.Decimal(stockOut.sale.discount)
+            : new Prisma.Decimal(0);
+          const total = price.times(quantity).minus(discount);
+
+          const category = item.productStock?.product?.typeProduct?.description;
+          if (category && categories.includes(category)) {
+            finalTotalByCategory[category] =
+              finalTotalByCategory[category].plus(total);
+            totalRevenue = totalRevenue.plus(total);
+          }
+        }
+      }
+
+      const result = [];
+
+      for (const category of categories) {
+        const value = finalTotalByCategory[category];
+        const percent = totalRevenue.greaterThan(0)
+          ? value.dividedBy(totalRevenue).times(100)
+          : new Prisma.Decimal(0);
+
+        const payload = {
+          period,
+          createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // ou ajustado como endDate, etc
+          foodCategory: category,
+          totalValuePercent: new Prisma.Decimal(percent.toFixed(2)),
+          companyId,
+        };
+
+        await this.insertRestaurantRevenueByFoodCategoryPercent(payload);
+        result.push(payload);
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error calculating food category percentage:', error);
+      throw new Error('Could not calculate revenue percentage');
+    }
+  }
+
+  private async insertRestaurantRevenueByFoodCategoryPercent(
+    data: RestaurantRevenueByFoodCategoryPercent,
+  ): Promise<RestaurantRevenueByFoodCategoryPercent> {
+    return this.prisma.prismaOnline.restaurantRevenueByFoodCategoryPercent.upsert(
+      {
+        where: {
+          period_createdDate_foodCategory: {
+            period: data.period,
+            createdDate: data.createdDate,
+            foodCategory: data.foodCategory,
+          },
+        },
+        create: {
+          ...data,
+        },
+        update: {
+          ...data,
+        },
+      },
+    );
   }
 
   @Cron('0 0 * * *', { disabled: true })
@@ -1696,6 +1826,11 @@ export class RestaurantRevenueService {
       PeriodEnum.LAST_7_D,
     );
     await this.calculateRestaurantRevenueByOthersCategory(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
+    await this.calculateRestaurantRevenueByFoodCategoryPercent(
       parsedStartDateLast7Days,
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
@@ -1794,6 +1929,11 @@ export class RestaurantRevenueService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
+    await this.calculateRestaurantRevenueByFoodCategoryPercent(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
 
     const endTimeLast30Days = moment()
       .tz(timezone)
@@ -1884,6 +2024,11 @@ export class RestaurantRevenueService {
       PeriodEnum.LAST_6_M,
     );
     await this.calculateRestaurantRevenueByOthersCategory(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateRestaurantRevenueByDrinkCategory(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
