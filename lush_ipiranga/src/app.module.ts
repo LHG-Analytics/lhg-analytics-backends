@@ -28,6 +28,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de autenticação
 import { RestaurantModule } from './restaurant/restaurant.module';
 import { RestaurantRevenueModule } from './restaurantRevenue/restaurantRevenue.module';
+import { RestaurantSalesModule } from './restaurant-sales/restaurant-sales.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { RestaurantRevenueModule } from './restaurantRevenue/restaurantRevenue.m
     BookingsModule,
     RestaurantModule,
     RestaurantRevenueModule,
+    RestaurantSalesModule,
   ],
   controllers: [AppController],
   providers: [

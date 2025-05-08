@@ -16,7 +16,11 @@
         "build:lapa": "cd lush_lapa && npm run build",
         "build:tout": "cd tout && npm run build",
         "build:andar": "cd andar_de_cima && npm run build",
-        "build:auth": "cd authentication && npm run build"
+        "build:auth": "cd authentication && npm run build",
+        "dev:ipiranga": "cd lush_ipiranga && npm run start:dev",
+        "dev:lapa": "cd lush_lapa && npm run start:dev",
+        "dev:tout": "cd tout && npm run start:dev",
+        "dev:adc": "cd andar_de_cima && npm run start:dev"
     },
     "dependencies": {
         "@nestjs/class-validator": "^0.13.1",
