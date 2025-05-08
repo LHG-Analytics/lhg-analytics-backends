@@ -28,7 +28,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de autenticação
 import { RestaurantModule } from './restaurant/restaurant.module';
 import { RestaurantRevenueModule } from './restaurantRevenue/restaurantRevenue.module';
-import { RestaurantSalesModule } from './restaurant-sales/restaurant-sales.module';
+import { RestaurantSalesModule } from './restaurantSales/restaurantSales.module';
 
 @Module({
   imports: [

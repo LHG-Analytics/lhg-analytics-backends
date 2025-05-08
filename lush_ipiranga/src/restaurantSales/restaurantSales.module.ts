@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { RestaurantSalesService } from './restaurant-sales.service';
-import { RestaurantSalesController } from './restaurant-sales.controller';
+import { RestaurantSalesService } from './restaurantSales.service';
+import { RestaurantSalesController } from './restaurantSales.controller';
 
 @Module({
   controllers: [RestaurantSalesController],
