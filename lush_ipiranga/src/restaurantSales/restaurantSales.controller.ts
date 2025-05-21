@@ -1,27 +1,20 @@
+import { PeriodEnum } from '@client-online';
 import {
+  BadRequestException,
   Controller,
   Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  BadRequestException,
-  Query,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
-import { RestaurantSalesService } from './restaurantSales.service';
-import { CreateRestaurantSaleDto } from './dto/create-restaurantSale.dto';
-import { UpdateRestaurantSaleDto } from './dto/update-restaurantSale.dto';
 import {
   ApiBadRequestResponse,
   ApiNotFoundResponse,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { PeriodEnum } from '@client-online';
 import { RestaurantSales } from './entities/restaurantSale.entity';
+import { RestaurantSalesService } from './restaurantSales.service';
 
 @ApiTags('RestaurantSales')
 @Controller('RestaurantSales')
