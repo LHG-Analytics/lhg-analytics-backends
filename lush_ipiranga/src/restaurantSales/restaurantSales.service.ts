@@ -7,7 +7,10 @@ import { Cron } from '@nestjs/schedule';
 import * as moment from 'moment-timezone';
 import { ConsumptionGroup, PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
-import { RestaurantSales } from './entities/restaurantSale.entity';
+import {
+  RestaurantSales,
+  RestaurantSalesRanking,
+} from './entities/restaurantSale.entity';
 @Injectable()
 export class RestaurantSalesService {
   constructor(private prisma: PrismaService) {}
@@ -129,6 +132,114 @@ export class RestaurantSalesService {
     });
   }
 
+  private async CalculateRestaurantSalesRanking(
+    startDate: Date,
+    endDate: Date,
+    period: PeriodEnum,
+  ): Promise<any> {
+    try {
+      const companyId = 1;
+
+      // Ajustar a endDate para o final do dia anterior
+      const adjustedEndDate = new Date(endDate);
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      adjustedEndDate.setUTCHours(23, 59, 59, 999);
+
+      // Buscar todas as locações no intervalo de datas
+      const [allRentalApartments] = await this.fetchKpiData(
+        startDate,
+        adjustedEndDate,
+      );
+
+      if (!allRentalApartments || allRentalApartments.length === 0) {
+        throw new NotFoundException('No rental apartments found.');
+      }
+
+      // Coletar os stockOutIds
+      const stockOutIds = allRentalApartments
+        .map((rentalApartment) => rentalApartment.saleLease?.stockOutId)
+        .filter((id) => id !== undefined);
+
+      // Buscar os stockOutSaleLeases
+      const stockOutSaleLeases =
+        await this.prisma.prismaLocal.stockOut.findMany({
+          where: { id: { in: stockOutIds } },
+          include: {
+            stockOutItem: {
+              where: { canceled: null },
+              select: {
+                quantity: true,
+                productStock: {
+                  select: {
+                    product: {
+                      select: {
+                        description: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+      // Mapa para acumular a contagem por produto
+      const productSalesMap = new Map<string, number>();
+
+      // Agregando as quantidades
+      for (const stockOut of stockOutSaleLeases) {
+        for (const item of stockOut.stockOutItem) {
+          const description =
+            item.productStock?.product?.description ?? 'Produto sem nome';
+          const currentCount = productSalesMap.get(description) ?? 0;
+          const quantity = Number(item.quantity) || 0;
+          productSalesMap.set(description, currentCount + quantity);
+        }
+      }
+
+      // Inserindo no banco
+      for (const [productName, totalSales] of productSalesMap.entries()) {
+        await this.insertRestaurantSalesRanking({
+          companyId,
+          period: period,
+          createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
+          productName,
+          totalSales,
+        });
+      }
+
+      return { message: 'Restaurant sales ranking calculated successfully.' };
+    } catch (error) {
+      console.error(
+        'Erro ao calcular ranking de vendas do restaurante:',
+        error,
+      );
+      throw new BadRequestException(
+        `Failed to calculate restaurant sales ranking: ${error.message}`,
+      );
+    }
+  }
+
+  private async insertRestaurantSalesRanking(
+    data: RestaurantSalesRanking,
+  ): Promise<RestaurantSalesRanking> {
+    return this.prisma.prismaOnline.restaurantSalesRanking.upsert({
+      where: {
+        period_createdDate_productName: {
+          period: data.period,
+          createdDate: data.createdDate,
+          productName: data.productName,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
+  }
+
   @Cron('0 0 * * *', { disabled: true })
   async handleCron() {
     const timezone = 'America/Sao_Paulo'; // Defina seu fuso horário
@@ -190,11 +301,11 @@ export class RestaurantSalesService {
       previousParsedEndDateLast7DaysParsed,
       PeriodEnum.LAST_7_D,
     );
-    // await this.calculateRestaurantRevenueByPeriod(
-    //   parsedStartDateLast7Days,
-    //   parsedEndDateLast7Days,
-    //   PeriodEnum.LAST_7_D,
-    // );
+    await this.CalculateRestaurantSalesRanking(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
     // await this.calculateRestaurantRevenueByPeriodPercent(
     //   parsedStartDateLast7Days,
     //   parsedEndDateLast7Days,
@@ -299,11 +410,11 @@ export class RestaurantSalesService {
       previousParsedEndDateLast30DaysParsed,
       PeriodEnum.LAST_30_D,
     );
-    // await this.calculateRestaurantRevenueByPeriod(
-    //   parsedStartDateLast30Days,
-    //   parsedEndDateLast30Days,
-    //   PeriodEnum.LAST_30_D,
-    // );
+    await this.CalculateRestaurantSalesRanking(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
     // await this.calculateRestaurantRevenueByPeriodPercent(
     //   parsedStartDateLast30Days,
     //   parsedEndDateLast30Days,
@@ -408,11 +519,11 @@ export class RestaurantSalesService {
       previousParsedEndDateLast6MonthsParsed,
       PeriodEnum.LAST_6_M,
     );
-    // await this.calculateRestaurantRevenueByPeriod(
-    //   parsedStartDateLast6Months,
-    //   parsedEndDateLast6Months,
-    //   PeriodEnum.LAST_6_M,
-    // );
+    await this.CalculateRestaurantSalesRanking(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
     // await this.calculateRestaurantRevenueByPeriodPercent(
     //   parsedStartDateLast6Months,
     //   parsedEndDateLast6Months,
