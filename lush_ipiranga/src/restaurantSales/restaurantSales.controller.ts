@@ -14,7 +14,12 @@ import {
 import { RestaurantSalesService } from './restaurantSales.service';
 import { CreateRestaurantSaleDto } from './dto/create-restaurantSale.dto';
 import { UpdateRestaurantSaleDto } from './dto/update-restaurantSale.dto';
-import { ApiBadRequestResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiNotFoundResponse,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { PeriodEnum } from '@client-online';
 import { RestaurantSales } from './entities/restaurantSale.entity';
 
@@ -114,5 +119,20 @@ export class RestaurantSalesController {
     }
 
     return date;
+  }
+
+  @Get('run-cron-job')
+  @HttpCode(HttpStatus.OK)
+  @ApiNotFoundResponse({ description: 'No Restaurant Sales found.' })
+  @ApiBadRequestResponse({ description: 'Failed to run the cron job.' })
+  async runCronJob(): Promise<any> {
+    try {
+      // Chama o método do serviço que executa as operações do cron job
+      return await this.restaurantSalesService.handleCron();
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to run the cron job: ${error.message}`,
+      );
+    }
   }
 }

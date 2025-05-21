@@ -48,16 +48,7 @@ export class BookingsRevenueService {
           dateService: true,
           startDate: true,
           rentalApartmentId: true,
-        },
-      }),
-      this.prisma.prismaLocal.originBooking.findMany({
-        where: {
-          deletionDate: {
-            equals: null,
-          },
-        },
-        select: {
-          typeOrigin: true,
+          discountBooking: true,
         },
       }),
       this.prisma.prismaLocal.newRelease.findMany({
@@ -68,8 +59,12 @@ export class BookingsRevenueService {
           releaseType: {
             equals: 'RESERVA',
           },
+          accountPayReceiveId: {
+            equals: null,
+          },
         },
         select: {
+          value: true,
           halfPaymentId: true,
           originalsId: true,
         },
@@ -83,6 +78,16 @@ export class BookingsRevenueService {
         select: {
           id: true, // Adicione o id para o mapeamento
           name: true,
+        },
+      }),
+      this.prisma.prismaLocal.originBooking.findMany({
+        where: {
+          deletionDate: {
+            equals: null,
+          },
+        },
+        select: {
+          typeOrigin: true,
         },
       }),
     ]);
@@ -471,8 +476,10 @@ export class BookingsRevenueService {
     }
 
     // Buscar todas as reservas e os novos lançamentos
-    const [allBookings, originBookings, newReleases, halfPayments] =
-      await this.fetchKpiData(startDate, adjustedEndDate);
+    const [allBookings, newReleases, halfPayments] = await this.fetchKpiData(
+      startDate,
+      adjustedEndDate,
+    );
 
     if (!allBookings || allBookings.length === 0) {
       throw new NotFoundException('No bookings found.');
