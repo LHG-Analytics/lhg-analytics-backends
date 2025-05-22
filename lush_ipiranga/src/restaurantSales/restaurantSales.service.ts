@@ -250,6 +250,7 @@ export class RestaurantSalesService {
 
     const categories: string[] = [
       '07 - CAFE DA MANHA E CHA',
+      '08 - ADICIONAIS',
       '09 - PETISCOS',
       '10 - ENTRADAS',
       '11 - LANCHES',
@@ -325,6 +326,8 @@ export class RestaurantSalesService {
     for (const category of categories) {
       const totalSales = totalByCategory[category];
 
+      const totalSalesPercent = new Prisma.Decimal(totalSales / totalAllSales);
+
       await this.insertRestaurantSalesByFoodCategory({
         companyId,
         period,
@@ -332,6 +335,7 @@ export class RestaurantSalesService {
         foodCategory: category,
         totalSales,
         totalAllSales,
+        totalSalesPercent,
       });
     }
   }
