@@ -132,7 +132,7 @@ export class RestaurantSalesService {
     });
   }
 
-  private async CalculateRestaurantSalesRanking(
+  private async calculateRestaurantSalesRanking(
     startDate: Date,
     endDate: Date,
     period: PeriodEnum,
@@ -240,6 +240,50 @@ export class RestaurantSalesService {
     });
   }
 
+  private async calculateRestaurantSalesByFoodCategory(
+    startDate: Date,
+    endDate: Date,
+    period?: PeriodEnum,
+  ): Promise<any> {
+    try {
+      const companyId = 1;
+
+      const categories: string[] = [
+        '07 - CAFE DA MANHA E CHA',
+        '09 - PETISCOS',
+        '10 - ENTRADAS',
+        '11 - LANCHES',
+        '12 - PRATOS PRINCIPAIS',
+        '13 - ACOMPANHAMENTOS',
+        '14 - SOBREMESAS',
+        '15- BOMBONIERE',
+      ];
+
+      const revenueByCategory: {
+        [key: string]: {
+          categories: string[];
+          series: number[];
+          total: number;
+        };
+      } = {};
+      categories.forEach((category) => {
+        revenueByCategory[category] = { categories: [], series: [], total: 0 };
+      });
+
+      const adjustedEndDate = new Date(endDate);
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      adjustedEndDate.setUTCHours(23, 59, 59, 999);
+
+      const finalTotalByCategory: { [key: string]: Prisma.Decimal } = {};
+      categories.forEach((category) => {
+        finalTotalByCategory[category] = new Prisma.Decimal(0);
+      });
+    } catch (error) {
+      console.error('Error fetching restaurant sales by food category:', error);
+      throw new Error('Could not fetch sales data');
+    }
+  }
+
   @Cron('0 0 * * *', { disabled: true })
   async handleCron() {
     const timezone = 'America/Sao_Paulo'; // Defina seu fuso horário
@@ -301,7 +345,7 @@ export class RestaurantSalesService {
       previousParsedEndDateLast7DaysParsed,
       PeriodEnum.LAST_7_D,
     );
-    await this.CalculateRestaurantSalesRanking(
+    await this.calculateRestaurantSalesRanking(
       parsedStartDateLast7Days,
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
@@ -410,7 +454,7 @@ export class RestaurantSalesService {
       previousParsedEndDateLast30DaysParsed,
       PeriodEnum.LAST_30_D,
     );
-    await this.CalculateRestaurantSalesRanking(
+    await this.calculateRestaurantSalesRanking(
       parsedStartDateLast30Days,
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
@@ -519,7 +563,7 @@ export class RestaurantSalesService {
       previousParsedEndDateLast6MonthsParsed,
       PeriodEnum.LAST_6_M,
     );
-    await this.CalculateRestaurantSalesRanking(
+    await this.calculateRestaurantSalesRanking(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,

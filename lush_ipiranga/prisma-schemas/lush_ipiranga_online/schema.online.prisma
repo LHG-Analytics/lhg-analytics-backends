@@ -850,15 +850,16 @@ model RestaurantSalesRanking {
 }
 
 model RestaurantSalesByFoodCategory {
-  id           Int         @id @default(autoincrement())
-  period       PeriodEnum?
-  totalSales   Int
-  createdDate  DateTime
-  foodCategory String
-  companyId    Int
-  company      Company?    @relation(fields: [companyId], references: [id])
-  restaurantId Int?
-  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+  id            Int         @id @default(autoincrement())
+  period        PeriodEnum?
+  totalSales    Int
+  totalAllSales Int
+  createdDate   DateTime
+  foodCategory  String
+  companyId     Int
+  company       Company?    @relation(fields: [companyId], references: [id])
+  restaurantId  Int?
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate, foodCategory])
 }

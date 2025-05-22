@@ -30,6 +30,7 @@ export class RestaurantSalesByFoodCategory
   createdDate: Date;
   foodCategory: string;
   totalSales: number;
+  totalAllSales: number;
 }
 
 export class RestaurantSalesByFoodCategoryPercent
