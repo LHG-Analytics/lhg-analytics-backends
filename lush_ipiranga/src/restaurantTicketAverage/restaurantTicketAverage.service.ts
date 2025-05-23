@@ -7,7 +7,10 @@ import {
 import { Cron } from '@nestjs/schedule';
 import * as moment from 'moment-timezone';
 import { PrismaService } from '../prisma/prisma.service';
-import { RestaurantTicketAverage } from './entities/restaurantTicketAverage.entity';
+import {
+  RestaurantTicketAverage,
+  RestaurantTicketAverageByTotalRentals,
+} from './entities/restaurantTicketAverage.entity';
 
 @Injectable()
 export class RestaurantTicketAverageService {
@@ -195,6 +198,175 @@ export class RestaurantTicketAverageService {
     });
   }
 
+  async calculateRestaurantTicketAverageByTotalRentals(
+    startDate: Date,
+    endDate: Date,
+    period?: PeriodEnum,
+  ): Promise<any> {
+    try {
+      const companyId = 1;
+
+      const adjustedEndDate = new Date(endDate);
+      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      } else if (period === PeriodEnum.LAST_6_M) {
+        adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1);
+        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      }
+
+      const abProductTypes = [
+        '07 - CAFE DA MANHA E CHA',
+        '08 - ADICIONAIS',
+        '09 - PETISCOS',
+        '10 - ENTRADAS',
+        '11 - LANCHES',
+        '12 - PRATOS PRINCIPAIS',
+        '13 - ACOMPANHAMENTOS',
+        '14 - SOBREMESAS',
+        '15 - BOMBONIERE',
+        '01 - SOFT DRINKS',
+        '02 - CERVEJAS',
+        '03 - COQUETEIS',
+        '04 - DOSES',
+        '05 - GARRAFAS',
+        '06 - VINHOS E ESPUMANTES',
+      ];
+
+      const [allRentalApartments] = await this.fetchKpiData(
+        startDate,
+        adjustedEndDate,
+      );
+
+      if (!allRentalApartments || allRentalApartments.length === 0) {
+        throw new NotFoundException('No rental apartments found.');
+      }
+
+      const stockOutIds = allRentalApartments
+        .map((r) => r.saleLease?.stockOutId)
+        .filter((id) => id !== undefined);
+
+      const stockOutSaleLeases =
+        await this.prisma.prismaLocal.stockOut.findMany({
+          where: { id: { in: stockOutIds } },
+          include: {
+            stockOutItem: {
+              where: { canceled: null },
+              select: {
+                priceSale: true,
+                quantity: true,
+                stockOutId: true,
+                productStock: {
+                  select: {
+                    product: {
+                      select: {
+                        typeProduct: {
+                          select: {
+                            description: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            sale: {
+              select: {
+                discount: true,
+              },
+            },
+          },
+        });
+
+      const stockOutMap = new Map<number, any>();
+      stockOutSaleLeases.forEach((s) => {
+        stockOutMap.set(s.id, s);
+      });
+
+      let totalABNetRevenue = new Prisma.Decimal(0);
+      let rentalsWithABCount = 0;
+
+      for (const rentalApartment of allRentalApartments) {
+        const saleLease = rentalApartment.saleLease;
+        if (!saleLease?.stockOutId) continue;
+
+        const stockOut = stockOutMap.get(saleLease.stockOutId);
+        if (!stockOut?.stockOutItem?.length) continue;
+
+        let abItemTotal = new Prisma.Decimal(0);
+        let hasABItem = false;
+
+        for (const item of stockOut.stockOutItem) {
+          const description =
+            item.productStock?.product?.typeProduct?.description;
+          if (description && abProductTypes.includes(description)) {
+            const price = new Prisma.Decimal(item.priceSale || 0);
+            const quantity = new Prisma.Decimal(item.quantity || 0);
+            abItemTotal = abItemTotal.plus(price.times(quantity));
+            hasABItem = true;
+          }
+        }
+
+        if (hasABItem) {
+          const discount = stockOut.sale?.discount
+            ? new Prisma.Decimal(stockOut.sale.discount)
+            : new Prisma.Decimal(0);
+
+          const netValue = abItemTotal.minus(discount);
+          totalABNetRevenue = totalABNetRevenue.plus(netValue);
+          rentalsWithABCount += 1;
+        }
+      }
+
+      const totalRentals = allRentalApartments.length;
+
+      const ticketAverage =
+        totalRentals > 0
+          ? totalABNetRevenue.div(totalRentals)
+          : new Prisma.Decimal(0);
+
+      // ⬇️ Inserir no banco de dados
+      await this.insertRestaurantTicketAverageByTotalRentals({
+        totalAllTicketAverageByTotalRentals: ticketAverage,
+        companyId,
+        period,
+        createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
+      });
+
+      return {
+        totalNetRevenue: totalABNetRevenue.toNumber(),
+        rentalsWithABCount,
+        ticketAverage: ticketAverage.toNumber(),
+      };
+    } catch (error) {
+      console.error('Erro ao calcular ticket médio de A&B:', error);
+      throw new BadRequestException(
+        `Erro ao calcular ticket médio de A&B: ${error.message}`,
+      );
+    }
+  }
+
+  private async insertRestaurantTicketAverageByTotalRentals(
+    data: RestaurantTicketAverageByTotalRentals,
+  ): Promise<RestaurantTicketAverageByTotalRentals> {
+    return this.prisma.prismaOnline.restaurantTicketAverageByTotalRentals.upsert(
+      {
+        where: {
+          period_createdDate: {
+            period: data.period,
+            createdDate: data.createdDate,
+          },
+        },
+        create: {
+          ...data,
+        },
+        update: {
+          ...data,
+        },
+      },
+    );
+  }
+
   @Cron('0 0 * * *', { disabled: true })
   async handleCron() {
     const timezone = 'America/Sao_Paulo'; // Defina seu fuso horário
@@ -254,6 +426,11 @@ export class RestaurantTicketAverageService {
     await this.findAllRestaurantTicketAverage(
       previousParsedStartDateLast7Days,
       previousParsedEndDateLast7DaysParsed,
+      PeriodEnum.LAST_7_D,
+    );
+    await this.calculateRestaurantTicketAverageByTotalRentals(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
     );
 
@@ -320,6 +497,11 @@ export class RestaurantTicketAverageService {
       previousParsedEndDateLast30DaysParsed,
       PeriodEnum.LAST_30_D,
     );
+    await this.calculateRestaurantTicketAverageByTotalRentals(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
 
     const endTimeLast30Days = moment()
       .tz(timezone)
@@ -382,6 +564,11 @@ export class RestaurantTicketAverageService {
     await this.findAllRestaurantTicketAverage(
       previousParsedStartDateLast6Months,
       previousParsedEndDateLast6MonthsParsed,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateRestaurantTicketAverageByTotalRentals(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
 
