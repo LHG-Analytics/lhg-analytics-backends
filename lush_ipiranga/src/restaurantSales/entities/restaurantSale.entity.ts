@@ -54,6 +54,7 @@ export class RestaurantSalesByOthersCategory
   period?: PeriodEnum;
   companyId: number;
   createdDate: Date;
+  totalAllSales: number;
   othersCategory: string;
   totalSales: number;
   totalSalesPercent: Prisma.Decimal;

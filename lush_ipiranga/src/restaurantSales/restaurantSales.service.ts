@@ -11,6 +11,7 @@ import {
   RestaurantSales,
   RestaurantSalesByDrinkCategory,
   RestaurantSalesByFoodCategory,
+  RestaurantSalesByOthersCategory,
   RestaurantSalesRanking,
 } from './entities/restaurantSale.entity';
 @Injectable()
@@ -477,6 +478,121 @@ export class RestaurantSalesService {
     });
   }
 
+  private async calculateRestaurantSalesByOthersCategory(
+    startDate: Date,
+    endDate: Date,
+    period: PeriodEnum,
+  ): Promise<void> {
+    const companyId = 1;
+
+    const categories: string[] = [
+      '16 - PRODUTOS EROTICOS',
+      '17 - CONVENIENCIA E HIGIENE',
+      'ITENS EXTRAS',
+      'RESERVAS',
+      'SOUVENIR',
+    ];
+
+    // Ajustar endDate para ontem às 23:59:59.999
+    const adjustedEndDate = new Date(endDate);
+    adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+    adjustedEndDate.setUTCHours(23, 59, 59, 999);
+
+    const createdDate = new Date(adjustedEndDate);
+    createdDate.setUTCHours(5, 59, 59, 999);
+
+    const allRentalApartments =
+      await this.prisma.prismaLocal.rentalApartment.findMany({
+        where: {
+          checkIn: {
+            gte: startDate.toISOString(),
+            lte: adjustedEndDate.toISOString(),
+          },
+          endOccupationType: 'FINALIZADA',
+        },
+        include: {
+          saleLease: true,
+        },
+      });
+
+    const stockOutIds = allRentalApartments
+      .map((r) => r.saleLease?.stockOutId)
+      .filter((id): id is number => id !== undefined);
+
+    const stockOuts = await this.prisma.prismaLocal.stockOut.findMany({
+      where: { id: { in: stockOutIds } },
+      include: {
+        stockOutItem: {
+          where: { canceled: null },
+          include: {
+            productStock: {
+              include: {
+                product: {
+                  include: {
+                    typeProduct: { select: { description: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const totalByCategory: { [category: string]: number } = {};
+    categories.forEach((cat) => (totalByCategory[cat] = 0));
+
+    for (const stockOut of stockOuts) {
+      for (const item of stockOut.stockOutItem) {
+        const category = item.productStock?.product?.typeProduct?.description;
+        if (category && categories.includes(category)) {
+          totalByCategory[category] += Number(item.quantity || 0);
+        }
+      }
+    }
+
+    const totalAllSales = Object.values(totalByCategory).reduce(
+      (sum, qty) => sum + qty,
+      0,
+    );
+
+    for (const category of categories) {
+      const totalSales = totalByCategory[category];
+
+      const totalSalesPercent = new Prisma.Decimal(totalSales / totalAllSales);
+
+      await this.insertRestaurantSalesByOthersCategory({
+        companyId,
+        period,
+        createdDate,
+        othersCategory: category,
+        totalSales,
+        totalAllSales,
+        totalSalesPercent,
+      });
+    }
+  }
+
+  private async insertRestaurantSalesByOthersCategory(
+    data: RestaurantSalesByOthersCategory,
+  ): Promise<RestaurantSalesByOthersCategory> {
+    return this.prisma.prismaOnline.restaurantSalesByOthersCategory.upsert({
+      where: {
+        period_createdDate_othersCategory: {
+          period: data.period,
+          createdDate: data.createdDate,
+          othersCategory: data.othersCategory,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
+  }
+
   @Cron('0 0 * * *', { disabled: true })
   async handleCron() {
     const timezone = 'America/Sao_Paulo'; // Defina seu fuso horário
@@ -553,11 +669,11 @@ export class RestaurantSalesService {
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
     );
-    // await this.calculateRestaurantRevenueByFoodCategory(
-    //   parsedStartDateLast7Days,
-    //   parsedEndDateLast7Days,
-    //   PeriodEnum.LAST_7_D,
-    // );
+    await this.calculateRestaurantSalesByOthersCategory(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
     // await this.calculateRestaurantRevenueByDrinkCategory(
     //   parsedStartDateLast7Days,
     //   parsedEndDateLast7Days,
@@ -662,11 +778,11 @@ export class RestaurantSalesService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
-    // await this.calculateRestaurantRevenueByFoodCategory(
-    //   parsedStartDateLast30Days,
-    //   parsedEndDateLast30Days,
-    //   PeriodEnum.LAST_30_D,
-    // );
+    await this.calculateRestaurantSalesByOthersCategory(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
     // await this.calculateRestaurantRevenueByDrinkCategory(
     //   parsedStartDateLast30Days,
     //   parsedEndDateLast30Days,
@@ -771,11 +887,11 @@ export class RestaurantSalesService {
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
-    // await this.calculateRestaurantRevenueByFoodCategory(
-    //   parsedStartDateLast6Months,
-    //   parsedEndDateLast6Months,
-    //   PeriodEnum.LAST_6_M,
-    // );
+    await this.calculateRestaurantSalesByOthersCategory(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
     // await this.calculateRestaurantRevenueByDrinkCategory(
     //   parsedStartDateLast6Months,
     //   parsedEndDateLast6Months,

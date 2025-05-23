@@ -879,6 +879,7 @@ model RestaurantSalesByOthersCategory {
   id                Int         @id @default(autoincrement())
   period            PeriodEnum?
   totalSales        Int
+  totalAllSales     Int
   createdDate       DateTime
   othersCategory    String
   totalSalesPercent Decimal     @db.Decimal(10, 2)
