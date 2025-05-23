@@ -1,3 +1,4 @@
+import { PeriodEnum, Prisma } from '@client-online';
 import {
   BadRequestException,
   Injectable,
@@ -5,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as moment from 'moment-timezone';
-import { ConsumptionGroup, PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   RestaurantSales,

@@ -9,67 +9,67 @@ datasource db {
 }
 
 model Company {
-  id                                            Int                                             @id @default(autoincrement())
-  name                                          String
-  kpiRevenues                                   KpiRevenue[]
-  kpiTotalRentals                               KpiTotalRentals[]
-  kpiTicketAverages                             KpiTicketAverage[]
-  kpiAlos                                       KpiAlos[]
-  KpiOccupancyRates                             KpiOccupancyRate[]
-  KpiGiros                                      KpiGiro[]
-  KpiRevpars                                    KpiRevpar[]
-  KpiTrevpars                                   KpiTrevpar[]
-  KpiOccupancyRatesByWeek                       KpiOccupancyRateByWeek[]
-  KpiGiroByWeek                                 KpiGiroByWeek[]
-  KpiOccupancyRatesByPeriod                     KpiOccupancyRateByPeriod[]
-  KpiOccupancyRatesBySuiteCategory              KpiOccupancyRateBySuiteCategory[]
-  KpiRevenuesByRentalType                       KpiRevenueByRentalType[]
-  KpiRevenueByPeriod                            KpiRevenueByPeriod[]
-  KpiTotalRentalsByPeriod                       KpiTotalRentalsByPeriod[]
-  KpiRevparsByPeriod                            KpiRevparByPeriod[]
-  KpiTicketAveragesByPeriod                     KpiTicketAverageByPeriod[]
-  KpiTrevparsByPeriod                           KpiTrevparByPeriod[]
-  Cleanings                                     Cleanings[]
-  CleaningsByPeriod                             CleaningsByPeriod[]
-  CleaningsByWeek                               CleaningsByWeek[]
-  Inspections                                   Inspections[]
-  Governance                                    Governance?
-  CleaningsByPeriodShift                        CleaningsByPeriodShift[]
-  Bookings                                      Bookings[]
-  BookingsTotalRentalsByRentalType              BookingsTotalRentalsByRentalType[]
-  BookingsRevenueByChannelType                  BookingsRevenueByChannelType[]
-  BookingsTicketAverage                         BookingsTicketAverage[]
-  BookingsRevenue                               BookingsRevenue[]
-  BookingsRepresentativeness                    BookingsRepresentativeness[]
-  BookingsRepresentativenessByPeriod            BookingsRepresentativenessByPeriod[]
-  BookingsTotalRentals                          BookingsTotalRentals[]
-  BookingsTotalRentalsByPeriod                  BookingsTotalRentalsByPeriod[]
-  BookingsRevenueByPeriod                       BookingsRevenueByPeriod[]
-  BookingsTotalRentalsByChannelType             BookingsTotalRentalsByChannelType[]
-  BookingsTicketAverageByChannelType            BookingsTicketAverageByChannelType[]
-  BookingsRevenueByPayment                      BookingsRevenueByPayment[]
-  BookingsRepresentativenessByChannelType       BookingsRepresentativenessByChannelType[]
-  BookingsTotalRentalsByPeriodEcommerce         BookingsTotalRentalsByPeriodEcommerce[]
-  BookingsRevenueByPeriodEcommerce              BookingsRevenueByPeriodEcommerce[]
-  Restaurant                                    Restaurant[]
-  RestaurantRevenue                             RestaurantRevenue[]
-  RestaurantRevenueByPeriod                     RestaurantRevenueByPeriod[]
-  RestaurantRevenueByFoodCategory               RestaurantRevenueByFoodCategory[]
-  RestaurantRevenueByDrinkCategory              RestaurantRevenueByDrinkCategory[]
-  RestaurantSales                               RestaurantSales[]
-  RestaurantSalesRanking                        RestaurantSalesRanking[]
-  RestaurantRevenueByFoodCategoryPercent        RestaurantRevenueByFoodCategoryPercent[]
-  RestaurantRevenueByDrinkCategoryPercent       RestaurantRevenueByDrinkCategoryPercent[]
-  RestaurantRevenueByOthersCategory             RestaurantRevenueByOthersCategory[]
-  RestaurantRevenueByOthersCategoryPercent      RestaurantRevenueByOthersCategoryPercent[]
-  RestaurantSalesByFoodCategory                 RestaurantSalesByFoodCategory[]
-  RestaurantSalesByDrinkCategory                RestaurantSalesByDrinkCategory[]
-  RestaurantSalesByOthersCategory               RestaurantSalesByOthersCategory[]
-  RestaurantTicketAverage                       RestaurantTicketAverage[]
-  RestaurantTicketAverageByTotalRentals         RestaurantTicketAverageByTotalRentals[]
-  RestaurantTicketAverageByTotalRentalsByPeriod RestaurantTicketAverageByTotalRentalsByPeriod[]
-  RestaurantRevenueByPeriodPercent              RestaurantRevenueByPeriodPercent[]
-  RestaurantRevenueByGroupByPeriod              RestaurantRevenueByGroupByPeriod[]
+  id                                       Int                                        @id @default(autoincrement())
+  name                                     String
+  kpiRevenues                              KpiRevenue[]
+  kpiTotalRentals                          KpiTotalRentals[]
+  kpiTicketAverages                        KpiTicketAverage[]
+  kpiAlos                                  KpiAlos[]
+  KpiOccupancyRates                        KpiOccupancyRate[]
+  KpiGiros                                 KpiGiro[]
+  KpiRevpars                               KpiRevpar[]
+  KpiTrevpars                              KpiTrevpar[]
+  KpiOccupancyRatesByWeek                  KpiOccupancyRateByWeek[]
+  KpiGiroByWeek                            KpiGiroByWeek[]
+  KpiOccupancyRatesByPeriod                KpiOccupancyRateByPeriod[]
+  KpiOccupancyRatesBySuiteCategory         KpiOccupancyRateBySuiteCategory[]
+  KpiRevenuesByRentalType                  KpiRevenueByRentalType[]
+  KpiRevenueByPeriod                       KpiRevenueByPeriod[]
+  KpiTotalRentalsByPeriod                  KpiTotalRentalsByPeriod[]
+  KpiRevparsByPeriod                       KpiRevparByPeriod[]
+  KpiTicketAveragesByPeriod                KpiTicketAverageByPeriod[]
+  KpiTrevparsByPeriod                      KpiTrevparByPeriod[]
+  Cleanings                                Cleanings[]
+  CleaningsByPeriod                        CleaningsByPeriod[]
+  CleaningsByWeek                          CleaningsByWeek[]
+  Inspections                              Inspections[]
+  Governance                               Governance?
+  CleaningsByPeriodShift                   CleaningsByPeriodShift[]
+  Bookings                                 Bookings[]
+  BookingsTotalRentalsByRentalType         BookingsTotalRentalsByRentalType[]
+  BookingsRevenueByChannelType             BookingsRevenueByChannelType[]
+  BookingsTicketAverage                    BookingsTicketAverage[]
+  BookingsRevenue                          BookingsRevenue[]
+  BookingsRepresentativeness               BookingsRepresentativeness[]
+  BookingsRepresentativenessByPeriod       BookingsRepresentativenessByPeriod[]
+  BookingsTotalRentals                     BookingsTotalRentals[]
+  BookingsTotalRentalsByPeriod             BookingsTotalRentalsByPeriod[]
+  BookingsRevenueByPeriod                  BookingsRevenueByPeriod[]
+  BookingsTotalRentalsByChannelType        BookingsTotalRentalsByChannelType[]
+  BookingsTicketAverageByChannelType       BookingsTicketAverageByChannelType[]
+  BookingsRevenueByPayment                 BookingsRevenueByPayment[]
+  BookingsRepresentativenessByChannelType  BookingsRepresentativenessByChannelType[]
+  BookingsTotalRentalsByPeriodEcommerce    BookingsTotalRentalsByPeriodEcommerce[]
+  BookingsRevenueByPeriodEcommerce         BookingsRevenueByPeriodEcommerce[]
+  Restaurant                               Restaurant[]
+  RestaurantRevenue                        RestaurantRevenue[]
+  RestaurantRevenueByPeriod                RestaurantRevenueByPeriod[]
+  RestaurantRevenueByFoodCategory          RestaurantRevenueByFoodCategory[]
+  RestaurantRevenueByDrinkCategory         RestaurantRevenueByDrinkCategory[]
+  RestaurantSales                          RestaurantSales[]
+  RestaurantSalesRanking                   RestaurantSalesRanking[]
+  RestaurantRevenueByFoodCategoryPercent   RestaurantRevenueByFoodCategoryPercent[]
+  RestaurantRevenueByDrinkCategoryPercent  RestaurantRevenueByDrinkCategoryPercent[]
+  RestaurantRevenueByOthersCategory        RestaurantRevenueByOthersCategory[]
+  RestaurantRevenueByOthersCategoryPercent RestaurantRevenueByOthersCategoryPercent[]
+  RestaurantSalesByFoodCategory            RestaurantSalesByFoodCategory[]
+  RestaurantSalesByDrinkCategory           RestaurantSalesByDrinkCategory[]
+  RestaurantSalesByOthersCategory          RestaurantSalesByOthersCategory[]
+  RestaurantTicketAverage                  RestaurantTicketAverage[]
+  RestaurantTicketAverageByTotalRentals    RestaurantTicketAverageByTotalRentals[]
+  RestaurantTicketAverageByPeriod          RestaurantTicketAverageByPeriod[]
+  RestaurantRevenueByPeriodPercent         RestaurantRevenueByPeriodPercent[]
+  RestaurantRevenueByGroupByPeriod         RestaurantRevenueByGroupByPeriod[]
 }
 
 model Governance {
@@ -653,27 +653,27 @@ model BookingsTotalRentalsByChannelType {
 }
 
 model Restaurant {
-  id                                            Int                                             @id @default(autoincrement())
-  companyId                                     Int
-  company                                       Company?                                        @relation(fields: [companyId], references: [id])
-  RestaurantRevenue                             RestaurantRevenue[]
-  RestaurantRevenueByPeriod                     RestaurantRevenueByPeriod[]
-  RestaurantRevenueByFoodCategory               RestaurantRevenueByFoodCategory[]
-  RestaurantRevenueByDrinkCategory              RestaurantRevenueByDrinkCategory[]
-  RestaurantSales                               RestaurantSales[]
-  RestaurantSalesRanking                        RestaurantSalesRanking[]
-  RestaurantRevenueByFoodCategoryPercent        RestaurantRevenueByFoodCategoryPercent[]
-  RestaurantRevenueByDrinkCategoryPercent       RestaurantRevenueByDrinkCategoryPercent[]
-  RestaurantRevenueByOthersCategory             RestaurantRevenueByOthersCategory[]
-  RestaurantRevenueByOthersCategoryPercent      RestaurantRevenueByOthersCategoryPercent[]
-  RestaurantSalesByFoodCategory                 RestaurantSalesByFoodCategory[]
-  RestaurantSalesByDrinkCategory                RestaurantSalesByDrinkCategory[]
-  RestaurantSalesByOthersCategory               RestaurantSalesByOthersCategory[]
-  RestaurantTicketAverage                       RestaurantTicketAverage[]
-  RestaurantTicketAverageByTotalRentals         RestaurantTicketAverageByTotalRentals[]
-  RestaurantTicketAverageByTotalRentalsByPeriod RestaurantTicketAverageByTotalRentalsByPeriod[]
-  RestaurantRevenueByPeriodPercent              RestaurantRevenueByPeriodPercent[]
-  RestaurantRevenueByGroupByPeriod              RestaurantRevenueByGroupByPeriod[]
+  id                                       Int                                        @id @default(autoincrement())
+  companyId                                Int
+  company                                  Company?                                   @relation(fields: [companyId], references: [id])
+  RestaurantRevenue                        RestaurantRevenue[]
+  RestaurantRevenueByPeriod                RestaurantRevenueByPeriod[]
+  RestaurantRevenueByFoodCategory          RestaurantRevenueByFoodCategory[]
+  RestaurantRevenueByDrinkCategory         RestaurantRevenueByDrinkCategory[]
+  RestaurantSales                          RestaurantSales[]
+  RestaurantSalesRanking                   RestaurantSalesRanking[]
+  RestaurantRevenueByFoodCategoryPercent   RestaurantRevenueByFoodCategoryPercent[]
+  RestaurantRevenueByDrinkCategoryPercent  RestaurantRevenueByDrinkCategoryPercent[]
+  RestaurantRevenueByOthersCategory        RestaurantRevenueByOthersCategory[]
+  RestaurantRevenueByOthersCategoryPercent RestaurantRevenueByOthersCategoryPercent[]
+  RestaurantSalesByFoodCategory            RestaurantSalesByFoodCategory[]
+  RestaurantSalesByDrinkCategory           RestaurantSalesByDrinkCategory[]
+  RestaurantSalesByOthersCategory          RestaurantSalesByOthersCategory[]
+  RestaurantTicketAverage                  RestaurantTicketAverage[]
+  RestaurantTicketAverageByTotalRentals    RestaurantTicketAverageByTotalRentals[]
+  RestaurantTicketAverageByPeriod          RestaurantTicketAverageByPeriod[]
+  RestaurantRevenueByPeriodPercent         RestaurantRevenueByPeriodPercent[]
+  RestaurantRevenueByGroupByPeriod         RestaurantRevenueByGroupByPeriod[]
 }
 
 model RestaurantRevenue {
@@ -917,15 +917,15 @@ model RestaurantTicketAverageByTotalRentals {
   @@unique([period, createdDate])
 }
 
-model RestaurantTicketAverageByTotalRentalsByPeriod {
-  id                               Int         @id @default(autoincrement())
-  period                           PeriodEnum?
-  totalTicketAverageByTotalRentals Decimal     @db.Decimal(10, 2)
-  createdDate                      DateTime
-  companyId                        Int
-  company                          Company?    @relation(fields: [companyId], references: [id])
-  restaurantId                     Int?
-  restaurant                       Restaurant? @relation(fields: [restaurantId], references: [id])
+model RestaurantTicketAverageByPeriod {
+  id                 Int         @id @default(autoincrement())
+  period             PeriodEnum?
+  totalTicketAverage Decimal     @db.Decimal(10, 2)
+  createdDate        DateTime
+  companyId          Int
+  company            Company?    @relation(fields: [companyId], references: [id])
+  restaurantId       Int?
+  restaurant         Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate])
 }
