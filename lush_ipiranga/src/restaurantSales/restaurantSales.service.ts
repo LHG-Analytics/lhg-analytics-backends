@@ -674,31 +674,6 @@ export class RestaurantSalesService {
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
     );
-    // await this.calculateRestaurantRevenueByDrinkCategory(
-    //   parsedStartDateLast7Days,
-    //   parsedEndDateLast7Days,
-    //   PeriodEnum.LAST_7_D,
-    // );
-    // await this.calculateRestaurantRevenueByOthersCategory(
-    //   parsedStartDateLast7Days,
-    //   parsedEndDateLast7Days,
-    //   PeriodEnum.LAST_7_D,
-    // );
-    // await this.calculateRestaurantRevenueByFoodCategoryPercent(
-    //   parsedStartDateLast7Days,
-    //   parsedEndDateLast7Days,
-    //   PeriodEnum.LAST_7_D,
-    // );
-    // await this.calculateRestaurantRevenueByDrinkCategoryPercent(
-    //   parsedStartDateLast7Days,
-    //   parsedEndDateLast7Days,
-    //   PeriodEnum.LAST_7_D,
-    // );
-    // await this.calculateRestaurantRevenueByOthersCategoryPercent(
-    //   parsedStartDateLast7Days,
-    //   parsedEndDateLast7Days,
-    //   PeriodEnum.LAST_7_D,
-    // );
 
     const endTimeLast7Days = moment()
       .tz(timezone)
@@ -783,31 +758,6 @@ export class RestaurantSalesService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
-    // await this.calculateRestaurantRevenueByDrinkCategory(
-    //   parsedStartDateLast30Days,
-    //   parsedEndDateLast30Days,
-    //   PeriodEnum.LAST_30_D,
-    // );
-    // await this.calculateRestaurantRevenueByOthersCategory(
-    //   parsedStartDateLast30Days,
-    //   parsedEndDateLast30Days,
-    //   PeriodEnum.LAST_30_D,
-    // );
-    // await this.calculateRestaurantRevenueByFoodCategoryPercent(
-    //   parsedStartDateLast30Days,
-    //   parsedEndDateLast30Days,
-    //   PeriodEnum.LAST_30_D,
-    // );
-    // await this.calculateRestaurantRevenueByDrinkCategoryPercent(
-    //   parsedStartDateLast30Days,
-    //   parsedEndDateLast30Days,
-    //   PeriodEnum.LAST_30_D,
-    // );
-    // await this.calculateRestaurantRevenueByOthersCategoryPercent(
-    //   parsedStartDateLast30Days,
-    //   parsedEndDateLast30Days,
-    //   PeriodEnum.LAST_30_D,
-    // );
 
     const endTimeLast30Days = moment()
       .tz(timezone)
@@ -892,31 +842,6 @@ export class RestaurantSalesService {
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
-    // await this.calculateRestaurantRevenueByDrinkCategory(
-    //   parsedStartDateLast6Months,
-    //   parsedEndDateLast6Months,
-    //   PeriodEnum.LAST_6_M,
-    // );
-    // await this.calculateRestaurantRevenueByOthersCategory(
-    //   parsedStartDateLast6Months,
-    //   parsedEndDateLast6Months,
-    //   PeriodEnum.LAST_6_M,
-    // );
-    // await this.calculateRestaurantRevenueByFoodCategoryPercent(
-    //   parsedStartDateLast6Months,
-    //   parsedEndDateLast6Months,
-    //   PeriodEnum.LAST_6_M,
-    // );
-    // await this.calculateRestaurantRevenueByDrinkCategoryPercent(
-    //   parsedStartDateLast6Months,
-    //   parsedEndDateLast6Months,
-    //   PeriodEnum.LAST_6_M,
-    // );
-    // await this.calculateRestaurantRevenueByOthersCategoryPercent(
-    //   parsedStartDateLast6Months,
-    //   parsedEndDateLast6Months,
-    //   PeriodEnum.LAST_6_M,
-    // );
 
     const endTimeLast6Months = moment()
       .tz(timezone)
