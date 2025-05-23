@@ -64,9 +64,7 @@ model Company {
   RestaurantRevenueByOthersCategoryPercent      RestaurantRevenueByOthersCategoryPercent[]
   RestaurantSalesByFoodCategory                 RestaurantSalesByFoodCategory[]
   RestaurantSalesByDrinkCategory                RestaurantSalesByDrinkCategory[]
-  RestaurantSalesByDrinkCategoryPercent         RestaurantSalesByDrinkCategoryPercent[]
   RestaurantSalesByOthersCategory               RestaurantSalesByOthersCategory[]
-  RestaurantSalesByOthersCategoryPercent        RestaurantSalesByOthersCategoryPercent[]
   RestaurantTicketAverage                       RestaurantTicketAverage[]
   RestaurantTicketAverageByTotalRentals         RestaurantTicketAverageByTotalRentals[]
   RestaurantTicketAverageByTotalRentalsByPeriod RestaurantTicketAverageByTotalRentalsByPeriod[]
@@ -670,9 +668,7 @@ model Restaurant {
   RestaurantRevenueByOthersCategoryPercent      RestaurantRevenueByOthersCategoryPercent[]
   RestaurantSalesByFoodCategory                 RestaurantSalesByFoodCategory[]
   RestaurantSalesByDrinkCategory                RestaurantSalesByDrinkCategory[]
-  RestaurantSalesByDrinkCategoryPercent         RestaurantSalesByDrinkCategoryPercent[]
   RestaurantSalesByOthersCategory               RestaurantSalesByOthersCategory[]
-  RestaurantSalesByOthersCategoryPercent        RestaurantSalesByOthersCategoryPercent[]
   RestaurantTicketAverage                       RestaurantTicketAverage[]
   RestaurantTicketAverageByTotalRentals         RestaurantTicketAverageByTotalRentals[]
   RestaurantTicketAverageByTotalRentalsByPeriod RestaurantTicketAverageByTotalRentalsByPeriod[]
@@ -864,25 +860,13 @@ model RestaurantSalesByFoodCategory {
 }
 
 model RestaurantSalesByDrinkCategory {
-  id            Int         @id @default(autoincrement())
-  period        PeriodEnum?
-  totalSale     Int
-  createdDate   DateTime
-  drinkCategory String
-  companyId     Int
-  company       Company?    @relation(fields: [companyId], references: [id])
-  restaurantId  Int?
-  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
-
-  @@unique([period, createdDate, drinkCategory])
-}
-
-model RestaurantSalesByDrinkCategoryPercent {
   id               Int         @id @default(autoincrement())
   period           PeriodEnum?
-  totalSalePercent Decimal     @db.Decimal(10, 2)
+  totalSale        Int
   createdDate      DateTime
   drinkCategory    String
+  totalAllSales    Int
+  totalSalePercent Decimal     @db.Decimal(10, 2)
   companyId        Int
   company          Company?    @relation(fields: [companyId], references: [id])
   restaurantId     Int?
@@ -892,25 +876,12 @@ model RestaurantSalesByDrinkCategoryPercent {
 }
 
 model RestaurantSalesByOthersCategory {
-  id             Int         @id @default(autoincrement())
-  period         PeriodEnum?
-  totalSales     Int
-  createdDate    DateTime
-  othersCategory String
-  companyId      Int
-  company        Company?    @relation(fields: [companyId], references: [id])
-  restaurantId   Int?
-  restaurant     Restaurant? @relation(fields: [restaurantId], references: [id])
-
-  @@unique([period, createdDate, othersCategory])
-}
-
-model RestaurantSalesByOthersCategoryPercent {
   id                Int         @id @default(autoincrement())
   period            PeriodEnum?
-  totalSalesPercent Decimal     @db.Decimal(10, 2)
+  totalSales        Int
   createdDate       DateTime
   othersCategory    String
+  totalSalesPercent Decimal     @db.Decimal(10, 2)
   companyId         Int
   company           Company?    @relation(fields: [companyId], references: [id])
   restaurantId      Int?
