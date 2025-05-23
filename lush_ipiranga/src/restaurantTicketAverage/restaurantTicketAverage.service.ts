@@ -9,6 +9,7 @@ import * as moment from 'moment-timezone';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   RestaurantTicketAverage,
+  RestaurantTicketAverageByPeriod,
   RestaurantTicketAverageByTotalRentals,
 } from './entities/restaurantTicketAverage.entity';
 
@@ -367,6 +368,195 @@ export class RestaurantTicketAverageService {
     );
   }
 
+  async calculateRestaurantTicketAverageByPeriod(
+    startDate: Date,
+    endDate: Date,
+    period?: PeriodEnum,
+  ): Promise<any> {
+    try {
+      const companyId = 1;
+
+      // Ajustar a endDate para o final do dia anterior
+      const adjustedEndDate = new Date(endDate);
+      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Subtrai um dia
+      adjustedEndDate.setUTCHours(23, 59, 59, 999); // Define o final do dia
+
+      // Iniciar currentDate no início do dia da startDate
+      let currentDate = new Date(startDate);
+      currentDate.setUTCHours(0, 0, 0, 0); // Início do dia contábil às 00:00:00
+
+      const abProductTypes = [
+        '07 - CAFE DA MANHA E CHA',
+        '08 - ADICIONAIS',
+        '09 - PETISCOS',
+        '10 - ENTRADAS',
+        '11 - LANCHES',
+        '12 - PRATOS PRINCIPAIS',
+        '13 - ACOMPANHAMENTOS',
+        '14 - SOBREMESAS',
+        '15 - BOMBONIERE',
+        '01 - SOFT DRINKS',
+        '02 - CERVEJAS',
+        '03 - COQUETEIS',
+        '04 - DOSES',
+        '05 - GARRAFAS',
+        '06 - VINHOS E ESPUMANTES',
+      ];
+
+      let totalABNetRevenue = new Prisma.Decimal(0);
+      let totalRentals = 0;
+
+      while (currentDate <= adjustedEndDate) {
+        let nextDate = new Date(currentDate);
+
+        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+          nextDate.setDate(nextDate.getDate() + 1);
+          nextDate.setUTCHours(0, 0, 0, 0);
+        } else if (period === PeriodEnum.LAST_6_M) {
+          currentDate.setDate(currentDate.getDate() - 1); // Ajuste para último dia do mês anterior
+          currentDate.setUTCHours(23, 59, 59, 999);
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          nextDate.setUTCHours(0, 0, 0, 0);
+        }
+
+        const [allRentalApartments] = await this.fetchKpiData(
+          currentDate,
+          nextDate,
+        );
+
+        if (!allRentalApartments || allRentalApartments.length === 0) {
+          currentDate = new Date(nextDate);
+          continue;
+        }
+
+        const stockOutIds = allRentalApartments
+          .map((r) => r.saleLease?.stockOutId)
+          .filter((id) => id !== undefined);
+
+        const stockOutSaleLeases =
+          await this.prisma.prismaLocal.stockOut.findMany({
+            where: { id: { in: stockOutIds } },
+            include: {
+              stockOutItem: {
+                where: { canceled: null },
+                select: {
+                  priceSale: true,
+                  quantity: true,
+                  stockOutId: true,
+                  productStock: {
+                    select: {
+                      product: {
+                        select: {
+                          typeProduct: {
+                            select: {
+                              description: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              sale: {
+                select: {
+                  discount: true,
+                },
+              },
+            },
+          });
+
+        const stockOutMap = new Map<number, any>();
+        stockOutSaleLeases.forEach((s) => {
+          stockOutMap.set(s.id, s);
+        });
+
+        let currentPeriodNetRevenue = new Prisma.Decimal(0);
+
+        for (const rentalApartment of allRentalApartments) {
+          const saleLease = rentalApartment.saleLease;
+          if (!saleLease?.stockOutId) continue;
+
+          const stockOut = stockOutMap.get(saleLease.stockOutId);
+          if (!stockOut?.stockOutItem?.length) continue;
+
+          let abItemTotal = new Prisma.Decimal(0);
+
+          for (const item of stockOut.stockOutItem) {
+            const description =
+              item.productStock?.product?.typeProduct?.description;
+            if (description && abProductTypes.includes(description)) {
+              const price = new Prisma.Decimal(item.priceSale || 0);
+              const quantity = new Prisma.Decimal(item.quantity || 0);
+              abItemTotal = abItemTotal.plus(price.times(quantity));
+            }
+          }
+
+          const discount = stockOut.sale?.discount
+            ? new Prisma.Decimal(stockOut.sale.discount)
+            : new Prisma.Decimal(0);
+
+          const netValue = abItemTotal.minus(discount);
+          currentPeriodNetRevenue = currentPeriodNetRevenue.plus(netValue);
+        }
+
+        const currentPeriodRentals = allRentalApartments.length;
+
+        const ticketAverage =
+          currentPeriodRentals > 0
+            ? currentPeriodNetRevenue.div(currentPeriodRentals)
+            : new Prisma.Decimal(0);
+
+        await this.insertRestaurantTicketAverageByPeriod({
+          totalTicketAverage: ticketAverage,
+          companyId,
+          period,
+          createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)),
+        });
+
+        totalABNetRevenue = totalABNetRevenue.plus(currentPeriodNetRevenue);
+        totalRentals += currentPeriodRentals;
+
+        currentDate = new Date(nextDate);
+      }
+
+      const finalAverage =
+        totalRentals > 0
+          ? totalABNetRevenue.div(totalRentals)
+          : new Prisma.Decimal(0);
+
+      return {
+        totalNetRevenue: totalABNetRevenue.toNumber(),
+        totalRentals,
+        ticketAverage: finalAverage.toNumber(),
+      };
+    } catch (error) {
+      console.error('Erro ao calcular ticket médio de A&B:', error);
+      throw new BadRequestException(
+        `Erro ao calcular ticket médio de A&B: ${error.message}`,
+      );
+    }
+  }
+
+  private async insertRestaurantTicketAverageByPeriod(
+    data: RestaurantTicketAverageByPeriod,
+  ): Promise<RestaurantTicketAverageByPeriod> {
+    return this.prisma.prismaOnline.restaurantTicketAverageByPeriod.upsert({
+      where: {
+        period_createdDate: {
+          period: data.period,
+          createdDate: data.createdDate,
+        },
+      },
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
+  }
+
   @Cron('0 0 * * *', { disabled: true })
   async handleCron() {
     const timezone = 'America/Sao_Paulo'; // Defina seu fuso horário
@@ -429,6 +619,16 @@ export class RestaurantTicketAverageService {
       PeriodEnum.LAST_7_D,
     );
     await this.calculateRestaurantTicketAverageByTotalRentals(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
+    await this.calculateRestaurantTicketAverageByTotalRentals(
+      previousParsedStartDateLast7Days,
+      previousParsedEndDateLast7DaysParsed,
+      PeriodEnum.LAST_7_D,
+    );
+    await this.calculateRestaurantTicketAverageByPeriod(
       parsedStartDateLast7Days,
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
@@ -502,6 +702,16 @@ export class RestaurantTicketAverageService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
+    await this.calculateRestaurantTicketAverageByTotalRentals(
+      previousParsedStartDateLast30Days,
+      previousParsedEndDateLast30DaysParsed,
+      PeriodEnum.LAST_30_D,
+    );
+    await this.calculateRestaurantTicketAverageByPeriod(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
 
     const endTimeLast30Days = moment()
       .tz(timezone)
@@ -567,6 +777,16 @@ export class RestaurantTicketAverageService {
       PeriodEnum.LAST_6_M,
     );
     await this.calculateRestaurantTicketAverageByTotalRentals(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateRestaurantTicketAverageByTotalRentals(
+      previousParsedStartDateLast6Months,
+      previousParsedEndDateLast6MonthsParsed,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateRestaurantTicketAverageByPeriod(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
