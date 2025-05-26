@@ -51,16 +51,6 @@ export class RestaurantRevenueByFoodCategory
   period?: PeriodEnum;
   totalValue: Prisma.Decimal;
   totalAllValue: Prisma.Decimal;
-}
-
-export class RestaurantRevenueByFoodCategoryPercent
-  implements Prisma.RestaurantRevenueByFoodCategoryPercentUncheckedCreateInput
-{
-  id?: number;
-  companyId: number;
-  createdDate: Date;
-  foodCategory: string;
-  period?: PeriodEnum;
   totalValuePercent: Prisma.Decimal;
 }
 
@@ -74,16 +64,6 @@ export class RestaurantRevenueByDrinkCategory
   period?: PeriodEnum;
   totalValue: Prisma.Decimal;
   totalAllValue: Prisma.Decimal;
-}
-
-export class RestaurantRevenueByDrinkCategoryPercent
-  implements Prisma.RestaurantRevenueByDrinkCategoryPercentUncheckedCreateInput
-{
-  id?: number;
-  companyId: number;
-  createdDate: Date;
-  drinkCategory: string;
-  period?: PeriodEnum;
   totalValuePercent: Prisma.Decimal;
 }
 
@@ -97,15 +77,5 @@ export class RestaurantRevenueByOthersCategory
   period?: PeriodEnum;
   totalValue: Prisma.Decimal;
   totalAllValue: Prisma.Decimal;
-}
-
-export class RestaurantRevenueByOthersCategoryPercent
-  implements Prisma.RestaurantRevenueByOthersCategoryPercentUncheckedCreateInput
-{
-  id?: number;
-  companyId: number;
-  createdDate: Date;
-  othersCategory: string;
-  period?: PeriodEnum;
   totalValuePercent: Prisma.Decimal;
 }

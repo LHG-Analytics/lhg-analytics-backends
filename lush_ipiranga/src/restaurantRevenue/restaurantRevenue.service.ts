@@ -10,12 +10,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   RestaurantRevenue,
   RestaurantRevenueByDrinkCategory,
-  RestaurantRevenueByDrinkCategoryPercent,
   RestaurantRevenueByFoodCategory,
-  RestaurantRevenueByFoodCategoryPercent,
   RestaurantRevenueByGroupByPeriod,
   RestaurantRevenueByOthersCategory,
-  RestaurantRevenueByOthersCategoryPercent,
   RestaurantRevenueByPeriod,
   RestaurantRevenueByPeriodPercent,
 } from './entities/restaurantRevenue.entity';
@@ -926,6 +923,12 @@ export class RestaurantRevenueService {
         }
       }
 
+      //calcular total geral para calcular % depois
+      const finalTotalGeneral = Object.values(finalTotalByCategory).reduce(
+        (acc, val) => acc.plus(val),
+        new Prisma.Decimal(0),
+      );
+
       // 🔁 2ª PASSAGEM: iterar por dia/mês normalmente
       let currentDate = new Date(startDate);
       currentDate.setUTCHours(0, 0, 0, 0);
@@ -1034,12 +1037,19 @@ export class RestaurantRevenueService {
           const createdDate = new Date(displayDate);
           createdDate.setUTCHours(5, 59, 59, 999);
 
+          const totalValuePercent = finalTotalGeneral.gt(0)
+            ? finalTotalByCategory[category].dividedBy(finalTotalGeneral)
+            : new Prisma.Decimal(0);
+
           await this.insertRestaurantRevenueByFoodCategory({
             period,
             createdDate,
             foodCategory: category,
-            totalValue: new Prisma.Decimal(totalByCategory[category]), // dia ou mês
-            totalAllValue: new Prisma.Decimal(finalTotalByCategory[category]), // sempre fixo
+            totalValue: new Prisma.Decimal(totalByCategory[category]),
+            totalAllValue: new Prisma.Decimal(finalTotalByCategory[category]),
+            totalValuePercent: new Prisma.Decimal(
+              totalValuePercent.times(100).toFixed(2),
+            ),
             companyId,
           });
         }
@@ -1189,6 +1199,12 @@ export class RestaurantRevenueService {
         }
       }
 
+      //calcular total geral para calcular % depois
+      const finalTotalGeneral = Object.values(finalTotalByCategory).reduce(
+        (acc, val) => acc.plus(val),
+        new Prisma.Decimal(0),
+      );
+
       // 🔁 2ª PASSAGEM: iterar por dia/mês normalmente
       let currentDate = new Date(startDate);
       currentDate.setUTCHours(0, 0, 0, 0);
@@ -1297,12 +1313,19 @@ export class RestaurantRevenueService {
           const createdDate = new Date(displayDate);
           createdDate.setUTCHours(5, 59, 59, 999);
 
+          const totalValuePercent = finalTotalGeneral.gt(0)
+            ? finalTotalByCategory[category].dividedBy(finalTotalGeneral)
+            : new Prisma.Decimal(0);
+
           await this.insertRestaurantRevenueByDrinkCategory({
             period,
             createdDate,
             drinkCategory: category,
             totalValue: new Prisma.Decimal(totalByCategory[category]), // dia ou mês
             totalAllValue: new Prisma.Decimal(finalTotalByCategory[category]), // sempre fixo
+            totalValuePercent: new Prisma.Decimal(
+              totalValuePercent.times(100).toFixed(2),
+            ),
             companyId,
           });
         }
@@ -1451,6 +1474,12 @@ export class RestaurantRevenueService {
         }
       }
 
+      //calcular total geral para calcular % depois
+      const finalTotalGeneral = Object.values(finalTotalByCategory).reduce(
+        (acc, val) => acc.plus(val),
+        new Prisma.Decimal(0),
+      );
+
       // 🔁 2ª PASSAGEM: iterar por dia/mês normalmente
       let currentDate = new Date(startDate);
       currentDate.setUTCHours(0, 0, 0, 0);
@@ -1559,12 +1588,19 @@ export class RestaurantRevenueService {
           const createdDate = new Date(displayDate);
           createdDate.setUTCHours(5, 59, 59, 999);
 
+          const totalValuePercent = finalTotalGeneral.gt(0)
+            ? finalTotalByCategory[category].dividedBy(finalTotalGeneral)
+            : new Prisma.Decimal(0);
+
           await this.insertRestaurantRevenueByOthersCategory({
             period,
             createdDate,
             othersCategory: category,
             totalValue: new Prisma.Decimal(totalByCategory[category]), // dia ou mês
             totalAllValue: new Prisma.Decimal(finalTotalByCategory[category]), // sempre fixo
+            totalValuePercent: new Prisma.Decimal(
+              totalValuePercent.times(100).toFixed(2),
+            ),
             companyId,
           });
         }
@@ -1600,418 +1636,6 @@ export class RestaurantRevenueService {
         ...data,
       },
     });
-  }
-
-  private async calculateRestaurantRevenueByFoodCategoryPercent(
-    startDate: Date,
-    endDate: Date,
-    period: PeriodEnum,
-  ): Promise<any> {
-    try {
-      const companyId = 1;
-
-      const categories: string[] = [
-        '07 - CAFE DA MANHA E CHA',
-        '09 - PETISCOS',
-        '10 - ENTRADAS',
-        '11 - LANCHES',
-        '12 - PRATOS PRINCIPAIS',
-        '13 - ACOMPANHAMENTOS',
-        '14 - SOBREMESAS',
-        '15- BOMBONIERE',
-      ];
-
-      const adjustedEndDate = new Date(endDate);
-      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
-      adjustedEndDate.setUTCHours(23, 59, 59, 999);
-
-      const finalTotalByCategory: { [key: string]: Prisma.Decimal } = {};
-      categories.forEach((category) => {
-        finalTotalByCategory[category] = new Prisma.Decimal(0);
-      });
-
-      const rentalApartments =
-        await this.prisma.prismaLocal.rentalApartment.findMany({
-          where: {
-            checkIn: {
-              gte: startDate.toISOString(),
-              lt: adjustedEndDate.toISOString(),
-            },
-            endOccupationType: 'FINALIZADA',
-          },
-          include: { saleLease: true },
-        });
-
-      const stockOutIds: number[] = rentalApartments
-        .map((r) => r.saleLease?.stockOutId)
-        .filter((id): id is number => !!id);
-
-      const stockOuts =
-        stockOutIds.length > 0
-          ? await this.prisma.prismaLocal.stockOut.findMany({
-              where: { id: { in: stockOutIds } },
-              include: {
-                stockOutItem: {
-                  where: { canceled: null },
-                  include: {
-                    productStock: {
-                      include: {
-                        product: {
-                          include: {
-                            typeProduct: {
-                              select: { description: true },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-                sale: { select: { discount: true } },
-              },
-            })
-          : [];
-
-      let totalRevenue = new Prisma.Decimal(0);
-
-      for (const stockOut of stockOuts) {
-        for (const item of stockOut.stockOutItem) {
-          const price = new Prisma.Decimal(item.priceSale);
-          const quantity = new Prisma.Decimal(item.quantity);
-          const discount = stockOut.sale?.discount
-            ? new Prisma.Decimal(stockOut.sale.discount)
-            : new Prisma.Decimal(0);
-          const total = price.times(quantity).minus(discount);
-
-          const category = item.productStock?.product?.typeProduct?.description;
-          if (category && categories.includes(category)) {
-            finalTotalByCategory[category] =
-              finalTotalByCategory[category].plus(total);
-            totalRevenue = totalRevenue.plus(total);
-          }
-        }
-      }
-
-      const result = [];
-
-      for (const category of categories) {
-        const value = finalTotalByCategory[category];
-        const percent = totalRevenue.greaterThan(0)
-          ? value.dividedBy(totalRevenue).times(100)
-          : new Prisma.Decimal(0);
-
-        const payload = {
-          period,
-          createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // ou ajustado como endDate, etc
-          foodCategory: category,
-          totalValuePercent: new Prisma.Decimal(percent.toFixed(2)),
-          companyId,
-        };
-
-        await this.insertRestaurantRevenueByFoodCategoryPercent(payload);
-        result.push(payload);
-      }
-
-      return result;
-    } catch (error) {
-      console.error('Error calculating food category percentage:', error);
-      throw new Error('Could not calculate revenue percentage');
-    }
-  }
-
-  private async insertRestaurantRevenueByFoodCategoryPercent(
-    data: RestaurantRevenueByFoodCategoryPercent,
-  ): Promise<RestaurantRevenueByFoodCategoryPercent> {
-    return this.prisma.prismaOnline.restaurantRevenueByFoodCategoryPercent.upsert(
-      {
-        where: {
-          period_createdDate_foodCategory: {
-            period: data.period,
-            createdDate: data.createdDate,
-            foodCategory: data.foodCategory,
-          },
-        },
-        create: {
-          ...data,
-        },
-        update: {
-          ...data,
-        },
-      },
-    );
-  }
-
-  private async calculateRestaurantRevenueByDrinkCategoryPercent(
-    startDate: Date,
-    endDate: Date,
-    period: PeriodEnum,
-  ): Promise<any> {
-    try {
-      const companyId = 1;
-
-      const categories: string[] = [
-        '01 - SOFT DRINKS',
-        '02 - CERVEJAS',
-        '03 - COQUETEIS',
-        '04 - DOSES',
-        '05 - GARRAFAS',
-        '06 - VINHOS E ESPUMANTES',
-      ];
-
-      const adjustedEndDate = new Date(endDate);
-      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
-      adjustedEndDate.setUTCHours(23, 59, 59, 999);
-
-      const finalTotalByCategory: { [key: string]: Prisma.Decimal } = {};
-      categories.forEach((category) => {
-        finalTotalByCategory[category] = new Prisma.Decimal(0);
-      });
-
-      const rentalApartments =
-        await this.prisma.prismaLocal.rentalApartment.findMany({
-          where: {
-            checkIn: {
-              gte: startDate.toISOString(),
-              lt: adjustedEndDate.toISOString(),
-            },
-            endOccupationType: 'FINALIZADA',
-          },
-          include: { saleLease: true },
-        });
-
-      const stockOutIds: number[] = rentalApartments
-        .map((r) => r.saleLease?.stockOutId)
-        .filter((id): id is number => !!id);
-
-      const stockOuts =
-        stockOutIds.length > 0
-          ? await this.prisma.prismaLocal.stockOut.findMany({
-              where: { id: { in: stockOutIds } },
-              include: {
-                stockOutItem: {
-                  where: { canceled: null },
-                  include: {
-                    productStock: {
-                      include: {
-                        product: {
-                          include: {
-                            typeProduct: {
-                              select: { description: true },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-                sale: { select: { discount: true } },
-              },
-            })
-          : [];
-
-      let totalRevenue = new Prisma.Decimal(0);
-
-      for (const stockOut of stockOuts) {
-        for (const item of stockOut.stockOutItem) {
-          const price = new Prisma.Decimal(item.priceSale);
-          const quantity = new Prisma.Decimal(item.quantity);
-          const discount = stockOut.sale?.discount
-            ? new Prisma.Decimal(stockOut.sale.discount)
-            : new Prisma.Decimal(0);
-          const total = price.times(quantity).minus(discount);
-
-          const category = item.productStock?.product?.typeProduct?.description;
-          if (category && categories.includes(category)) {
-            finalTotalByCategory[category] =
-              finalTotalByCategory[category].plus(total);
-            totalRevenue = totalRevenue.plus(total);
-          }
-        }
-      }
-
-      const result = [];
-
-      for (const category of categories) {
-        const value = finalTotalByCategory[category];
-        const percent = totalRevenue.greaterThan(0)
-          ? value.dividedBy(totalRevenue).times(100)
-          : new Prisma.Decimal(0);
-
-        const payload = {
-          period,
-          createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // ou ajustado como endDate, etc
-          drinkCategory: category,
-          totalValuePercent: new Prisma.Decimal(percent.toFixed(2)),
-          companyId,
-        };
-
-        await this.insertRestaurantRevenueByDrinkCategoryPercent(payload);
-        result.push(payload);
-      }
-
-      return result;
-    } catch (error) {
-      console.error('Error calculating food category percentage:', error);
-      throw new Error('Could not calculate revenue percentage');
-    }
-  }
-
-  private async insertRestaurantRevenueByDrinkCategoryPercent(
-    data: RestaurantRevenueByDrinkCategoryPercent,
-  ): Promise<RestaurantRevenueByDrinkCategoryPercent> {
-    return this.prisma.prismaOnline.restaurantRevenueByDrinkCategoryPercent.upsert(
-      {
-        where: {
-          period_createdDate_drinkCategory: {
-            period: data.period,
-            createdDate: data.createdDate,
-            drinkCategory: data.drinkCategory,
-          },
-        },
-        create: {
-          ...data,
-        },
-        update: {
-          ...data,
-        },
-      },
-    );
-  }
-
-  private async calculateRestaurantRevenueByOthersCategoryPercent(
-    startDate: Date,
-    endDate: Date,
-    period: PeriodEnum,
-  ): Promise<any> {
-    try {
-      const companyId = 1;
-
-      const categories: string[] = [
-        '16 - PRODUTOS EROTICOS',
-        '17 - CONVENIENCIA E HIGIENE',
-        'ITENS EXTRAS',
-        'RESERVAS',
-        'SOUVENIR',
-      ];
-
-      const adjustedEndDate = new Date(endDate);
-      adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
-      adjustedEndDate.setUTCHours(23, 59, 59, 999);
-
-      const finalTotalByCategory: { [key: string]: Prisma.Decimal } = {};
-      categories.forEach((category) => {
-        finalTotalByCategory[category] = new Prisma.Decimal(0);
-      });
-
-      const rentalApartments =
-        await this.prisma.prismaLocal.rentalApartment.findMany({
-          where: {
-            checkIn: {
-              gte: startDate.toISOString(),
-              lt: adjustedEndDate.toISOString(),
-            },
-            endOccupationType: 'FINALIZADA',
-          },
-          include: { saleLease: true },
-        });
-
-      const stockOutIds: number[] = rentalApartments
-        .map((r) => r.saleLease?.stockOutId)
-        .filter((id): id is number => !!id);
-
-      const stockOuts =
-        stockOutIds.length > 0
-          ? await this.prisma.prismaLocal.stockOut.findMany({
-              where: { id: { in: stockOutIds } },
-              include: {
-                stockOutItem: {
-                  where: { canceled: null },
-                  include: {
-                    productStock: {
-                      include: {
-                        product: {
-                          include: {
-                            typeProduct: {
-                              select: { description: true },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-                sale: { select: { discount: true } },
-              },
-            })
-          : [];
-
-      let totalRevenue = new Prisma.Decimal(0);
-
-      for (const stockOut of stockOuts) {
-        for (const item of stockOut.stockOutItem) {
-          const price = new Prisma.Decimal(item.priceSale);
-          const quantity = new Prisma.Decimal(item.quantity);
-          const discount = stockOut.sale?.discount
-            ? new Prisma.Decimal(stockOut.sale.discount)
-            : new Prisma.Decimal(0);
-          const total = price.times(quantity).minus(discount);
-
-          const category = item.productStock?.product?.typeProduct?.description;
-          if (category && categories.includes(category)) {
-            finalTotalByCategory[category] =
-              finalTotalByCategory[category].plus(total);
-            totalRevenue = totalRevenue.plus(total);
-          }
-        }
-      }
-
-      const result = [];
-
-      for (const category of categories) {
-        const value = finalTotalByCategory[category];
-        const percent = totalRevenue.greaterThan(0)
-          ? value.dividedBy(totalRevenue).times(100)
-          : new Prisma.Decimal(0);
-
-        const payload = {
-          period,
-          createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // ou ajustado como endDate, etc
-          othersCategory: category,
-          totalValuePercent: new Prisma.Decimal(percent.toFixed(2)),
-          companyId,
-        };
-
-        await this.insertRestaurantRevenueByOtherCategoryPercent(payload);
-        result.push(payload);
-      }
-
-      return result;
-    } catch (error) {
-      console.error('Error calculating food category percentage:', error);
-      throw new Error('Could not calculate revenue percentage');
-    }
-  }
-
-  private async insertRestaurantRevenueByOtherCategoryPercent(
-    data: RestaurantRevenueByOthersCategoryPercent,
-  ): Promise<RestaurantRevenueByOthersCategoryPercent> {
-    return this.prisma.prismaOnline.restaurantRevenueByOthersCategoryPercent.upsert(
-      {
-        where: {
-          period_createdDate_othersCategory: {
-            period: data.period,
-            createdDate: data.createdDate,
-            othersCategory: data.othersCategory,
-          },
-        },
-        create: {
-          ...data,
-        },
-        update: {
-          ...data,
-        },
-      },
-    );
   }
 
   @Cron('0 0 * * *', { disabled: true })
@@ -2101,21 +1725,6 @@ export class RestaurantRevenueService {
       PeriodEnum.LAST_7_D,
     );
     await this.calculateRestaurantRevenueByOthersCategory(
-      parsedStartDateLast7Days,
-      parsedEndDateLast7Days,
-      PeriodEnum.LAST_7_D,
-    );
-    await this.calculateRestaurantRevenueByFoodCategoryPercent(
-      parsedStartDateLast7Days,
-      parsedEndDateLast7Days,
-      PeriodEnum.LAST_7_D,
-    );
-    await this.calculateRestaurantRevenueByDrinkCategoryPercent(
-      parsedStartDateLast7Days,
-      parsedEndDateLast7Days,
-      PeriodEnum.LAST_7_D,
-    );
-    await this.calculateRestaurantRevenueByOthersCategoryPercent(
       parsedStartDateLast7Days,
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
@@ -2214,21 +1823,6 @@ export class RestaurantRevenueService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
-    await this.calculateRestaurantRevenueByFoodCategoryPercent(
-      parsedStartDateLast30Days,
-      parsedEndDateLast30Days,
-      PeriodEnum.LAST_30_D,
-    );
-    await this.calculateRestaurantRevenueByDrinkCategoryPercent(
-      parsedStartDateLast30Days,
-      parsedEndDateLast30Days,
-      PeriodEnum.LAST_30_D,
-    );
-    await this.calculateRestaurantRevenueByOthersCategoryPercent(
-      parsedStartDateLast30Days,
-      parsedEndDateLast30Days,
-      PeriodEnum.LAST_30_D,
-    );
 
     const endTimeLast30Days = moment()
       .tz(timezone)
@@ -2319,21 +1913,6 @@ export class RestaurantRevenueService {
       PeriodEnum.LAST_6_M,
     );
     await this.calculateRestaurantRevenueByOthersCategory(
-      parsedStartDateLast6Months,
-      parsedEndDateLast6Months,
-      PeriodEnum.LAST_6_M,
-    );
-    await this.calculateRestaurantRevenueByFoodCategoryPercent(
-      parsedStartDateLast6Months,
-      parsedEndDateLast6Months,
-      PeriodEnum.LAST_6_M,
-    );
-    await this.calculateRestaurantRevenueByDrinkCategoryPercent(
-      parsedStartDateLast6Months,
-      parsedEndDateLast6Months,
-      PeriodEnum.LAST_6_M,
-    );
-    await this.calculateRestaurantRevenueByOthersCategoryPercent(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,

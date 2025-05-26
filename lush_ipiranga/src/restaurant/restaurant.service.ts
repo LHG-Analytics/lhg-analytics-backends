@@ -120,12 +120,9 @@ export class RestaurantService {
       RestaurantRevenueByGroupByPeriod,
       RestaurantRevenueByFoodCategory,
       RestaurantRevenueByDrinkCategory,
-      RestaurantRevenueByDrinkCategoryPercent,
       RestaurantSalesByDrinkCategory,
       RestaurantRevenueByOthersCategory,
-      RestaurantRevenueByOthersCategoryPercent,
       RestaurantSalesByOthersCategory,
-      RestaurantRevenueByFoodCategoryPercent,
       RestaurantSalesByFoodCategory,
     ] = await this.prisma.prismaOnline.$transaction([
       this.prisma.prismaOnline.restaurantRevenue.findMany({
@@ -360,6 +357,7 @@ export class RestaurantService {
           totalValue: true,
           foodCategory: true,
           totalAllValue: true,
+          totalValuePercent: true,
         },
         orderBy: {
           createdDate: 'desc',
@@ -379,30 +377,12 @@ export class RestaurantService {
           totalValue: true,
           totalAllValue: true,
           drinkCategory: true,
+          totalValuePercent: true,
         },
         orderBy: {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.restaurantRevenueByDrinkCategoryPercent.findMany(
-        {
-          where: {
-            period: period,
-            createdDate: {
-              gte: endDate,
-            },
-          },
-          select: {
-            createdDate: true,
-            period: true,
-            totalValuePercent: true,
-            drinkCategory: true,
-          },
-          orderBy: {
-            createdDate: 'desc',
-          },
-        },
-      ),
       this.prisma.prismaOnline.restaurantSalesByDrinkCategory.findMany({
         where: {
           period: period,
@@ -436,30 +416,12 @@ export class RestaurantService {
           totalValue: true,
           totalAllValue: true,
           othersCategory: true,
+          totalValuePercent: true,
         },
         orderBy: {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.restaurantRevenueByOthersCategoryPercent.findMany(
-        {
-          where: {
-            period: period,
-            createdDate: {
-              gte: endDate,
-            },
-          },
-          select: {
-            createdDate: true,
-            period: true,
-            totalValuePercent: true,
-            othersCategory: true,
-          },
-          orderBy: {
-            createdDate: 'desc',
-          },
-        },
-      ),
       this.prisma.prismaOnline.restaurantSalesByOthersCategory.findMany({
         where: {
           period: period,
@@ -474,23 +436,6 @@ export class RestaurantService {
           totalSales: true,
           totalSalesPercent: true,
           othersCategory: true,
-        },
-        orderBy: {
-          createdDate: 'desc',
-        },
-      }),
-      this.prisma.prismaOnline.restaurantRevenueByFoodCategoryPercent.findMany({
-        where: {
-          period: period,
-          createdDate: {
-            gte: endDate,
-          },
-        },
-        select: {
-          createdDate: true,
-          period: true,
-          totalValuePercent: true,
-          foodCategory: true,
         },
         orderBy: {
           createdDate: 'desc',
@@ -826,7 +771,7 @@ export class RestaurantService {
     }
 
     // Preencher com dados de percentual de receita
-    for (const revenuePercent of RestaurantRevenueByDrinkCategoryPercent) {
+    for (const revenuePercent of RestaurantRevenueByDrinkCategory) {
       const category = revenuePercent.drinkCategory;
       if (reportByDrinks[category]) {
         reportByDrinks[category].revenuePercent = Number(
@@ -855,9 +800,9 @@ export class RestaurantService {
         .reduce((sum, [, data]) => sum + data.revenue, 0),
 
       revenuePercent: Math.round(
-        RestaurantRevenueByDrinkCategoryPercent.filter(
-          (item) => item.drinkCategory !== totalCategory,
-        ).reduce((sum, item) => sum + Number(item.totalValuePercent || 0), 0),
+        Object.entries(reportByDrinks)
+          .filter(([category]) => category !== totalCategory)
+          .reduce((sum, [, data]) => sum + Number(data.revenuePercent || 0), 0),
       ),
 
       quantity:
@@ -895,7 +840,7 @@ export class RestaurantService {
     }
 
     // Preencher com dados de percentual de receita
-    for (const revenuePercent of RestaurantRevenueByOthersCategoryPercent) {
+    for (const revenuePercent of RestaurantRevenueByOthersCategory) {
       const category = revenuePercent.othersCategory;
       if (reportByOthers[category]) {
         reportByOthers[category].revenuePercent = Number(
@@ -924,9 +869,9 @@ export class RestaurantService {
         .reduce((sum, [, data]) => sum + data.revenue, 0),
 
       revenuePercent: Math.round(
-        RestaurantRevenueByOthersCategoryPercent.filter(
-          (item) => item.othersCategory !== totalCategoryOthers,
-        ).reduce((sum, item) => sum + Number(item.totalValuePercent || 0), 0),
+        Object.entries(reportByOthers)
+          .filter(([category]) => category !== totalCategory)
+          .reduce((sum, [, data]) => sum + Number(data.revenuePercent || 0), 0),
       ),
 
       quantity:
@@ -941,7 +886,7 @@ export class RestaurantService {
         ).reduce((sum, item) => sum + Number(item.totalSalesPercent || 0), 0),
       ),
     };
-    //------------------
+
     const reportByFood: Record<
       string,
       {
@@ -964,7 +909,7 @@ export class RestaurantService {
     }
 
     // Preencher com dados de percentual de receita
-    for (const revenuePercent of RestaurantRevenueByFoodCategoryPercent) {
+    for (const revenuePercent of RestaurantRevenueByFoodCategory) {
       const category = revenuePercent.foodCategory;
       if (reportByFood[category]) {
         reportByFood[category].revenuePercent = Number(
@@ -993,9 +938,9 @@ export class RestaurantService {
         .reduce((sum, [, data]) => sum + data.revenue, 0),
 
       revenuePercent: Math.round(
-        RestaurantRevenueByFoodCategoryPercent.filter(
-          (item) => item.foodCategory !== totalCategoryFood,
-        ).reduce((sum, item) => sum + Number(item.totalValuePercent || 0), 0),
+        Object.entries(reportByFood)
+          .filter(([category]) => category !== totalCategory)
+          .reduce((sum, [, data]) => sum + Number(data.revenuePercent || 0), 0),
       ),
 
       quantity:
