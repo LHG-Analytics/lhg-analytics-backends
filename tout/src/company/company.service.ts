@@ -1505,8 +1505,8 @@ export class CompanyService {
   }
 
   async calculateKpisByDateRange(startDate: Date, endDate: Date) {
-    console.log('startDate:', startDate);
-    console.log('endDate:', endDate);
+    console.log('startDate custom data:', startDate);
+    console.log('endDate custom data:', endDate);
 
     const [
       allRentalApartments,
