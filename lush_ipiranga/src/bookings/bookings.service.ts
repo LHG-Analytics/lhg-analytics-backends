@@ -112,8 +112,8 @@ export class BookingsService {
         return createdDate.date() === dayOfMonth; // Verifica se o dia do mês é o mesmo
       });
     };
-    // Consultas para buscar os dados de KPIs com base nas datas selecionadas
 
+    // Consultas para buscar os dados de KPIs com base nas datas selecionadas
     const [
       BookingsRevenue,
       BookingsRevenuePreviousData,

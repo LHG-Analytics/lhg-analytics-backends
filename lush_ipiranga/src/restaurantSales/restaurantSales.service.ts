@@ -148,6 +148,40 @@ export class RestaurantSalesService {
       adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
       adjustedEndDate.setUTCHours(23, 59, 59, 999);
 
+      // Lista de produtos permitidos (formato exato dos descriptions)
+      const allowedProducts = [
+        'CAFE PREMIUM',
+        'LUSH BURGER',
+        'MIX DE PASTEIS',
+        'RISOTO COM ESCALOPE DE FILE MIGNON',
+        'SALMAO AL LIMONE',
+        'CAFE LUSH',
+        'PICANHA (CORTES ESPECIAIS)',
+        'FILE MIGNON (CORTES ESPECIAIS)',
+        'BRUNCH',
+        'CUBOS DE MIGNON AO MOLHO DE CERVEJA PRETA',
+        'QUADRADINHOS DE TAPIOCA',
+        'TABUA DE FRIOS',
+        'MIX DE BRUSCHETTAS',
+        'FRITAS COM MOLHO DE QUEIJO',
+        'STEAK TARTARE COM CHIPS DE BATATA DOCE',
+        'MOQUECA VEGANA',
+        'VEGAN BURGER',
+        'FILE DE FRANGO (CORTES ESPECIAIS)',
+        'TILAPIA (CORTES ESPECIAIS)',
+        'LUSH SHAKE',
+        'NEW YORK CHEESECAKE',
+        'SALADA LUSH',
+        'MOQUECA DE CAMARAO',
+        'MINI CHURROS COM DOCE DE LEITE',
+        'TACO DE CARNE',
+        'BROWNIE DE CHOCOLATE',
+        'PAPPARDELLE COM RAGU DE COSTELA',
+        'TORTA COOKIE DE NUTELLA',
+        'RISOTO DE CAMARAO',
+        'CEVICHE',
+      ];
+
       // Buscar todas as locações no intervalo de datas
       const [allRentalApartments] = await this.fetchKpiData(
         startDate,
@@ -189,11 +223,13 @@ export class RestaurantSalesService {
       // Mapa para acumular a contagem por produto
       const productSalesMap = new Map<string, number>();
 
-      // Agregando as quantidades
+      // Agregando as quantidades somente dos produtos permitidos
       for (const stockOut of stockOutSaleLeases) {
         for (const item of stockOut.stockOutItem) {
           const description =
             item.productStock?.product?.description ?? 'Produto sem nome';
+          if (!allowedProducts.includes(description.toUpperCase())) continue;
+
           const currentCount = productSalesMap.get(description) ?? 0;
           const quantity = Number(item.quantity) || 0;
           productSalesMap.set(description, currentCount + quantity);
@@ -453,7 +489,9 @@ export class RestaurantSalesService {
         drinkCategory: category,
         totalSale,
         totalAllSales,
-        totalSalePercent,
+        totalSalePercent: new Prisma.Decimal(
+          totalSalePercent.times(100).toFixed(2),
+        ),
       });
     }
   }

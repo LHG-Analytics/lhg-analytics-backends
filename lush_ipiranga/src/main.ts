@@ -59,8 +59,9 @@ async function bootstrap() {
       .addTag('RestaurantSales')
       .addTag('RestaurantTicketAverage')
       .addTag('Company')
-      .addTag('Governance')
+      .addTag('Restaurants')
       .addTag('Bookings')
+      .addTag('Governance')
       .addTag('CronJobs')
       .build();
 
