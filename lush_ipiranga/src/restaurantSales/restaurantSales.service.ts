@@ -373,7 +373,9 @@ export class RestaurantSalesService {
         foodCategory: category,
         totalSales,
         totalAllSales,
-        totalSalesPercent,
+        totalSalesPercent: new Prisma.Decimal(
+          totalSalesPercent.times(100).toFixed(2),
+        ),
       });
     }
   }
@@ -606,7 +608,9 @@ export class RestaurantSalesService {
         othersCategory: category,
         totalSales,
         totalAllSales,
-        totalSalesPercent,
+        totalSalesPercent: new Prisma.Decimal(
+          totalSalesPercent.times(100).toFixed(2),
+        ),
       });
     }
   }

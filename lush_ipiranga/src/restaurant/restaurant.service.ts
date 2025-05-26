@@ -122,6 +122,11 @@ export class RestaurantService {
       RestaurantRevenueByDrinkCategory,
       RestaurantRevenueByDrinkCategoryPercent,
       RestaurantSalesByDrinkCategory,
+      RestaurantRevenueByOthersCategory,
+      RestaurantRevenueByOthersCategoryPercent,
+      RestaurantSalesByOthersCategory,
+      RestaurantRevenueByFoodCategoryPercent,
+      RestaurantSalesByFoodCategory,
     ] = await this.prisma.prismaOnline.$transaction([
       this.prisma.prismaOnline.restaurantRevenue.findMany({
         where: {
@@ -354,6 +359,7 @@ export class RestaurantService {
           period: true,
           totalValue: true,
           foodCategory: true,
+          totalAllValue: true,
         },
         orderBy: {
           createdDate: 'desc',
@@ -411,6 +417,99 @@ export class RestaurantService {
           totalSale: true,
           totalSalePercent: true,
           drinkCategory: true,
+        },
+        orderBy: {
+          createdDate: 'desc',
+        },
+      }),
+      this.prisma.prismaOnline.restaurantRevenueByOthersCategory.findMany({
+        where: {
+          period: period,
+          createdDate: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        select: {
+          createdDate: true,
+          period: true,
+          totalValue: true,
+          totalAllValue: true,
+          othersCategory: true,
+        },
+        orderBy: {
+          createdDate: 'desc',
+        },
+      }),
+      this.prisma.prismaOnline.restaurantRevenueByOthersCategoryPercent.findMany(
+        {
+          where: {
+            period: period,
+            createdDate: {
+              gte: endDate,
+            },
+          },
+          select: {
+            createdDate: true,
+            period: true,
+            totalValuePercent: true,
+            othersCategory: true,
+          },
+          orderBy: {
+            createdDate: 'desc',
+          },
+        },
+      ),
+      this.prisma.prismaOnline.restaurantSalesByOthersCategory.findMany({
+        where: {
+          period: period,
+          createdDate: {
+            gte: endDate,
+          },
+        },
+        select: {
+          createdDate: true,
+          period: true,
+          totalAllSales: true,
+          totalSales: true,
+          totalSalesPercent: true,
+          othersCategory: true,
+        },
+        orderBy: {
+          createdDate: 'desc',
+        },
+      }),
+      this.prisma.prismaOnline.restaurantRevenueByFoodCategoryPercent.findMany({
+        where: {
+          period: period,
+          createdDate: {
+            gte: endDate,
+          },
+        },
+        select: {
+          createdDate: true,
+          period: true,
+          totalValuePercent: true,
+          foodCategory: true,
+        },
+        orderBy: {
+          createdDate: 'desc',
+        },
+      }),
+      this.prisma.prismaOnline.restaurantSalesByFoodCategory.findMany({
+        where: {
+          period: period,
+          createdDate: {
+            gte: endDate,
+          },
+        },
+        select: {
+          createdDate: true,
+          period: true,
+          totalAllSales: true,
+          totalSales: true,
+          totalSalesPercent: true,
+          foodCategory: true,
         },
         orderBy: {
           createdDate: 'desc',
@@ -774,6 +873,144 @@ export class RestaurantService {
       ),
     };
 
+    const reportByOthers: Record<
+      string,
+      {
+        revenue: number;
+        revenuePercent: number;
+        quantity: number;
+        quantityPercent: number;
+      }
+    > = {};
+
+    // Preencher com dados de receita
+    for (const revenue of RestaurantRevenueByOthersCategory) {
+      const category = revenue.othersCategory;
+      reportByOthers[category] = {
+        revenue: Number(revenue.totalAllValue),
+        revenuePercent: 0,
+        quantity: 0,
+        quantityPercent: 0,
+      };
+    }
+
+    // Preencher com dados de percentual de receita
+    for (const revenuePercent of RestaurantRevenueByOthersCategoryPercent) {
+      const category = revenuePercent.othersCategory;
+      if (reportByOthers[category]) {
+        reportByOthers[category].revenuePercent = Number(
+          revenuePercent.totalValuePercent,
+        );
+      }
+    }
+
+    // Preencher com dados de quantidade e percentual de quantidade
+    for (const sales of RestaurantSalesByOthersCategory) {
+      const category = sales.othersCategory;
+      if (reportByOthers[category]) {
+        reportByOthers[category].quantity = Number(sales.totalSales);
+        reportByOthers[category].quantityPercent = Number(
+          sales.totalSalesPercent,
+        );
+      }
+    }
+
+    // Inserir TOTAL se ele existir (normalmente vem com drinkCategory = 'TOTAL')
+    const totalCategoryOthers = 'TOTAL';
+
+    reportByOthers[totalCategoryOthers] = {
+      revenue: Object.entries(reportByOthers)
+        .filter(([category]) => category !== totalCategoryOthers)
+        .reduce((sum, [, data]) => sum + data.revenue, 0),
+
+      revenuePercent: Math.round(
+        RestaurantRevenueByOthersCategoryPercent.filter(
+          (item) => item.othersCategory !== totalCategoryOthers,
+        ).reduce((sum, item) => sum + Number(item.totalValuePercent || 0), 0),
+      ),
+
+      quantity:
+        Number(
+          RestaurantSalesByOthersCategory.find((item) => item.othersCategory[0])
+            ?.totalAllSales,
+        ) || 0,
+
+      quantityPercent: Math.round(
+        RestaurantSalesByOthersCategory.filter(
+          (item) => item.othersCategory !== totalCategoryOthers,
+        ).reduce((sum, item) => sum + Number(item.totalSalesPercent || 0), 0),
+      ),
+    };
+    //------------------
+    const reportByFood: Record<
+      string,
+      {
+        revenue: number;
+        revenuePercent: number;
+        quantity: number;
+        quantityPercent: number;
+      }
+    > = {};
+
+    // Preencher com dados de receita
+    for (const revenue of RestaurantRevenueByFoodCategory) {
+      const category = revenue.foodCategory;
+      reportByFood[category] = {
+        revenue: Number(revenue.totalAllValue),
+        revenuePercent: 0,
+        quantity: 0,
+        quantityPercent: 0,
+      };
+    }
+
+    // Preencher com dados de percentual de receita
+    for (const revenuePercent of RestaurantRevenueByFoodCategoryPercent) {
+      const category = revenuePercent.foodCategory;
+      if (reportByFood[category]) {
+        reportByFood[category].revenuePercent = Number(
+          revenuePercent.totalValuePercent,
+        );
+      }
+    }
+
+    // Preencher com dados de quantidade e percentual de quantidade
+    for (const sales of RestaurantSalesByFoodCategory) {
+      const category = sales.foodCategory;
+      if (reportByFood[category]) {
+        reportByFood[category].quantity = Number(sales.totalSales);
+        reportByFood[category].quantityPercent = Number(
+          sales.totalSalesPercent,
+        );
+      }
+    }
+
+    // Inserir TOTAL se ele existir (normalmente vem com drinkCategory = 'TOTAL')
+    const totalCategoryFood = 'TOTAL';
+
+    reportByFood[totalCategoryFood] = {
+      revenue: Object.entries(reportByFood)
+        .filter(([category]) => category !== totalCategoryFood)
+        .reduce((sum, [, data]) => sum + data.revenue, 0),
+
+      revenuePercent: Math.round(
+        RestaurantRevenueByFoodCategoryPercent.filter(
+          (item) => item.foodCategory !== totalCategoryFood,
+        ).reduce((sum, item) => sum + Number(item.totalValuePercent || 0), 0),
+      ),
+
+      quantity:
+        Number(
+          RestaurantSalesByFoodCategory.find((item) => item.foodCategory[0])
+            ?.totalAllSales,
+        ) || 0,
+
+      quantityPercent: Math.round(
+        RestaurantSalesByFoodCategory.filter(
+          (item) => item.foodCategory !== totalCategoryFood,
+        ).reduce((sum, item) => sum + Number(item.totalSalesPercent || 0), 0),
+      ),
+    };
+
     return {
       Company: 'Lush Ipiranga',
       BigNumbers: [bigNumbers],
@@ -786,6 +1023,8 @@ export class RestaurantService {
       RevenueFoodByPeriod: revenueFoodByPeriod,
       RevenueDrinksByPeriod: revenueDrinksByPeriod,
       ReportByDrinks: reportByDrinks,
+      ReportByOthers: reportByOthers,
+      ReportByFood: reportByFood,
     };
   }
 }
