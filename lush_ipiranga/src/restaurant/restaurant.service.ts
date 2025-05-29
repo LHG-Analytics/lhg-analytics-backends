@@ -749,9 +749,10 @@ export class RestaurantService {
       seriesDrink,
     };
 
-    const reportByDrinks: Record<
+    const reportByDrinksMap: Record<
       string,
       {
+        name: string;
         revenue: number;
         revenuePercent: number;
         quantity: number;
@@ -762,7 +763,8 @@ export class RestaurantService {
     // Preencher com dados de receita
     for (const revenue of RestaurantRevenueByDrinkCategory) {
       const category = revenue.drinkCategory;
-      reportByDrinks[category] = {
+      reportByDrinksMap[category] = {
+        name: category,
         revenue: Number(revenue.totalAllValue),
         revenuePercent: 0,
         quantity: 0,
@@ -773,8 +775,8 @@ export class RestaurantService {
     // Preencher com dados de percentual de receita
     for (const revenuePercent of RestaurantRevenueByDrinkCategory) {
       const category = revenuePercent.drinkCategory;
-      if (reportByDrinks[category]) {
-        reportByDrinks[category].revenuePercent = Number(
+      if (reportByDrinksMap[category]) {
+        reportByDrinksMap[category].revenuePercent = Number(
           revenuePercent.totalValuePercent,
         );
       }
@@ -783,44 +785,39 @@ export class RestaurantService {
     // Preencher com dados de quantidade e percentual de quantidade
     for (const sales of RestaurantSalesByDrinkCategory) {
       const category = sales.drinkCategory;
-      if (reportByDrinks[category]) {
-        reportByDrinks[category].quantity = Number(sales.totalSale);
-        reportByDrinks[category].quantityPercent = Number(
+      if (reportByDrinksMap[category]) {
+        reportByDrinksMap[category].quantity = Number(sales.totalSale);
+        reportByDrinksMap[category].quantityPercent = Number(
           sales.totalSalePercent,
         );
       }
     }
 
-    // Inserir TOTAL se ele existir (normalmente vem com drinkCategory = 'TOTAL')
+    // Inserir TOTAL
     const totalCategory = 'TOTAL';
 
-    reportByDrinks[totalCategory] = {
-      revenue: Object.entries(reportByDrinks)
+    reportByDrinksMap[totalCategory] = {
+      name: totalCategory,
+      revenue: Object.entries(reportByDrinksMap)
         .filter(([category]) => category !== totalCategory)
-        .reduce((sum, [, data]) => sum + data.revenue, 0),
+        .reduce((sum, [, data]) => Number((sum + data.revenue).toFixed(2)), 0),
 
-      revenuePercent: Math.round(
-        Object.entries(reportByDrinks)
-          .filter(([category]) => category !== totalCategory)
-          .reduce((sum, [, data]) => sum + Number(data.revenuePercent || 0), 0),
-      ),
+      revenuePercent: 100,
 
-      quantity:
-        Number(
-          RestaurantSalesByDrinkCategory.find((item) => item.drinkCategory[0])
-            ?.totalAllSales,
-        ) || 0,
+      quantity: Object.entries(reportByDrinksMap)
+        .filter(([category]) => category !== totalCategory)
+        .reduce((sum, [, data]) => sum + data.quantity, 0),
 
-      quantityPercent: Math.round(
-        RestaurantSalesByDrinkCategory.filter(
-          (item) => item.drinkCategory !== totalCategory,
-        ).reduce((sum, item) => sum + Number(item.totalSalePercent || 0), 0),
-      ),
+      quantityPercent: 100,
     };
 
-    const reportByOthers: Record<
+    // Converter para array com campo `name`
+    const reportByDrinks = Object.values(reportByDrinksMap);
+
+    const reportByOthersMap: Record<
       string,
       {
+        name: string;
         revenue: number;
         revenuePercent: number;
         quantity: number;
@@ -831,7 +828,8 @@ export class RestaurantService {
     // Preencher com dados de receita
     for (const revenue of RestaurantRevenueByOthersCategory) {
       const category = revenue.othersCategory;
-      reportByOthers[category] = {
+      reportByOthersMap[category] = {
+        name: category,
         revenue: Number(revenue.totalAllValue),
         revenuePercent: 0,
         quantity: 0,
@@ -839,57 +837,48 @@ export class RestaurantService {
       };
     }
 
-    // Preencher com dados de percentual de receita
+    // Percentual de receita
     for (const revenuePercent of RestaurantRevenueByOthersCategory) {
       const category = revenuePercent.othersCategory;
-      if (reportByOthers[category]) {
-        reportByOthers[category].revenuePercent = Number(
+      if (reportByOthersMap[category]) {
+        reportByOthersMap[category].revenuePercent = Number(
           revenuePercent.totalValuePercent,
         );
       }
     }
 
-    // Preencher com dados de quantidade e percentual de quantidade
+    // Quantidade e percentual
     for (const sales of RestaurantSalesByOthersCategory) {
       const category = sales.othersCategory;
-      if (reportByOthers[category]) {
-        reportByOthers[category].quantity = Number(sales.totalSales);
-        reportByOthers[category].quantityPercent = Number(
+      if (reportByOthersMap[category]) {
+        reportByOthersMap[category].quantity = Number(sales.totalSales);
+        reportByOthersMap[category].quantityPercent = Number(
           sales.totalSalesPercent,
         );
       }
     }
 
-    // Inserir TOTAL se ele existir (normalmente vem com drinkCategory = 'TOTAL')
+    // Inserir TOTAL
     const totalCategoryOthers = 'TOTAL';
-
-    reportByOthers[totalCategoryOthers] = {
-      revenue: Object.entries(reportByOthers)
+    reportByOthersMap[totalCategoryOthers] = {
+      name: totalCategoryOthers,
+      revenue: Object.entries(reportByOthersMap)
         .filter(([category]) => category !== totalCategoryOthers)
         .reduce((sum, [, data]) => sum + data.revenue, 0),
+      revenuePercent: 100,
+      quantity: Object.entries(reportByOthersMap)
+        .filter(([category]) => category !== totalCategoryOthers)
+        .reduce((sum, [, data]) => sum + data.quantity, 0),
 
-      revenuePercent: Math.round(
-        Object.entries(reportByOthers)
-          .filter(([category]) => category !== totalCategory)
-          .reduce((sum, [, data]) => sum + Number(data.revenuePercent || 0), 0),
-      ),
-
-      quantity:
-        Number(
-          RestaurantSalesByOthersCategory.find((item) => item.othersCategory[0])
-            ?.totalAllSales,
-        ) || 0,
-
-      quantityPercent: Math.round(
-        RestaurantSalesByOthersCategory.filter(
-          (item) => item.othersCategory !== totalCategoryOthers,
-        ).reduce((sum, item) => sum + Number(item.totalSalesPercent || 0), 0),
-      ),
+      quantityPercent: 100,
     };
 
-    const reportByFood: Record<
+    const reportByOthers = Object.values(reportByOthersMap);
+
+    const reportByFoodMap: Record<
       string,
       {
+        name: string;
         revenue: number;
         revenuePercent: number;
         quantity: number;
@@ -897,10 +886,11 @@ export class RestaurantService {
       }
     > = {};
 
-    // Preencher com dados de receita
+    // Receita
     for (const revenue of RestaurantRevenueByFoodCategory) {
       const category = revenue.foodCategory;
-      reportByFood[category] = {
+      reportByFoodMap[category] = {
+        name: category,
         revenue: Number(revenue.totalAllValue),
         revenuePercent: 0,
         quantity: 0,
@@ -908,53 +898,43 @@ export class RestaurantService {
       };
     }
 
-    // Preencher com dados de percentual de receita
+    // Percentual de receita
     for (const revenuePercent of RestaurantRevenueByFoodCategory) {
       const category = revenuePercent.foodCategory;
-      if (reportByFood[category]) {
-        reportByFood[category].revenuePercent = Number(
+      if (reportByFoodMap[category]) {
+        reportByFoodMap[category].revenuePercent = Number(
           revenuePercent.totalValuePercent,
         );
       }
     }
 
-    // Preencher com dados de quantidade e percentual de quantidade
+    // Quantidade
     for (const sales of RestaurantSalesByFoodCategory) {
       const category = sales.foodCategory;
-      if (reportByFood[category]) {
-        reportByFood[category].quantity = Number(sales.totalSales);
-        reportByFood[category].quantityPercent = Number(
+      if (reportByFoodMap[category]) {
+        reportByFoodMap[category].quantity = Number(sales.totalSales);
+        reportByFoodMap[category].quantityPercent = Number(
           sales.totalSalesPercent,
         );
       }
     }
 
-    // Inserir TOTAL se ele existir (normalmente vem com drinkCategory = 'TOTAL')
+    // TOTAL
     const totalCategoryFood = 'TOTAL';
-
-    reportByFood[totalCategoryFood] = {
-      revenue: Object.entries(reportByFood)
+    reportByFoodMap[totalCategoryFood] = {
+      name: totalCategoryFood,
+      revenue: Object.entries(reportByFoodMap)
         .filter(([category]) => category !== totalCategoryFood)
         .reduce((sum, [, data]) => sum + data.revenue, 0),
+      revenuePercent: 100,
+      quantity: Object.entries(reportByFoodMap)
+        .filter(([category]) => category !== totalCategoryFood)
+        .reduce((sum, [, data]) => sum + data.quantity, 0),
 
-      revenuePercent: Math.round(
-        Object.entries(reportByFood)
-          .filter(([category]) => category !== totalCategory)
-          .reduce((sum, [, data]) => sum + Number(data.revenuePercent || 0), 0),
-      ),
-
-      quantity:
-        Number(
-          RestaurantSalesByFoodCategory.find((item) => item.foodCategory[0])
-            ?.totalAllSales,
-        ) || 0,
-
-      quantityPercent: Math.round(
-        RestaurantSalesByFoodCategory.filter(
-          (item) => item.foodCategory !== totalCategoryFood,
-        ).reduce((sum, item) => sum + Number(item.totalSalesPercent || 0), 0),
-      ),
+      quantityPercent: 100,
     };
+
+    const reportByFood = Object.values(reportByFoodMap);
 
     return {
       Company: 'Lush Ipiranga',
