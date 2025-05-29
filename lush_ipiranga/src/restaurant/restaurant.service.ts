@@ -1,5 +1,5 @@
 import { PeriodEnum, Prisma } from '@client-online';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
@@ -971,5 +971,141 @@ export class RestaurantService {
       ReportByOthers: reportByOthers,
       ReportByFood: reportByFood,
     };
+  }
+
+  private async fetchKpiData(startDate: Date, endDate: Date) {
+    return await Promise.all([
+      this.prisma.prismaLocal.rentalApartment.findMany({
+        where: {
+          checkIn: {
+            gte: startDate,
+            lte: endDate,
+          },
+          endOccupationType: 'FINALIZADA',
+        },
+        include: {
+          saleLease: true,
+        },
+      }),
+    ]);
+  }
+
+  async calculateKpisByDateRange(startDate: Date, endDate: Date): Promise<any> {
+    try {
+      console.log('startDate custom date:', startDate);
+      console.log('endDate custom date:', endDate);
+
+      const [allRentalApartments] = await this.fetchKpiData(startDate, endDate);
+
+      const allSales = allRentalApartments.length;
+
+      // Coletar todos os stockOutSaleLease de uma vez
+      const stockOutIds = allRentalApartments
+        .map((rentalApartment) => rentalApartment.saleLease?.stockOutId)
+        .filter((id) => id !== undefined);
+
+      const stockOutSaleLeases =
+        await this.prisma.prismaLocal.stockOut.findMany({
+          where: { id: { in: stockOutIds } },
+          include: {
+            stockOutItem: {
+              where: { canceled: null },
+              select: {
+                id: true,
+                priceSale: true,
+                quantity: true,
+                stockOutId: true,
+              },
+            },
+            sale: {
+              select: {
+                discount: true,
+              },
+            },
+          },
+        });
+
+      const stockOutMap = new Map<number, any>();
+      stockOutSaleLeases.forEach((stockOut) => {
+        stockOutMap.set(stockOut.id, stockOut);
+      });
+
+      let totalGrossRevenue = new Prisma.Decimal(0); // Inicializa a receita bruta
+      let totalDiscount = new Prisma.Decimal(0); // Inicializa o total de descontos
+
+      for (const rentalApartment of allRentalApartments) {
+        const saleLease = rentalApartment.saleLease;
+
+        if (saleLease && saleLease.stockOutId) {
+          const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
+
+          if (
+            stockOutSaleLease &&
+            Array.isArray(stockOutSaleLease.stockOutItem)
+          ) {
+            let itemTotalValue = new Prisma.Decimal(0);
+            let discountSale = new Prisma.Decimal(0);
+
+            // Calcular o valor total da venda para este item
+            stockOutSaleLease.stockOutItem.forEach((stockOutItem) => {
+              const priceSale = new Prisma.Decimal(stockOutItem.priceSale || 0);
+              const quantity = new Prisma.Decimal(stockOutItem.quantity || 0);
+              itemTotalValue = itemTotalValue.plus(priceSale.times(quantity));
+            });
+
+            // Aplica o desconto se existir
+            discountSale = stockOutSaleLease.sale?.discount
+              ? new Prisma.Decimal(stockOutSaleLease.sale.discount)
+              : new Prisma.Decimal(0);
+
+            // Acumula a receita bruta e o desconto total
+            totalGrossRevenue = totalGrossRevenue.plus(itemTotalValue);
+            totalDiscount = totalDiscount.plus(discountSale);
+          }
+        }
+      }
+
+      // Calcular a receita líquida
+      const totalAllValue = totalGrossRevenue.minus(totalDiscount);
+
+      // Montando o retorno de BigNumbers
+      const bigNumbers = {
+        currentDate: {
+          // Itera sobre cada item e acumula o totalValue
+          totalAllValue: Number(totalAllValue ?? 0),
+
+          allSales: Number(allSales),
+
+          /*totalAllSales: RestaurantSales[0]?.totalAllSales ?? 0,
+          totalAllTicketAverage: Number(
+            RestaurantTicketAverage[0]?.totalAllTicketAverage ?? 0,
+          ),
+
+          totalAllTicketAverageByTotalRentals: Number(
+            RestaurantTicketAverageByTotalRentals[0]
+              ?.totalAllTicketAverageByTotalRentals ?? 0,
+          ),*/
+        },
+      };
+
+      return {
+        Company: 'Lush Ipiranga',
+        BigNumbers: [bigNumbers],
+        /*RevenueAbByPeriod: revenueAbByPeriod,
+        RevenueAbByPeriodPercent: revenueAbByPeriodPercent,
+        TicketAverageByPeriod: ticketAverageByPeriod,
+        BestSellingItems: bestSellingItems,
+        LeastSellingItems: leastSellingItems,
+        RevenueByGroupPeriod: revenueByGroupPeriod,
+        RevenueFoodByPeriod: revenueFoodByPeriod,
+        RevenueDrinksByPeriod: revenueDrinksByPeriod,
+        ReportByDrinks: reportByDrinks,
+        ReportByOthers: reportByOthers,
+        ReportByFood: reportByFood,*/
+      };
+    } catch (error) {
+      console.error('Erro ao calcular os KPIs:', error);
+      throw new BadRequestException();
+    }
   }
 }

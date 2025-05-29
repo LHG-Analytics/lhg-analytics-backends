@@ -42,12 +42,12 @@ export class RestaurantTicketAverageService {
     try {
       const companyId = 1;
 
+      // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
       if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
-        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
-        adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1);
-        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       }
 
       const abProductTypes = [

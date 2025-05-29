@@ -1,6 +1,18 @@
 import { PeriodEnum } from '@client-online';
-import { BadRequestException, Controller, Get, Query } from '@nestjs/common';
-import { ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiNotFoundResponse,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { RestaurantService } from './restaurant.service';
 
 @ApiTags('Restaurants')
@@ -27,7 +39,7 @@ export class RestaurantController {
     return this.restaurantService.findAllRestaurants(period);
   }
 
-  /*@Get('restaurants/date-range')
+  @Get('restaurants/date-range')
   @ApiQuery({
     name: 'startDate',
     required: true,
@@ -92,5 +104,5 @@ export class RestaurantController {
     }
 
     return date;
-  }*/
+  }
 }
