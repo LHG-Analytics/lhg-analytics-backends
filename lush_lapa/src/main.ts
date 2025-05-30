@@ -50,9 +50,13 @@ async function bootstrap() {
       .addTag('BookingsTotalRentals')
       .addTag('BookingsTicketAverage')
       .addTag('BookingsRepresentativeness')
+      .addTag('RestaurantRevenue')
+      .addTag('RestaurantSales')
+      .addTag('RestaurantTicketAverage')
       .addTag('Company')
-      .addTag('Governance')
+      .addTag('Restaurants')
       .addTag('Bookings')
+      .addTag('Governance')
       .addTag('CronJobs')
       .build();
 

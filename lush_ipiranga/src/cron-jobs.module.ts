@@ -15,6 +15,9 @@ import { BookingsTotalRentalsService } from './bookingsTotalRentals/bookingsTota
 import { BookingsTicketAverageService } from './bookingsTicketAverage/bookingsTicketAverage.service';
 import { BookingsRepresentativenessService } from './bookingsRepresentativeness/bookingsRepresentativeness.service';
 import { BookingsRevenueService } from './bookingsRevenue/bookingsRevenue.service';
+import { RestaurantRevenueService } from './restaurantRevenue/restaurantRevenue.service';
+import { RestaurantSalesService } from './restaurantSales/restaurantSales.service';
+import { RestaurantTicketAverageService } from './restaurantTicketAverage/restaurantTicketAverage.service';
 
 @Module({
   imports: [],
@@ -35,6 +38,9 @@ import { BookingsRevenueService } from './bookingsRevenue/bookingsRevenue.servic
     BookingsTotalRentalsService,
     BookingsTicketAverageService,
     BookingsRepresentativenessService,
+    RestaurantRevenueService,
+    RestaurantSalesService,
+    RestaurantTicketAverageService,
   ],
 })
 export class CronJobsModule {}

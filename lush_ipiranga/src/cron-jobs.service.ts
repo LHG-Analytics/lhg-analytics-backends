@@ -15,6 +15,9 @@ import { BookingsRevenueService } from './bookingsRevenue/bookingsRevenue.servic
 import { BookingsTotalRentalsService } from './bookingsTotalRentals/bookingsTotalRentals.service';
 import { BookingsTicketAverageService } from './bookingsTicketAverage/bookingsTicketAverage.service';
 import { BookingsRepresentativenessService } from './bookingsRepresentativeness/bookingsRepresentativeness.service';
+import { RestaurantRevenueService } from './restaurantRevenue/restaurantRevenue.service';
+import { RestaurantSalesService } from './restaurantSales/restaurantSales.service';
+import { RestaurantTicketAverageService } from './restaurantTicketAverage/restaurantTicketAverage.service';
 
 @Injectable()
 export class CronJobsService {
@@ -35,6 +38,9 @@ export class CronJobsService {
     private readonly bookingsTotalRental: BookingsTotalRentalsService,
     private readonly bookingsTicketAverage: BookingsTicketAverageService,
     private readonly bookingsRepresentativeness: BookingsRepresentativenessService,
+    private readonly restaurantRevenue: RestaurantRevenueService,
+    private readonly restaurantSales: RestaurantSalesService,
+    private readonly restaurantTicketAverage: RestaurantTicketAverageService,
   ) {}
 
   @Cron('0 0,6,16 * * *', { timeZone: 'America/Sao_Paulo' })
@@ -67,6 +73,9 @@ export class CronJobsService {
       await this.bookingsTotalRental.handleCron();
       await this.bookingsTicketAverage.handleCron();
       await this.bookingsRepresentativeness.handleCron();
+      await this.restaurantRevenue.handleCron();
+      await this.restaurantSales.handleCron();
+      await this.restaurantTicketAverage.handleCron();
     } catch (error) {
       console.error('Erro ao executar os CronJobs do Lush Ipiranga:', error);
     } finally {
