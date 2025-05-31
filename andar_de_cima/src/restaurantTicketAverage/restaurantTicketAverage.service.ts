@@ -51,20 +51,19 @@ export class RestaurantTicketAverageService {
       }
 
       const abProductTypes = [
-        '07 - CAFE DA MANHA',
-        '08 - PETISCOS',
-        '09 - ENTRADAS',
-        '10 - LANCHE',
+        '08 - CAFE DA MANHA',
+        '09 - PETICOS, ENTRADAS E PIZZAS',
+        '10 - LANCHES',
         '11 - PRATOS',
-        '12 - ACOMPANHAMENTOS',
-        '13 - SOBREMESA',
-        '15 -BOMBONIERE',
-        '01 - SOFT DRINK',
+        '12 - SOBREMESA',
+        '14 - BOMBONIERE',
+        '01 - SOFT DRINKS',
         '02 - CERVEJAS',
         '03 - COQUETEIS',
         '04 - DOSES',
         '05 - GARRAFAS',
-        '06 - VINHOS E ESPUMANTES',
+        '06 - VINHOS',
+        '07 - ESPUMANTES',
       ];
 
       const [allRentalApartments] = await this.fetchKpiData(
@@ -215,20 +214,19 @@ export class RestaurantTicketAverageService {
       }
 
       const abProductTypes = [
-        '07 - CAFE DA MANHA',
-        '08 - PETISCOS',
-        '09 - ENTRADAS',
-        '10 - LANCHE',
+        '08 - CAFE DA MANHA',
+        '09 - PETICOS, ENTRADAS E PIZZAS',
+        '10 - LANCHES',
         '11 - PRATOS',
-        '12 - ACOMPANHAMENTOS',
-        '13 - SOBREMESA',
-        '15 -BOMBONIERE',
-        '01 - SOFT DRINK',
+        '12 - SOBREMESA',
+        '14 - BOMBONIERE',
+        '01 - SOFT DRINKS',
         '02 - CERVEJAS',
         '03 - COQUETEIS',
         '04 - DOSES',
         '05 - GARRAFAS',
-        '06 - VINHOS E ESPUMANTES',
+        '06 - VINHOS',
+        '07 - ESPUMANTES',
       ];
 
       const [allRentalApartments] = await this.fetchKpiData(
@@ -384,20 +382,19 @@ export class RestaurantTicketAverageService {
       currentDate.setUTCHours(0, 0, 0, 0); // Início do dia contábil às 00:00:00
 
       const abProductTypes = [
-        '07 - CAFE DA MANHA',
-        '08 - PETISCOS',
-        '09 - ENTRADAS',
-        '10 - LANCHE',
+        '08 - CAFE DA MANHA',
+        '09 - PETICOS, ENTRADAS E PIZZAS',
+        '10 - LANCHES',
         '11 - PRATOS',
-        '12 - ACOMPANHAMENTOS',
-        '13 - SOBREMESA',
-        '15 -BOMBONIERE',
-        '01 - SOFT DRINK',
+        '12 - SOBREMESA',
+        '14 - BOMBONIERE',
+        '01 - SOFT DRINKS',
         '02 - CERVEJAS',
         '03 - COQUETEIS',
         '04 - DOSES',
         '05 - GARRAFAS',
-        '06 - VINHOS E ESPUMANTES',
+        '06 - VINHOS',
+        '07 - ESPUMANTES',
       ];
 
       let totalABNetRevenue = new Prisma.Decimal(0);

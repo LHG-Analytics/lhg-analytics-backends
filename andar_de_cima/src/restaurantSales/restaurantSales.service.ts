@@ -149,32 +149,24 @@ export class RestaurantSalesService {
 
       // Lista de produtos permitidos (formato exato dos descriptions)
       const allowedProducts = [
-        'CAFE DA MANHA LUSH PREMIUM',
-        'CAFE DA MANHA LUSH',
-        'ESCALOPE DE MIGNON COM RISOTO',
-        'SPECIAL BURGER',
-        'MIX DE PASTEL',
-        'CIABATTA DE MIGNON',
-        'FRITAS COM MOLHO DE QUEIJOS',
-        'FILET MIGNON 220G',
-        'MIX DE BRUSCHETTAS',
-        'TORTA COOKIE DE NUTELLA',
-        'PICANHA 220G',
-        'FRANGO CROCANTE',
-        'SALMAO AL LIMONE',
+        'CAFE DA MANHA',
+        'SUFLAIR',
+        'FERRERO ROCHER',
+        'PIZZA DE MARGHERITA',
+        'PIZZA DE CALABRESA',
+        'BATATA RUFFLES',
+        'HALLS CEREJA',
+        'CASTANHA DE CAJU',
+        'BROWNIE COM SORVETE DE BAUNILHA',
+        'SANDUICHE MERCADAO (SALAME)',
+        'ISCAS DE FILET MIGNON',
         'DADINHO DE TAPIOCA',
-        'VEGAN BURGUER',
-        'TILAPIA 170G',
-        'CUBOS DE MIGNON AO MOLHO DE CERVEJA PRETA',
-        'CHURROS DE DOCE DE LEITE',
-        'FILE DE FRANGO',
-        'SALADA CAPRESE',
-        'RISOTO DE CAMARAO',
-        'CEVICHE',
-        'BROWNIE',
-        'FETTUCCINE COM RAGU DE COSTELA',
-        'STEAK TARTAR COM CHIPS DE BATATA DOCE',
-        'STROGONOFF LUSH',
+        'FILET DE FRANGO COM COUSCOUS MARROQUINO E LEGUMES',
+        'HALLS PRETA',
+        'PIZZA DE ALHO PORO COM SHITAKE',
+        'DADINHO DE TAPIOCA',
+        'NHOQUE DE MANDIOQUINHA COM CAMARAO',
+        'PIZZA DE MARGHERITA',
       ];
 
       // Buscar todas as locações no intervalo de datas
@@ -282,14 +274,12 @@ export class RestaurantSalesService {
     const companyId = 1;
 
     const categories: string[] = [
-      '07 - CAFE DA MANHA',
-      '08 - PETISCOS',
-      '09 - ENTRADAS',
-      '10 - LANCHE',
+      '08 - CAFE DA MANHA',
+      '09 - PETICOS, ENTRADAS E PIZZAS',
+      '10 - LANCHES',
       '11 - PRATOS',
-      '12 - ACOMPANHAMENTOS',
-      '13 - SOBREMESA',
-      '15 -BOMBONIERE',
+      '12 - SOBREMESA',
+      '14 - BOMBONIERE',
     ];
 
     // Ajustar endDate para ontem às 23:59:59.999
@@ -402,12 +392,13 @@ export class RestaurantSalesService {
     const companyId = 1;
 
     const categories: string[] = [
-      '01 - SOFT DRINK',
+      '01 - SOFT DRINKS',
       '02 - CERVEJAS',
       '03 - COQUETEIS',
       '04 - DOSES',
       '05 - GARRAFAS',
-      '06 - VINHOS E ESPUMANTES',
+      '06 - VINHOS',
+      '07 - ESPUMANTES',
     ];
 
     // Ajustar endDate para ontem às 23:59:59.999
@@ -520,8 +511,8 @@ export class RestaurantSalesService {
     const companyId = 1;
 
     const categories: string[] = [
-      '14 - PRODUTOS EROTICOS',
-      '16 - CONVENIENCIA',
+      '13 - PRODUTOS EROTICOS',
+      '15 - CONVENIENCIA',
       'ITENS EXTRAS',
       'RESERVAS',
       'SOUVENIR',

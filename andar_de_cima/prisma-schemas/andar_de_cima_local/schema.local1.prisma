@@ -228,8 +228,8 @@ model StockOutItem {
 model ProductStock {
   id           Int           @id @default(autoincrement()) @map("id")
   version      Int           @map("versao")
-  minimum      Decimal       @map("minimo") @db.Decimal(10, 2)
-  maximum      Decimal       @map("maximo") @db.Decimal(10, 2)
+  minimum      Decimal?      @map("minimo") @db.Decimal(10, 2)
+  maximum      Decimal?      @map("maximo") @db.Decimal(10, 2)
   idStock      Int           @map("id_estoque")
   stockOutItem StockOutItem?
   productId    Int           @map("id_produto")
@@ -245,6 +245,7 @@ model Product {
   description               String         @map("descricao")
   code                      Int            @map("codigo")
   idTypeProduct             Int            @map("id_tipoproduto")
+  typeProduct               TypeProduct    @relation(fields: [idTypeProduct], references: [id])
   priceSale                 Int            @map("precovenda")
   idUnitInputMeasurement    Int            @map("id_unidademedidaentrada")
   idUnitOutputMeasurement   Int            @map("id_unidademedidasaida")
@@ -266,8 +267,37 @@ model Product {
   variation                 String         @map("variacao")
   stockNegative             Boolean        @map("estoquenegativo")
   productStock              ProductStock[]
+  packProducts              PackProducts[]
 
   @@map("produto")
+}
+
+model TypeProduct {
+  id                    Int       @id @default(autoincrement()) @map("id")
+  version               Int       @map("versao")
+  description           String    @map("descricao")
+  consumable            Boolean   @map("consumivel")
+  idPrintConfiguration  Int?      @map("id_configuracaoimpressao")
+  deletionDate          DateTime? @map("dataexclusao")
+  idResponsibleDeletion Int?      @map("id_responsavelexclusao")
+  nameDisplay           String?   @map("nomeexibicao")
+  simultaneousPrinting  Boolean   @map("impressaosimultanea")
+  product               Product[]
+
+  @@map("tipoproduto")
+}
+
+model PackProducts {
+  idProduct             Int       @unique @map("id_produto")
+  product               Product   @relation(fields: [idProduct], references: [id])
+  name                  String    @map("nome")
+  value                 Decimal   @map("valor") @db.Decimal(10, 2)
+  information           String?   @map("informacao")
+  deletionDate          DateTime? @map("dataexclusao")
+  idResponsibleDeletion Int?      @map("id_responsavelexclusao")
+  registrationProgress  String    @map("progressocadastro")
+
+  @@map("pacotedeprodutos")
 }
 
 model Stock {
