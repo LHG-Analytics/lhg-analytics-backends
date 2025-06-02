@@ -562,24 +562,24 @@ export class RestaurantService {
       ),
     };
 
-    const top15Sales = [...RestaurantSalesRanking]
+    const top10Sales = [...RestaurantSalesRanking]
       .sort((a, b) => Number(b.totalSales) - Number(a.totalSales)) // já ordena decrescente
-      .slice(0, 15); // pega os 15 com maior totalSales
+      .slice(0, 10); // pega os 10 com maior totalSales
 
-    // Como já está ordenado, basta usar top15Sales diretamente
+    // Como já está ordenado, basta usar top10Sales diretamente
     const bestSellingItems = {
-      categories: top15Sales.map((item) => item.productName),
-      series: top15Sales.map((item) => Number(item.totalSales)),
+      categories: top10Sales.map((item) => item.productName),
+      series: top10Sales.map((item) => Number(item.totalSales)),
     };
 
-    const top15LeastSales = [...RestaurantSalesRanking]
+    const top10LeastSales = [...RestaurantSalesRanking]
       .sort((a, b) => Number(a.totalSales) - Number(b.totalSales)) // já ordena crescente
-      .slice(0, 15); // pega os 15 com menor totalSales
+      .slice(0, 10); // pega os 10 com menor totalSales
 
-    // Como já está ordenado, basta usar top15LeastSales diretamente
+    // Como já está ordenado, basta usar top10LeastSales diretamente
     const leastSellingItems = {
-      categories: top15LeastSales.map((item) => item.productName),
-      series: top15LeastSales.map((item) => Number(item.totalSales)),
+      categories: top10LeastSales.map((item) => item.productName),
+      series: top10LeastSales.map((item) => Number(item.totalSales)),
     };
 
     // Aplicar o filtro se o período for LAST_6_M

@@ -576,7 +576,7 @@ export class RestaurantService {
       .sort((a, b) => Number(a.totalSales) - Number(b.totalSales)) // já ordena crescente
       .slice(0, 5); // pega os 5 com menor totalSales
 
-    // Como já está ordenado, basta usar top15LeastSales diretamente
+    // Como já está ordenado, basta usar top5LeastSales diretamente
     const leastSellingItems = {
       categories: top5LeastSales.map((item) => item.productName),
       series: top5LeastSales.map((item) => Number(item.totalSales)),

@@ -24,6 +24,10 @@ import { BookingsTotalRentalsModule } from './bookingsTotalRentals/bookingsTotal
 import { BookingsTicketAverageModule } from './bookingsTicketAverage/bookingsTicketAverage.module';
 import { BookingsRepresentativenessModule } from './bookingsRepresentativeness/bookingsRepresentativeness.module';
 import { BookingsModule } from './bookings/bookings.module';
+import { RestaurantModule } from './restaurant/restaurant.module';
+import { RestaurantRevenueModule } from './restaurantRevenue/restaurantRevenue.module';
+import { RestaurantSalesModule } from './restaurantSales/restaurantSales.module';
+import { RestaurantTicketAverageModule } from './restaurantTicketAverage/restaurantTicketAverage.module';
 
 @Module({
   imports: [
@@ -47,6 +51,10 @@ import { BookingsModule } from './bookings/bookings.module';
     BookingsTicketAverageModule,
     BookingsRepresentativenessModule,
     BookingsModule,
+    RestaurantModule,
+    RestaurantRevenueModule,
+    RestaurantSalesModule,
+    RestaurantTicketAverageModule,
   ],
   controllers: [AppController],
   providers: [
