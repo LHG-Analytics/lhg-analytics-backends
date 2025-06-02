@@ -148,7 +148,7 @@ export class KpiTicketAverageService {
           this.prisma.prismaLocal.suiteCategory.findMany({
             where: {
               description: {
-                in: ['CLUB', 'SUBLIME', 'RELAX', 'GLAM', 'HIDRO', 'SUITE A'],
+                in: ['CLUB', 'SUBLIME', 'RELAX', 'GLAM', 'HIDRO', 'A'],
               },
             },
           }),
