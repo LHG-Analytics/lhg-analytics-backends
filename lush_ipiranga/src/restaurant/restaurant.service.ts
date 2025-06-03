@@ -977,7 +977,23 @@ export class RestaurantService {
 
       const [allRentalApartments] = await this.fetchKpiData(startDate, endDate);
 
-      const allSales = allRentalApartments.length;
+      const abProductTypes = [
+        '07 - CAFE DA MANHA E CHA',
+        '08 - ADICIONAIS',
+        '09 - PETISCOS',
+        '10 - ENTRADAS',
+        '11 - LANCHES',
+        '12 - PRATOS PRINCIPAIS',
+        '13 - ACOMPANHAMENTOS',
+        '14 - SOBREMESAS',
+        '15 - BOMBONIERE',
+        '01 - SOFT DRINKS',
+        '02 - CERVEJAS',
+        '03 - COQUETEIS',
+        '04 - DOSES',
+        '05 - GARRAFAS',
+        '06 - VINHOS E ESPUMANTES',
+      ];
 
       // Coletar todos os stockOutSaleLease de uma vez
       const stockOutIds = allRentalApartments
@@ -995,6 +1011,19 @@ export class RestaurantService {
                 priceSale: true,
                 quantity: true,
                 stockOutId: true,
+                productStock: {
+                  select: {
+                    product: {
+                      select: {
+                        typeProduct: {
+                          select: {
+                            description: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               },
             },
             sale: {
@@ -1012,9 +1041,40 @@ export class RestaurantService {
 
       let totalGrossRevenue = new Prisma.Decimal(0); // Inicializa a receita bruta
       let totalDiscount = new Prisma.Decimal(0); // Inicializa o total de descontos
+      let totalAllSales = 0;
+      let totalABNetRevenue = new Prisma.Decimal(0);
+      let rentalsWithABCount = 0;
 
       for (const rentalApartment of allRentalApartments) {
         const saleLease = rentalApartment.saleLease;
+        if (!saleLease?.stockOutId) continue;
+
+        const stockOut = stockOutMap.get(saleLease.stockOutId);
+        if (!stockOut?.stockOutItem?.length) continue;
+
+        let abItemTotal = new Prisma.Decimal(0);
+        let hasABItem = false;
+
+        for (const item of stockOut.stockOutItem) {
+          const description =
+            item.productStock?.product?.typeProduct?.description;
+          if (description && abProductTypes.includes(description)) {
+            const price = new Prisma.Decimal(item.priceSale || 0);
+            const quantity = new Prisma.Decimal(item.quantity || 0);
+            abItemTotal = abItemTotal.plus(price.times(quantity));
+            hasABItem = true;
+          }
+        }
+
+        if (hasABItem) {
+          const discount = stockOut.sale?.discount
+            ? new Prisma.Decimal(stockOut.sale.discount)
+            : new Prisma.Decimal(0);
+
+          const netValue = abItemTotal.minus(discount);
+          totalABNetRevenue = totalABNetRevenue.plus(netValue);
+          rentalsWithABCount += 1;
+        }
 
         if (saleLease && saleLease.stockOutId) {
           const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
@@ -1045,6 +1105,24 @@ export class RestaurantService {
         }
       }
 
+      const totalAllTicketAverage =
+        rentalsWithABCount > 0
+          ? totalABNetRevenue.div(rentalsWithABCount)
+          : new Prisma.Decimal(0);
+
+      const totalRentals = allRentalApartments.length;
+
+      const totalAllTicketAverageByTotalRentals =
+        totalRentals > 0
+          ? totalABNetRevenue.div(totalRentals)
+          : new Prisma.Decimal(0);
+
+      stockOutSaleLeases.forEach((stockOut) => {
+        if (stockOut.stockOutItem.length > 0) {
+          totalAllSales++;
+        }
+      });
+
       // Calcular a receita líquida
       const totalAllValue = totalGrossRevenue.minus(totalDiscount);
 
@@ -1054,17 +1132,12 @@ export class RestaurantService {
           // Itera sobre cada item e acumula o totalValue
           totalAllValue: Number(totalAllValue ?? 0),
 
-          allSales: Number(allSales),
-
-          /*totalAllSales: RestaurantSales[0]?.totalAllSales ?? 0,
-          totalAllTicketAverage: Number(
-            RestaurantTicketAverage[0]?.totalAllTicketAverage ?? 0,
-          ),
+          totalAllSales: Number(totalAllSales ?? 0),
+          totalAllTicketAverage: Number(totalAllTicketAverage.toFixed(2) ?? 0),
 
           totalAllTicketAverageByTotalRentals: Number(
-            RestaurantTicketAverageByTotalRentals[0]
-              ?.totalAllTicketAverageByTotalRentals ?? 0,
-          ),*/
+            totalAllTicketAverageByTotalRentals.toFixed(2) ?? 0,
+          ),
         },
       };
 
