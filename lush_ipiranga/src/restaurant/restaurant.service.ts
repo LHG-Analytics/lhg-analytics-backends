@@ -970,195 +970,235 @@ export class RestaurantService {
     ]);
   }
 
-  async calculateKpisByDateRange(startDate: Date, endDate: Date): Promise<any> {
-    try {
-      console.log('startDate custom date:', startDate);
-      console.log('endDate custom date:', endDate);
+  async calculateKpisByDateRange(startDate: Date, endDate: Date) {
+    const abProductTypes = [
+      '07 - CAFE DA MANHA E CHA',
+      '08 - ADICIONAIS',
+      '09 - PETISCOS',
+      '10 - ENTRADAS',
+      '11 - LANCHES',
+      '12 - PRATOS PRINCIPAIS',
+      '13 - ACOMPANHAMENTOS',
+      '14 - SOBREMESAS',
+      '15- BOMBONIERE',
+      '01 - SOFT DRINKS',
+      '02 - CERVEJAS',
+      '03 - COQUETEIS',
+      '04 - DOSES',
+      '05 - GARRAFAS',
+      '06 - VINHOS E ESPUMANTES',
+    ];
 
-      const [allRentalApartments] = await this.fetchKpiData(startDate, endDate);
+    const formattedStart = moment
+      .utc(startDate)
+      .set({ hour: 6, minute: 0, second: 0 })
+      .format('YYYY-MM-DD HH:mm:ss');
 
-      const abProductTypes = [
-        '07 - CAFE DA MANHA E CHA',
-        '08 - ADICIONAIS',
-        '09 - PETISCOS',
-        '10 - ENTRADAS',
-        '11 - LANCHES',
-        '12 - PRATOS PRINCIPAIS',
-        '13 - ACOMPANHAMENTOS',
-        '14 - SOBREMESAS',
-        '15 - BOMBONIERE',
-        '01 - SOFT DRINKS',
-        '02 - CERVEJAS',
-        '03 - COQUETEIS',
-        '04 - DOSES',
-        '05 - GARRAFAS',
-        '06 - VINHOS E ESPUMANTES',
-      ];
+    const formattedEnd = moment
+      .utc(endDate)
+      .add(1, 'day') // importante para pegar o último dia completo
+      .set({ hour: 5, minute: 59, second: 59 })
+      .format('YYYY-MM-DD HH:mm:ss');
 
-      // Coletar todos os stockOutSaleLease de uma vez
-      const stockOutIds = allRentalApartments
-        .map((rentalApartment) => rentalApartment.saleLease?.stockOutId)
-        .filter((id) => id !== undefined);
+    const abProductTypesSqlList = abProductTypes
+      .map((p) => `'${p}'`)
+      .join(', ');
 
-      const stockOutSaleLeases =
-        await this.prisma.prismaLocal.stockOut.findMany({
-          where: { id: { in: stockOutIds } },
-          include: {
-            stockOutItem: {
-              where: { canceled: null },
-              select: {
-                id: true,
-                priceSale: true,
-                quantity: true,
-                stockOutId: true,
-                productStock: {
-                  select: {
-                    product: {
-                      select: {
-                        typeProduct: {
-                          select: {
-                            description: true,
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            sale: {
-              select: {
-                discount: true,
-              },
-            },
-          },
-        });
+    const kpisRawSql = `
+    SELECT
+      ra."id_apartamentostate",
+      so.id AS "id_saidaestoque",
+      COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalGross",
+      COALESCE(s."desconto", 0) AS "desconto",
+      COALESCE(SUM(
+        CASE
+          WHEN tp."descricao" IN (${abProductTypesSqlList})
+          THEN soi."precovenda" * soi."quantidade"
+          ELSE 0
+        END
+      ), 0) AS "abTotal"
+    FROM "locacaoapartamento" ra
+    LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+    LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+    LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+    LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+    LEFT JOIN "produto" p ON p.id = ps."id_produto"
+    LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+    LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+    WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
+      AND ra."datainicialdaocupacao" <= '${formattedEnd}'
+      AND ra."fimocupacaotipo" = 'FINALIZADA'
+    GROUP BY ra."id_apartamentostate", so.id, s."desconto"
+  `;
 
-      const stockOutMap = new Map<number, any>();
-      stockOutSaleLeases.forEach((stockOut) => {
-        stockOutMap.set(stockOut.id, stockOut);
-      });
+    const revenueAbPeriodSql = `
+    SELECT
+      TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
+      COALESCE(SUM(
+        CASE
+          WHEN tp."descricao" IN (${abProductTypesSqlList})
+          THEN soi."precovenda" * soi."quantidade"
+          ELSE 0
+        END
+      ), 0) AS "totalValue"
+    FROM "locacaoapartamento" ra
+    LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+    LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+    LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+    LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+    LEFT JOIN "produto" p ON p.id = ps."id_produto"
+    LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+    WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
+      AND ra."datainicialdaocupacao" <= '${formattedEnd}'
+      AND ra."fimocupacaotipo" = 'FINALIZADA'
+    GROUP BY "date"
+    ORDER BY "date" DESC
+  `;
 
-      let totalGrossRevenue = new Prisma.Decimal(0); // Inicializa a receita bruta
-      let totalDiscount = new Prisma.Decimal(0); // Inicializa o total de descontos
-      let totalAllSales = 0;
-      let totalABNetRevenue = new Prisma.Decimal(0);
-      let rentalsWithABCount = 0;
+    const totalRevenueByPeriodSql = `
+   SELECT
+  "date",
+  SUM("valor") AS "totalRevenue"
+FROM (
+  -- Receita de locações (valortotal já inclui consumo)
+  SELECT
+    TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
+    ra."valortotal" AS "valor"
+  FROM "locacaoapartamento" ra
+  WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
+    AND ra."datainicialdaocupacao" <= '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
 
-      for (const rentalApartment of allRentalApartments) {
-        const saleLease = rentalApartment.saleLease;
-        if (!saleLease?.stockOutId) continue;
+  UNION ALL
 
-        const stockOut = stockOutMap.get(saleLease.stockOutId);
-        if (!stockOut?.stockOutItem?.length) continue;
+  -- Receita de vendas diretas (soma dos itens - desconto)
+  SELECT
+    TO_CHAR(so."datasaida", 'YYYY-MM-DD') AS "date",
+    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) - COALESCE(v."desconto", 0) AS "valor"
+  FROM "vendadireta" vd
+  INNER JOIN "saidaestoque" so ON so.id = vd."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "venda" v ON v."id_saidaestoque" = so.id
+  WHERE so."datasaida" >= '${formattedStart}'
+    AND so."datasaida" <= '${formattedEnd}'
+  GROUP BY TO_CHAR(so."datasaida", 'YYYY-MM-DD'), v."desconto"
+) AS all_revenues
+GROUP BY "date"
+ORDER BY "date" DESC;
+  `;
 
-        let abItemTotal = new Prisma.Decimal(0);
-        let hasABItem = false;
+    const rawResult =
+      await this.prisma.prismaLocal.$queryRawUnsafe<any[]>(kpisRawSql);
+    const rawPeriodResult =
+      await this.prisma.prismaLocal.$queryRawUnsafe<any[]>(revenueAbPeriodSql);
+    const rawTotalRevenueResult = await this.prisma.prismaLocal.$queryRawUnsafe<
+      any[]
+    >(totalRevenueByPeriodSql);
 
-        for (const item of stockOut.stockOutItem) {
-          const description =
-            item.productStock?.product?.typeProduct?.description;
-          if (description && abProductTypes.includes(description)) {
-            const price = new Prisma.Decimal(item.priceSale || 0);
-            const quantity = new Prisma.Decimal(item.quantity || 0);
-            abItemTotal = abItemTotal.plus(price.times(quantity));
-            hasABItem = true;
-          }
-        }
+    let totalGrossRevenue = new Prisma.Decimal(0);
+    let totalDiscount = new Prisma.Decimal(0);
+    let totalABNetRevenue = new Prisma.Decimal(0);
+    let rentalsWithABCount = 0;
+    let totalAllSales = 0;
 
-        if (hasABItem) {
-          const discount = stockOut.sale?.discount
-            ? new Prisma.Decimal(stockOut.sale.discount)
-            : new Prisma.Decimal(0);
+    for (const row of rawResult) {
+      const gross = new Prisma.Decimal(row.totalGross);
+      const discount = new Prisma.Decimal(row.desconto);
+      const abTotal = new Prisma.Decimal(row.abTotal);
+      const netAB = abTotal.minus(discount);
 
-          const netValue = abItemTotal.minus(discount);
-          totalABNetRevenue = totalABNetRevenue.plus(netValue);
-          rentalsWithABCount += 1;
-        }
+      totalGrossRevenue = totalGrossRevenue.plus(gross);
+      totalDiscount = totalDiscount.plus(discount);
 
-        if (saleLease && saleLease.stockOutId) {
-          const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
-
-          if (
-            stockOutSaleLease &&
-            Array.isArray(stockOutSaleLease.stockOutItem)
-          ) {
-            let itemTotalValue = new Prisma.Decimal(0);
-            let discountSale = new Prisma.Decimal(0);
-
-            // Calcular o valor total da venda para este item
-            stockOutSaleLease.stockOutItem.forEach((stockOutItem) => {
-              const priceSale = new Prisma.Decimal(stockOutItem.priceSale || 0);
-              const quantity = new Prisma.Decimal(stockOutItem.quantity || 0);
-              itemTotalValue = itemTotalValue.plus(priceSale.times(quantity));
-            });
-
-            // Aplica o desconto se existir
-            discountSale = stockOutSaleLease.sale?.discount
-              ? new Prisma.Decimal(stockOutSaleLease.sale.discount)
-              : new Prisma.Decimal(0);
-
-            // Acumula a receita bruta e o desconto total
-            totalGrossRevenue = totalGrossRevenue.plus(itemTotalValue);
-            totalDiscount = totalDiscount.plus(discountSale);
-          }
-        }
+      if (abTotal.gt(0)) {
+        totalABNetRevenue = totalABNetRevenue.plus(netAB);
+        rentalsWithABCount++;
       }
 
-      const totalAllTicketAverage =
-        rentalsWithABCount > 0
-          ? totalABNetRevenue.div(rentalsWithABCount)
-          : new Prisma.Decimal(0);
-
-      const totalRentals = allRentalApartments.length;
-
-      const totalAllTicketAverageByTotalRentals =
-        totalRentals > 0
-          ? totalABNetRevenue.div(totalRentals)
-          : new Prisma.Decimal(0);
-
-      stockOutSaleLeases.forEach((stockOut) => {
-        if (stockOut.stockOutItem.length > 0) {
-          totalAllSales++;
-        }
-      });
-
-      // Calcular a receita líquida
-      const totalAllValue = totalGrossRevenue.minus(totalDiscount);
-
-      // Montando o retorno de BigNumbers
-      const bigNumbers = {
-        currentDate: {
-          // Itera sobre cada item e acumula o totalValue
-          totalAllValue: Number(totalAllValue ?? 0),
-
-          totalAllSales: Number(totalAllSales ?? 0),
-          totalAllTicketAverage: Number(totalAllTicketAverage.toFixed(2) ?? 0),
-
-          totalAllTicketAverageByTotalRentals: Number(
-            totalAllTicketAverageByTotalRentals.toFixed(2) ?? 0,
-          ),
-        },
-      };
-
-      return {
-        Company: 'Lush Ipiranga',
-        BigNumbers: [bigNumbers],
-        /*RevenueAbByPeriod: revenueAbByPeriod,
-        RevenueAbByPeriodPercent: revenueAbByPeriodPercent,
-        TicketAverageByPeriod: ticketAverageByPeriod,
-        BestSellingItems: bestSellingItems,
-        LeastSellingItems: leastSellingItems,
-        RevenueByGroupPeriod: revenueByGroupPeriod,
-        RevenueFoodByPeriod: revenueFoodByPeriod,
-        RevenueDrinksByPeriod: revenueDrinksByPeriod,
-        ReportByDrinks: reportByDrinks,
-        ReportByOthers: reportByOthers,
-        ReportByFood: reportByFood,*/
-      };
-    } catch (error) {
-      console.error('Erro ao calcular os KPIs:', error);
-      throw new BadRequestException();
+      if (gross.gt(0)) {
+        totalAllSales++;
+      }
     }
+
+    const totalNetRevenue = totalGrossRevenue.minus(totalDiscount);
+    const totalRentals = rawResult.length;
+    const totalAllTicketAverage =
+      rentalsWithABCount > 0
+        ? totalABNetRevenue.div(rentalsWithABCount)
+        : new Prisma.Decimal(0);
+
+    const totalAllTicketAverageByTotalRentals =
+      totalRentals > 0
+        ? totalABNetRevenue.div(totalRentals)
+        : new Prisma.Decimal(0);
+
+    const isMonthly = moment(endDate).diff(moment(startDate), 'days') > 31;
+
+    const abGrouped = new Map<string, number>();
+    const totalGrouped = new Map<string, number>();
+
+    for (const abItem of rawPeriodResult) {
+      const dateKey = isMonthly
+        ? moment(abItem.date).format('YYYY-MM')
+        : moment(abItem.date).format('YYYY-MM-DD');
+
+      const current = abGrouped.get(dateKey) || 0;
+      abGrouped.set(dateKey, current + Number(abItem.totalValue));
+    }
+
+    for (const totalItem of rawTotalRevenueResult) {
+      const dateKey = isMonthly
+        ? moment(totalItem.date).format('YYYY-MM')
+        : moment(totalItem.date).format('YYYY-MM-DD');
+
+      const current = totalGrouped.get(dateKey) || 0;
+      totalGrouped.set(dateKey, current + Number(totalItem.totalRevenue));
+    }
+
+    const dateKeys = [...abGrouped.keys()].sort(); // ordenação por data
+
+    const revenueAbByPeriod = {
+      categories: dateKeys.map((key) =>
+        isMonthly
+          ? moment(key, 'YYYY-MM').format('MM/YYYY')
+          : moment(key).format('DD/MM/YYYY'),
+      ),
+      series: dateKeys.map((key) => {
+        const ab = abGrouped.get(key) || 0;
+        return Number(ab.toFixed(2));
+      }),
+    };
+
+    const revenueAbByPeriodPercent = {
+      categories: dateKeys.map((key) =>
+        isMonthly
+          ? moment(key, 'YYYY-MM').format('MM/YYYY')
+          : moment(key).format('DD/MM/YYYY'),
+      ),
+      series: dateKeys.map((key) => {
+        const ab = abGrouped.get(key) || 0;
+        const total = totalGrouped.get(key) || 0;
+        const percent = total > 0 ? (ab / total) * 100 : 0;
+        return Number(percent.toFixed(2));
+      }),
+    };
+
+    return {
+      Company: 'Lush Ipiranga',
+      BigNumbers: [
+        {
+          currentDate: {
+            totalAllValue: Number(totalABNetRevenue),
+            totalAllSales: totalAllSales,
+            totalAllTicketAverage: Number(totalAllTicketAverage.toFixed(2)),
+            totalAllTicketAverageByTotalRentals: Number(
+              totalAllTicketAverageByTotalRentals.toFixed(2),
+            ),
+          },
+        },
+      ],
+      RevenueAbByPeriod: revenueAbByPeriod,
+      RevenueAbByPeriodPercent: revenueAbByPeriodPercent,
+    };
   }
 }

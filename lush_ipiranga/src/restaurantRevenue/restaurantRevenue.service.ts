@@ -701,7 +701,7 @@ export class RestaurantRevenueService {
                       '12 - PRATOS PRINCIPAIS',
                       '13 - ACOMPANHAMENTOS',
                       '14 - SOBREMESAS',
-                      '15 - BOMBONIERE',
+                      '15- BOMBONIERE',
                     ].includes(productTypeDescription)
                   ) {
                     totalByGroup.ALIMENTOS =
