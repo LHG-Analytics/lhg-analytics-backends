@@ -972,51 +972,14 @@ export class RestaurantService {
 
   async calculateKpisByDateRange(startDate: Date, endDate: Date) {
     const abProductTypes = [
-      '07 - CAFE DA MANHA E CHA',
-      '08 - ADICIONAIS',
-      '09 - PETISCOS',
-      '10 - ENTRADAS',
-      '11 - LANCHES',
-      '12 - PRATOS PRINCIPAIS',
-      '13 - ACOMPANHAMENTOS',
-      '14 - SOBREMESAS',
-      '15- BOMBONIERE',
-      '01 - SOFT DRINKS',
-      '02 - CERVEJAS',
-      '03 - COQUETEIS',
-      '04 - DOSES',
-      '05 - GARRAFAS',
-      '06 - VINHOS E ESPUMANTES',
+      78, 64, 77, 57, 56, 79, 54, 55, 80, 53, 62, 59, 61, 58, 63,
     ];
 
-    const aProductTypes = [
-      '07 - CAFE DA MANHA E CHA',
-      '08 - ADICIONAIS',
-      '09 - PETISCOS',
-      '10 - ENTRADAS',
-      '11 - LANCHES',
-      '12 - PRATOS PRINCIPAIS',
-      '13 - ACOMPANHAMENTOS',
-      '14 - SOBREMESAS',
-      '15- BOMBONIERE',
-    ];
+    const aProductTypes = [78, 64, 77, 57, 62, 59, 61, 58, 63];
 
-    const bProductTypes = [
-      '01 - SOFT DRINKS',
-      '02 - CERVEJAS',
-      '03 - COQUETEIS',
-      '04 - DOSES',
-      '05 - GARRAFAS',
-      '06 - VINHOS E ESPUMANTES',
-    ];
+    const bProductTypes = [56, 79, 54, 55, 80, 53];
 
-    const othersList = [
-      '16 - PRODUTOS EROTICOS',
-      '17 - CONVENIENCIA E HIGIENE',
-      'ITENS EXTRAS',
-      'RESERVAS',
-      'SOUVENIR',
-    ];
+    const othersList = [71, 72, 69, 68, 70];
 
     const formattedStart = moment
       .utc(startDate)
@@ -1029,100 +992,89 @@ export class RestaurantService {
       .set({ hour: 5, minute: 59, second: 59 })
       .format('YYYY-MM-DD HH:mm:ss');
 
-    const abProductTypesSqlList = abProductTypes
-      .map((p) => `'${p}'`)
-      .join(', ');
-
-    const aProductTypesSqlList = aProductTypes.map((p) => `'${p}'`).join(', ');
-
-    const bProductTypesSqlList = bProductTypes.map((p) => `'${p}'`).join(', ');
-
-    const othersProductTypesSqlList = othersList
-      .map((p) => `'${p}'`)
-      .join(', ');
+    const abProductTypesSqlList = abProductTypes.join(', ');
+    const aProductTypesSqlList = aProductTypes.join(', ');
+    const bProductTypesSqlList = bProductTypes.join(', ');
+    const othersProductTypesSqlList = othersList.join(', ');
 
     const kpisRawSql = `
-    SELECT
-      ra."id_apartamentostate",
-      so.id AS "id_saidaestoque",
-      COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalGross",
-      COALESCE(s."desconto", 0) AS "desconto",
-      COALESCE(SUM(
-        CASE
-          WHEN tp."descricao" IN (${abProductTypesSqlList})
-          THEN soi."precovenda" * soi."quantidade"
-          ELSE 0
-        END
-      ), 0) AS "abTotal"
-    FROM "locacaoapartamento" ra
-    LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
-    LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
-    LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-    LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
-    LEFT JOIN "produto" p ON p.id = ps."id_produto"
-    LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-    LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
-    WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
-      AND ra."datainicialdaocupacao" <= '${formattedEnd}'
-      AND ra."fimocupacaotipo" = 'FINALIZADA'
-    GROUP BY ra."id_apartamentostate", so.id, s."desconto"
-  `;
+  SELECT
+    ra."id_apartamentostate",
+    so.id AS "id_saidaestoque",
+    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalGross",
+    COALESCE(s."desconto", 0) AS "desconto",
+    COALESCE(SUM(
+      CASE
+        WHEN tp.id IN (${abProductTypesSqlList})
+        THEN soi."precovenda" * soi."quantidade"
+        ELSE 0
+      END
+    ), 0) AS "abTotal"
+  FROM "locacaoapartamento" ra
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+  LEFT JOIN "produto" p ON p.id = ps."id_produto"
+  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+  GROUP BY ra."id_apartamentostate", so.id, s."desconto"
+`;
 
     const revenueAbPeriodSql = `
-    SELECT
-      TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
-      COALESCE(SUM(
-        CASE
-          WHEN tp."descricao" IN (${abProductTypesSqlList})
-          THEN soi."precovenda" * soi."quantidade"
-          ELSE 0
-        END
-      ), 0) AS "totalValue"
-    FROM "locacaoapartamento" ra
-    LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
-    LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
-    LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-    LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
-    LEFT JOIN "produto" p ON p.id = ps."id_produto"
-    LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-    WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
-      AND ra."datainicialdaocupacao" <= '${formattedEnd}'
-      AND ra."fimocupacaotipo" = 'FINALIZADA'
-    GROUP BY "date"
-    ORDER BY "date" DESC
-  `;
-
-    const totalRevenueByPeriodSql = `
-   SELECT
-  "date",
-  SUM("valor") AS "totalRevenue"
-FROM (
-  -- Receita de locações (valortotal já inclui consumo)
   SELECT
     TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
-    ra."valortotal" AS "valor"
+    COALESCE(SUM(
+      CASE
+        WHEN tp.id IN (${abProductTypesSqlList})
+        THEN soi."precovenda" * soi."quantidade"
+        ELSE 0
+      END
+    ), 0) AS "totalValue"
   FROM "locacaoapartamento" ra
-  WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
-    AND ra."datainicialdaocupacao" <= '${formattedEnd}'
-    AND ra."fimocupacaotipo" = 'FINALIZADA'
-
-  UNION ALL
-
-  -- Receita de vendas diretas (soma dos itens - desconto)
-  SELECT
-    TO_CHAR(so."datasaida", 'YYYY-MM-DD') AS "date",
-    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) - COALESCE(v."desconto", 0) AS "valor"
-  FROM "vendadireta" vd
-  INNER JOIN "saidaestoque" so ON so.id = vd."id_saidaestoque"
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
   LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-  LEFT JOIN "venda" v ON v."id_saidaestoque" = so.id
-  WHERE so."datasaida" >= '${formattedStart}'
-    AND so."datasaida" <= '${formattedEnd}'
-  GROUP BY TO_CHAR(so."datasaida", 'YYYY-MM-DD'), v."desconto"
-) AS all_revenues
-GROUP BY "date"
-ORDER BY "date" DESC;
-  `;
+  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+  LEFT JOIN "produto" p ON p.id = ps."id_produto"
+  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+  GROUP BY "date"
+  ORDER BY "date" DESC
+`;
+
+    const totalRevenueByPeriodSql = `
+  SELECT
+    "date",
+    SUM("valor") AS "totalRevenue"
+  FROM (
+    -- Receita de locações (valortotal já inclui consumo)
+    SELECT
+      TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
+      ra."valortotal" AS "valor"
+    FROM "locacaoapartamento" ra
+    WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+      AND ra."fimocupacaotipo" = 'FINALIZADA'
+
+    UNION ALL
+
+    -- Receita de vendas diretas (soma dos itens - desconto)
+    SELECT
+      TO_CHAR(so."datasaida" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
+      COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) - COALESCE(v."desconto", 0) AS "valor"
+    FROM "vendadireta" vd
+    INNER JOIN "saidaestoque" so ON so.id = vd."id_saidaestoque"
+    LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+    LEFT JOIN "venda" v ON v."id_saidaestoque" = so.id
+    WHERE so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    GROUP BY TO_CHAR(so."datasaida" - INTERVAL '6 hours', 'YYYY-MM-DD'), v."desconto"
+  ) AS all_revenues
+  GROUP BY "date"
+  ORDER BY "date" DESC;
+`;
 
     const abTicketCountByPeriodSql = `
   SELECT
@@ -1135,161 +1087,127 @@ ORDER BY "date" DESC;
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
-    AND ra."datainicialdaocupacao" <= '${formattedEnd}'
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND ra."fimocupacaotipo" = 'FINALIZADA'
-    AND tp."descricao" IN (${abProductTypesSqlList})
+    AND tp.id IN (${abProductTypesSqlList})
   GROUP BY "date"
   ORDER BY "date" DESC
 `;
 
     const bestSellingItemsSql = `
-SELECT 
-  p."descricao" AS "productName",
-  SUM(soi."quantidade") AS "totalSales"
-FROM "saidaestoque" so
-JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
-JOIN "produto" p ON p.id = pe."id_produto"
-WHERE p."id_tipoproduto" IN (78, 64, 77, 57, 56, 79, 54, 55, 80, 53, 62, 59, 61, 58, 63)
-  AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
-GROUP BY p."descricao"
-ORDER BY "totalSales" DESC
-LIMIT 10;
+  SELECT 
+    p."descricao" AS "productName",
+    SUM(soi."quantidade") AS "totalSales"
+  FROM "saidaestoque" so
+  JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
+  JOIN "produto" p ON p.id = pe."id_produto"
+  JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  WHERE tp.id IN (${abProductTypesSqlList})
+    AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+  GROUP BY p."descricao"
+  ORDER BY "totalSales" DESC
+  LIMIT 10;
 `;
 
     // Consulta para os 10 menos vendidos
     const leastSellingItemsSql = `
-SELECT 
-  p."descricao" AS "productName",
-  SUM(soi."quantidade") AS "totalSales"
-FROM "saidaestoque" so
-JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
-JOIN "produto" p ON p.id = pe."id_produto"
-WHERE p."id_tipoproduto" IN (78, 64, 77, 57, 56, 79, 54, 55, 80, 53, 62, 59, 61, 58, 63)
-  AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
-GROUP BY p."descricao"
-HAVING SUM(soi."quantidade") > 0
-ORDER BY "totalSales" ASC
-LIMIT 10;
+  SELECT 
+    p."descricao" AS "productName",
+    SUM(soi."quantidade") AS "totalSales"
+  FROM "saidaestoque" so
+  JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
+  JOIN "produto" p ON p.id = pe."id_produto"
+  JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  WHERE tp.id IN (${abProductTypesSqlList})
+    AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+  GROUP BY p."descricao"
+  HAVING SUM(soi."quantidade") > 0
+  ORDER BY "totalSales" ASC
+  LIMIT 10;
 `;
 
     const revenueGroupByPeriodSql = `
-SELECT
-  TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
-  COALESCE(SUM(
-    CASE
-      WHEN tp."descricao" IN (
-        '07 - CAFE DA MANHA E CHA',
-        '08 - ADICIONAIS',
-        '09 - PETISCOS',
-        '10 - ENTRADAS',
-        '11 - LANCHES',
-        '12 - PRATOS PRINCIPAIS',
-        '13 - ACOMPANHAMENTOS',
-        '14 - SOBREMESAS',
-        '15- BOMBONIERE'
-      )
-      THEN soi."precovenda" * soi."quantidade"
-      ELSE 0
-    END
-  ), 0) AS "ALIMENTOS",
+  SELECT
+    TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
 
-  COALESCE(SUM(
-    CASE
-      WHEN tp."descricao" IN (
-        '01 - SOFT DRINKS',
-        '02 - CERVEJAS',
-        '03 - COQUETEIS',
-        '04 - DOSES',
-        '05 - GARRAFAS',
-        '06 - VINHOS E ESPUMANTES'
-      )
-      THEN soi."precovenda" * soi."quantidade"
-      ELSE 0
-    END
-  ), 0) AS "BEBIDAS",
+    COALESCE(SUM(
+      CASE
+        WHEN tp.id IN (${aProductTypesSqlList})
+        THEN soi."precovenda" * soi."quantidade"
+        ELSE 0
+      END
+    ), 0) AS "ALIMENTOS",
 
-  COALESCE(SUM(
-    CASE
-      WHEN tp."descricao" NOT IN (
-        '01 - SOFT DRINKS',
-        '02 - CERVEJAS',
-        '03 - COQUETEIS',
-        '04 - DOSES',
-        '05 - GARRAFAS',
-        '06 - VINHOS E ESPUMANTES',
-        '07 - CAFE DA MANHA E CHA',
-        '08 - ADICIONAIS',
-        '09 - PETISCOS',
-        '10 - ENTRADAS',
-        '11 - LANCHES',
-        '12 - PRATOS PRINCIPAIS',
-        '13 - ACOMPANHAMENTOS',
-        '14 - SOBREMESAS',
-        '15- BOMBONIERE'
-      )
-      THEN soi."precovenda" * soi."quantidade"
-      ELSE 0
-    END
-  ), 0) AS "OUTROS"
+    COALESCE(SUM(
+      CASE
+        WHEN tp.id IN (${bProductTypesSqlList})
+        THEN soi."precovenda" * soi."quantidade"
+        ELSE 0
+      END
+    ), 0) AS "BEBIDAS",
 
-FROM "locacaoapartamento" ra
-LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
-LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
-LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
-LEFT JOIN "produto" p ON p.id = ps."id_produto"
-LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+    COALESCE(SUM(
+      CASE
+        WHEN tp.id NOT IN (${abProductTypesSqlList})
+        THEN soi."precovenda" * soi."quantidade"
+        ELSE 0
+      END
+    ), 0) AS "OUTROS"
 
-WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
-  AND ra."datainicialdaocupacao" <= '${formattedEnd}'
-  AND ra."fimocupacaotipo" = 'FINALIZADA'
+  FROM "locacaoapartamento" ra
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+  LEFT JOIN "produto" p ON p.id = ps."id_produto"
+  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
 
-GROUP BY "date"
-ORDER BY "date" DESC;
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+
+  GROUP BY "date"
+  ORDER BY "date" DESC;
 `;
 
     const revenueAPeriodSql = `
-   SELECT
-  TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
-  tp."descricao" AS "category",
-  COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalValue"
-FROM "locacaoapartamento" ra
-LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
-LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
-LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
-LEFT JOIN "produto" p ON p.id = ps."id_produto"
-LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
-  AND ra."datainicialdaocupacao" <= '${formattedEnd}'
-  AND ra."fimocupacaotipo" = 'FINALIZADA'
-  AND tp."descricao" IN (${aProductTypesSqlList}) -- ou bProductTypesSqlList
-GROUP BY "date", tp."descricao"
-ORDER BY "date" DESC
-  `;
+  SELECT
+    TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
+    tp."descricao" AS "category",
+    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalValue"
+  FROM "locacaoapartamento" ra
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+  LEFT JOIN "produto" p ON p.id = ps."id_produto"
+  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+    AND tp.id IN (${aProductTypesSqlList})
+  GROUP BY "date", tp."descricao"
+  ORDER BY "date" DESC;
+`;
 
     const revenueBPeriodSql = `
-    SELECT
-  TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
-  tp."descricao" AS "category",
-  COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalValue"
-FROM "locacaoapartamento" ra
-LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
-LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
-LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
-LEFT JOIN "produto" p ON p.id = ps."id_produto"
-LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
-  AND ra."datainicialdaocupacao" <= '${formattedEnd}'
-  AND ra."fimocupacaotipo" = 'FINALIZADA'
-  AND tp."descricao" IN (${bProductTypesSqlList}) -- ou bProductTypesSqlList
-GROUP BY "date", tp."descricao"
-ORDER BY "date" DESC
-  `;
+  SELECT
+    TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
+    tp."descricao" AS "category",
+    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalValue"
+  FROM "locacaoapartamento" ra
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+  LEFT JOIN "produto" p ON p.id = ps."id_produto"
+  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+    AND tp.id IN (${bProductTypesSqlList})
+  GROUP BY "date", tp."descricao"
+  ORDER BY "date" DESC;
+`;
 
     const reportByFoodSql = `
   SELECT
@@ -1303,10 +1221,9 @@ ORDER BY "date" DESC
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
-    AND ra."datainicialdaocupacao" <= '${formattedEnd}'
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND ra."fimocupacaotipo" = 'FINALIZADA'
-    AND tp."descricao" IN (${aProductTypesSqlList})
+    AND tp.id IN (${aProductTypesSqlList})
   GROUP BY tp."descricao"
   ORDER BY revenue DESC
 `;
@@ -1323,10 +1240,9 @@ ORDER BY "date" DESC
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
-    AND ra."datainicialdaocupacao" <= '${formattedEnd}'
+WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND ra."fimocupacaotipo" = 'FINALIZADA'
-    AND tp."descricao" IN (${bProductTypesSqlList})
+    AND tp.id IN (${bProductTypesSqlList})
   GROUP BY tp."descricao"
   ORDER BY revenue DESC
 `;
@@ -1343,10 +1259,9 @@ ORDER BY "date" DESC
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
-    AND ra."datainicialdaocupacao" <= '${formattedEnd}'
+ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND ra."fimocupacaotipo" = 'FINALIZADA'
-    AND tp."descricao" IN (${othersProductTypesSqlList})
+    AND tp.id IN (${othersProductTypesSqlList})
   GROUP BY tp."descricao"
   ORDER BY revenue DESC
 `;
