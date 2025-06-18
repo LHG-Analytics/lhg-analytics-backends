@@ -953,23 +953,6 @@ export class RestaurantService {
     };
   }
 
-  private async fetchKpiData(startDate: Date, endDate: Date) {
-    return await Promise.all([
-      this.prisma.prismaLocal.rentalApartment.findMany({
-        where: {
-          checkIn: {
-            gte: startDate,
-            lte: endDate,
-          },
-          endOccupationType: 'FINALIZADA',
-        },
-        include: {
-          saleLease: true,
-        },
-      }),
-    ]);
-  }
-
   async calculateKpisByDateRange(startDate: Date, endDate: Date) {
     const abProductTypes = [
       78, 64, 77, 57, 56, 79, 54, 55, 80, 53, 62, 59, 61, 58, 63,
