@@ -989,6 +989,35 @@ export class RestaurantService {
       '06 - VINHOS E ESPUMANTES',
     ];
 
+    const aProductTypes = [
+      '07 - CAFE DA MANHA E CHA',
+      '08 - ADICIONAIS',
+      '09 - PETISCOS',
+      '10 - ENTRADAS',
+      '11 - LANCHES',
+      '12 - PRATOS PRINCIPAIS',
+      '13 - ACOMPANHAMENTOS',
+      '14 - SOBREMESAS',
+      '15- BOMBONIERE',
+    ];
+
+    const bProductTypes = [
+      '01 - SOFT DRINKS',
+      '02 - CERVEJAS',
+      '03 - COQUETEIS',
+      '04 - DOSES',
+      '05 - GARRAFAS',
+      '06 - VINHOS E ESPUMANTES',
+    ];
+
+    const othersList = [
+      '16 - PRODUTOS EROTICOS',
+      '17 - CONVENIENCIA E HIGIENE',
+      'ITENS EXTRAS',
+      'RESERVAS',
+      'SOUVENIR',
+    ];
+
     const formattedStart = moment
       .utc(startDate)
       .set({ hour: 6, minute: 0, second: 0 })
@@ -1001,6 +1030,14 @@ export class RestaurantService {
       .format('YYYY-MM-DD HH:mm:ss');
 
     const abProductTypesSqlList = abProductTypes
+      .map((p) => `'${p}'`)
+      .join(', ');
+
+    const aProductTypesSqlList = aProductTypes.map((p) => `'${p}'`).join(', ');
+
+    const bProductTypesSqlList = bProductTypes.map((p) => `'${p}'`).join(', ');
+
+    const othersProductTypesSqlList = othersList
       .map((p) => `'${p}'`)
       .join(', ');
 
@@ -1214,6 +1251,106 @@ GROUP BY "date"
 ORDER BY "date" DESC;
 `;
 
+    const revenueAPeriodSql = `
+   SELECT
+  TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
+  tp."descricao" AS "category",
+  COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalValue"
+FROM "locacaoapartamento" ra
+LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+LEFT JOIN "produto" p ON p.id = ps."id_produto"
+LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
+  AND ra."datainicialdaocupacao" <= '${formattedEnd}'
+  AND ra."fimocupacaotipo" = 'FINALIZADA'
+  AND tp."descricao" IN (${aProductTypesSqlList}) -- ou bProductTypesSqlList
+GROUP BY "date", tp."descricao"
+ORDER BY "date" DESC
+  `;
+
+    const revenueBPeriodSql = `
+    SELECT
+  TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
+  tp."descricao" AS "category",
+  COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalValue"
+FROM "locacaoapartamento" ra
+LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+LEFT JOIN "produto" p ON p.id = ps."id_produto"
+LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
+  AND ra."datainicialdaocupacao" <= '${formattedEnd}'
+  AND ra."fimocupacaotipo" = 'FINALIZADA'
+  AND tp."descricao" IN (${bProductTypesSqlList}) -- ou bProductTypesSqlList
+GROUP BY "date", tp."descricao"
+ORDER BY "date" DESC
+  `;
+
+    const reportByFoodSql = `
+  SELECT
+    tp."descricao" AS "category",
+    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "revenue",
+    COALESCE(SUM(soi."quantidade"), 0) AS "quantity"
+  FROM "locacaoapartamento" ra
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+  LEFT JOIN "produto" p ON p.id = ps."id_produto"
+  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
+    AND ra."datainicialdaocupacao" <= '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+    AND tp."descricao" IN (${aProductTypesSqlList})
+  GROUP BY tp."descricao"
+  ORDER BY revenue DESC
+`;
+
+    const reportByDrinkSql = `
+  SELECT
+    tp."descricao" AS "category",
+    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "revenue",
+    COALESCE(SUM(soi."quantidade"), 0) AS "quantity"
+  FROM "locacaoapartamento" ra
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+  LEFT JOIN "produto" p ON p.id = ps."id_produto"
+  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
+    AND ra."datainicialdaocupacao" <= '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+    AND tp."descricao" IN (${bProductTypesSqlList})
+  GROUP BY tp."descricao"
+  ORDER BY revenue DESC
+`;
+
+    const reportByOthersSql = `
+  SELECT
+    tp."descricao" AS "category",
+    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "revenue",
+    COALESCE(SUM(soi."quantidade"), 0) AS "quantity"
+  FROM "locacaoapartamento" ra
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+  LEFT JOIN "produto" p ON p.id = ps."id_produto"
+  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  WHERE ra."datainicialdaocupacao" >= '${formattedStart}'
+    AND ra."datainicialdaocupacao" <= '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+    AND tp."descricao" IN (${othersProductTypesSqlList})
+  GROUP BY tp."descricao"
+  ORDER BY revenue DESC
+`;
+
     try {
       const [
         rawResult,
@@ -1223,6 +1360,11 @@ ORDER BY "date" DESC;
         bestSellingResult,
         leastSellingResult,
         revenueGroupByPeriodResult,
+        rawAPeriodResult,
+        rawBPeriodResult,
+        resultByFood,
+        resultByDrink,
+        resultByOthers,
       ] = await Promise.all([
         this.prisma.prismaLocal.$queryRawUnsafe<any[]>(kpisRawSql),
         this.prisma.prismaLocal.$queryRawUnsafe<any[]>(revenueAbPeriodSql),
@@ -1233,8 +1375,14 @@ ORDER BY "date" DESC;
         this.prisma.prismaLocal.$queryRawUnsafe<any[]>(bestSellingItemsSql),
         this.prisma.prismaLocal.$queryRawUnsafe<any[]>(leastSellingItemsSql),
         this.prisma.prismaLocal.$queryRawUnsafe<any[]>(revenueGroupByPeriodSql),
+        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(revenueAPeriodSql),
+        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(revenueBPeriodSql),
+        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(reportByFoodSql),
+        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(reportByDrinkSql),
+        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(reportByOthersSql),
       ]);
 
+      // --- BigNumbers ---
       let totalGrossRevenue = new Prisma.Decimal(0);
       let totalDiscount = new Prisma.Decimal(0);
       let totalABNetRevenue = new Prisma.Decimal(0);
@@ -1266,7 +1414,6 @@ ORDER BY "date" DESC;
         rentalsWithABCount > 0
           ? totalABNetRevenue.div(rentalsWithABCount)
           : new Prisma.Decimal(0);
-
       const totalAllTicketAverageByTotalRentals =
         totalRentals > 0
           ? totalABNetRevenue.div(totalRentals)
@@ -1274,18 +1421,80 @@ ORDER BY "date" DESC;
 
       const isMonthly = moment(endDate).diff(moment(startDate), 'days') > 31;
 
+      // --- RevenueAbByPeriod / Percent / TicketAverageByPeriod ---
       const abGrouped = new Map<string, number>();
       const totalGrouped = new Map<string, number>();
+      const rentalsWithAbGrouped = new Map<string, number>();
 
       for (const abItem of rawPeriodResult) {
         const dateKey = isMonthly
           ? moment(abItem.date).format('YYYY-MM')
           : moment(abItem.date).format('YYYY-MM-DD');
-
         const current = abGrouped.get(dateKey) || 0;
         abGrouped.set(dateKey, current + Number(abItem.totalValue));
       }
 
+      for (const totalItem of rawTotalRevenueResult) {
+        const dateKey = isMonthly
+          ? moment(totalItem.date).format('YYYY-MM')
+          : moment(totalItem.date).format('YYYY-MM-DD');
+        const current = totalGrouped.get(dateKey) || 0;
+        totalGrouped.set(dateKey, current + Number(totalItem.totalRevenue));
+      }
+
+      for (const item of rawAbTicketCountResult) {
+        const dateKey = isMonthly
+          ? moment(item.date).format('YYYY-MM')
+          : moment(item.date).format('YYYY-MM-DD');
+        const current = rentalsWithAbGrouped.get(dateKey) || 0;
+        rentalsWithAbGrouped.set(dateKey, current + Number(item.rentalsWithAB));
+      }
+
+      const dateKeys = [...abGrouped.keys()].sort();
+
+      const revenueAbByPeriod = {
+        categories: dateKeys.map((key) =>
+          isMonthly
+            ? moment(key, 'YYYY-MM').format('MM/YYYY')
+            : moment(key).format('DD/MM/YYYY'),
+        ),
+        series: dateKeys.map((key) =>
+          Number((abGrouped.get(key) || 0).toFixed(2)),
+        ),
+      };
+
+      const revenueAbByPeriodPercent = {
+        categories: revenueAbByPeriod.categories,
+        series: dateKeys.map((key) => {
+          const ab = abGrouped.get(key) || 0;
+          const total = totalGrouped.get(key) || 0;
+          const percent = total > 0 ? (ab / total) * 100 : 0;
+          return Number(percent.toFixed(2));
+        }),
+      };
+
+      const ticketAverageByPeriod = {
+        categories: revenueAbByPeriod.categories,
+        series: dateKeys.map((key) => {
+          const ab = abGrouped.get(key) || 0;
+          const rentals = rentalsWithAbGrouped.get(key) || 0;
+          const ticket = rentals > 0 ? ab / rentals : 0;
+          return Number(ticket.toFixed(2));
+        }),
+      };
+
+      // --- BestSellingItems / LeastSellingItems ---
+      const bestSellingItems = {
+        categories: bestSellingResult.map((item) => item.productName),
+        series: bestSellingResult.map((item) => Number(item.totalSales)),
+      };
+
+      const leastSellingItems = {
+        categories: leastSellingResult.map((item) => item.productName),
+        series: leastSellingResult.map((item) => Number(item.totalSales)),
+      };
+
+      // --- RevenueByGroupPeriod ---
       const revenueGrouped = new Map<
         string,
         { ALIMENTOS: number; BEBIDAS: number; OUTROS: number }
@@ -1306,92 +1515,17 @@ ORDER BY "date" DESC;
         current.OUTROS += Number(row.OUTROS) || 0;
       }
 
-      for (const totalItem of rawTotalRevenueResult) {
-        const dateKey = isMonthly
-          ? moment(totalItem.date).format('YYYY-MM')
-          : moment(totalItem.date).format('YYYY-MM-DD');
-
-        const current = totalGrouped.get(dateKey) || 0;
-        totalGrouped.set(dateKey, current + Number(totalItem.totalRevenue));
-      }
-
-      const rentalsWithAbGrouped = new Map<string, number>();
-
-      for (const item of rawAbTicketCountResult) {
-        const dateKey = isMonthly
-          ? moment(item.date).format('YYYY-MM')
-          : moment(item.date).format('YYYY-MM-DD');
-
-        const current = rentalsWithAbGrouped.get(dateKey) || 0;
-        rentalsWithAbGrouped.set(dateKey, current + Number(item.rentalsWithAB));
-      }
-
-      const dateKeys = [...abGrouped.keys()].sort(); // ordenação por data
-
       const revenueKeys = [...revenueGrouped.keys()].sort();
+      const alimentosSeries = revenueKeys.map((key) =>
+        Number(revenueGrouped.get(key)!.ALIMENTOS.toFixed(2)),
+      );
+      const bebidasSeries = revenueKeys.map((key) =>
+        Number(revenueGrouped.get(key)!.BEBIDAS.toFixed(2)),
+      );
+      const outrosSeries = revenueKeys.map((key) =>
+        Number(revenueGrouped.get(key)!.OUTROS.toFixed(2)),
+      );
 
-      const revenueAbByPeriod = {
-        categories: dateKeys.map((key) =>
-          isMonthly
-            ? moment(key, 'YYYY-MM').format('MM/YYYY')
-            : moment(key).format('DD/MM/YYYY'),
-        ),
-        series: dateKeys.map((key) => {
-          const ab = abGrouped.get(key) || 0;
-          return Number(ab.toFixed(2));
-        }),
-      };
-
-      const revenueAbByPeriodPercent = {
-        categories: dateKeys.map((key) =>
-          isMonthly
-            ? moment(key, 'YYYY-MM').format('MM/YYYY')
-            : moment(key).format('DD/MM/YYYY'),
-        ),
-        series: dateKeys.map((key) => {
-          const ab = abGrouped.get(key) || 0;
-          const total = totalGrouped.get(key) || 0;
-          const percent = total > 0 ? (ab / total) * 100 : 0;
-          return Number(percent.toFixed(2));
-        }),
-      };
-
-      const ticketAverageByPeriod = {
-        categories: dateKeys.map((key) =>
-          isMonthly
-            ? moment(key, 'YYYY-MM').format('MM/YYYY')
-            : moment(key).format('DD/MM/YYYY'),
-        ),
-        series: dateKeys.map((key) => {
-          const ab = abGrouped.get(key) || 0;
-          const rentals = rentalsWithAbGrouped.get(key) || 0;
-          const ticket = rentals > 0 ? ab / rentals : 0;
-          return Number(ticket.toFixed(2));
-        }),
-      };
-
-      const bestSellingItems = {
-        categories: bestSellingResult.map((item) => item.productName),
-        series: bestSellingResult.map((item) => Number(item.totalSales)),
-      };
-
-      const leastSellingItems = {
-        categories: leastSellingResult.map((item) => item.productName),
-        series: leastSellingResult.map((item) => Number(item.totalSales)),
-      };
-
-      const alimentosSeries = [];
-      const bebidasSeries = [];
-      const outrosSeries = [];
-
-      for (const key of revenueKeys) {
-        const data = revenueGrouped.get(key)!;
-        alimentosSeries.push(Number(data.ALIMENTOS.toFixed(2)));
-        bebidasSeries.push(Number(data.BEBIDAS.toFixed(2)));
-        outrosSeries.push(Number(data.OUTROS.toFixed(2)));
-      }
-
-      // 4. Construir o objeto no formato desejado, parecido com revenueAbByPeriod
       const revenueByGroupPeriod = {
         categories: revenueKeys.map((key) =>
           isMonthly
@@ -1405,6 +1539,131 @@ ORDER BY "date" DESC;
         ],
       };
 
+      // --- RevenueFoodByPeriod / RevenueDrinksByPeriod ---
+      function buildRevenueSeries(rawData: any[], isMonthly: boolean) {
+        const dateSet = new Set<string>();
+        const categoryMap = new Map<string, Map<string, number>>();
+
+        for (const item of rawData) {
+          const dateKey = isMonthly
+            ? moment(item.date).format('YYYY-MM')
+            : moment(item.date).format('YYYY-MM-DD');
+          const category = item.category || 'OUTROS';
+          dateSet.add(dateKey);
+
+          if (!categoryMap.has(category)) {
+            categoryMap.set(category, new Map());
+          }
+
+          const categoryData = categoryMap.get(category)!;
+          const current = categoryData.get(dateKey) || 0;
+          categoryData.set(dateKey, current + Number(item.totalValue));
+        }
+
+        const sortedDates = [...dateSet].sort();
+        const categories = sortedDates.map((key) =>
+          isMonthly
+            ? moment(key, 'YYYY-MM').format('MM/YYYY')
+            : moment(key).format('DD/MM/YYYY'),
+        );
+
+        const series = [...categoryMap.entries()].map(([category, dateMap]) => {
+          const data = sortedDates.map((date) =>
+            Number((dateMap.get(date) || 0).toFixed(2)),
+          );
+          return { name: category, data };
+        });
+
+        return { categories, series };
+      }
+
+      const revenueAByPeriod = (() => {
+        const { categories, series } = buildRevenueSeries(
+          rawAPeriodResult,
+          isMonthly,
+        );
+        return { categoriesFood: categories, seriesFood: series };
+      })();
+
+      const revenueBByPeriod = (() => {
+        const { categories, series } = buildRevenueSeries(
+          rawBPeriodResult,
+          isMonthly,
+        );
+        return { categoriesDrink: categories, seriesDrink: series };
+      })();
+
+      // --- ReportByFood / Drinks / Others ---
+      function buildReport(
+        data: any[],
+        totalRevenue: number,
+        totalQuantity: number,
+      ) {
+        return [
+          ...data.map((row) => ({
+            name: row.category,
+            revenue: Number(row.revenue),
+            revenuePercent: totalRevenue
+              ? Number(((row.revenue / totalRevenue) * 100).toFixed(2))
+              : 0,
+            quantity: Number(row.quantity),
+            quantityPercent: totalQuantity
+              ? Number(((row.quantity / totalQuantity) * 100).toFixed(2))
+              : 0,
+          })),
+          {
+            name: 'TOTAL',
+            revenue: Number(totalRevenue.toFixed(2)),
+            revenuePercent: 100,
+            quantity: totalQuantity,
+            quantityPercent: 100,
+          },
+        ];
+      }
+
+      const totalRevenueFood = resultByFood.reduce(
+        (acc, row) => acc + Number(row.revenue),
+        0,
+      );
+      const totalQuantityFood = resultByFood.reduce(
+        (acc, row) => acc + Number(row.quantity),
+        0,
+      );
+      const reportByFood = buildReport(
+        resultByFood,
+        totalRevenueFood,
+        totalQuantityFood,
+      );
+
+      const totalRevenueDrink = resultByDrink.reduce(
+        (acc, row) => acc + Number(row.revenue),
+        0,
+      );
+      const totalQuantityDrink = resultByDrink.reduce(
+        (acc, row) => acc + Number(row.quantity),
+        0,
+      );
+      const reportByDrink = buildReport(
+        resultByDrink,
+        totalRevenueDrink,
+        totalQuantityDrink,
+      );
+
+      const totalRevenueOthers = resultByOthers.reduce(
+        (acc, row) => acc + Number(row.revenue),
+        0,
+      );
+      const totalQuantityOthers = resultByOthers.reduce(
+        (acc, row) => acc + Number(row.quantity),
+        0,
+      );
+      const reportByOthers = buildReport(
+        resultByOthers,
+        totalRevenueOthers,
+        totalQuantityOthers,
+      );
+
+      // --- Return final ---
       return {
         Company: 'Lush Ipiranga',
         BigNumbers: [
@@ -1425,6 +1684,11 @@ ORDER BY "date" DESC;
         BestSellingItems: bestSellingItems,
         LeastSellingItems: leastSellingItems,
         RevenueByGroupPeriod: revenueByGroupPeriod,
+        RevenueFoodByPeriod: revenueAByPeriod,
+        RevenueDrinksByPeriod: revenueBByPeriod,
+        ReportByDrinks: reportByDrink,
+        ReportByOthers: reportByOthers,
+        ReportByFood: reportByFood,
       };
     } catch (error) {
       console.error('Erro ao executar queries dos KPIs do restaurante:', error);
