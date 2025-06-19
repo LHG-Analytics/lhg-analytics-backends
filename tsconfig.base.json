@@ -11,10 +11,14 @@
         "experimentalDecorators": true,
         "allowSyntheticDefaultImports": true,
         "skipLibCheck": true,
+        "useUnknownInCatchVariables": false,
         "forceConsistentCasingInFileNames": true,
         "incremental": true,
         "baseUrl": ".",
         "paths": {
+            "@auth/*": [
+                "authentication/src/*"
+            ],
             "@/*": [
                 "./*"
             ]

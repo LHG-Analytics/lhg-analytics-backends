@@ -38,7 +38,10 @@ async function bootstrap() {
         'API para visualização e gerenciamento dos Endpoints no backend',
       )
       .setVersion('1.0')
-      //.addBearerAuth()
+      /*.addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        'JWT-auth',
+      )*/
       .addServer(isProduction ? '/lush_ipiranga' : '/')
       .addTag('users')
       .addTag('KpiAlos')

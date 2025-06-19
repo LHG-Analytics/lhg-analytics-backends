@@ -39,7 +39,12 @@ export class UserController {
       const createdUser = await this.userService.createUser(createUserDto);
       return createdUser; // Este já deve ser um UserResponseDto
     } catch (error) {
-      throw new BadRequestException(`Failed to create user: ${error.message}`);
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Failed to create user: ${error.message}`,
+        );
+      }
+      throw new BadRequestException('Failed to create user: erro desconhecido');
     }
   }
 
@@ -60,10 +65,12 @@ export class UserController {
       );
       return updatedUser; // Este já deve ser um UserResponseDto
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw new NotFoundException(error.message);
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Failed to create user: ${error.message}`,
+        );
       }
-      throw new BadRequestException(`Failed to update user: ${error.message}`);
+      throw new BadRequestException(`Failed to update user: erro desconhecido`);
     }
   }
 
@@ -78,7 +85,12 @@ export class UserController {
       const users = await this.userService.findAll();
       return users; // Este já deve ser um array de UserResponseDto
     } catch (error) {
-      throw new BadRequestException(`Failed to fetch users: ${error.message}`);
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Failed to create user: ${error.message}`,
+        );
+      }
+      throw new BadRequestException('Failed to fetch users: erro desconhecido');
     }
   }
 
@@ -107,7 +119,7 @@ export class UserController {
       if (error instanceof NotFoundException) {
         throw new NotFoundException(error.message);
       }
-      throw new BadRequestException(`Failed to delete user: ${error.message}`);
+      throw new BadRequestException(`Failed to delete user: erro desconhecido`);
     }
   }
 }

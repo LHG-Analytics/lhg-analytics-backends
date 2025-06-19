@@ -2,6 +2,7 @@ import { PeriodEnum, Prisma } from '@client-online';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { PrismaService } from '../prisma/prisma.service';
+
 @Injectable()
 export class RestaurantService {
   constructor(private prisma: PrismaService) {}
@@ -1590,8 +1591,16 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
       };
     } catch (error) {
       console.error('Erro ao executar queries dos KPIs do restaurante:', error);
+
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao calcular os KPIs do restaurante: ${error.message}`,
+        );
+      }
+
+      // fallback genérico se não for Error
       throw new BadRequestException(
-        `Falha ao calcular os KPIs do restaurante: ${error.message}`,
+        'Falha ao calcular os KPIs do restaurante: erro desconhecido',
       );
     }
   }

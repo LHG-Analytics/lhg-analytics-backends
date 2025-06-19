@@ -98,7 +98,10 @@ export class UserService {
 
       return usersWithCompanyNames;
     } catch (error) {
-      throw new Error(`Failed to fetch users: ${error.message}`);
+      if (error instanceof Error) {
+        throw new Error(`Failed to fetch users: ${error.message}`);
+      }
+      throw new Error('Failed to fetch users: erro desconhecido');
     }
   }
 
