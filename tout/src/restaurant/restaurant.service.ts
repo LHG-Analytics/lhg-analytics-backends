@@ -971,7 +971,6 @@ export class RestaurantService {
 
     const formattedEnd = moment
       .utc(endDate)
-      .add(1, 'day') // importante para pegar o último dia completo
       .set({ hour: 23, minute: 59, second: 59 })
       .format('YYYY-MM-DD HH:mm:ss');
 
