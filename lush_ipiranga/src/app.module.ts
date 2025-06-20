@@ -30,6 +30,7 @@ import { RestaurantModule } from './restaurant/restaurant.module';
 import { RestaurantRevenueModule } from './restaurantRevenue/restaurantRevenue.module';
 import { RestaurantSalesModule } from './restaurantSales/restaurantSales.module';
 import { RestaurantTicketAverageModule } from './restaurantTicketAverage/restaurantTicketAverage.module';
+import { RestaurantCostsModule } from './restaurantCosts/restaurantCosts.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { RestaurantTicketAverageModule } from './restaurantTicketAverage/restaur
     RestaurantRevenueModule,
     RestaurantSalesModule,
     RestaurantTicketAverageModule,
+    RestaurantCostsModule,
   ],
   controllers: [AppController],
   providers: [

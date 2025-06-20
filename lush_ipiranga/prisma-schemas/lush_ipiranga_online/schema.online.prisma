@@ -67,6 +67,7 @@ model Company {
   RestaurantTicketAverageByPeriod         RestaurantTicketAverageByPeriod[]
   RestaurantRevenueByPeriodPercent        RestaurantRevenueByPeriodPercent[]
   RestaurantRevenueByGroupByPeriod        RestaurantRevenueByGroupByPeriod[]
+  RestaurantCMV                           RestaurantCMV[]
 }
 
 model Governance {
@@ -668,6 +669,7 @@ model Restaurant {
   RestaurantTicketAverageByPeriod       RestaurantTicketAverageByPeriod[]
   RestaurantRevenueByPeriodPercent      RestaurantRevenueByPeriodPercent[]
   RestaurantRevenueByGroupByPeriod      RestaurantRevenueByGroupByPeriod[]
+  RestaurantCMV                         RestaurantCMV[]
 }
 
 model RestaurantRevenue {
@@ -881,6 +883,19 @@ model RestaurantTicketAverageByPeriod {
   company            Company?    @relation(fields: [companyId], references: [id])
   restaurantId       Int?
   restaurant         Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@unique([period, createdDate])
+}
+
+model RestaurantCMV {
+  id           Int         @id @default(autoincrement())
+  period       PeriodEnum?
+  totalAllCMV  Decimal     @db.Decimal(10, 2)
+  createdDate  DateTime
+  companyId    Int
+  company      Company?    @relation(fields: [companyId], references: [id])
+  restaurantId Int?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@unique([period, createdDate])
 }

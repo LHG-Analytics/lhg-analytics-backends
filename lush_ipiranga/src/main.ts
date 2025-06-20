@@ -60,6 +60,7 @@ async function bootstrap() {
       .addTag('BookingsRepresentativeness')
       .addTag('RestaurantRevenue')
       .addTag('RestaurantSales')
+      .addTag('RestaurantCosts')
       .addTag('RestaurantTicketAverage')
       .addTag('Company')
       .addTag('Restaurants')
