@@ -982,6 +982,7 @@ export class RestaurantService {
   SELECT
     ra."id_apartamentostate",
     so.id AS "id_saidaestoque",
+    TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
     COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalGross",
     COALESCE(s."desconto", 0) AS "desconto",
     COALESCE(SUM(
@@ -999,9 +1000,9 @@ export class RestaurantService {
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
   LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
- WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND ra."fimocupacaotipo" = 'FINALIZADA'
-  GROUP BY ra."id_apartamentostate", so.id, s."desconto"
+  GROUP BY ra."id_apartamentostate", so.id, s."desconto", ra."datainicialdaocupacao"
 `;
 
     const revenueAbPeriodSql = `
@@ -1009,8 +1010,11 @@ export class RestaurantService {
     TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
     COALESCE(SUM(
       CASE
-        WHEN tp.id IN (${abProductTypesSqlList})
-        THEN soi."precovenda" * soi."quantidade"
+        WHEN tp.id IN (${abProductTypesSqlList}) THEN
+          (soi."precovenda" * soi."quantidade") * 
+          (
+            1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0)
+          )
         ELSE 0
       END
     ), 0) AS "totalValue"
@@ -1021,6 +1025,15 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+  LEFT JOIN (
+    SELECT 
+      soi."id_saidaestoque", 
+      SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+    FROM "saidaestoqueitem" soi
+    WHERE soi."cancelado" IS NULL
+    GROUP BY soi."id_saidaestoque"
+  ) AS so_total ON so_total."id_saidaestoque" = so.id
   WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND ra."fimocupacaotipo" = 'FINALIZADA'
   GROUP BY "date"
@@ -1289,7 +1302,10 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         const gross = new Prisma.Decimal(row.totalGross);
         const discount = new Prisma.Decimal(row.desconto);
         const abTotal = new Prisma.Decimal(row.abTotal);
-        const netAB = abTotal.minus(discount);
+        const discountProportion = gross.gt(0)
+          ? discount.mul(abTotal).div(gross)
+          : new Prisma.Decimal(0);
+        const netAB = abTotal.minus(discountProportion);
 
         totalGrossRevenue = totalGrossRevenue.plus(gross);
         totalDiscount = totalDiscount.plus(discount);
@@ -1565,7 +1581,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         BigNumbers: [
           {
             currentDate: {
-              totalAllValue: Number(totalABNetRevenue),
+              totalAllValue: Number(totalABNetRevenue.toFixed(2)),
               totalAllSales: totalAllSales,
               totalAllTicketAverage: Number(totalAllTicketAverage.toFixed(2)),
               totalAllTicketAverageByTotalRentals: Number(
