@@ -22,7 +22,7 @@ export class RestaurantCostsService {
     this.apiUrl = this.config.get('DESBRAVADOR_API_URL');
     this.user = this.config.get('DESBRAVADOR_USER');
     this.pass = this.config.get('DESBRAVADOR_PASS');
-    this.companyId = Number(this.config.get('DESBRAVADOR_COMPANY_ID'));
+    this.companyId = Number(this.config.get('DESBRAVADOR_IPIRANGA_ID'));
   }
 
   async calculateCMV(
