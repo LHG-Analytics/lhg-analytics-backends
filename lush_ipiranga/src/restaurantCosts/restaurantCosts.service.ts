@@ -12,7 +12,7 @@ export class RestaurantCostsService {
   private apiUrl: string;
   private user: string;
   private pass: string;
-  private companyId: number;
+  private unitId: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -22,7 +22,7 @@ export class RestaurantCostsService {
     this.apiUrl = this.config.get('DESBRAVADOR_API_URL');
     this.user = this.config.get('DESBRAVADOR_USER');
     this.pass = this.config.get('DESBRAVADOR_PASS');
-    this.companyId = Number(this.config.get('DESBRAVADOR_IPIRANGA_ID'));
+    this.unitId = Number(this.config.get('DESBRAVADOR_IPIRANGA_ID'));
   }
 
   async calculateCMV(
@@ -30,6 +30,8 @@ export class RestaurantCostsService {
     endDate: Date,
     period?: PeriodEnum,
   ): Promise<any> {
+    const companyId = 1;
+
     const token = await this.getToken();
 
     const movimentos = await this.getMovimentos(token, startDate, endDate);
@@ -49,7 +51,7 @@ export class RestaurantCostsService {
       totalAllCMV,
       createdDate: adjustedEndDate,
       period,
-      companyId: this.companyId,
+      companyId,
     });
   }
 
@@ -67,7 +69,7 @@ export class RestaurantCostsService {
     const dtInicial = start.toISOString().split('T')[0];
     const dtFinal = end.toISOString().split('T')[0];
 
-    const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL='${dtInicial}'&DTFINAL='${dtFinal}'&CDEMPRESA=${this.companyId}`;
+    const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL='${dtInicial}'&DTFINAL='${dtFinal}'&CDEMPRESA=${this.unitId}`;
 
     const res = await this.http.axiosRef.get(url, {
       headers: {
@@ -75,7 +77,21 @@ export class RestaurantCostsService {
       },
     });
 
-    return res.data;
+    const data = res.data;
+
+    if (Array.isArray(data)) {
+      return data;
+    }
+
+    if (Array.isArray(data.resultado)) {
+      return data.resultado;
+    }
+
+    console.error(
+      'Formato inesperado da resposta:',
+      JSON.stringify(data, null, 2),
+    );
+    throw new Error('Resposta inválida da API Desbravador');
   }
 
   private async insertRestaurantCMV(
