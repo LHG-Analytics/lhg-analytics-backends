@@ -36,14 +36,6 @@ export class RestaurantCostsService {
 
     const movimentos = await this.getMovimentos(token, startDate, endDate);
 
-    console.log('[DEBUG] Movimentos retornados:', movimentos);
-
-    console.log(
-      '[DEBUG] Movimentos recebidos:',
-      movimentos.length,
-      JSON.stringify(movimentos.slice(0, 5), null, 2),
-    );
-
     const saidas = movimentos.filter((m) =>
       [2, 20, 21, 22, 31].includes(m.codigoTipoMovimento),
     );
@@ -158,6 +150,9 @@ export class RestaurantCostsService {
     if (data && Array.isArray(data.resultado)) {
       return data.resultado;
     }
+
+    // 🔍 Mostra estrutura completa
+    console.dir(res.data, { depth: null });
 
     // Se não veio nada utilizável
     console.warn('⚠️ Resposta inesperada da API Desbravador:', data);
