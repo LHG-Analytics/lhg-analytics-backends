@@ -96,7 +96,10 @@ export class RestaurantCostsService {
     const totalRevenue = revenueResult?.[0]?.totalValue ?? 0;
 
     const cmvDecimal = totalRevenue > 0 ? totalCost / totalRevenue : 0;
-    const totalAllCMV = new Prisma.Decimal(cmvDecimal.toFixed(2));
+
+    console.log('totalRevenue:', totalRevenue);
+    console.log('totalCost:', totalCost);
+    const totalAllCMV = new Prisma.Decimal(Number(cmvDecimal.toFixed(2)));
 
     // Ajuste de horário UTC para data de referência
     const adjustedEndDate = new Date(endDate);
@@ -113,9 +116,6 @@ export class RestaurantCostsService {
     // Retorno limpo conforme solicitado
     return {
       totalAllCMV: result.totalAllCMV,
-      createdDate: result.createdDate,
-      period: result.period,
-      companyId: result.companyId,
     };
   }
 
