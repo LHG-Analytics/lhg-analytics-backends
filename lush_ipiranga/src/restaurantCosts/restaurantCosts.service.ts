@@ -132,45 +132,39 @@ export class RestaurantCostsService {
   private async getMovimentos(token: string, start: Date, end: Date) {
     const dtInicial = start.toISOString().split('T')[0];
     const dtFinal = end.toISOString().split('T')[0];
-
     console.log('dtInicial:', dtInicial);
     console.log('dtFinal:', dtFinal);
 
-    const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL=${dtInicial}&DTFINAL=${dtFinal}&CDEMPRESA=${this.unitId}`;
+    const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL='${dtInicial}'&DTFINAL='${dtFinal}'&CDEMPRESA=${this.unitId}`;
 
     console.log('[DEBUG] URL gerada:', url);
 
-    try {
-      const res = await this.http.axiosRef.get(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+    const res = await this.http.axiosRef.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-      console.log(
-        '[DEBUG] Resposta da API:',
-        JSON.stringify(res.data, null, 2),
-      );
+    const data = res.data;
 
-      const data = res.data;
+    console.log(
+      '[DEBUG] GetMovimentoEstoque retorno:',
+      JSON.stringify(data, null, 2),
+    );
 
-      // Se já é um array diretamente
-      if (Array.isArray(data)) {
-        return data;
-      }
-
-      // Se veio no formato { resultado: [...] }
-      if (data && Array.isArray(data.resultado)) {
-        return data.resultado;
-      }
-
-      // Se não veio nada utilizável
-      console.warn('⚠️ Resposta inesperada da API Desbravador:', data);
-      return [];
-    } catch (error) {
-      console.error('Erro ao chamar a API:', error);
-      return [];
+    // Se já é um array diretamente
+    if (Array.isArray(data)) {
+      return data;
     }
+
+    // Se veio no formato { resultado: [...] }
+    if (data && Array.isArray(data.resultado)) {
+      return data.resultado;
+    }
+
+    // Se não veio nada utilizável
+    console.warn('⚠️ Resposta inesperada da API Desbravador:', data);
+    return [];
   }
 
   private async insertRestaurantCMV(
