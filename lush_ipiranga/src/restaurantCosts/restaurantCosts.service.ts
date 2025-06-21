@@ -135,7 +135,7 @@ export class RestaurantCostsService {
     console.log('start:', start, 'end:', end);
     console.log('dtInicial:', dtInicial, 'dtFinal:', dtFinal);
 
-    const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL=${dtInicial}&DTFINAL=${dtFinal}&CDEMPRESA=${this.unitId}`;
+    const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL='${dtInicial}'&DTFINAL='${dtFinal}'&CDEMPRESA=${this.unitId}`;
 
     console.log('[DEBUG] URL gerada:', url);
 
