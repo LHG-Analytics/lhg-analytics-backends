@@ -125,7 +125,7 @@ export class RestaurantCostsService {
       { user: this.user, pass: this.pass },
       { timeout: 10000 },
     );
-    console.log('res:::::::', res);
+    console.log('res:::::::', JSON.stringify(res, null, 2));
     return res.data.token ?? res.data;
   }
 
