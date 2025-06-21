@@ -33,26 +33,88 @@ export class RestaurantCostsService {
     const companyId = 1;
 
     const token = await this.getToken();
-
     const movimentos = await this.getMovimentos(token, startDate, endDate);
 
-    const saidas = movimentos.filter((mov) => mov.codigoTipoMovimento === 2);
+    const saidas = Array.isArray(movimentos)
+      ? movimentos.filter((mov) => mov.codigoTipoMovimento === 2)
+      : [];
 
-    const totalAllCMV = new Prisma.Decimal(
-      saidas.reduce((acc, item) => acc + Number(item.custo || 0), 0),
+    const totalCost = saidas.reduce(
+      (acc, item) => acc + Number(item.custo || 0),
+      0,
     );
 
-    // Ajusta endDate para a data de referência (com UTC 05:59:59.999)
+    // Receita A&B via SQL
+    const formattedStart = startDate.toISOString().split('T')[0];
+    const formattedEnd = endDate.toISOString().split('T')[0];
+
+    const abProductTypes = [
+      78, 64, 77, 57, 56, 79, 54, 55, 80, 53, 62, 59, 61, 58, 63,
+    ];
+
+    const abProductTypesSqlList = abProductTypes.join(', ');
+
+    const revenueAbPeriodSql = `
+      SELECT
+        COALESCE(SUM(
+          CASE
+            WHEN tp.id IN (${abProductTypesSqlList}) THEN
+              (soi."precovenda" * soi."quantidade") * 
+              (
+                1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0)
+              )
+            ELSE 0
+          END
+        ), 0) AS "totalValue"
+      FROM "locacaoapartamento" ra
+      LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+      LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+      LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+      LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+      LEFT JOIN "produto" p ON p.id = ps."id_produto"
+      LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+      LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+      LEFT JOIN (
+        SELECT 
+          soi."id_saidaestoque", 
+          SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+        FROM "saidaestoqueitem" soi
+        WHERE soi."cancelado" IS NULL
+        GROUP BY soi."id_saidaestoque"
+      ) AS so_total ON so_total."id_saidaestoque" = so.id
+      WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+        AND ra."fimocupacaotipo" = 'FINALIZADA'
+    `;
+
+    const revenueResult =
+      await this.prisma.prismaLocal.$queryRawUnsafe<{ totalValue: number }[]>(
+        revenueAbPeriodSql,
+      );
+
+    const totalRevenue = revenueResult?.[0]?.totalValue ?? 0;
+
+    const cmvDecimal = totalRevenue > 0 ? totalCost / totalRevenue : 0;
+    const totalAllCMV = new Prisma.Decimal(cmvDecimal.toFixed(2));
+
+    // Ajuste de horário UTC para data de referência
     const adjustedEndDate = new Date(endDate);
     adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
     adjustedEndDate.setUTCHours(5, 59, 59, 999);
 
-    return this.insertRestaurantCMV({
+    const result = await this.insertRestaurantCMV({
       totalAllCMV,
       createdDate: adjustedEndDate,
       period,
       companyId,
     });
+
+    // Retorno limpo conforme solicitado
+    return {
+      totalAllCMV: result.totalAllCMV,
+      createdDate: result.createdDate,
+      period: result.period,
+      companyId: result.companyId,
+    };
   }
 
   private async getToken(): Promise<string> {
@@ -61,7 +123,6 @@ export class RestaurantCostsService {
       { user: this.user, pass: this.pass },
       { timeout: 10000 },
     );
-
     return res.data.token ?? res.data;
   }
 
@@ -79,18 +140,19 @@ export class RestaurantCostsService {
 
     const data = res.data;
 
+    console.log(
+      '[DEBUG] GetMovimentoEstoque retorno:',
+      JSON.stringify(data, null, 2),
+    );
+
     if (Array.isArray(data)) {
       return data;
     }
 
-    if (Array.isArray(data.resultado)) {
+    if (data?.resultado && Array.isArray(data.resultado)) {
       return data.resultado;
     }
 
-    console.error(
-      'Formato inesperado da resposta:',
-      JSON.stringify(data, null, 2),
-    );
     throw new Error('Resposta inválida da API Desbravador');
   }
 
