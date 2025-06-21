@@ -33,13 +33,20 @@ export class RestaurantCostsService {
     const companyId = 1;
 
     const token = await this.getToken();
-    console.log('[DEBUG] Token obtido:', token);
 
     const movimentos = await this.getMovimentos(token, startDate, endDate);
 
-    const saidas = Array.isArray(movimentos)
-      ? movimentos.filter((mov) => mov.codigoTipoMovimento === 2)
-      : [];
+    console.log('[DEBUG] Movimentos retornados:', movimentos);
+
+    console.log(
+      '[DEBUG] Movimentos recebidos:',
+      movimentos.length,
+      JSON.stringify(movimentos.slice(0, 5), null, 2),
+    );
+
+    const saidas = movimentos.filter((m) =>
+      [22, 31, 21].includes(m.codigoTipoMovimento),
+    );
 
     const totalCost = saidas.reduce(
       (acc, item) => acc + Number(item.custo || 0),
@@ -97,8 +104,6 @@ export class RestaurantCostsService {
 
     const cmvDecimal = totalRevenue > 0 ? totalCost / totalRevenue : 0;
 
-    console.log('totalRevenue:', totalRevenue);
-    console.log('totalCost:', totalCost);
     const totalAllCMV = cmvDecimal;
 
     // Ajuste de horário UTC para data de referência
@@ -135,8 +140,6 @@ export class RestaurantCostsService {
     console.log('dtFinal:', dtFinal);
 
     const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL='${dtInicial}'&DTFINAL='${dtFinal}'&CDEMPRESA=${this.unitId}`;
-
-    console.log('[DEBUG] URL gerada:', url);
 
     const res = await this.http.axiosRef.get(url, {
       headers: {
