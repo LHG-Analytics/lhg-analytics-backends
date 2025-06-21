@@ -37,7 +37,7 @@ export class RestaurantCostsService {
     const movimentos = await this.getMovimentos(token, startDate, endDate);
 
     const saidas = movimentos.filter((m) =>
-      [2, 20, 21, 22, 31].includes(m.codigoTipoMovimento),
+      [2].includes(m.codigoTipoMovimento),
     );
 
     const totalCost = saidas.reduce(
