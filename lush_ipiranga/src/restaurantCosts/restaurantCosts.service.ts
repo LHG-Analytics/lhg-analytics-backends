@@ -99,7 +99,7 @@ export class RestaurantCostsService {
 
     console.log('totalRevenue:', totalRevenue);
     console.log('totalCost:', totalCost);
-    const totalAllCMV = new Prisma.Decimal(Number(cmvDecimal.toFixed(2)));
+    const totalAllCMV = new Prisma.Decimal(cmvDecimal);
 
     // Ajuste de horário UTC para data de referência
     const adjustedEndDate = new Date(endDate);
@@ -107,7 +107,7 @@ export class RestaurantCostsService {
     adjustedEndDate.setUTCHours(5, 59, 59, 999);
 
     const result = await this.insertRestaurantCMV({
-      totalAllCMV,
+      totalAllCMV: new Prisma.Decimal(Number(totalAllCMV.toFixed(2))),
       createdDate: adjustedEndDate,
       period,
       companyId,
@@ -133,48 +133,35 @@ export class RestaurantCostsService {
     const dtFinal = end.toISOString().split('T')[0];
 
     const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL='${dtInicial}'&DTFINAL='${dtFinal}'&CDEMPRESA=${this.unitId}`;
+
     console.log('[DEBUG] URL gerada:', url);
 
-    try {
-      const res = await this.http.axiosRef.get(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+    const res = await this.http.axiosRef.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-      const data = res.data;
+    const data = res.data;
 
-      console.log(
-        '[DEBUG] GetMovimentoEstoque retorno:',
-        JSON.stringify(data, null, 2),
-      );
+    console.log(
+      '[DEBUG] GetMovimentoEstoque retorno:',
+      JSON.stringify(data, null, 2),
+    );
 
-      // Caso o retorno seja um array diretamente (correto)
-      if (Array.isArray(data)) {
-        return data;
-      }
-
-      // Caso venha dentro de `resultado`
-      if (Array.isArray(data.resultado)) {
-        return data.resultado;
-      }
-
-      // Caso `resultado` venha como string vazia
-      if (typeof data.resultado === 'string' && data.resultado.trim() === '') {
-        console.warn('⚠️ Resultado vazio. Nenhuma movimentação encontrada.');
-        return [];
-      }
-
-      // Nenhum dado válido encontrado
-      console.error(
-        '❌ Resposta inválida da API Desbravador:',
-        JSON.stringify(data),
-      );
-      return [];
-    } catch (error) {
-      console.error('❌ Erro ao chamar a API do Desbravador:', error);
-      return [];
+    // Se já é um array diretamente
+    if (Array.isArray(data)) {
+      return data;
     }
+
+    // Se veio no formato { resultado: [...] }
+    if (data && Array.isArray(data.resultado)) {
+      return data.resultado;
+    }
+
+    // Se não veio nada utilizável
+    console.warn('⚠️ Resposta inesperada da API Desbravador:', data);
+    return [];
   }
 
   private async insertRestaurantCMV(
