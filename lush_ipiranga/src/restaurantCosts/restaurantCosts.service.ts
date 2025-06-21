@@ -139,7 +139,7 @@ export class RestaurantCostsService {
     console.log('dtInicial:', dtInicial);
     console.log('dtFinal:', dtFinal);
 
-    const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL='${dtInicial}'&DTFINAL='${dtFinal}'&CDEMPRESA=${this.unitId}`;
+    const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL=${dtInicial}&DTFINAL=${dtFinal}&CDEMPRESA=${this.unitId}`;
 
     const res = await this.http.axiosRef.get(url, {
       headers: {
