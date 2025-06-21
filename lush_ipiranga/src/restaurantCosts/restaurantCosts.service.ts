@@ -132,39 +132,49 @@ export class RestaurantCostsService {
     const dtInicial = start.toISOString().split('T')[0];
     const dtFinal = end.toISOString().split('T')[0];
 
-    console.log('start:', start, 'end:', end);
-    console.log('dtInicial:', dtInicial, 'dtFinal:', dtFinal);
-
     const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL='${dtInicial}'&DTFINAL='${dtFinal}'&CDEMPRESA=${this.unitId}`;
-
     console.log('[DEBUG] URL gerada:', url);
 
-    const res = await this.http.axiosRef.get(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    try {
+      const res = await this.http.axiosRef.get(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    const data = res.data;
+      const data = res.data;
 
-    console.log(
-      '[DEBUG] GetMovimentoEstoque retorno:',
-      JSON.stringify(data, null, 2),
-    );
+      console.log(
+        '[DEBUG] GetMovimentoEstoque retorno:',
+        JSON.stringify(data, null, 2),
+      );
 
-    if (!data || Object.keys(data).length === 0) {
+      // Caso o retorno seja um array diretamente (correto)
+      if (Array.isArray(data)) {
+        return data;
+      }
+
+      // Caso venha dentro de `resultado`
+      if (Array.isArray(data.resultado)) {
+        return data.resultado;
+      }
+
+      // Caso `resultado` venha como string vazia
+      if (typeof data.resultado === 'string' && data.resultado.trim() === '') {
+        console.warn('⚠️ Resultado vazio. Nenhuma movimentação encontrada.');
+        return [];
+      }
+
+      // Nenhum dado válido encontrado
+      console.error(
+        '❌ Resposta inválida da API Desbravador:',
+        JSON.stringify(data),
+      );
+      return [];
+    } catch (error) {
+      console.error('❌ Erro ao chamar a API do Desbravador:', error);
       return [];
     }
-
-    if (Array.isArray(data)) {
-      return data;
-    }
-
-    if (Array.isArray(data.resultado)) {
-      return data.resultado;
-    }
-
-    throw new Error('Resposta inválida da API Desbravador');
   }
 
   private async insertRestaurantCMV(
