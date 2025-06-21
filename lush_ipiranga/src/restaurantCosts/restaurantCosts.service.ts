@@ -133,6 +133,9 @@ export class RestaurantCostsService {
     const dtInicial = start.toISOString().split('T')[0];
     const dtFinal = end.toISOString().split('T')[0];
 
+    console.log('dtInicial:', dtInicial);
+    console.log('dtFinal:', dtFinal);
+
     const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL=${dtInicial}&DTFINAL=${dtFinal}&CDEMPRESA=${this.unitId}`;
 
     console.log('[DEBUG] URL gerada:', url);
