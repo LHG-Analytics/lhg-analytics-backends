@@ -33,6 +33,8 @@ export class RestaurantCostsService {
     const companyId = 1;
 
     const token = await this.getToken();
+    console.log('[DEBUG] Token obtido:', token);
+
     const movimentos = await this.getMovimentos(token, startDate, endDate);
 
     const saidas = Array.isArray(movimentos)
@@ -130,7 +132,7 @@ export class RestaurantCostsService {
     const dtInicial = start.toISOString().split('T')[0];
     const dtFinal = end.toISOString().split('T')[0];
 
-    const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL='${dtInicial}'&DTFINAL='${dtFinal}'&CDEMPRESA=${this.unitId}`;
+    const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL=${dtInicial}&DTFINAL=${dtFinal}&CDEMPRESA=${this.unitId}`;
 
     const res = await this.http.axiosRef.get(url, {
       headers: {
@@ -145,11 +147,15 @@ export class RestaurantCostsService {
       JSON.stringify(data, null, 2),
     );
 
+    if (!data || Object.keys(data).length === 0) {
+      return [];
+    }
+
     if (Array.isArray(data)) {
       return data;
     }
 
-    if (data?.resultado && Array.isArray(data.resultado)) {
+    if (Array.isArray(data.resultado)) {
       return data.resultado;
     }
 
