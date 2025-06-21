@@ -45,7 +45,7 @@ export class RestaurantCostsService {
     );
 
     const saidas = movimentos.filter((m) =>
-      [22, 31, 21].includes(m.codigoTipoMovimento),
+      [2].includes(m.codigoTipoMovimento),
     );
 
     const totalCost = saidas.reduce(
@@ -148,11 +148,6 @@ export class RestaurantCostsService {
     });
 
     const data = res.data;
-
-    console.log(
-      '[DEBUG] GetMovimentoEstoque retorno:',
-      JSON.stringify(data, null, 2),
-    );
 
     // Se já é um array diretamente
     if (Array.isArray(data)) {
