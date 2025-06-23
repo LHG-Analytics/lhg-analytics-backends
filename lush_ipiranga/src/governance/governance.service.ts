@@ -692,69 +692,6 @@ export class GovernanceService {
     };
   }
 
-  private async fetchKpiData(startDate: Date, endDate: Date) {
-    return await Promise.all([
-      this.prisma.prismaLocal.apartmentCleaning.findMany({
-        where: {
-          startDate: {
-            gte: startDate,
-            lte: endDate,
-          },
-          endDate: {
-            not: null, // Excluir registros onde endDate é null
-          },
-          reasonEnd: {
-            equals: 'COMPLETA',
-          },
-        },
-        include: {
-          employee: {
-            include: {
-              personPaper: {
-                include: {
-                  person: true,
-                },
-              },
-            },
-          },
-        },
-      }),
-      this.prisma.prismaLocal.apartmentInspection.findMany({
-        where: {
-          startDate: {
-            gte: startDate,
-            lte: endDate,
-          },
-          reasonEnd: 'APROVADA', // Filtrar apenas as inspeções aprovadas
-          user: {
-            employee: {
-              role: {
-                id: {
-                  equals: 24,
-                },
-              },
-            },
-          },
-        },
-        include: {
-          user: {
-            include: {
-              employee: {
-                include: {
-                  personPaper: {
-                    include: {
-                      person: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      }),
-    ]);
-  }
-
   async calculateKpibyDateRangeSQL(
     startDate: Date,
     endDate: Date,
@@ -977,12 +914,12 @@ weekdays AS (
     day_date,
     LOWER(
       CASE EXTRACT(ISODOW FROM day_date)
-        WHEN 1 THEN 'segunda-feira'
-        WHEN 2 THEN 'terça-feira'
-        WHEN 3 THEN 'quarta-feira'
-        WHEN 4 THEN 'quinta-feira'
-        WHEN 5 THEN 'sexta-feira'
-        WHEN 6 THEN 'sábado'
+        WHEN 1 THEN 'segunda'
+        WHEN 2 THEN 'terca'
+        WHEN 3 THEN 'quarta'
+        WHEN 4 THEN 'quinta'
+        WHEN 5 THEN 'sexta'
+        WHEN 6 THEN 'sabado'
         WHEN 7 THEN 'domingo'
       END
     ) AS weekday
