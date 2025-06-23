@@ -65,7 +65,10 @@ export class GovernanceController {
       const end = this.convertToDate(endDate, true); // Fim, com ajuste de horário
 
       // Chama o serviço com as datas e o período, se fornecidos
-      return await this.governanceService.calculateKpisByDateRange(start, end);
+      return await this.governanceService.calculateKpibyDateRangeSQL(
+        start,
+        end,
+      );
     } catch (error) {
       throw new BadRequestException(`Failed to fetch KPIs: ${error.message}`);
     }
@@ -99,9 +102,9 @@ export class GovernanceController {
     // Ajusta as horas conforme necessário
     if (isEndDate) {
       date.setDate(date.getDate() + 1);
-      date.setUTCHours(3, 59, 59, 999); // Define o final às 05:59:59.999
+      date.setUTCHours(5, 59, 59, 999); // Define o final às 05:59:59.999
     } else {
-      date.setUTCHours(4, 0, 0, 0); // Define o início às 06:00
+      date.setUTCHours(6, 0, 0, 0); // Define o início às 06:00
     }
 
     return date;
