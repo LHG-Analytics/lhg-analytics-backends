@@ -759,19 +759,19 @@ export class GovernanceService {
     const shiftCleaningSQL = `
   SELECT
   CASE
-    WHEN f."horarioinicioexpediente" IS NULL OR f."horarioinicioexpediente" = '' THEN 'TERCEIRIZADO'
+    WHEN f."horarioinicioexpediente" IS NULL OR f."horarioinicioexpediente" = '' THEN 'Terceirizado'
     WHEN (
       CAST(split_part(f."horarioinicioexpediente", ':', 1) AS INTEGER) * 3600 +
       CAST(split_part(f."horarioinicioexpediente", ':', 2) AS INTEGER) * 60
-    ) BETWEEN 21600 AND 39599 THEN 'MANHÃ'
+    ) BETWEEN 21600 AND 39599 THEN 'Manhã'
     WHEN (
       CAST(split_part(f."horarioinicioexpediente", ':', 1) AS INTEGER) * 3600 +
       CAST(split_part(f."horarioinicioexpediente", ':', 2) AS INTEGER) * 60
-    ) BETWEEN 39600 AND 68399 THEN 'TARDE'
+    ) BETWEEN 39600 AND 68399 THEN 'Tarde'
     WHEN (
       CAST(split_part(f."horarioinicioexpediente", ':', 1) AS INTEGER) * 3600 +
       CAST(split_part(f."horarioinicioexpediente", ':', 2) AS INTEGER) * 60
-    ) BETWEEN 68400 AND 86399 THEN 'NOITE'
+    ) BETWEEN 68400 AND 86399 THEN 'Noite'
     ELSE 'HORÁRIO INDEFINIDO'
   END AS name,
   COUNT(*)::INT AS value
