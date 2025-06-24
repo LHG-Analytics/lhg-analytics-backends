@@ -1152,13 +1152,38 @@ ORDER BY
       const shift = row.shift;
       const stats = row.weekdays_stats;
 
-      teamSizing[shift] = {
+      const shiftStatsOrdered: Record<string, any> = {
         totalAverageShiftCleaning: Number(row.total_average_shift_cleaning),
         idealShiftMaid: Number(row.ideal_shift_maid),
         realShiftMaid: Number(row.real_shift_maid),
         difference: Number(row.difference),
-        ...row.weekdays_stats,
       };
+
+      const weekdayStats = row.weekdays_stats || {};
+
+      for (const day of orderedWeekdays) {
+        const stats = weekdayStats[day];
+        if (stats) {
+          shiftStatsOrdered[day] = {
+            totalCleanings: Number(stats.totalCleanings),
+            averageDailyWeekCleaning: Number(stats.averageDailyWeekCleaning),
+          };
+
+          // soma nos totais
+          totals.totalAverageDailyWeekCleaning[day] =
+            (totals.totalAverageDailyWeekCleaning[day] || 0) +
+            Number(stats.averageDailyWeekCleaning);
+        }
+      }
+
+      teamSizing[shift] = shiftStatsOrdered;
+
+      totals.totalIdealShiftMaid += Number(row.ideal_shift_maid);
+      totals.totalRealShiftMaid += Number(row.real_shift_maid);
+      totals.totalDifference += Number(row.difference);
+      totals.totalAllAverageShiftCleaning += Number(
+        row.total_average_shift_cleaning,
+      );
 
       // Adiciona cada dia da semana
       const shiftWeekdayStats: Record<string, any> = {};
@@ -1199,10 +1224,10 @@ ORDER BY
     const averagePerDayOrdered: Record<string, number> = {};
 
     for (const day of orderedWeekdays) {
-      const value = totals.totalAverageDailyWeekCleaning[day] || 0;
-      averagePerDayOrdered[day] = Number(value.toFixed(2));
+      averagePerDayOrdered[day] = Number(
+        (totals.totalAverageDailyWeekCleaning[day] || 0).toFixed(2),
+      );
     }
-
     totals.totalAverageDailyWeekCleaning = averagePerDayOrdered;
 
     return {
