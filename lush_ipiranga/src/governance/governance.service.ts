@@ -1224,10 +1224,10 @@ ORDER BY
     const averagePerDayOrdered: Record<string, number> = {};
 
     for (const day of orderedWeekdays) {
-      averagePerDayOrdered[day] = Number(
-        (totals.totalAverageDailyWeekCleaning[day] || 0).toFixed(2),
-      );
+      const value = totals.totalAverageDailyWeekCleaning[day] || 0;
+      averagePerDayOrdered[day] = Number(value.toFixed(2));
     }
+
     totals.totalAverageDailyWeekCleaning = averagePerDayOrdered;
 
     return {
