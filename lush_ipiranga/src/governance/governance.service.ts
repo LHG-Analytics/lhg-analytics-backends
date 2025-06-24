@@ -1234,6 +1234,10 @@ ORDER BY
       );
     }
 
+    totals.totalAllAverageShiftCleaning = Number(
+      totals.totalAllAverageShiftCleaning.toFixed(2),
+    );
+
     teamSizing['Totals'] = totals;
 
     Object.keys(totals.totalAverageDailyWeekCleaning).forEach((key) => {
