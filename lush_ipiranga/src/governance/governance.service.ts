@@ -866,12 +866,12 @@ weekday_counts AS (
   SELECT
     LOWER(
       CASE EXTRACT(ISODOW FROM day)
-        WHEN 1 THEN 'segunda-feira'
-        WHEN 2 THEN 'terça-feira'
-        WHEN 3 THEN 'quarta-feira'
-        WHEN 4 THEN 'quinta-feira'
-        WHEN 5 THEN 'sexta-feira'
-        WHEN 6 THEN 'sábado'
+        WHEN 1 THEN 'segunda'
+        WHEN 2 THEN 'terca'
+        WHEN 3 THEN 'quarta'
+        WHEN 4 THEN 'quinta'
+        WHEN 5 THEN 'sexta'
+        WHEN 6 THEN 'sabado'
         WHEN 7 THEN 'domingo'
       END
     ) AS weekday,
@@ -882,7 +882,7 @@ weekday_counts AS (
 shifted_cleanings AS (
   SELECT
     l.id,
-    (l."datainicio" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')::date AS dt_start,
+    l."datainicio"::date AS dt_start,
     f."horarioinicioexpediente",
     CASE
       WHEN EXTRACT(HOUR FROM f."horarioinicioexpediente"::time) BETWEEN 6 AND 10 THEN 'Manhã'
@@ -922,17 +922,27 @@ weekdays AS (
         WHEN 6 THEN 'sabado'
         WHEN 7 THEN 'domingo'
       END
-    ) AS weekday
+    ) AS weekday,
+    CASE EXTRACT(ISODOW FROM day_date)
+      WHEN 7 THEN 1 -- domingo
+      WHEN 6 THEN 2 -- sabado
+      WHEN 5 THEN 3 -- sexta
+      WHEN 4 THEN 4 -- quinta
+      WHEN 3 THEN 5 -- quarta
+      WHEN 2 THEN 6 -- terca
+      WHEN 1 THEN 7 -- segunda
+    END AS weekday_order
   FROM day_shift_totals
 ),
 shift_day_agg AS (
   SELECT
     s.shift,
     w.weekday,
-    SUM(s.total_cleanings) AS total_cleanings
+    SUM(s.total_cleanings) AS total_cleanings,
+    w.weekday_order
   FROM day_shift_totals s
   JOIN weekdays w ON s.day_date = w.day_date
-  GROUP BY s.shift, w.weekday
+  GROUP BY s.shift, w.weekday, w.weekday_order
 ),
 shift_summary AS (
   SELECT
@@ -964,6 +974,7 @@ SELECT
           2
         )
     )
+    ORDER BY sda.weekday_order
   ) FILTER (WHERE sda.weekday IS NOT NULL) AS weekdays_stats
 FROM shift_summary ss
 LEFT JOIN real_shift_maid_count rsm ON rsm.shift = ss.shift
@@ -1006,6 +1017,28 @@ ORDER BY
       this.prisma.prismaLocal.$queryRawUnsafe<any[]>(employeeReportSql),
       this.prisma.prismaLocal.$queryRawUnsafe<TeamSizingRow[]>(teamSizingSQL),
     ]);
+
+    const orderedWeekdays = [
+      'domingo',
+      'sabado',
+      'sexta',
+      'quinta',
+      'quarta',
+      'terca',
+      'segunda',
+    ];
+
+    function reorderWeekdays(stats: Record<string, any>) {
+      const reordered: Record<string, any> = {};
+
+      for (const key of orderedWeekdays) {
+        if (stats[key]) {
+          reordered[key] = stats[key];
+        }
+      }
+
+      return reordered;
+    }
 
     const isMonthly = moment(endDate).diff(moment(startDate), 'days') > 31;
 
@@ -1142,26 +1175,22 @@ ORDER BY
       const shift = row.shift;
       const stats = row.weekdays_stats;
 
+      const weekdaysOrdered = reorderWeekdays(stats);
+
       teamSizing[shift] = {
         totalAverageShiftCleaning: Number(row.total_average_shift_cleaning),
         idealShiftMaid: Number(row.ideal_shift_maid),
         realShiftMaid: Number(row.real_shift_maid),
         difference: Number(row.difference),
-        ...row.weekdays_stats,
+        ...weekdaysOrdered,
       };
 
-      // Adiciona cada dia da semana
-      for (const [weekday, values] of Object.entries(stats)) {
-        teamSizing[shift][weekday.toLowerCase()] = {
-          totalCleanings: Number(values.totalCleanings),
-          averageDailyWeekCleaning: Number(values.averageDailyWeekCleaning),
-        };
-
-        if (!totals.totalAverageDailyWeekCleaning[weekday.toLowerCase()]) {
-          totals.totalAverageDailyWeekCleaning[weekday.toLowerCase()] = 0;
+      for (const [weekday, values] of Object.entries(weekdaysOrdered)) {
+        if (!totals.totalAverageDailyWeekCleaning[weekday]) {
+          totals.totalAverageDailyWeekCleaning[weekday] = 0;
         }
 
-        totals.totalAverageDailyWeekCleaning[weekday.toLowerCase()] += Number(
+        totals.totalAverageDailyWeekCleaning[weekday] += Number(
           values.averageDailyWeekCleaning,
         );
       }
@@ -1176,9 +1205,9 @@ ORDER BY
 
     teamSizing['Totals'] = totals;
 
-    Object.keys(totals.totalAverageDailyWeekCleaning).forEach((weekday) => {
-      totals.totalAverageDailyWeekCleaning[weekday] = Number(
-        totals.totalAverageDailyWeekCleaning[weekday].toFixed(2),
+    Object.keys(totals.totalAverageDailyWeekCleaning).forEach((key) => {
+      totals.totalAverageDailyWeekCleaning[key] = Number(
+        totals.totalAverageDailyWeekCleaning[key].toFixed(2),
       );
     });
 
