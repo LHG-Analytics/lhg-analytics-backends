@@ -927,7 +927,7 @@ shifted_cleanings AS (
   WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND l."datafim" IS NOT NULL
     AND l."motivofim" = 'COMPLETA'
-    AND f."id_cargo" IN (4)
+    AND f."id_cargo" IN (7)
     AND f."horarioinicioexpediente" IS NOT NULL
     AND TRIM(f."horarioinicioexpediente") <> ''
     AND f."id" NOT IN (11)
@@ -992,9 +992,9 @@ real_shift_maid_count AS (
 SELECT
   ss.shift,
   ss.total_average_shift_cleaning,
-  ROUND(ss.total_average_shift_cleaning / 7.0)::int AS ideal_shift_maid,
+  ROUND(ss.total_average_shift_cleaning / 9.0)::int AS ideal_shift_maid,
   COALESCE(rsm.real_shift_maid, 0) AS real_shift_maid,
-  COALESCE(rsm.real_shift_maid, 0) - (ROUND(ss.total_average_shift_cleaning / 7.0)::int) AS difference,
+  COALESCE(rsm.real_shift_maid, 0) - (ROUND(ss.total_average_shift_cleaning / 9.0)::int) AS difference,
   jsonb_object_agg(
     sda.weekday,
     jsonb_build_object(
