@@ -757,32 +757,33 @@ export class GovernanceService {
 `;
 
     const shiftCleaningSQL = `
+  WITH shift_data AS (
+    SELECT
+      CASE
+        WHEN f."horarioinicioexpediente" BETWEEN '06:00' AND '10:59' THEN 'Manhã'
+        WHEN f."horarioinicioexpediente" BETWEEN '11:00' AND '18:59' THEN 'Tarde'
+        WHEN f."horarioinicioexpediente" BETWEEN '19:00' AND '23:59' THEN 'Noite'
+        ELSE 'Terceirizado'
+      END AS shift
+    FROM "limpezaapartamento" l
+    JOIN "funcionario" f ON f."id" = l."id_funcionario"
+    WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+      AND l."datafim" IS NOT NULL
+      AND l."motivofim" = 'COMPLETA'
+      AND f."id_cargo" IN (4, 45)
+  )
   SELECT
-  CASE
-    WHEN f."horarioinicioexpediente" IS NULL OR f."horarioinicioexpediente" = '' THEN 'Terceirizado'
-    WHEN (
-      CAST(split_part(f."horarioinicioexpediente", ':', 1) AS INTEGER) * 3600 +
-      CAST(split_part(f."horarioinicioexpediente", ':', 2) AS INTEGER) * 60
-    ) BETWEEN 21600 AND 39599 THEN 'Manhã'
-    WHEN (
-      CAST(split_part(f."horarioinicioexpediente", ':', 1) AS INTEGER) * 3600 +
-      CAST(split_part(f."horarioinicioexpediente", ':', 2) AS INTEGER) * 60
-    ) BETWEEN 39600 AND 68399 THEN 'Tarde'
-    WHEN (
-      CAST(split_part(f."horarioinicioexpediente", ':', 1) AS INTEGER) * 3600 +
-      CAST(split_part(f."horarioinicioexpediente", ':', 2) AS INTEGER) * 60
-    ) BETWEEN 68400 AND 86399 THEN 'Noite'
-    ELSE 'HORÁRIO INDEFINIDO'
-  END AS name,
-  COUNT(*)::INT AS value
-FROM "limpezaapartamento" l
-JOIN "funcionario" f ON f."id" = l."id_funcionario"
-WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
-  AND l."datafim" IS NOT NULL
-  AND l."motivofim" = 'COMPLETA'
-  AND f."id_cargo" IN (4, 45)
-GROUP BY name
-ORDER BY name;
+    shift AS name,
+    COUNT(*)::INT AS value
+  FROM shift_data
+  GROUP BY shift
+  ORDER BY
+    CASE shift
+      WHEN 'Manhã' THEN 1
+      WHEN 'Tarde' THEN 2
+      WHEN 'Noite' THEN 3
+      WHEN 'Terceirizado' THEN 4
+    END;
 `;
 
     const cleaningsByPeriodSql = `
@@ -800,58 +801,88 @@ ORDER BY "date" ASC;
 `;
 
     const cleaningsByPeriodShiftSql = `
- SELECT
-  TO_CHAR(l."datainicio" - INTERVAL '6 hours', 'YYYY-MM-DD') AS date,
-  CASE
-    WHEN f."horarioinicioexpediente" BETWEEN '06:00' AND '10:59' THEN 'Manhã'
-    WHEN f."horarioinicioexpediente" BETWEEN '11:00' AND '18:59' THEN 'Tarde'
-    WHEN f."horarioinicioexpediente" BETWEEN '19:00' AND '23:59' THEN 'Noite'
-    ELSE 'Terceirizado'
-  END AS shift,
-  ppessoa."nome" AS employee_name,
-  COUNT(*)::INT AS total_cleanings
-FROM "limpezaapartamento" l
-JOIN "funcionario" f ON f."id" = l."id_funcionario"
-JOIN "pessoapapel" pp ON pp."id" = f."id"
-JOIN "pessoa" ppessoa ON ppessoa."id" = pp."id_pessoa"
-WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
-  AND l."datafim" IS NOT NULL
-  AND l."motivofim" = 'COMPLETA'
-  AND f."id_cargo" IN (4, 45)
-GROUP BY date, shift, employee_name
-ORDER BY date, shift, employee_name;
-`;
-
-    const employeeReportSql = `
-SELECT
-  shift,
-  employee_name,
-  total_suites,
-  total_days,
-  ROUND(total_suites::numeric / total_days, 2) AS average_daily_cleaning
-FROM (
+WITH cleaning_data AS (
   SELECT
+    TO_CHAR(l."datainicio" - INTERVAL '6 hours', 'YYYY-MM-DD') AS date,
     CASE
       WHEN f."horarioinicioexpediente" BETWEEN '06:00' AND '10:59' THEN 'Manhã'
       WHEN f."horarioinicioexpediente" BETWEEN '11:00' AND '18:59' THEN 'Tarde'
       WHEN f."horarioinicioexpediente" BETWEEN '19:00' AND '23:59' THEN 'Noite'
       ELSE 'Terceirizado'
     END AS shift,
-    ppessoa."nome" AS employee_name,
-    COUNT(*) AS total_suites,
-    COUNT(DISTINCT TO_CHAR(l."datainicio" - INTERVAL '6 hours', 'YYYY-MM-DD')) AS total_days
+    ppessoa."nome" AS employee_name
   FROM "limpezaapartamento" l
   JOIN "funcionario" f ON f."id" = l."id_funcionario"
   JOIN "pessoapapel" pp ON pp."id" = f."id"
   JOIN "pessoa" ppessoa ON ppessoa."id" = pp."id_pessoa"
-  WHERE
-    l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+  WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND l."datafim" IS NOT NULL
     AND l."motivofim" = 'COMPLETA'
     AND f."id_cargo" IN (4, 45)
-  GROUP BY shift, employee_name
-) AS sub
-ORDER BY shift, employee_name;
+)
+SELECT
+  date,
+  shift,
+  employee_name,
+  COUNT(*)::INT AS total_cleanings
+FROM cleaning_data
+GROUP BY date, shift, employee_name
+ORDER BY
+  date,
+  CASE shift
+    WHEN 'Manhã' THEN 1
+    WHEN 'Tarde' THEN 2
+    WHEN 'Noite' THEN 3
+    ELSE 4
+  END,
+  employee_name;
+`;
+
+    const employeeReportSql = `
+  WITH shift_data AS (
+    SELECT
+      CASE
+        WHEN f."horarioinicioexpediente" BETWEEN '06:00' AND '10:59' THEN 'Manhã'
+        WHEN f."horarioinicioexpediente" BETWEEN '11:00' AND '18:59' THEN 'Tarde'
+        WHEN f."horarioinicioexpediente" BETWEEN '19:00' AND '23:59' THEN 'Noite'
+        ELSE 'Terceirizado'
+      END AS shift,
+      ppessoa."nome" AS employee_name,
+      TO_CHAR(l."datainicio" - INTERVAL '6 hours', 'YYYY-MM-DD') AS adjusted_date
+    FROM "limpezaapartamento" l
+    JOIN "funcionario" f ON f."id" = l."id_funcionario"
+    JOIN "pessoapapel" pp ON pp."id" = f."id"
+    JOIN "pessoa" ppessoa ON ppessoa."id" = pp."id_pessoa"
+    WHERE
+      l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+      AND l."datafim" IS NOT NULL
+      AND l."motivofim" = 'COMPLETA'
+      AND f."id_cargo" IN (4, 45)
+  ),
+  aggregated AS (
+    SELECT
+      shift,
+      employee_name,
+      COUNT(*) AS total_suites,
+      COUNT(DISTINCT adjusted_date) AS total_days
+    FROM shift_data
+    GROUP BY shift, employee_name
+  )
+  SELECT
+    shift,
+    employee_name,
+    total_suites,
+    total_days,
+    ROUND(total_suites::numeric / total_days, 2) AS average_daily_cleaning
+  FROM aggregated
+  ORDER BY
+    CASE shift
+      WHEN 'Manhã' THEN 1
+      WHEN 'Tarde' THEN 2
+      WHEN 'Noite' THEN 3
+      WHEN 'Terceirizado' THEN 4
+    END,
+    employee_name;
 `;
 
     const teamSizingSQL = `
