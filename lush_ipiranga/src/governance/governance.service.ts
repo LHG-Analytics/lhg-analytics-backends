@@ -1161,29 +1161,19 @@ ORDER BY
       };
 
       // Adiciona cada dia da semana
-      const shiftWeekdayStats: Record<string, any> = {};
-
       for (const [weekday, values] of Object.entries(stats)) {
-        const day = weekday.toLowerCase();
-        shiftWeekdayStats[day] = {
+        teamSizing[shift][weekday.toLowerCase()] = {
           totalCleanings: Number(values.totalCleanings),
           averageDailyWeekCleaning: Number(values.averageDailyWeekCleaning),
         };
 
-        if (!totals.totalAverageDailyWeekCleaning[day]) {
-          totals.totalAverageDailyWeekCleaning[day] = 0;
+        if (!totals.totalAverageDailyWeekCleaning[weekday.toLowerCase()]) {
+          totals.totalAverageDailyWeekCleaning[weekday.toLowerCase()] = 0;
         }
 
-        totals.totalAverageDailyWeekCleaning[day] += Number(
+        totals.totalAverageDailyWeekCleaning[weekday.toLowerCase()] += Number(
           values.averageDailyWeekCleaning,
         );
-      }
-
-      // Agora adiciona no teamSizing[shift] já na ordem correta
-      for (const day of orderedWeekdays) {
-        if (shiftWeekdayStats[day]) {
-          teamSizing[shift][day] = shiftWeekdayStats[day];
-        }
       }
 
       totals.totalIdealShiftMaid += Number(row.ideal_shift_maid);
