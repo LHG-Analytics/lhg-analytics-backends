@@ -983,10 +983,10 @@ LEFT JOIN weekday_counts wc ON wc.weekday = sda.weekday
 GROUP BY ss.shift, ss.total_average_shift_cleaning, rsm.real_shift_maid
 ORDER BY
   CASE ss.shift
-    WHEN 'Manhã' THEN 1
+    WHEN 'Noite' THEN 1
     WHEN 'Tarde' THEN 2
-    WHEN 'Noite' THEN 3
-    ELSE 5
+    WHEN 'Manhã' THEN 3
+    ELSE 4
   END;
 `;
 
