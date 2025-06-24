@@ -1009,6 +1009,16 @@ ORDER BY
 
     const isMonthly = moment(endDate).diff(moment(startDate), 'days') > 31;
 
+    const orderedWeekdays = [
+      'domingo',
+      'sabado',
+      'sexta',
+      'quinta',
+      'quarta',
+      'terca',
+      'segunda',
+    ];
+
     const totalAllInspections = inspectionResult?.[0]?.totalInspections || 0;
 
     const supervisorsPerformanceFormatted = {
@@ -1151,19 +1161,29 @@ ORDER BY
       };
 
       // Adiciona cada dia da semana
+      const shiftWeekdayStats: Record<string, any> = {};
+
       for (const [weekday, values] of Object.entries(stats)) {
-        teamSizing[shift][weekday.toLowerCase()] = {
+        const day = weekday.toLowerCase();
+        shiftWeekdayStats[day] = {
           totalCleanings: Number(values.totalCleanings),
           averageDailyWeekCleaning: Number(values.averageDailyWeekCleaning),
         };
 
-        if (!totals.totalAverageDailyWeekCleaning[weekday.toLowerCase()]) {
-          totals.totalAverageDailyWeekCleaning[weekday.toLowerCase()] = 0;
+        if (!totals.totalAverageDailyWeekCleaning[day]) {
+          totals.totalAverageDailyWeekCleaning[day] = 0;
         }
 
-        totals.totalAverageDailyWeekCleaning[weekday.toLowerCase()] += Number(
+        totals.totalAverageDailyWeekCleaning[day] += Number(
           values.averageDailyWeekCleaning,
         );
+      }
+
+      // Agora adiciona no teamSizing[shift] já na ordem correta
+      for (const day of orderedWeekdays) {
+        if (shiftWeekdayStats[day]) {
+          teamSizing[shift][day] = shiftWeekdayStats[day];
+        }
       }
 
       totals.totalIdealShiftMaid += Number(row.ideal_shift_maid);
@@ -1176,11 +1196,14 @@ ORDER BY
 
     teamSizing['Totals'] = totals;
 
-    Object.keys(totals.totalAverageDailyWeekCleaning).forEach((weekday) => {
-      totals.totalAverageDailyWeekCleaning[weekday] = Number(
-        totals.totalAverageDailyWeekCleaning[weekday].toFixed(2),
-      );
-    });
+    const averagePerDayOrdered: Record<string, number> = {};
+
+    for (const day of orderedWeekdays) {
+      const value = totals.totalAverageDailyWeekCleaning[day] || 0;
+      averagePerDayOrdered[day] = Number(value.toFixed(2));
+    }
+
+    totals.totalAverageDailyWeekCleaning = averagePerDayOrdered;
 
     return {
       Company: 'Lush Ipiranga',
