@@ -1196,14 +1196,11 @@ ORDER BY
 
     teamSizing['Totals'] = totals;
 
-    const averagePerDayOrdered: Record<string, number> = {};
-
-    for (const day of orderedWeekdays) {
-      const value = totals.totalAverageDailyWeekCleaning[day] || 0;
-      averagePerDayOrdered[day] = Number(value.toFixed(2));
-    }
-
-    totals.totalAverageDailyWeekCleaning = averagePerDayOrdered;
+    Object.keys(totals.totalAverageDailyWeekCleaning).forEach((weekday) => {
+      totals.totalAverageDailyWeekCleaning[weekday] = Number(
+        totals.totalAverageDailyWeekCleaning[weekday].toFixed(2),
+      );
+    });
 
     return {
       Company: 'Lush Ipiranga',
