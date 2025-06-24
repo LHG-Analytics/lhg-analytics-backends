@@ -953,7 +953,7 @@ SELECT
   ss.total_average_shift_cleaning,
   ROUND(ss.total_average_shift_cleaning / 7.0)::int AS ideal_shift_maid,
   COALESCE(rsm.real_shift_maid, 0) AS real_shift_maid,
-  (ROUND(ss.total_average_shift_cleaning / 7.0)::int) - COALESCE(rsm.real_shift_maid, 0) AS difference,
+  COALESCE(rsm.real_shift_maid, 0) - (ROUND(ss.total_average_shift_cleaning / 7.0)::int) AS difference,
   jsonb_object_agg(
     sda.weekday,
     jsonb_build_object(
@@ -975,7 +975,6 @@ ORDER BY
     WHEN 'Manhã' THEN 1
     WHEN 'Tarde' THEN 2
     WHEN 'Noite' THEN 3
-    WHEN 'Terceirizado' THEN 4
     ELSE 5
   END;
 `;
