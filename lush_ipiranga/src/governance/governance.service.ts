@@ -984,6 +984,10 @@ ORDER BY
       inspectionResult,
       supervisorPerformanceResult,
       shiftCleaningResult,
+      rawCleaningPeriodResult,
+      rawCleaningPeriodShiftResult,
+      employeeReportRaw,
+      teamSizingResult,
     ] = await Promise.all([
       this.prisma.prismaLocal.$queryRawUnsafe<{ totalSuitesCleaned: number }[]>(
         totalSuitesCleanedSql,
@@ -997,14 +1001,6 @@ ORDER BY
       this.prisma.prismaLocal.$queryRawUnsafe<
         { name: string; value: number }[]
       >(shiftCleaningSQL),
-    ]);
-
-    const [
-      rawCleaningPeriodResult,
-      rawCleaningPeriodShiftResult,
-      employeeReportRaw,
-      teamSizingResult,
-    ] = await Promise.all([
       this.prisma.prismaLocal.$queryRawUnsafe<any[]>(cleaningsByPeriodSql),
       this.prisma.prismaLocal.$queryRawUnsafe<any[]>(cleaningsByPeriodShiftSql),
       this.prisma.prismaLocal.$queryRawUnsafe<any[]>(employeeReportSql),
