@@ -1009,16 +1009,6 @@ ORDER BY
 
     const isMonthly = moment(endDate).diff(moment(startDate), 'days') > 31;
 
-    const orderedWeekdays = [
-      'domingo',
-      'sabado',
-      'sexta',
-      'quinta',
-      'quarta',
-      'terca',
-      'segunda',
-    ];
-
     const totalAllInspections = inspectionResult?.[0]?.totalInspections || 0;
 
     const supervisorsPerformanceFormatted = {
