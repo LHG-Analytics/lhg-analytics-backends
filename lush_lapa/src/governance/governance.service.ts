@@ -692,479 +692,571 @@ export class GovernanceService {
     };
   }
 
-  private async fetchKpiData(startDate: Date, endDate: Date) {
-    return await Promise.all([
-      this.prisma.prismaLocal.apartmentCleaning.findMany({
-        where: {
-          startDate: {
-            gte: startDate,
-            lte: endDate,
-          },
-          endDate: {
-            not: null, // Excluir registros onde endDate é null
-          },
-          reasonEnd: {
-            equals: 'COMPLETA',
-          },
-        },
-        include: {
-          employee: {
-            include: {
-              personPaper: {
-                include: {
-                  person: true,
-                },
-              },
-            },
-          },
-        },
-      }),
-      this.prisma.prismaLocal.apartmentInspection.findMany({
-        where: {
-          startDate: {
-            gte: startDate,
-            lte: endDate,
-          },
-          reasonEnd: 'APROVADA', // Filtrar apenas as inspeções aprovadas
-          user: {
-            employee: {
-              role: {
-                id: {
-                  equals: 19,
-                },
-              },
-            },
-          },
-        },
-        include: {
-          user: {
-            include: {
-              employee: {
-                include: {
-                  personPaper: {
-                    include: {
-                      person: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      }),
+  async calculateKpibyDateRangeSQL(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<any> {
+    const formattedStart = moment
+      .utc(startDate)
+      .set({ hour: 6, minute: 0, second: 0 })
+      .format('YYYY-MM-DD HH:mm:ss');
+
+    const formattedEnd = moment
+      .utc(endDate)
+      .set({ hour: 5, minute: 59, second: 59 })
+      .format('YYYY-MM-DD HH:mm:ss');
+
+    type TeamSizingRow = {
+      shift: string;
+      total_average_shift_cleaning: number;
+      ideal_shift_maid: number;
+      real_shift_maid: number;
+      difference: number;
+      weekdays_stats: Record<
+        string,
+        { totalCleanings: number; averageDailyWeekCleaning: number }
+      >;
+    };
+
+    const totalSuitesCleanedSql = `
+  SELECT
+    COUNT(*)::INT AS "totalSuitesCleaned"
+  FROM "limpezaapartamento" l
+  JOIN "funcionario" f ON f."id" = l."id_funcionario"
+  WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND l."datafim" IS NOT NULL
+    AND l."motivofim" = 'COMPLETA'
+    AND f."id_cargo" IN (4,20)
+`;
+
+    const totalInspectionsSql = `
+  SELECT
+    COUNT(*)::INT AS "totalInspections"
+  FROM "vistoriaapartamento" va
+  JOIN "usuario" u ON u."id" = va."id_responsavel"
+  JOIN "funcionario" f ON f."id" = u."id_funcionario"
+  WHERE va."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND va."motivofim" = 'APROVADA'
+    AND f."id_cargo" = 19
+`;
+
+    const supervisorPerformanceSQL = `
+  SELECT
+    p."nome" AS name,
+    COUNT(*)::INT AS value
+  FROM "vistoriaapartamento" va
+  JOIN "usuario" u ON u."id" = va."id_responsavel"
+  JOIN "funcionario" f ON f."id" = u."id_funcionario"
+  JOIN "pessoapapel" pp ON pp."id" = f."id"
+  JOIN "pessoa" p ON p."id" = pp."id_pessoa"
+  WHERE va."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND va."motivofim" = 'APROVADA'
+    AND f."id_cargo" = 19
+  GROUP BY p."nome"
+  ORDER BY value DESC;
+`;
+
+    const shiftCleaningSQL = `
+  WITH shift_data AS (
+    SELECT
+      CASE
+        WHEN f."horarioinicioexpediente" BETWEEN '06:00' AND '10:59' THEN 'Manhã'
+        WHEN f."horarioinicioexpediente" BETWEEN '11:00' AND '18:59' THEN 'Tarde'
+        WHEN f."horarioinicioexpediente" BETWEEN '19:00' AND '23:59' THEN 'Noite'
+        ELSE 'Terceirizado'
+      END AS shift
+    FROM "limpezaapartamento" l
+    JOIN "funcionario" f ON f."id" = l."id_funcionario"
+    WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+      AND l."datafim" IS NOT NULL
+      AND l."motivofim" = 'COMPLETA'
+      AND f."id_cargo" IN (4, 20)
+  )
+  SELECT
+    shift AS name,
+    COUNT(*)::INT AS value
+  FROM shift_data
+  GROUP BY shift
+  ORDER BY
+    CASE shift
+      WHEN 'Manhã' THEN 1
+      WHEN 'Tarde' THEN 2
+      WHEN 'Noite' THEN 3
+      WHEN 'Terceirizado' THEN 4
+    END;
+`;
+
+    const cleaningsByPeriodSql = `
+ SELECT
+  TO_CHAR(l."datainicio" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
+  COUNT(*)::INT AS "totalCleanings"
+FROM "limpezaapartamento" l
+JOIN "funcionario" f ON f."id" = l."id_funcionario"
+WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+  AND l."datafim" IS NOT NULL
+  AND l."motivofim" = 'COMPLETA'
+  AND f."id_cargo" IN (4, 20)
+GROUP BY "date"
+ORDER BY "date" ASC;
+`;
+
+    const cleaningsByPeriodShiftSql = `
+WITH cleaning_data AS (
+  SELECT
+    TO_CHAR(l."datainicio" - INTERVAL '6 hours', 'YYYY-MM-DD') AS date,
+    CASE
+      WHEN f."horarioinicioexpediente" BETWEEN '06:00' AND '10:59' THEN 'Manhã'
+      WHEN f."horarioinicioexpediente" BETWEEN '11:00' AND '18:59' THEN 'Tarde'
+      WHEN f."horarioinicioexpediente" BETWEEN '19:00' AND '23:59' THEN 'Noite'
+      ELSE 'Terceirizado'
+    END AS shift,
+    ppessoa."nome" AS employee_name
+  FROM "limpezaapartamento" l
+  JOIN "funcionario" f ON f."id" = l."id_funcionario"
+  JOIN "pessoapapel" pp ON pp."id" = f."id"
+  JOIN "pessoa" ppessoa ON ppessoa."id" = pp."id_pessoa"
+  WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND l."datafim" IS NOT NULL
+    AND l."motivofim" = 'COMPLETA'
+    AND f."id_cargo" IN (4, 20)
+)
+SELECT
+  date,
+  shift,
+  employee_name,
+  COUNT(*)::INT AS total_cleanings
+FROM cleaning_data
+GROUP BY date, shift, employee_name
+ORDER BY
+  date,
+  CASE shift
+    WHEN 'Manhã' THEN 1
+    WHEN 'Tarde' THEN 2
+    WHEN 'Noite' THEN 3
+    ELSE 4
+  END,
+  employee_name;
+`;
+
+    const employeeReportSql = `
+  WITH shift_data AS (
+    SELECT
+      CASE
+        WHEN f."horarioinicioexpediente" BETWEEN '06:00' AND '10:59' THEN 'Manhã'
+        WHEN f."horarioinicioexpediente" BETWEEN '11:00' AND '18:59' THEN 'Tarde'
+        WHEN f."horarioinicioexpediente" BETWEEN '19:00' AND '23:59' THEN 'Noite'
+        ELSE 'Terceirizado'
+      END AS shift,
+      ppessoa."nome" AS employee_name,
+      TO_CHAR(l."datainicio" - INTERVAL '6 hours', 'YYYY-MM-DD') AS adjusted_date
+    FROM "limpezaapartamento" l
+    JOIN "funcionario" f ON f."id" = l."id_funcionario"
+    JOIN "pessoapapel" pp ON pp."id" = f."id"
+    JOIN "pessoa" ppessoa ON ppessoa."id" = pp."id_pessoa"
+    WHERE
+      l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+      AND l."datafim" IS NOT NULL
+      AND l."motivofim" = 'COMPLETA'
+      AND f."id_cargo" IN (4, 20)
+      AND f."id_cargo" NOT IN (19)
+
+  ),
+  aggregated AS (
+    SELECT
+      shift,
+      employee_name,
+      COUNT(*) AS total_suites,
+      COUNT(DISTINCT adjusted_date) AS total_days
+    FROM shift_data
+    GROUP BY shift, employee_name
+  )
+  SELECT
+    shift,
+    employee_name,
+    total_suites,
+    total_days,
+    ROUND(total_suites::numeric / total_days, 2) AS average_daily_cleaning
+  FROM aggregated
+  ORDER BY
+    CASE shift
+      WHEN 'Manhã' THEN 1
+      WHEN 'Tarde' THEN 2
+      WHEN 'Noite' THEN 3
+      WHEN 'Terceirizado' THEN 4
+    END,
+    employee_name;
+`;
+
+    const teamSizingSQL = `
+WITH date_range AS (
+  SELECT generate_series(
+    '${formattedStart}'::date,
+    '${formattedEnd}'::date,
+    interval '1 day'
+  )::date AS day
+),
+weekday_counts AS (
+  SELECT
+    LOWER(
+      CASE EXTRACT(ISODOW FROM day)
+        WHEN 1 THEN 'segunda'
+        WHEN 2 THEN 'terca'
+        WHEN 3 THEN 'quarta'
+        WHEN 4 THEN 'quinta'
+        WHEN 5 THEN 'sexta'
+        WHEN 6 THEN 'sabado'
+        WHEN 7 THEN 'domingo'
+      END
+    ) AS weekday,
+    COUNT(*) AS occurrences
+  FROM date_range
+  GROUP BY weekday
+),
+shifted_cleanings AS (
+  SELECT
+    l.id,
+    l."datainicio"::date AS dt_start,
+    f."horarioinicioexpediente",
+    CASE
+      WHEN EXTRACT(HOUR FROM f."horarioinicioexpediente"::time) BETWEEN 6 AND 10 THEN 'Manhã'
+      WHEN EXTRACT(HOUR FROM f."horarioinicioexpediente"::time) BETWEEN 11 AND 18 THEN 'Tarde'
+      WHEN EXTRACT(HOUR FROM f."horarioinicioexpediente"::time) BETWEEN 19 AND 23 THEN 'Noite'
+      ELSE 'Terceirizado'
+    END AS shift,
+    f.id AS employee_id
+  FROM "limpezaapartamento" l
+  JOIN "funcionario" f ON f.id = l."id_funcionario"
+  WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND l."datafim" IS NOT NULL
+    AND l."motivofim" = 'COMPLETA'
+    AND f."id_cargo" IN (4)
+    AND f."horarioinicioexpediente" IS NOT NULL
+    AND TRIM(f."horarioinicioexpediente") <> ''
+    AND f."id" NOT IN (112857, 3361)
+),
+day_shift_totals AS (
+  SELECT
+    shift,
+    dt_start AS day_date,
+    COUNT(*) AS total_cleanings
+  FROM shifted_cleanings
+  GROUP BY shift, dt_start
+),
+weekdays AS (
+  SELECT DISTINCT
+    day_date,
+    LOWER(
+      CASE EXTRACT(ISODOW FROM day_date)
+        WHEN 1 THEN 'segunda'
+        WHEN 2 THEN 'terca'
+        WHEN 3 THEN 'quarta'
+        WHEN 4 THEN 'quinta'
+        WHEN 5 THEN 'sexta'
+        WHEN 6 THEN 'sabado'
+        WHEN 7 THEN 'domingo'
+      END
+    ) AS weekday,
+    CASE EXTRACT(ISODOW FROM day_date)
+      WHEN 7 THEN 1 -- domingo
+      WHEN 6 THEN 2 -- sabado
+      WHEN 5 THEN 3 -- sexta
+      WHEN 4 THEN 4 -- quinta
+      WHEN 3 THEN 5 -- quarta
+      WHEN 2 THEN 6 -- terca
+      WHEN 1 THEN 7 -- segunda
+    END AS weekday_order
+  FROM day_shift_totals
+),
+shift_day_agg AS (
+  SELECT
+    s.shift,
+    w.weekday,
+    SUM(s.total_cleanings) AS total_cleanings,
+    w.weekday_order
+  FROM day_shift_totals s
+  JOIN weekdays w ON s.day_date = w.day_date
+  GROUP BY s.shift, w.weekday, w.weekday_order
+),
+shift_summary AS (
+  SELECT
+    shift,
+    ROUND(AVG(total_cleanings)::numeric, 2) AS total_average_shift_cleaning
+  FROM day_shift_totals
+  GROUP BY shift
+),
+real_shift_maid_count AS (
+  SELECT
+    shift,
+    COUNT(DISTINCT employee_id) AS real_shift_maid
+  FROM shifted_cleanings
+  GROUP BY shift
+)
+SELECT
+  ss.shift,
+  ss.total_average_shift_cleaning,
+  ROUND(ss.total_average_shift_cleaning / 11.0)::int AS ideal_shift_maid,
+  COALESCE(rsm.real_shift_maid, 0) AS real_shift_maid,
+  COALESCE(rsm.real_shift_maid, 0) - (ROUND(ss.total_average_shift_cleaning / 11.0)::int) AS difference,
+  jsonb_object_agg(
+    sda.weekday,
+    jsonb_build_object(
+      'totalCleanings', sda.total_cleanings,
+      'averageDailyWeekCleaning', 
+        ROUND(
+          sda.total_cleanings::numeric / GREATEST(wc.occurrences, 1), 
+          2
+        )
+    )
+    ORDER BY sda.weekday_order
+  ) FILTER (WHERE sda.weekday IS NOT NULL) AS weekdays_stats
+FROM shift_summary ss
+LEFT JOIN real_shift_maid_count rsm ON rsm.shift = ss.shift
+LEFT JOIN shift_day_agg sda ON sda.shift = ss.shift
+LEFT JOIN weekday_counts wc ON wc.weekday = sda.weekday
+GROUP BY ss.shift, ss.total_average_shift_cleaning, rsm.real_shift_maid
+ORDER BY
+  CASE ss.shift
+    WHEN 'Noite' THEN 1
+    WHEN 'Tarde' THEN 2
+    WHEN 'Manhã' THEN 3
+    ELSE 4
+  END;
+`;
+
+    const [
+      cleaningTotalResultRaw,
+      inspectionResult,
+      supervisorPerformanceResult,
+      shiftCleaningResult,
+      rawCleaningPeriodResult,
+      rawCleaningPeriodShiftResult,
+      employeeReportRaw,
+      teamSizingResult,
+    ] = await Promise.all([
+      this.prisma.prismaLocal.$queryRawUnsafe<{ totalSuitesCleaned: number }[]>(
+        totalSuitesCleanedSql,
+      ),
+      this.prisma.prismaLocal.$queryRawUnsafe<{ totalInspections: number }[]>(
+        totalInspectionsSql,
+      ),
+      this.prisma.prismaLocal.$queryRawUnsafe<
+        { name: string; value: number }[]
+      >(supervisorPerformanceSQL),
+      this.prisma.prismaLocal.$queryRawUnsafe<
+        { name: string; value: number }[]
+      >(shiftCleaningSQL),
+      this.prisma.prismaLocal.$queryRawUnsafe<any[]>(cleaningsByPeriodSql),
+      this.prisma.prismaLocal.$queryRawUnsafe<any[]>(cleaningsByPeriodShiftSql),
+      this.prisma.prismaLocal.$queryRawUnsafe<any[]>(employeeReportSql),
+      this.prisma.prismaLocal.$queryRawUnsafe<TeamSizingRow[]>(teamSizingSQL),
     ]);
-  }
 
-  async calculateKpisByDateRange(startDate: Date, endDate: Date): Promise<any> {
-    try {
-      console.log('startDate:', startDate);
-      console.log('endDate:', endDate);
+    const orderedWeekdays = [
+      'domingo',
+      'sabado',
+      'sexta',
+      'quinta',
+      'quarta',
+      'terca',
+      'segunda',
+    ];
 
-      const timezone = 'America/Sao_Paulo';
+    function reorderWeekdays(stats: Record<string, any>) {
+      const reordered: Record<string, any> = {};
 
-      const [cleanings, inspections] = await this.fetchKpiData(
-        startDate,
-        endDate,
-      );
-
-      if (!cleanings || cleanings.length === 0) {
-        throw new NotFoundException('No cleaning data found.');
-      }
-
-      const shifts = {
-        Manhã: { start: 6 * 3600, end: 10 * 3600 + 59 * 60 + 59 },
-        Tarde: { start: 11 * 3600, end: 18 * 3600 + 59 * 60 + 59 },
-        Noite: { start: 19 * 3600, end: 23 * 3600 + 59 * 60 + 59 },
-      };
-
-      const getShiftByBusinessStartTime = (
-        businessStartTime: string | null,
-      ): string => {
-        if (!businessStartTime) {
-          return 'Terceirizado';
-        }
-
-        const [hour, minute] = businessStartTime.split(':').map(Number);
-        const totalSeconds = hour * 3600 + minute * 60;
-
-        for (const [shift, { start, end }] of Object.entries(shifts)) {
-          if (totalSeconds >= start && totalSeconds <= end) {
-            return shift;
-          }
-        }
-        return 'Terceirizado';
-      };
-
-      const isWithinDateRange = (
-        date: Moment,
-        startDate: Moment,
-        endDate: Moment,
-      ): boolean => {
-        return date.isBetween(startDate, endDate, null, '[]'); // Inclui as extremidades
-      };
-
-      const groupedByShifts: Record<string, Record<string, any>> = {
-        Manhã: {},
-        Tarde: {},
-        Noite: {},
-        Terceirizado: {},
-      };
-
-      let totalAllSuitesCleanings = 0;
-      let totalAllAverageDailyCleaning = 0;
-
-      // Inicializa uniqueEmployeesByShift
-      const uniqueEmployeesByShift: Record<string, Set<number>> = {
-        Manhã: new Set(),
-        Tarde: new Set(),
-        Noite: new Set(),
-      };
-
-      for (const cleaning of cleanings) {
-        const cleaningStartDate = moment.utc(cleaning.startDate).tz(timezone);
-
-        const startOfDay = cleaningStartDate
-          .clone()
-          .startOf('day')
-          .add(4, 'hours');
-        const endOfDay = cleaningStartDate
-          .clone()
-          .startOf('day')
-          .add(1, 'days')
-          .subtract(1, 'seconds');
-
-        if (
-          !isWithinDateRange(
-            cleaningStartDate,
-            moment(startDate),
-            moment(endDate),
-          )
-        ) {
-          continue;
-        }
-
-        if (
-          cleaningStartDate.isBefore(startOfDay) ||
-          cleaningStartDate.isAfter(endOfDay)
-        ) {
-          continue;
-        }
-
-        const workDay = startOfDay.format('DD/MM/YYYY');
-        const employeeName =
-          cleaning.employee?.personPaper?.person.name || 'Desconhecido';
-        const businessStartTime = cleaning.employee?.businessStartTime;
-
-        const shift = getShiftByBusinessStartTime(businessStartTime);
-
-        if (!groupedByShifts[shift][employeeName]) {
-          groupedByShifts[shift][employeeName] = {
-            'Total de suítes': 0,
-            'Dias trabalhados': new Set(),
-            'Daily Counts': new Array(
-              moment(endDate).diff(moment(startDate), 'days') + 1,
-            ).fill(0),
-          };
-        }
-
-        const employeeData = groupedByShifts[shift][employeeName];
-        employeeData['Total de suítes']++;
-        employeeData['Dias trabalhados'].add(workDay);
-
-        const dateIndex = moment(workDay, 'DD/MM/YYYY').diff(
-          moment(startDate),
-          'days',
-        );
-        if (dateIndex >= 0 && dateIndex < employeeData['Daily Counts'].length) {
-          employeeData['Daily Counts'][dateIndex]++;
-        }
-
-        totalAllSuitesCleanings++;
-
-        // Verifica se o shift é válido antes de adicionar o funcionário
-        if (shift && uniqueEmployeesByShift[shift]) {
-          uniqueEmployeesByShift[shift].add(cleaning.employee?.id);
-        } else {
-          continue;
+      for (const key of orderedWeekdays) {
+        if (stats[key]) {
+          reordered[key] = stats[key];
         }
       }
 
-      // Calcular médias e total de dias trabalhados
-      for (const shift of Object.keys(groupedByShifts)) {
-        for (const employeeName of Object.keys(groupedByShifts[shift])) {
-          const data = groupedByShifts[shift][employeeName];
-          const totalDaysWorked = data['Dias trabalhados'].size;
-          data['Dias trabalhados'] = totalDaysWorked;
-          data['Média por dia'] =
-            totalDaysWorked > 0
-              ? Number((data['Total de suítes'] / totalDaysWorked).toFixed(1))
-              : 0;
-
-          totalAllAverageDailyCleaning += data['Média por dia'];
-        }
-      }
-
-      if (!inspections || inspections.length === 0) {
-        throw new NotFoundException('No inspection data found.');
-      }
-
-      const supervisorsPerformance: {
-        [key: string]: { name: string; value: number };
-      } = {};
-
-      for (const inspection of inspections) {
-        const supervisorName =
-          inspection.user?.employee?.personPaper?.person.name || 'Desconhecido';
-        const totalInspections = 1;
-
-        if (supervisorsPerformance[supervisorName]) {
-          supervisorsPerformance[supervisorName].value += totalInspections;
-        } else {
-          supervisorsPerformance[supervisorName] = {
-            name: supervisorName,
-            value: totalInspections,
-          };
-        }
-      }
-
-      const performanceArray = Object.values(supervisorsPerformance);
-
-      const supervisorsPerformanceFormatted = {
-        categories: performanceArray.map((item) => item.name),
-        series: performanceArray.map((item) => item.value),
-      };
-
-      const cleaningByDateResults: { date: string; totalCleanings: number }[] =
-        [];
-
-      const cleaningsByShiftAndDay: { [key: string]: any } = {
-        Manhã: {},
-        Tarde: {},
-        Noite: {},
-      };
-
-      let currentDate = moment.utc(startDate).startOf('day').add(4, 'hours');
-      const endMoment = moment.utc(endDate).startOf('day').add(4, 'hours');
-
-      while (currentDate.isBefore(endMoment)) {
-        const dateString = currentDate.format('DD/MM/YYYY');
-        const dailyCleanings =
-          await this.prisma.prismaLocal.apartmentCleaning.findMany({
-            where: {
-              startDate: {
-                gte: currentDate.toDate(),
-                lt: currentDate.clone().add(1, 'day').toDate(),
-              },
-              endDate: {
-                not: null,
-              },
-              reasonEnd: {
-                equals: 'COMPLETA',
-              },
-            },
-          });
-
-        cleaningByDateResults.push({
-          date: dateString,
-          totalCleanings: dailyCleanings.length,
-        });
-
-        currentDate = currentDate.add(1, 'day');
-      }
-
-      const cleaningByDateCategories = cleaningByDateResults.map(
-        (item) => item.date,
-      );
-      const cleaningByDateSeries = cleaningByDateResults.map(
-        (item) => item.totalCleanings,
-      );
-
-      const employeeCleaningByShift = {
-        categories: cleaningByDateCategories,
-        series: [],
-      };
-
-      for (const shift of Object.keys(groupedByShifts)) {
-        const dailyShiftData = [];
-
-        for (const employeeName of Object.keys(groupedByShifts[shift])) {
-          const employeeData = groupedByShifts[shift][employeeName];
-          dailyShiftData.push({
-            name: employeeName,
-            data: employeeData['Daily Counts'],
-          });
-        }
-
-        employeeCleaningByShift.series.push({
-          [shift]: dailyShiftData,
-        });
-      }
-
-      const bigNumbers = {
-        currentDate: {
-          totalAllSuitesCleanings: totalAllSuitesCleanings,
-          totalAllAverageDailyCleaning: parseFloat(
-            totalAllAverageDailyCleaning.toFixed(2),
-          ),
-          totalAllInspections: inspections.length,
-        },
-      };
-
-      const employeeReport = {};
-      for (const shift of Object.keys(groupedByShifts)) {
-        employeeReport[shift] = [];
-        for (const employeeName of Object.keys(groupedByShifts[shift])) {
-          const data = groupedByShifts[shift][employeeName];
-          employeeReport[shift].push({
-            employeeName: employeeName,
-            totalSuitesCleanings: data['Total de suítes'],
-            totalDaysWorked: data['Dias trabalhados'],
-            averageDailyCleaning: data['Média por dia'],
-          });
-        }
-      }
-
-      const dayCountMap: { [key: string]: number } = {};
-
-      // Função para remover acentos
-      const removeAccents = (str: string) => {
-        return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      };
-
-      // Contar ocorrências de cada dia da semana no período
-      let currentDates = moment.tz(startDate, timezone);
-
-      while (currentDates.isSameOrBefore(moment.tz(endDate, timezone))) {
-        const dayOfWeek = removeAccents(
-          currentDates.format('dddd').replace('-feira', ''),
-        ); // Remove o sufixo e acentos
-        dayCountMap[dayOfWeek] = (dayCountMap[dayOfWeek] || 0) + 1;
-        currentDates.add(1, 'days');
-      }
-
-      // Agrupar dados
-      const uniqueEmployeesByShifts = {
-        Manhã: new Set<number>(),
-        Tarde: new Set<number>(),
-        Noite: new Set<number>(),
-      };
-
-      const excludedShifts = new Set([
-        'EXTRA MANHA',
-        'EXTRA TARDE',
-        'EXTRA NOITE',
-      ]);
-
-      for (const cleaning of cleanings) {
-        const workDay = removeAccents(
-          moment
-            .tz(cleaning.startDate, timezone)
-            .format('dddd')
-            .replace('-feira', ''),
-        ); // Remove o sufixo e acentos
-        const businessStartTime = cleaning.employee?.businessStartTime;
-        if (!businessStartTime) continue;
-        const shift = getShiftByBusinessStartTime(businessStartTime);
-
-        if (shift && !excludedShifts.has(shift)) {
-          // Inicializa os dados para o turno e dia, se ainda não existirem
-          if (!cleaningsByShiftAndDay[shift][workDay]) {
-            cleaningsByShiftAndDay[shift][workDay] = { totalCleanings: 0 };
-          }
-
-          // Adiciona o ID do funcionário ao conjunto para contar apenas uma vez
-          uniqueEmployeesByShifts[shift].add(cleaning.employee.id);
-          cleaningsByShiftAndDay[shift][workDay].totalCleanings++;
-        }
-      }
-
-      // Calcular as métricas e preparar dados para inserção
-      const totals = {
-        totalAverageDailyWeekCleaning: {} as { [key: string]: number },
-        totalIdealShiftMaid: 0,
-        totalRealShiftMaid: 0,
-        totalDifference: 0,
-        totalAllAverageShiftCleaning: 0,
-      };
-
-      for (const shift in cleaningsByShiftAndDay) {
-        let shiftTotalCount = 0;
-
-        for (const day in cleaningsByShiftAndDay[shift]) {
-          const dayData = cleaningsByShiftAndDay[shift][day];
-          const averageDailyWeekCleaning = (
-            dayData.totalCleanings / (dayCountMap[day] || 1)
-          ).toFixed(2);
-          cleaningsByShiftAndDay[shift][day].averageDailyWeekCleaning =
-            +averageDailyWeekCleaning;
-
-          // Acumula a média diária para cada dia da semana
-          totals.totalAverageDailyWeekCleaning[day] =
-            (totals.totalAverageDailyWeekCleaning[day] || 0) +
-            +averageDailyWeekCleaning;
-
-          // Acumula total para o turno
-          shiftTotalCount += +averageDailyWeekCleaning;
-        }
-
-        // Calcular e atualizar turnos
-        cleaningsByShiftAndDay[shift].totalAverageShiftCleaning = +(
-          shiftTotalCount / Object.keys(cleaningsByShiftAndDay[shift]).length
-        ).toFixed(2);
-        cleaningsByShiftAndDay[shift].idealShiftMaid = Math.ceil(
-          cleaningsByShiftAndDay[shift].totalAverageShiftCleaning / 7,
-        );
-
-        totals.totalIdealShiftMaid +=
-          cleaningsByShiftAndDay[shift].idealShiftMaid;
-        cleaningsByShiftAndDay[shift].realShiftMaid =
-          uniqueEmployeesByShifts[shift].size;
-        totals.totalRealShiftMaid +=
-          cleaningsByShiftAndDay[shift].realShiftMaid;
-        cleaningsByShiftAndDay[shift].difference =
-          cleaningsByShiftAndDay[shift].realShiftMaid -
-          cleaningsByShiftAndDay[shift].idealShiftMaid;
-        totals.totalDifference += cleaningsByShiftAndDay[shift].difference;
-
-        // Acumula para totalAllAverageShiftCleaning
-        totals.totalAllAverageShiftCleaning +=
-          cleaningsByShiftAndDay[shift].totalAverageShiftCleaning;
-      }
-
-      // Adiciona totais ao retorno
-      cleaningsByShiftAndDay.Totals = {
-        totalAverageDailyWeekCleaning: totals.totalAverageDailyWeekCleaning,
-        totalIdealShiftMaid: totals.totalIdealShiftMaid,
-        totalRealShiftMaid: totals.totalRealShiftMaid,
-        totalDifference: totals.totalDifference,
-        totalAllAverageShiftCleaning:
-          +totals.totalAllAverageShiftCleaning.toFixed(2),
-      };
-
-      return {
-        Company: 'Lush Lapa',
-        BigNumbers: [bigNumbers],
-        SupervisorsPerformance: supervisorsPerformanceFormatted,
-        ShiftCleaning: {
-          categories: Object.keys(groupedByShifts),
-          series: Object.values(groupedByShifts).map((shiftData) =>
-            Object.values(shiftData).reduce(
-              (total, employee) => total + employee['Total de suítes'],
-              0,
-            ),
-          ),
-        },
-        CleaningByDate: {
-          categories: cleaningByDateCategories,
-          series: cleaningByDateSeries,
-        },
-        EmployeeCleaningByShift: employeeCleaningByShift,
-        EmployeeReport: employeeReport,
-        TeamSizing: cleaningsByShiftAndDay,
-      };
-    } catch (error) {
-      console.error('Erro ao calcular os KPIs:', error);
-      throw new BadRequestException();
+      return reordered;
     }
+
+    const isMonthly = moment(endDate).diff(moment(startDate), 'days') > 31;
+
+    const totalAllInspections = inspectionResult?.[0]?.totalInspections || 0;
+
+    const supervisorsPerformanceFormatted = {
+      categories: supervisorPerformanceResult.map((item) => item.name),
+      series: supervisorPerformanceResult.map((item) => item.value),
+    };
+
+    const shiftCleaningFormatted = {
+      categories: shiftCleaningResult.map((item) => item.name),
+      series: shiftCleaningResult.map((item) => item.value),
+    };
+
+    const totalAllSuitesCleanings =
+      cleaningTotalResultRaw?.[0]?.totalSuitesCleaned || 0;
+
+    const accountingStart = moment
+      .utc(startDate)
+      .set({ hour: 6, minute: 0, second: 0 });
+    const accountingEnd = moment
+      .utc(endDate)
+      .add(1, 'day')
+      .set({ hour: 5, minute: 59, second: 59 });
+    const totalDays = accountingEnd.diff(accountingStart, 'days');
+
+    const totalAllAverageDailyCleaning =
+      totalDays > 0 ? totalAllSuitesCleanings / totalDays : 0;
+
+    const bigNumbers = {
+      currentDate: {
+        totalAllSuitesCleanings: totalAllSuitesCleanings,
+        totalAllAverageDailyCleaning: parseFloat(
+          totalAllAverageDailyCleaning.toFixed(2),
+        ),
+        totalAllInspections: totalAllInspections,
+      },
+    };
+
+    const cleaningsGrouped = new Map<string, number>();
+
+    for (const row of rawCleaningPeriodResult) {
+      const dateKey = isMonthly
+        ? moment(row.date, 'YYYY-MM-DD').format('YYYY-MM')
+        : moment(row.date, 'YYYY-MM-DD').format('YYYY-MM-DD');
+
+      const current = cleaningsGrouped.get(dateKey) || 0;
+      cleaningsGrouped.set(dateKey, current + Number(row.totalCleanings));
+    }
+
+    const dateKeys = [...cleaningsGrouped.keys()].sort();
+
+    const cleaningsByPeriod = {
+      categories: dateKeys.map((key) =>
+        isMonthly
+          ? moment(key, 'YYYY-MM').format('MM/YYYY')
+          : moment(key).format('DD/MM/YYYY'),
+      ),
+      series: dateKeys.map((key) =>
+        Number((cleaningsGrouped.get(key) || 0).toFixed(0)),
+      ),
+    };
+
+    const shiftsMap: Record<
+      string,
+      Record<string, Record<string, number>>
+    > = {}; // shift -> employee -> date -> count
+
+    for (const {
+      date,
+      shift,
+      employee_name,
+      total_cleanings,
+    } of rawCleaningPeriodShiftResult) {
+      const key = isMonthly
+        ? moment(date, 'YYYY-MM-DD').format('YYYY-MM')
+        : moment(date, 'YYYY-MM-DD').format('YYYY-MM-DD');
+
+      if (!shiftsMap[shift]) shiftsMap[shift] = {};
+      if (!shiftsMap[shift][employee_name])
+        shiftsMap[shift][employee_name] = {};
+      shiftsMap[shift][employee_name][key] = total_cleanings;
+    }
+
+    // Usa os mesmos dateKeys já definidos anteriormente
+    const cleaningsByPeriodShift = {
+      categories: dateKeys.map((key) =>
+        isMonthly
+          ? moment(key, 'YYYY-MM').format('MM/YYYY')
+          : moment(key).format('DD/MM/YYYY'),
+      ),
+      series: Object.entries(shiftsMap).map(([shift, employees]) => {
+        const shiftSeries = Object.entries(employees).map(
+          ([employeeName, dateCounts]) => {
+            return {
+              name: employeeName,
+              data: dateKeys.map((dateKey) => dateCounts[dateKey] || 0),
+            };
+          },
+        );
+
+        return {
+          [shift]: shiftSeries,
+        };
+      }),
+    };
+
+    const employeeReport: Record<string, any[]> = {};
+
+    for (const row of employeeReportRaw) {
+      const shift = row.shift;
+      if (!employeeReport[shift]) employeeReport[shift] = [];
+
+      employeeReport[shift].push({
+        employeeName: row.employee_name,
+        totalSuitesCleanings: Number(row.total_suites),
+        totalDaysWorked: Number(row.total_days),
+        averageDailyCleaning: Number(row.average_daily_cleaning),
+      });
+    }
+
+    const totals = {
+      totalAverageDailyWeekCleaning: {},
+      totalIdealShiftMaid: 0,
+      totalRealShiftMaid: 0,
+      totalDifference: 0,
+      totalAllAverageShiftCleaning: 0,
+    };
+
+    const teamSizing: Record<string, any> = {};
+
+    for (const row of teamSizingResult) {
+      const shift = row.shift;
+      const stats = row.weekdays_stats;
+
+      const weekdaysOrdered = reorderWeekdays(stats);
+
+      teamSizing[shift] = {
+        totalAverageShiftCleaning: Number(row.total_average_shift_cleaning),
+        idealShiftMaid: Number(row.ideal_shift_maid),
+        realShiftMaid: Number(row.real_shift_maid),
+        difference: Number(row.difference),
+        ...weekdaysOrdered,
+      };
+
+      for (const [weekday, values] of Object.entries(weekdaysOrdered)) {
+        if (!totals.totalAverageDailyWeekCleaning[weekday]) {
+          totals.totalAverageDailyWeekCleaning[weekday] = 0;
+        }
+
+        totals.totalAverageDailyWeekCleaning[weekday] += Number(
+          values.averageDailyWeekCleaning,
+        );
+      }
+
+      totals.totalIdealShiftMaid += Number(row.ideal_shift_maid);
+      totals.totalRealShiftMaid += Number(row.real_shift_maid);
+      totals.totalDifference += Number(row.difference);
+      totals.totalAllAverageShiftCleaning += Number(
+        row.total_average_shift_cleaning,
+      );
+    }
+
+    totals.totalAllAverageShiftCleaning = Number(
+      totals.totalAllAverageShiftCleaning.toFixed(2),
+    );
+
+    teamSizing['Totals'] = totals;
+
+    Object.keys(totals.totalAverageDailyWeekCleaning).forEach((key) => {
+      totals.totalAverageDailyWeekCleaning[key] = Number(
+        totals.totalAverageDailyWeekCleaning[key].toFixed(2),
+      );
+    });
+
+    return {
+      Company: 'Lush Lapa',
+      BigNumbers: [bigNumbers],
+      SupervisorsPerformance: supervisorsPerformanceFormatted,
+      ShiftCleaning: shiftCleaningFormatted,
+      CleaningByDate: cleaningsByPeriod,
+      EmployeeCleaningByShift: cleaningsByPeriodShift,
+      EmployeeReport: employeeReport,
+      TeamSizing: teamSizing,
+    };
   }
 }
