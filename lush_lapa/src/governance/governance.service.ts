@@ -545,10 +545,14 @@ export class GovernanceService {
         });
       }
 
-      // Cria a estrutura de série para o gráfico
-      const series = Object.entries(shiftsData).map(([shift, employees]) => ({
-        [shift]: employees,
-      }));
+      // Cria a estrutura de série como objeto com turnos como chaves
+      const series = Object.entries(shiftsData).reduce(
+        (acc, [shift, employees]) => {
+          acc[shift] = employees;
+          return acc;
+        },
+        {},
+      );
 
       return {
         categories,
@@ -1164,20 +1168,15 @@ ORDER BY
           ? moment(key, 'YYYY-MM').format('MM/YYYY')
           : moment(key).format('DD/MM/YYYY'),
       ),
-      series: Object.entries(shiftsMap).map(([shift, employees]) => {
-        const shiftSeries = Object.entries(employees).map(
-          ([employeeName, dateCounts]) => {
-            return {
-              name: employeeName,
-              data: dateKeys.map((dateKey) => dateCounts[dateKey] || 0),
-            };
-          },
+      series: Object.entries(shiftsMap).reduce((acc, [shift, employees]) => {
+        acc[shift] = Object.entries(employees).map(
+          ([employeeName, dateCounts]) => ({
+            name: employeeName,
+            data: dateKeys.map((dateKey) => dateCounts[dateKey] || 0),
+          }),
         );
-
-        return {
-          [shift]: shiftSeries,
-        };
-      }),
+        return acc;
+      }, {}),
     };
 
     const employeeReport: Record<string, any[]> = {};
