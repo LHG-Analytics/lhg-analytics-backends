@@ -764,6 +764,7 @@ export class GovernanceService {
   WITH shift_data AS (
     SELECT
       CASE
+        WHEN f."id" IN (1702, 1703, 1704) THEN 'Terceirizado'
         WHEN f."horarioinicioexpediente" BETWEEN '06:00' AND '10:59' THEN 'Manhã'
         WHEN f."horarioinicioexpediente" BETWEEN '11:00' AND '18:59' THEN 'Tarde'
         WHEN f."horarioinicioexpediente" BETWEEN '19:00' AND '23:59' THEN 'Noite'
