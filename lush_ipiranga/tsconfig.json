@@ -25,9 +25,9 @@
       "@client-local": [
         "dist/generated/client-local"
       ],
-      "@auth/*": [
+      /*"@auth/*": [
         "../authentication/src/*"
-      ]
+      ]*/
     }
   },
   "include": [
