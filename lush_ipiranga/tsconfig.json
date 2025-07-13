@@ -1,5 +1,5 @@
 {
-  //"extends": "../tsconfig.base.json",
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "module": "commonjs",
     "declaration": true,
@@ -25,9 +25,9 @@
       "@client-local": [
         "dist/generated/client-local"
       ],
-      // "@auth/*": [
-      //  "../authentication/src/*"
-      //]
+      "@auth/*": [
+        "../authentication/src/*"
+      ]
     }
   },
   "include": [

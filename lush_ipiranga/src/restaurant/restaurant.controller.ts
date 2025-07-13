@@ -14,13 +14,13 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { RestaurantService } from './restaurant.service';
-//import { JwtAuthGuard } from '@auth/auth/guards/jwt-auth.guard';
-//import { UseGuards } from '@nestjs/common';
-//import { ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '@auth/auth/guards/jwt-auth.guard';
+import { UseGuards } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('Restaurants')
-//@ApiBearerAuth('JWT-auth')
-//@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard)
 @Controller('Restaurants')
 export class RestaurantController {
   constructor(private readonly restaurantService: RestaurantService) {}

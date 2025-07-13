@@ -1898,6 +1898,86 @@ export class BookingsService {
     }
   }
 
+  async calculateKpibyDateRangeSQL(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<any> {
+    const formattedStart = moment
+      .utc(startDate)
+      .set({ hour: 0, minute: 0, second: 0 })
+      .format('YYYY-MM-DD HH:mm:ss');
+
+    const formattedEnd = moment
+      .utc(endDate)
+      .set({ hour: 23, minute: 59, second: 59 })
+      .format('YYYY-MM-DD HH:mm:ss');
+
+    const totalBookingRevenueSQL = `
+  SELECT
+  canal,
+  ROUND(SUM(valor_final)::numeric, 2) AS "totalAllValue"
+FROM (
+  SELECT
+    CASE
+      WHEN r."id_tipoorigemreserva" = 3 AND r."reserva_programada_guia" = true THEN 'Guia Programado'
+      WHEN r."id_tipoorigemreserva" = 3 AND r."reserva_programada_guia" = false THEN 'Guia Não Programado'
+      WHEN r."id_tipoorigemreserva" = 1 THEN 'Sistema'
+      WHEN r."id_tipoorigemreserva" = 4 THEN 'Reserva API'
+      WHEN r."id_tipoorigemreserva" = 6 THEN 'Interna'
+      WHEN r."id_tipoorigemreserva" = 7 THEN 'Booking'
+      WHEN r."id_tipoorigemreserva" = 8 THEN 'Expedia'
+      ELSE 'Outros'
+    END AS canal,
+    
+    CASE
+      WHEN r."id_tipoorigemreserva" = 3 AND r."reserva_programada_guia" = false THEN
+        r."valorcontratado" - COALESCE(r."desconto_reserva", 0)
+      ELSE
+        r."valorcontratado"
+    END AS valor_final
+
+  FROM "reserva" r
+  WHERE
+    r."cancelada" IS NULL
+    AND r."valorcontratado" IS NOT NULL
+    AND (
+      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+      OR
+      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+    )
+    AND r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8)
+) AS sub
+GROUP BY canal
+ORDER BY canal;
+`;
+
+    const bookingRevenue = await this.prisma.prismaLocal.$queryRawUnsafe<any[]>(
+      totalBookingRevenueSQL,
+    );
+
+    // Exibe os valores por canal no console
+    console.table(bookingRevenue); // ou console.log se preferir
+
+    const totalValue = bookingRevenue.reduce(
+      (sum, r) => sum + Number(r.totalAllValue ?? 0),
+      0,
+    );
+
+    const bigNumbers = {
+      currentDate: {
+        totalAllValue: totalValue,
+        totalAllBookings: null, // será preenchido depois
+        totalAllTicketAverage: null, // será preenchido depois
+        totalAllRepresentativeness: null, // será preenchido depois
+      },
+    };
+
+    return {
+      Company: 'Andar de Cima',
+      BigNumbers: [bigNumbers],
+    };
+  }
+
   private determineRentalPeriod(
     checkIn: Date,
     checkOut: Date,

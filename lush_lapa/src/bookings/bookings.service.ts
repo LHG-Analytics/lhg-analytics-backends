@@ -1911,4 +1911,83 @@ export class BookingsService {
     const checkOutTime = new Date(checkOut).getTime();
     return (checkOutTime - checkInTime) / 1000; // Tempo em segundos
   }
+
+  async calculateKpibyDateRangeSQL(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<any> {
+    const formattedStart = moment
+      .utc(startDate)
+      .set({ hour: 0, minute: 0, second: 0 })
+      .format('YYYY-MM-DD HH:mm:ss');
+
+    const formattedEnd = moment
+      .utc(endDate)
+      .set({ hour: 23, minute: 59, second: 59 })
+      .format('YYYY-MM-DD HH:mm:ss');
+
+    const totalBookingRevenueSQL = `
+  SELECT
+  COALESCE(r."id_tipoorigemreserva", 0) AS "id_tipoorigemreserva",
+  ROUND(SUM(r."valorcontratado")::numeric, 2) AS "totalAllValue"
+FROM "reserva" r
+WHERE
+  r."cancelada" IS NULL
+  AND r."valorcontratado" IS NOT NULL
+  AND (
+    (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+    OR
+    (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+  )
+GROUP BY ROLLUP (r."id_tipoorigemreserva")
+HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva" IS NULL
+ORDER BY "id_tipoorigemreserva";
+`;
+
+    const bookingRevenue = await this.prisma.prismaLocal.$queryRawUnsafe<any[]>(
+      totalBookingRevenueSQL,
+    );
+
+    // Exibe os valores por canal no console
+    console.log(
+      'Receita por canal:',
+      bookingRevenue.map((r) => {
+        const canais: Record<number, string> = {
+          1: 'sistema',
+          3: 'guia de motéis',
+          4: 'reserva api',
+          6: 'interna',
+          7: 'booking',
+          8: 'expedia',
+        };
+
+        return {
+          canal:
+            r.id_tipoorigemreserva === null
+              ? 'TOTAL GERAL'
+              : (canais[r.id_tipoorigemreserva] ??
+                `Canal ${r.id_tipoorigemreserva}`),
+          totalAllValue: Number(r.totalAllValue),
+        };
+      }),
+    );
+
+    const totalLine = bookingRevenue.find(
+      (r) => r.id_tipoorigemreserva === null,
+    );
+
+    const bigNumbers = {
+      currentDate: {
+        totalAllValue: Number(totalLine?.totalAllValue ?? 0),
+        totalAllBookings: null, // será preenchido depois
+        totalAllTicketAverage: null, // será preenchido depois
+        totalAllRepresentativeness: null, // será preenchido depois
+      },
+    };
+
+    return {
+      Company: 'Lush Lapa',
+      BigNumbers: [bigNumbers],
+    };
+  }
 }
