@@ -98,9 +98,10 @@ export class CompanyController {
 
     // Ajusta as horas conforme necessário
     if (isEndDate) {
-      date.setUTCHours(23, 59, 59, 999); // Define o final às 05:59:59.999
+      date.setDate(date.getDate() + 1);
+      date.setUTCHours(5, 59, 59, 999); // Define o final às 05:59:59.999
     } else {
-      date.setUTCHours(0, 0, 0, 0); // Define o início às 06:00
+      date.setUTCHours(6, 0, 0, 0); // Define o início às 06:00
     }
 
     return date;

@@ -1913,9 +1913,18 @@ export class BookingsService {
       .format('YYYY-MM-DD HH:mm:ss');
 
     const totalBookingRevenueSQL = `
+WITH reservation_packages AS (
   SELECT
+    ppur.reserva_id,
+    SUM(pdp.valor) as package_total
+  FROM "pacotesprodutosutilizados_reserva" ppur
+  JOIN "pacotedeprodutos_utilizado" ppu ON ppu.id = ppur.pacotes_produto_utilizado_id
+  JOIN "pacotedeprodutos" pdp ON pdp.id_produto = ppu.id_origem
+  GROUP BY ppur.reserva_id)
+SELECT
   canal,
-  ROUND(SUM(valor_final)::numeric, 2) AS "totalAllValue"
+  SUM(valor_final)::numeric AS "totalAllValue",
+  COUNT(*) AS "totalBookings"
 FROM (
   SELECT
     CASE
@@ -1928,18 +1937,16 @@ FROM (
       WHEN r."id_tipoorigemreserva" = 8 THEN 'Expedia'
       ELSE 'Outros'
     END AS canal,
-    
-    CASE
+    (CASE
       WHEN r."id_tipoorigemreserva" = 3 AND r."reserva_programada_guia" = false THEN
         r."valorcontratado" - COALESCE(r."desconto_reserva", 0)
       ELSE
         r."valorcontratado"
-    END AS valor_final
-
+    END) + COALESCE(rp.package_total, 0) AS valor_final
   FROM "reserva" r
+  LEFT JOIN reservation_packages rp ON r.id = rp.reserva_id
   WHERE
     r."cancelada" IS NULL
-    AND r."valorcontratado" IS NOT NULL
     AND (
       (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
       OR
@@ -1951,9 +1958,21 @@ GROUP BY canal
 ORDER BY canal;
 `;
 
-    const bookingRevenue = await this.prisma.prismaLocal.$queryRawUnsafe<any[]>(
-      totalBookingRevenueSQL,
-    );
+    const totalRevenueSQL = `
+      SELECT
+        SUM(la."valortotal") AS "totalRevenue"
+      FROM "locacaoapartamento" la
+      WHERE la."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+        AND la."fimocupacaotipo" = 'FINALIZADA'
+    `;
+
+    console.log('formattedStart', formattedStart);
+    console.log('formattedEnd', formattedEnd);
+
+    const [bookingRevenue, totalRevenueResult] = await Promise.all([
+      this.prisma.prismaLocal.$queryRawUnsafe<any[]>(totalBookingRevenueSQL),
+      this.prisma.prismaLocal.$queryRawUnsafe<any[]>(totalRevenueSQL),
+    ]);
 
     // Exibe os valores por canal no console
     console.table(bookingRevenue); // ou console.log se preferir
@@ -1963,12 +1982,27 @@ ORDER BY canal;
       0,
     );
 
+    const totalBookings = bookingRevenue.reduce(
+      (sum, r) => sum + Number(r.totalBookings ?? 0),
+      0,
+    );
+
+    const totalTicketAverage =
+      totalBookings > 0 ? totalValue / totalBookings : 0;
+
+    const totalRevenue = Number(totalRevenueResult[0]?.totalRevenue ?? 0);
+
+    const totalAllRepresentativeness =
+      totalRevenue > 0 ? (totalValue / totalRevenue) * 100 : 0;
+
     const bigNumbers = {
       currentDate: {
         totalAllValue: totalValue,
-        totalAllBookings: null, // será preenchido depois
-        totalAllTicketAverage: null, // será preenchido depois
-        totalAllRepresentativeness: null, // será preenchido depois
+        totalAllBookings: totalBookings,
+        totalAllTicketAverage: Number(totalTicketAverage.toFixed(2)),
+        totalAllRepresentativeness: Number(
+          totalAllRepresentativeness.toFixed(2),
+        ),
       },
     };
 
