@@ -13,12 +13,14 @@ import { config } from 'dotenv';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
+import { ValidationPipe } from '@nestjs/common';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { CreateKpiAlosDto } from './kpiAlos/dto/create-kpiAlos.dto';
 import { UpdateKpiAlosDto } from './kpiAlos/dto/update-kpiAlos.dto';
 import { CreateKpiRevenueDto } from './kpiRevenue/dto/create-kpiRevenue.dto';
 import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
+import * as helmet from 'helmet';
 
 // Carregar variáveis de ambiente do arquivo .env
 config();
@@ -26,6 +28,23 @@ config();
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
+
+    // Configuração de segurança com Helmet
+    app.use(helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", "data:", "https:"],
+        },
+      },
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+      },
+    }));
 
     const servicePrefix = process.env.SERVICE_PREFIX_IPIRANGA || 'ipiranga';
     app.setGlobalPrefix(`${servicePrefix}/api`);
@@ -109,6 +128,17 @@ async function bootstrap() {
       allowedHeaders: ['Authorization', 'Content-Type'], // Adicionando Authorization aqui
       credentials: true, // Se estiver enviando cookies, mantenha true
     };
+
+    // Configuração global de validação
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true, // Remove propriedades não definidas no DTO
+        forbidNonWhitelisted: true, // Rejeita requests com propriedades extras
+        transform: true, // Transforma automaticamente para tipos corretos
+        disableErrorMessages: false, // Mantém mensagens de erro para debug
+        validationError: { target: false, value: false }, // Remove dados sensíveis dos erros
+      }),
+    );
 
     app.enableCors(corsOptions);
 

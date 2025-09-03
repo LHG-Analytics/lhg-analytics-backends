@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AuthService } from '../auth/auth.service';
-import { User } from './entities/user.entity';
+import { User, UserResponse } from './entities/user.entity';
 import { cpf } from 'cpf-cnpj-validator';
 
 @Injectable()
@@ -17,7 +17,7 @@ export class UserService {
     public authService: AuthService,
   ) {}
 
-  async createUser(createUserDto: CreateUserDto): Promise<User> {
+  async createUser(createUserDto: CreateUserDto): Promise<UserResponse> {
     if (!cpf.isValid(createUserDto.cpf)) {
       throw new BadRequestException('CPF inválido');
     }
@@ -43,13 +43,12 @@ export class UserService {
       email: createUserDto.email,
       name: createUserDto.name,
       cpf: createUserDto.cpf,
-      password: hashedPassword,
       role: createUserDto.role,
       company: createUserDto.company,
     };
   }
 
-  async updateUser(id: number, updateUserDto: UpdateUserDto): Promise<User> {
+  async updateUser(id: number, updateUserDto: UpdateUserDto): Promise<UserResponse> {
     await this.findUserById(id);
 
     // Verificar se o CPF é válido
@@ -72,26 +71,26 @@ export class UserService {
       data: updateUserDto,
     });
 
-    return {
-      ...updatedUser,
-    };
+    // Remove password from response
+    const { password, ...userResponse } = updatedUser;
+    return userResponse;
   }
 
-  async findAll(): Promise<User[]> {
+  async findAll(): Promise<UserResponse[]> {
     try {
       const users = await this.prisma.prismaOnline.user.findMany();
 
-      // Mapeia os usuários e busca o nome da empresa associada
+      // Mapeia os usuários e busca o nome da empresa associada (remove senha)
       const usersWithCompanyNames = await Promise.all(
         users.map(async (user) => {
+          const { password, ...userWithoutPassword } = user;
           return {
-            id: user.id,
-            name: user.name,
-            cpf: user.cpf,
-            password: user.password,
-            role: user.role,
-            email: user.email,
-            company: user.company,
+            id: userWithoutPassword.id,
+            name: userWithoutPassword.name,
+            cpf: userWithoutPassword.cpf,
+            role: userWithoutPassword.role,
+            email: userWithoutPassword.email,
+            company: userWithoutPassword.company,
           };
         }),
       );
@@ -105,7 +104,7 @@ export class UserService {
     }
   }
 
-  async findUserById(id: number): Promise<User> {
+  async findUserById(id: number): Promise<UserResponse> {
     const user = await this.prisma.prismaOnline.user.findUnique({
       where: { id },
     });
@@ -114,18 +113,12 @@ export class UserService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    return {
-      id: user.id,
-      name: user.name,
-      cpf: user.cpf,
-      password: user.password,
-      role: user.role,
-      email: user.email,
-      company: user.company,
-    };
+    // Remove password from response
+    const { password, ...userResponse } = user;
+    return userResponse;
   }
 
-  async findByEmail(email: string): Promise<User> {
+  async findByEmail(email: string): Promise<UserResponse> {
     const user = await this.prisma.prismaOnline.user.findUnique({
       where: { email },
     });
@@ -134,15 +127,9 @@ export class UserService {
       throw new NotFoundException(`User with email ${email} not found`);
     }
 
-    return {
-      id: user.id,
-      name: user.name,
-      cpf: user.cpf,
-      password: user.password,
-      role: user.role,
-      email: user.email,
-      company: user.company,
-    };
+    // Remove password from response
+    const { password, ...userResponse } = user;
+    return userResponse;
   }
 
   async deleteUser(id: number): Promise<void> {

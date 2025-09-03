@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { Moment } from 'moment-timezone';
-import { PeriodEnum } from '@client-online';
+import { PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -1038,22 +1038,22 @@ ORDER BY
       employeeReportRaw,
       teamSizingResult,
     ] = await Promise.all([
-      this.prisma.prismaLocal.$queryRawUnsafe<{ totalSuitesCleaned: number }[]>(
-        totalSuitesCleanedSql,
+      this.prisma.prismaLocal.$queryRaw<{ totalSuitesCleaned: number }[]>(
+        Prisma.sql([totalSuitesCleanedSql]),
       ),
-      this.prisma.prismaLocal.$queryRawUnsafe<{ totalInspections: number }[]>(
-        totalInspectionsSql,
+      this.prisma.prismaLocal.$queryRaw<{ totalInspections: number }[]>(
+        Prisma.sql([totalInspectionsSql]),
       ),
-      this.prisma.prismaLocal.$queryRawUnsafe<
+      this.prisma.prismaLocal.$queryRaw<
         { name: string; value: number }[]
-      >(supervisorPerformanceSQL),
-      this.prisma.prismaLocal.$queryRawUnsafe<
+      >(Prisma.sql([supervisorPerformanceSQL])),
+      this.prisma.prismaLocal.$queryRaw<
         { name: string; value: number }[]
-      >(shiftCleaningSQL),
-      this.prisma.prismaLocal.$queryRawUnsafe<any[]>(cleaningsByPeriodSql),
-      this.prisma.prismaLocal.$queryRawUnsafe<any[]>(cleaningsByPeriodShiftSql),
-      this.prisma.prismaLocal.$queryRawUnsafe<any[]>(employeeReportSql),
-      this.prisma.prismaLocal.$queryRawUnsafe<TeamSizingRow[]>(teamSizingSQL),
+      >(Prisma.sql([shiftCleaningSQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([cleaningsByPeriodSql])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([cleaningsByPeriodShiftSql])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([employeeReportSql])),
+      this.prisma.prismaLocal.$queryRaw<TeamSizingRow[]>(Prisma.sql([teamSizingSQL])),
     ]);
 
     const orderedWeekdays = [

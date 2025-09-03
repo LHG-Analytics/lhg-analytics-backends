@@ -1948,9 +1948,9 @@ FROM (
   WHERE
     r."cancelada" IS NULL
     AND (
-      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN $1 AND $2)
       OR
-      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN $1 AND $2)
     )
     AND r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8)
 ) AS sub
@@ -1962,7 +1962,7 @@ ORDER BY canal;
       SELECT
         SUM(la."valortotal") AS "totalRevenue"
       FROM "locacaoapartamento" la
-      WHERE la."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+      WHERE la."datainicialdaocupacao" BETWEEN $1 AND $2
         AND la."fimocupacaotipo" = 'FINALIZADA'
     `;
 
@@ -1970,8 +1970,58 @@ ORDER BY canal;
     console.log('formattedEnd', formattedEnd);
 
     const [bookingRevenue, totalRevenueResult] = await Promise.all([
-      this.prisma.prismaLocal.$queryRawUnsafe<any[]>(totalBookingRevenueSQL),
-      this.prisma.prismaLocal.$queryRawUnsafe<any[]>(totalRevenueSQL),
+      this.prisma.prismaLocal.$queryRaw<any[]>`
+WITH reservation_packages AS (
+  SELECT
+    ppur.reserva_id,
+    SUM(pdp.valor) as package_total
+  FROM "pacotesprodutosutilizados_reserva" ppur
+  JOIN "pacotedeprodutos_utilizado" ppu ON ppu.id = ppur.pacotes_produto_utilizado_id
+  JOIN "pacotedeprodutos" pdp ON pdp.id_produto = ppu.id_origem
+  GROUP BY ppur.reserva_id)
+SELECT
+  canal,
+  SUM(valor_final)::numeric AS "totalAllValue",
+  COUNT(*) AS "totalBookings"
+FROM (
+  SELECT
+    CASE
+      WHEN r."id_tipoorigemreserva" = 3 AND r."reserva_programada_guia" = true THEN 'Guia Programado'
+      WHEN r."id_tipoorigemreserva" = 3 AND r."reserva_programada_guia" = false THEN 'Guia Não Programado'
+      WHEN r."id_tipoorigemreserva" = 1 THEN 'Sistema'
+      WHEN r."id_tipoorigemreserva" = 4 THEN 'Reserva API'
+      WHEN r."id_tipoorigemreserva" = 6 THEN 'Interna'
+      WHEN r."id_tipoorigemreserva" = 7 THEN 'Booking'
+      WHEN r."id_tipoorigemreserva" = 8 THEN 'Expedia'
+      ELSE 'Outros'
+    END AS canal,
+    (CASE
+      WHEN r."id_tipoorigemreserva" = 3 AND r."reserva_programada_guia" = false THEN
+        r."valorcontratado" - COALESCE(r."desconto_reserva", 0)
+      ELSE
+        r."valorcontratado"
+    END) + COALESCE(rp.package_total, 0) AS valor_final
+  FROM "reserva" r
+  LEFT JOIN reservation_packages rp ON r.id = rp.reserva_id
+  WHERE
+    r."cancelada" IS NULL
+    AND (
+      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN ${formattedStart} AND ${formattedEnd})
+      OR
+      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN ${formattedStart} AND ${formattedEnd})
+    )
+    AND r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8)
+) AS sub
+GROUP BY canal
+ORDER BY canal;
+      `,
+      this.prisma.prismaLocal.$queryRaw<any[]>`
+      SELECT
+        SUM(la."valortotal") AS "totalRevenue"
+      FROM "locacaoapartamento" la
+      WHERE la."datainicialdaocupacao" BETWEEN ${formattedStart} AND ${formattedEnd}
+        AND la."fimocupacaotipo" = 'FINALIZADA'
+      `,
     ]);
 
     // Exibe os valores por canal no console

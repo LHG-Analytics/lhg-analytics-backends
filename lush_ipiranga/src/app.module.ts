@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './user/user.module';
@@ -35,6 +36,12 @@ import { RestaurantCostsModule } from './restaurantCosts/restaurantCosts.module'
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 1 minute  
+        limit: 100, // 100 requests per minute
+      },
+    ]),
     UserModule,
     PrismaModule,
     KpiAlosModule,
@@ -66,6 +73,10 @@ import { RestaurantCostsModule } from './restaurantCosts/restaurantCosts.module'
     AppService,
     PrismaService,
     CronJobsService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     //{
     //provide: APP_GUARD,
     // useClass: JwtAuthGuard, // Aplicado o guard de autenticação globalmente

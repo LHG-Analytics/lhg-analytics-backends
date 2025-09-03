@@ -88,8 +88,8 @@ export class RestaurantCostsService {
     `;
 
     const revenueResult =
-      await this.prisma.prismaLocal.$queryRawUnsafe<{ totalValue: number }[]>(
-        revenueAbPeriodSql,
+      await this.prisma.prismaLocal.$queryRaw<{ totalValue: number }[]>(
+        Prisma.sql([revenueAbPeriodSql]),
       );
 
     const totalRevenue = revenueResult?.[0]?.totalValue ?? 0;

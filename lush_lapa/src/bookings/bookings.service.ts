@@ -1944,8 +1944,8 @@ HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva
 ORDER BY "id_tipoorigemreserva";
 `;
 
-    const bookingRevenue = await this.prisma.prismaLocal.$queryRawUnsafe<any[]>(
-      totalBookingRevenueSQL,
+    const bookingRevenue = await this.prisma.prismaLocal.$queryRaw<any[]>(
+      Prisma.sql([totalBookingRevenueSQL]),
     );
 
     // Exibe os valores por canal no console

@@ -16,9 +16,6 @@ export class UserResponseDto {
   @IsString({ message: 'O CPF deve ser uma string' })
   cpf: string;
 
-  @ApiProperty({ example: 'senha123' })
-  @IsString({ message: 'A senha deve ser uma string' })
-  password: string; // Incluindo a senha encriptada
 
   @ApiProperty({ example: 'admin' })
   @IsString({ message: 'A função (role) deve ser uma string' })

@@ -5,12 +5,30 @@ import { PrismaService } from './prisma/prisma.service';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
+import * as helmet from 'helmet';
 
 config();
 
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
+
+    // Configuração de segurança com Helmet
+    app.use(helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", "data:", "https:"],
+        },
+      },
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+      },
+    }));
 
     // Prefixo interno, o proxy cuidará do "/auth"
     app.setGlobalPrefix('api');
@@ -69,15 +87,18 @@ async function bootstrap() {
       credentials: true,
     };
 
-    app.enableCors(corsOptions);
-
+    // Configuração global de validação
     app.useGlobalPipes(
       new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
+        whitelist: true, // Remove propriedades não definidas no DTO
+        forbidNonWhitelisted: true, // Rejeita requests com propriedades extras
+        transform: true, // Transforma automaticamente para tipos corretos
+        disableErrorMessages: false, // Mantém mensagens de erro para debug
+        validationError: { target: false, value: false }, // Remove dados sensíveis dos erros
       }),
     );
+
+    app.enableCors(corsOptions);
 
     const port = process.env.PORT_AUTH || 3005;
     await app.listen(port);

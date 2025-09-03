@@ -1275,20 +1275,20 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         resultByDrink,
         resultByOthers,
       ] = await Promise.all([
-        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(kpisRawSql),
-        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(revenueAbPeriodSql),
-        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(totalRevenueByPeriodSql),
-        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(
-          abTicketCountByPeriodSql,
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([kpisRawSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueAbPeriodSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalRevenueByPeriodSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(
+          Prisma.sql([abTicketCountByPeriodSql]),
         ),
-        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(bestSellingItemsSql),
-        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(leastSellingItemsSql),
-        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(revenueGroupByPeriodSql),
-        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(revenueAPeriodSql),
-        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(revenueBPeriodSql),
-        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(reportByFoodSql),
-        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(reportByDrinkSql),
-        this.prisma.prismaLocal.$queryRawUnsafe<any[]>(reportByOthersSql),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([bestSellingItemsSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([leastSellingItemsSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueGroupByPeriodSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueAPeriodSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueBPeriodSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([reportByFoodSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([reportByDrinkSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([reportByOthersSql])),
       ]);
 
       // --- BigNumbers ---

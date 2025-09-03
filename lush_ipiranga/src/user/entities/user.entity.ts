@@ -9,3 +9,6 @@ export class User implements Prisma.UserUncheckedCreateInput {
   role?: Role;
   company: string;
 }
+
+// User response type without sensitive data
+export type UserResponse = Omit<User, 'password'>;
