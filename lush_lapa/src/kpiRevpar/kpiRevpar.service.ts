@@ -23,7 +23,7 @@ export class KpiRevparService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         // Para LAST_6_M, subtrair um dia para não incluir a data atual
@@ -72,7 +72,7 @@ export class KpiRevparService {
       ]);
 
       // Inicializar um mapa para armazenar os totais por categoria
-      const categoryTotalsMap = {};
+      const categoryTotalsMap: Record<string, any> = {};
 
       let totalRevenue = new Prisma.Decimal(0);
       let totalSuites = 0;
@@ -86,7 +86,7 @@ export class KpiRevparService {
         };
 
         const rentalApartmentsInCategory = rentalApartments.filter(
-          (rentalApartment) =>
+          (rentalApartment: any) =>
             rentalApartment.suiteStates.suite.suiteCategoryId ===
             suiteCategory.id,
         );
@@ -178,7 +178,7 @@ export class KpiRevparService {
     } catch (error) {
       console.error('Erro ao calcular o KPI Revpar:', error);
       throw new BadRequestException(
-        `Falha ao calcular KPI Revpar: ${error.message}`,
+        `Falha ao calcular KPI Revpar: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -188,7 +188,7 @@ export class KpiRevparService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -215,7 +215,7 @@ export class KpiRevparService {
       while (currentDate < endDate) {
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(5, 59, 59, 999); // Fim do dia contábil às 05:59:59 do próximo dia
@@ -277,7 +277,7 @@ export class KpiRevparService {
           totalSuites += suitesInCategoryCount;
 
           const rentalApartmentsInCategory = rentalApartments.filter(
-            (rentalApartment) =>
+            (rentalApartment: any) =>
               rentalApartment.suiteStates.suite.suiteCategoryId ===
               suiteCategory.id,
           );
@@ -337,7 +337,7 @@ export class KpiRevparService {
       }
 
       // Formatar o resultado final
-      const totalRevparForThePeriod = Object.keys(results).map((date) => ({
+      const totalRevparForThePeriod = Object.keys(results).map((date: any) => ({
         [date]: results[date],
       }));
 
@@ -347,7 +347,7 @@ export class KpiRevparService {
     } catch (error) {
       console.error('Erro ao calcular o total de RevPAR por período:', error);
       throw new BadRequestException(
-        `Failed to calculate total RevPAR by period: ${error.message}`,
+        `Failed to calculate total RevPAR by period: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -358,7 +358,7 @@ export class KpiRevparService {
     return this.prisma.prismaOnline.kpiRevparByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

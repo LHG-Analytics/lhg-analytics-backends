@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import {
@@ -14,6 +15,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class BookingsService {
+  private readonly logger = new Logger(BookingsService.name);
+  
   constructor(private prisma: PrismaService) {}
 
   async findAllBookings(period: PeriodEnum) {
@@ -98,14 +101,14 @@ export class BookingsService {
       .toDate();
 
     // Exibe as datas geradas
-    console.log('startDate:', startDate);
-    console.log('endDate:', endDate);
-    console.log('startDatePrevious:', startDatePrevious);
-    console.log('endDatePrevious:', endDatePrevious);
+    this.logger.debug('startDate:', startDate);
+    this.logger.debug('endDate:', endDate);
+    this.logger.debug('startDatePrevious:', startDatePrevious);
+    this.logger.debug('endDatePrevious:', endDatePrevious);
 
     // Função de filtro para LAST_6_M
-    const filterByDayOfMonth = (data, dayOfMonth) => {
-      return data.filter((item) => {
+    const filterByDayOfMonth = (data: any[], dayOfMonth: number) => {
+      return data.filter((item: any) => {
         const createdDate = moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo');
@@ -143,7 +146,7 @@ export class BookingsService {
     ] = await this.prisma.prismaOnline.$transaction([
       this.prisma.prismaOnline.bookingsRevenue.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -159,7 +162,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsRevenue.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -176,7 +179,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsTotalRentals.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -192,7 +195,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsTotalRentals.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -209,7 +212,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsTicketAverage.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -225,7 +228,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsTicketAverage.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -242,7 +245,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsRepresentativeness.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -258,7 +261,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsRepresentativeness.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -275,7 +278,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsRevenueByPayment.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -292,7 +295,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsRevenueByChannelType.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -310,7 +313,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsTotalRentalsByRentalType.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -327,7 +330,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsRevenueByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -344,7 +347,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsRepresentativenessByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -361,7 +364,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsTotalRentalsByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -378,7 +381,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsTotalRentalsByChannelType.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -396,7 +399,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsTicketAverageByChannelType.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -415,7 +418,7 @@ export class BookingsService {
       this.prisma.prismaOnline.bookingsRepresentativenessByChannelType.findMany(
         {
           where: {
-            period: period,
+            period: period as PeriodEnum,
             createdDate: {
               gte: endDate,
             },
@@ -437,7 +440,7 @@ export class BookingsService {
           totalValue: true,
         },
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -451,7 +454,7 @@ export class BookingsService {
           totalValue: true,
         },
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -466,7 +469,7 @@ export class BookingsService {
           totalBookings: true,
         },
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -480,7 +483,7 @@ export class BookingsService {
           totalBookings: true,
         },
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -492,7 +495,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsTotalRentalsByPeriodEcommerce.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -509,7 +512,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.bookingsRevenueByPeriodEcommerce.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -526,7 +529,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.kpiRevenue.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate, // Filtra pela data inicial
           },
@@ -541,7 +544,7 @@ export class BookingsService {
       }),
       this.prisma.prismaOnline.kpiRevenue.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -593,22 +596,22 @@ export class BookingsService {
     };
 
     const paymentMethods = {
-      categories: BookingsRevenueByPayment.map((item) => item.paymentMethod),
-      series: BookingsRevenueByPayment.map((item) => Number(item.totalValue)),
+      categories: BookingsRevenueByPayment.map((item: any) => item.paymentMethod),
+      series: BookingsRevenueByPayment.map((item: any) => Number(item.totalValue)),
     };
 
     const billingPerChannel = {
-      categories: BookingsRevenueByChannelType.map((item) => item.channelType),
-      series: BookingsRevenueByChannelType.map((item) =>
+      categories: BookingsRevenueByChannelType.map((item: any) => item.channelType),
+      series: BookingsRevenueByChannelType.map((item: any) =>
         Number(item.totalValue),
       ),
     };
 
     const reservationsByRentalType = {
       categories: BookingsTotalRentalsByRentalType.map(
-        (item) => item.rentalType,
+        (item: any) => item.rentalType,
       ),
-      series: BookingsTotalRentalsByRentalType.map((item) =>
+      series: BookingsTotalRentalsByRentalType.map((item: any) =>
         Number(item.totalBookings),
       ),
     };
@@ -616,7 +619,7 @@ export class BookingsService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataRevenuePeriod = BookingsRevenueByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRevenuePeriod = filterByDayOfMonth(
         BookingsRevenueByPeriod,
         dayOfMonth,
@@ -624,20 +627,20 @@ export class BookingsService {
     }
 
     const billingOfReservationsByPeriod = {
-      categories: filteredDataRevenuePeriod.map((item) =>
+      categories: filteredDataRevenuePeriod.map((item: any) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: filteredDataRevenuePeriod.map((item) => Number(item.totalValue)),
+      series: filteredDataRevenuePeriod.map((item: any) => Number(item.totalValue)),
     };
 
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataRepresentativenessPeriod =
       BookingsRepresentativenessByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRepresentativenessPeriod = filterByDayOfMonth(
         BookingsRepresentativenessByPeriod,
         dayOfMonth,
@@ -645,13 +648,13 @@ export class BookingsService {
     }
 
     const representativenessOfReservesByPeriod = {
-      categories: filteredDataRepresentativenessPeriod.map((item) =>
+      categories: filteredDataRepresentativenessPeriod.map((item: any) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: filteredDataRepresentativenessPeriod.map((item) =>
+      series: filteredDataRepresentativenessPeriod.map((item: any) =>
         Number(item.totalRepresentativeness),
       ),
     };
@@ -659,7 +662,7 @@ export class BookingsService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataTotalRentalsPeriod = BookingsTotalRentalsByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataTotalRentalsPeriod = filterByDayOfMonth(
         BookingsTotalRentalsByPeriod,
         dayOfMonth,
@@ -667,29 +670,31 @@ export class BookingsService {
     }
 
     const numberOfReservationsPerPeriod = {
-      categories: filteredDataTotalRentalsPeriod.map((item) =>
+      categories: filteredDataTotalRentalsPeriod.map((item: any) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: filteredDataTotalRentalsPeriod.map((item) =>
+      series: filteredDataTotalRentalsPeriod.map((item: any) =>
         Number(item.totalBookings),
       ),
     };
 
     const kpiTableByChannelType = {
-      bookingsTotalRentalsByChannelType: {},
-      bookingsRevenueByChannelType: {},
-      bookingsTicketAverageByChannelType: {},
-      bookingsRepresentativenessByChannelType: {},
+      bookingsTotalRentalsByChannelType: {} as Record<string, number>,
+      bookingsRevenueByChannelType: {} as Record<string, number>,
+      bookingsTicketAverageByChannelType: {} as Record<string, number>,
+      bookingsRepresentativenessByChannelType: {} as Record<string, number>,
     };
 
     // Preencher bookingsTotalRentalsByChannelType
-    BookingsTotalRentalsByChannelType.forEach((item) => {
-      kpiTableByChannelType.bookingsTotalRentalsByChannelType[
-        item.channelType
-      ] = Number(item.totalBookings);
+    BookingsTotalRentalsByChannelType.forEach((item: any) => {
+      if (item.channelType) {
+        kpiTableByChannelType.bookingsTotalRentalsByChannelType[
+          item.channelType
+        ] = Number(item.totalBookings);
+      }
     });
 
     // Adiciona o total de bookings
@@ -700,9 +705,11 @@ export class BookingsService {
     }
 
     // Preencher bookingsRevenueByChannelType
-    BookingsRevenueByChannelType.forEach((item) => {
-      kpiTableByChannelType.bookingsRevenueByChannelType[item.channelType] =
-        Number(item.totalValue); // Garantir que seja um número
+    BookingsRevenueByChannelType.forEach((item: any) => {
+      if (item.channelType) {
+        kpiTableByChannelType.bookingsRevenueByChannelType[item.channelType] =
+          Number(item.totalValue); // Garantir que seja um número
+      }
     });
 
     // Adiciona o total de revenue
@@ -712,10 +719,12 @@ export class BookingsService {
     }
 
     // Preencher bookingsTicketAverageByChannelType
-    BookingsTicketAverageByChannelType.forEach((item) => {
-      kpiTableByChannelType.bookingsTicketAverageByChannelType[
-        item.channelType
-      ] = Number(item.totalTicketAverage); // Garantir que seja um número
+    BookingsTicketAverageByChannelType.forEach((item: any) => {
+      if (item.channelType) {
+        kpiTableByChannelType.bookingsTicketAverageByChannelType[
+          item.channelType
+        ] = Number(item.totalTicketAverage); // Garantir que seja um número
+      }
     });
 
     // Adiciona o total de ticket average
@@ -726,10 +735,12 @@ export class BookingsService {
     }
 
     // Preencher bookingsRepresentativenessByChannelType
-    BookingsRepresentativenessByChannelType.forEach((item) => {
-      kpiTableByChannelType.bookingsRepresentativenessByChannelType[
-        item.channelType
-      ] = Number(item.totalRepresentativeness); // Garantir que seja um número
+    BookingsRepresentativenessByChannelType.forEach((item: any) => {
+      if (item.channelType) {
+        kpiTableByChannelType.bookingsRepresentativenessByChannelType[
+          item.channelType
+        ] = Number(item.totalRepresentativeness); // Garantir que seja um número
+      }
     });
 
     // Adiciona o total de representatividade
@@ -746,7 +757,7 @@ export class BookingsService {
       currentDate: {
         // Itera sobre cada item e acumula o totalValue
         totalAllValue: Number(
-          BookingsRevenueByChannelTypeEcommerce._sum.totalValue || 0,
+          BookingsRevenueByChannelTypeEcommerce._sum.totalValue|| 0,
         ),
 
         totalAllBookings: Number(
@@ -754,19 +765,23 @@ export class BookingsService {
         ),
         totalAllTicketAverage: Number(
           BookingsRevenueByChannelTypeEcommerce._sum.totalValue
-            .dividedBy(
-              BookingsTotalRentalsByChannelTypeEcommerce._sum.totalBookings ||
-                1, // Usar 1 como divisor padrão para evitar divisão por zero
-            )
-            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
+            ? BookingsRevenueByChannelTypeEcommerce._sum.totalValue
+                .dividedBy(
+                  BookingsTotalRentalsByChannelTypeEcommerce._sum.totalBookings ||
+                    1, // Usar 1 como divisor padrão para evitar divisão por zero
+                )
+                .toFixed(2)
+            : 0, // Se o resultado for NaN, retorna 0
         ),
 
         totalAllRepresentativeness: Number(
           BookingsRevenueByChannelTypeEcommerce._sum.totalValue
-            .dividedBy(
-              KpiRevenue[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
-            )
-            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
+            ? BookingsRevenueByChannelTypeEcommerce._sum.totalValue
+                .dividedBy(
+                  KpiRevenue[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
+                )
+                .toFixed(2)
+            : 0, // Se o resultado for NaN, retorna 0
         ),
       },
 
@@ -781,19 +796,23 @@ export class BookingsService {
         ),
         totalAllTicketAveragePreviousData: Number(
           BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue
-            .dividedBy(
-              BookingsTotalRentalsByChannelTypeEcommercePrevious._sum
-                .totalBookings || 1, // Usar 1 como divisor padrão para evitar divisão por zero
-            )
-            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
+            ? BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue
+                .dividedBy(
+                  BookingsTotalRentalsByChannelTypeEcommercePrevious._sum
+                    .totalBookings || 1, // Usar 1 como divisor padrão para evitar divisão por zero
+                )
+                .toFixed(2)
+            : 0, // Se o resultado for NaN, retorna 0
         ),
 
         totalAllRepresentativenessPreviousData: Number(
           BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue
-            .dividedBy(
-              KpiRevenuePreviousData[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
-            )
-            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
+            ? BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue
+                .dividedBy(
+                  KpiRevenuePreviousData[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
+                )
+                .toFixed(2)
+            : 0, // Se o resultado for NaN, retorna 0
         ),
       },
     };
@@ -802,7 +821,7 @@ export class BookingsService {
     let filteredDataTotalRentalsByPeriodEcommerce =
       BookingsTotalRentalsByPeriodEcommerce;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataTotalRentalsByPeriodEcommerce = filterByDayOfMonth(
         BookingsTotalRentalsByPeriodEcommerce,
         dayOfMonth,
@@ -810,13 +829,13 @@ export class BookingsService {
     }
 
     const reservationsOfEcommerceByPeriod = {
-      categories: filteredDataTotalRentalsByPeriodEcommerce.map((item) =>
+      categories: filteredDataTotalRentalsByPeriodEcommerce.map((item: any) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: filteredDataTotalRentalsByPeriodEcommerce.map((item) =>
+      series: filteredDataTotalRentalsByPeriodEcommerce.map((item: any) =>
         Number(item.totalBookings),
       ),
     };
@@ -824,7 +843,7 @@ export class BookingsService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataRevenueByPeriodEcommerce = BookingsRevenueByPeriodEcommerce;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRevenueByPeriodEcommerce = filterByDayOfMonth(
         BookingsRevenueByPeriodEcommerce,
         dayOfMonth,
@@ -832,13 +851,13 @@ export class BookingsService {
     }
 
     const billingOfEcommerceByPeriod = {
-      categories: filteredDataRevenueByPeriodEcommerce.map((item) =>
+      categories: filteredDataRevenueByPeriodEcommerce.map((item: any) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: filteredDataRevenueByPeriodEcommerce.map((item) =>
+      series: filteredDataRevenueByPeriodEcommerce.map((item: any) =>
         Number(item.totalValue),
       ),
     };
@@ -891,10 +910,10 @@ export class BookingsService {
       },
     });
 
-    return stockOutItems.reduce((totalSaleDirect, stockOutItem) => {
+    return stockOutItems.reduce((totalSaleDirect: any, stockOutItem: any) => {
       const stockOut = stockOutItem.stockOuts;
 
-      if (stockOut && stockOut.saleDirect) {
+      if (stockOut&& stockOut.saleDirect) {
         const saleDirects = Array.isArray(stockOut.saleDirect)
           ? stockOut.saleDirect
           : [stockOut.saleDirect];
@@ -902,8 +921,8 @@ export class BookingsService {
           ? new Prisma.Decimal(stockOut.sale.discount)
           : new Prisma.Decimal(0);
 
-        saleDirects.forEach((saleDirect) => {
-          if (saleDirect && stockOutItem.stockOutId === saleDirect.stockOutId) {
+        saleDirects.forEach((saleDirect: any) => {
+          if (saleDirect&& stockOutItem.stockOutId === saleDirect.stockOutId) {
             const itemTotal = new Prisma.Decimal(stockOutItem.priceSale).times(
               new Prisma.Decimal(stockOutItem.quantity),
             );
@@ -921,8 +940,8 @@ export class BookingsService {
   private async calculateTotalSaleDirectForDate(
     date: Date,
   ): Promise<Prisma.Decimal> {
-    const startOfDay = moment(date).startOf('day').toDate();
-    const endOfDay = moment(date).endOf('day').toDate();
+    const startOfDay = moment(date).startOf('day' ).toDate();
+    const endOfDay = moment(date).endOf('day' ).toDate();
 
     return await this.calculateTotalSaleDirect(startOfDay, endOfDay);
   }
@@ -1043,7 +1062,7 @@ export class BookingsService {
     const stockOutIds: number[] = [];
     for (const rentalApartment of allRentalApartments) {
       const saleLease = rentalApartment.saleLease;
-      if (saleLease && saleLease.stockOutId) {
+      if (saleLease&& saleLease.stockOutId) {
         stockOutIds.push(saleLease.stockOutId);
       }
     }
@@ -1075,7 +1094,7 @@ export class BookingsService {
         : [];
 
     const stockOutMap = new Map(
-      stockOuts.map((stockOut) => [stockOut.id, stockOut]),
+      stockOuts.map((stockOut: any) => [stockOut.id, stockOut]),
     );
 
     const totalSaleDirect = await this.calculateTotalSaleDirect(
@@ -1096,8 +1115,8 @@ export class BookingsService {
 
   async calculateKpisByDateRange(startDate: Date, endDate: Date): Promise<any> {
     try {
-      console.log('startDate:', startDate);
-      console.log('endDate:', endDate);
+      this.logger.debug('startDate:', startDate);
+      this.logger.debug('endDate:', endDate);
 
       const {
         allBookings,
@@ -1114,8 +1133,9 @@ export class BookingsService {
       }
 
       // Calcular o total da receita de reservas
-      const totalAllValue = allBookings.reduce((total, bookings) => {
-        return total.plus(new Prisma.Decimal(bookings.priceRental));
+      const totalAllValue = allBookings.reduce((total: any, bookings: any) => {
+        const price = bookings.priceRental ?? 0;
+        return total.plus(new Prisma.Decimal(price));
       }, new Prisma.Decimal(0));
 
       // Calcular o total de reservas
@@ -1126,7 +1146,7 @@ export class BookingsService {
 
       // Calcular a receita geral de locações
       const totalValueForRentalApartments = allRentalApartments.reduce(
-        (total, apartment) => {
+        (total: any, apartment: any) => {
           return total.plus(new Prisma.Decimal(apartment.totalValue || 0)); // Adiciona 0 se totalValue for nulo
         },
         new Prisma.Decimal(0),
@@ -1163,41 +1183,49 @@ export class BookingsService {
       // Calcular o total de priceRental por meio de pagamento
       for (const booking of allBookings) {
         const matchingNewRelease = newReleases.find(
-          (release) => release.originalsId === booking.id, // Comparando booking.id com release.originalsId
+          (release: any) => release.originalsId === booking.id, // Comparando booking.id com release.originalsId
         );
 
         if (matchingNewRelease) {
           const halfPaymentId = matchingNewRelease.halfPaymentId;
           const paymentName = halfPaymentMap.get(halfPaymentId); // Obtém o nome do meio de pagamento
 
-          // Inicializa o total para o meio de pagamento se não existir
-          if (!revenueByPaymentMethod.has(paymentName)) {
-            revenueByPaymentMethod.set(paymentName, new Prisma.Decimal(0));
-          }
+          // Verifica se paymentName existe antes de usar
+          if (paymentName) {
+            // Inicializa o total para o meio de pagamento se não existir
+            if (!revenueByPaymentMethod.has(paymentName)) {
+              revenueByPaymentMethod.set(paymentName, new Prisma.Decimal(0));
+            }
 
-          // Acumula o valor atual ao total existente
-          const currentTotal = revenueByPaymentMethod.get(paymentName);
-          revenueByPaymentMethod.set(
-            paymentName,
-            currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
-          );
+            // Acumula o valor atual ao total existente
+            const currentTotal = revenueByPaymentMethod.get(paymentName);
+            if (currentTotal) {
+              revenueByPaymentMethod.set(
+                paymentName,
+                currentTotal.plus(new Prisma.Decimal(booking.priceRental ?? 0)),
+              );
+            }
+          }
         }
       }
 
       const paymentMethods = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       for (const [
         paymentName,
         totalValue,
       ] of revenueByPaymentMethod.entries()) {
-        // Adiciona o nome do método de pagamento à array de categorias
-        paymentMethods.categories.push(paymentName);
+        // Verifica se paymentName e totalValue existem antes de usar
+        if (paymentName && totalValue) {
+          // Adiciona o nome do método de pagamento à array de categorias
+          paymentMethods.categories.push(paymentName);
 
-        // Adiciona o valor total à array de séries
-        paymentMethods.series.push(totalValue.toNumber()); // Converte para número, se necessário
+          // Adiciona o valor total à array de séries
+          paymentMethods.series.push(totalValue.toNumber()); // Converte para número, se necessário
+        }
       }
 
       // Mapa para armazenar os totais por channelType
@@ -1268,7 +1296,7 @@ export class BookingsService {
       };
 
       // Calcular o total de priceRental por channelType
-      allBookings.forEach((booking) => {
+      allBookings.forEach((booking: any) => {
         const channelType = getChannelType(
           booking.idTypeOriginBooking,
           booking.dateService,
@@ -1278,17 +1306,19 @@ export class BookingsService {
         if (channelType) {
           // Acumula o valor atual ao total existente
           const currentTotal = revenueByChannelType.get(channelType);
-          revenueByChannelType.set(
-            channelType,
-            currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
-          );
+          if (currentTotal) {
+            revenueByChannelType.set(
+              channelType,
+              currentTotal.plus(new Prisma.Decimal(booking.priceRental ?? 0)),
+            );
+          }
         }
       });
 
       // Preparar o retorno no formato desejado
       const categories = Array.from(revenueByChannelType.keys());
       const series = Array.from(revenueByChannelType.values()).map(
-        (value) => value.toNumber() || 0, // Garantir que valores nulos sejam convertidos para R$0,00
+        (value: any) => value.toNumber() || 0, // Garantir que valores nulos sejam convertidos para R$0,00
       );
 
       const billingPerChannel = {
@@ -1307,8 +1337,8 @@ export class BookingsService {
       };
 
       const reservationsByRentalType = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       // Processa cada reserva para contar o tipo de locação
@@ -1316,28 +1346,31 @@ export class BookingsService {
         const checkIn = booking.rentalApartment?.checkIn; // Acessa checkIn do apartamento
         const checkOut = booking.rentalApartment?.checkOut; // Acessa checkOut do apartamento
 
-        // Determina o tipo de locação
-        const rentalType = this.determineRentalPeriod(
-          checkIn,
-          checkOut,
-          allBookings,
-        );
+        // Verifica se checkIn e checkOut existem antes de chamar determineRentalPeriod
+        if (checkIn&& checkOut) {
+          // Determina o tipo de locação
+          const rentalType = this.determineRentalPeriod(
+            checkIn,
+            checkOut,
+            allBookings,
+          );
 
-        // Incrementa o contador para o tipo de locação correspondente
-        if (rentalCounts[rentalType] !== undefined) {
-          rentalCounts[rentalType]++;
+          // Incrementa o contador para o tipo de locação correspondente
+          if (rentalCounts[rentalType as keyof typeof rentalCounts] !== undefined) {
+            rentalCounts[rentalType as keyof typeof rentalCounts]++;
+          }
         }
       }
 
       // Preenche as arrays de categorias e séries com os resultados
       for (const rentalType in rentalCounts) {
         reservationsByRentalType.categories.push(rentalType);
-        reservationsByRentalType.series.push(rentalCounts[rentalType]);
+        reservationsByRentalType.series.push(rentalCounts[rentalType as keyof typeof rentalCounts]);
       }
 
       const billingOfReservationsByPeriod = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       // Supondo que você tenha startDate e endDate definidos como moment.js
@@ -1350,13 +1383,13 @@ export class BookingsService {
         let totalValueForCurrentDate = new Prisma.Decimal(0); // Inicializa o total para a data atual
 
         // Calcular o total para a data atual
-        allBookings.forEach((booking) => {
+        allBookings.forEach((booking: any) => {
           const bookingDate = moment.utc(booking.dateService);
 
           // Se a data do booking corresponder à data atual, soma o priceRental
           if (bookingDate.isSame(currentDate, 'day')) {
             totalValueForCurrentDate = totalValueForCurrentDate.plus(
-              new Prisma.Decimal(booking.priceRental || 0),
+              new Prisma.Decimal(booking.priceRental|| 0),
             );
           }
         });
@@ -1376,26 +1409,26 @@ export class BookingsService {
       billingOfReservationsByPeriod.series.reverse();
 
       const representativenessOfReservesByPeriod = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       // Ajustar a endDate para o início do dia seguinte
-      const adjustedEndDate = moment(endDate).utc().startOf('day'); // Define o início do dia da endDate
+      const adjustedEndDate = moment(endDate).utc().startOf('day' ); // Define o início do dia da endDate
 
       // Iniciar currentDate no início do dia da startDate
-      let currentDateRep = moment(startDate).utc().startOf('day'); // Início do dia contábil às 00:00:00
+      let currentDateRep = moment(startDate).utc().startOf('day' ); // Início do dia contábil às 00:00:00
 
       // Iterar sobre as datas do período
       while (currentDateRep.isSameOrBefore(adjustedEndDate, 'day')) {
         const dateKey = currentDateRep.format('DD/MM/YYYY'); // Formata a data como "DD/MM/YYYY"
 
         // Definir o intervalo para reservas e representatividade (00:00 a 23:59)
-        const startOfDay = currentDateRep.clone().startOf('day'); // 00:00
-        const endOfDay = currentDateRep.clone().endOf('day'); // 23:59
+        const startOfDay = currentDateRep.clone().startOf('day' ); // 00:00
+        const endOfDay = currentDateRep.clone().endOf('day' ); // 23:59
 
         // Calcular a receita total de reservas para a data atual
-        const totalAllValue = allBookings.reduce((total, booking) => {
+        const totalAllValue = allBookings.reduce((total: any, booking: any) => {
           const bookingDate = moment.utc(booking.dateService);
 
           return bookingDate.isSameOrAfter(startOfDay) &&
@@ -1415,26 +1448,26 @@ export class BookingsService {
 
         // Calcular a receita total de locação para a data atual
         const totalValueForRentalApartments = allRentalApartments.reduce(
-          (total, apartment) => {
+          (total: any, apartment: any) => {
             const apartmentDate = moment.utc(apartment.checkIn);
 
             // Verifica se a data do check-in do apartamento está dentro do intervalo
             if (
-              apartmentDate.isSameOrAfter(rentalStartDate) &&
+              apartmentDate.isSameOrAfter(rentalStartDate)&&
               apartmentDate.isSameOrBefore(rentalEndDate)
             ) {
               let priceSale = new Prisma.Decimal(0);
               let discountSale = new Prisma.Decimal(0);
 
               // Lógica para calcular o priceSale
-              if (apartment.saleLease && apartment.saleLease.stockOutId) {
+              if (apartment.saleLease&& apartment.saleLease.stockOutId) {
                 const stockOutSaleLease = stockOutMap.get(
                   apartment.saleLease.stockOutId,
                 );
                 if (stockOutSaleLease) {
                   if (Array.isArray(stockOutSaleLease.stockOutItem)) {
                     priceSale = stockOutSaleLease.stockOutItem.reduce(
-                      (acc, current) =>
+                      (acc: any, current: any) =>
                         acc.plus(
                           new Prisma.Decimal(current.priceSale).times(
                             new Prisma.Decimal(current.quantity),
@@ -1490,15 +1523,15 @@ export class BookingsService {
       representativenessOfReservesByPeriod.series.reverse();
 
       const numberOfReservationsPerPeriod = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       // Ajustar a endDate para o início do dia seguinte
-      const adjustedEndDateBooking = moment(endDate).utc().startOf('day'); // Define o início do dia da endDate
+      const adjustedEndDateBooking = moment(endDate).utc().startOf('day' ); // Define o início do dia da endDate
 
       // Iniciar currentDate no início do dia da startDate
-      let currentDateBooking = moment(startDate).utc().startOf('day'); // Início do dia contábil às 00:00:00
+      let currentDateBooking = moment(startDate).utc().startOf('day' ); // Início do dia contábil às 00:00:00
 
       // Iterar sobre as datas do período
       while (currentDateBooking.isSameOrBefore(adjustedEndDateBooking, 'day')) {
@@ -1508,7 +1541,7 @@ export class BookingsService {
 
         // Contar o total de reservas para a data atual
         const totalBookingsForCurrentPeriod = allBookings.reduce(
-          (total, booking) => {
+          (total: any, booking: any) => {
             const bookingDate = moment.utc(booking.dateService);
             return bookingDate.isBetween(
               currentDateBooking,
@@ -1537,10 +1570,10 @@ export class BookingsService {
       numberOfReservationsPerPeriod.series.reverse();
 
       const kpiTableByChannelType = {
-        bookingsTotalRentalsByChannelType: {},
-        bookingsRevenueByChannelType: {},
-        bookingsTicketAverageByChannelType: {},
-        bookingsRepresentativenessByChannelType: {},
+        bookingsTotalRentalsByChannelType: {} as Record<string, number>,
+        bookingsRevenueByChannelType: {} as Record<string, number>,
+        bookingsTicketAverageByChannelType: {} as Record<string, number>,
+        bookingsRepresentativenessByChannelType: {} as Record<string, number>,
       };
 
       // Inicializa o objeto para armazenar contagem e receita
@@ -1569,13 +1602,13 @@ export class BookingsService {
       // Processa cada reserva para contar o tipo de canal e calcular a receita
       for (const booking of allBookings) {
         const channelType = getChannelType(
-          booking.originBooking.id,
+          booking.originBooking?.id ?? 0,
           booking.dateService,
           booking.startDate,
         );
 
         // Incrementa o contador e a receita para o tipo de canal correspondente
-        if (channelType && channelData[channelType]) {
+        if (channelType&& channelData[channelType]) {
           channelData[channelType].count++;
           channelData[channelType].revenue = channelData[
             channelType
@@ -1635,13 +1668,13 @@ export class BookingsService {
 
       // Calcular a receita total (vendas diretas + locações)
       const totalAllRevenue = totalSaleDirect.plus(
-        allRentalApartments.reduce((total, apartment) => {
+        allRentalApartments.reduce((total: any, apartment: any) => {
           return total.plus(new Prisma.Decimal(apartment.totalValue || 0)); // Adiciona 0 se totalValue for nulo
         }, new Prisma.Decimal(0)),
       );
 
       // Calcular a representatividade para cada canal
-      const representativenessByChannel = {};
+      const representativenessByChannel = {} as Record<string, number>;
       let totalAllRepresentativenessByChannelType = new Prisma.Decimal(0); // Inicializa a representatividade total
 
       for (const [channelType, { revenue }] of Object.entries(channelData)) {
@@ -1730,17 +1763,17 @@ export class BookingsService {
       };
 
       const reservationsOfEcommerceByPeriod = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       // Ajustar a endDate para o início do dia seguinte
       const adjustedEndDateBookingEcommerce = moment(endDate)
         .utc()
-        .startOf('day'); // Define o início do dia da endDate
+        .startOf('day' ); // Define o início do dia da endDate
 
       // Iniciar currentDate no início do dia da startDate
-      let currentDateBookingEcommerce = moment(startDate).utc().startOf('day'); // Início do dia contábil às 00:00:00
+      let currentDateBookingEcommerce = moment(startDate).utc().startOf('day' ); // Início do dia contábil às 00:00:00
 
       // Iterar sobre as datas do período
       while (
@@ -1757,7 +1790,7 @@ export class BookingsService {
 
         // Contar o total de reservas para a data atual
         const totalBookingsForCurrentPeriod = allBookingsEcommerce.reduce(
-          (total, booking) => {
+          (total: any, booking: any) => {
             const bookingDate = moment.utc(booking.dateService);
             return bookingDate.isBetween(
               currentDateBookingEcommerce,
@@ -1786,8 +1819,8 @@ export class BookingsService {
       reservationsOfEcommerceByPeriod.series.reverse();
 
       const billingOfEcommerceByPeriod = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       // Supondo que você tenha startDate e endDate definidos como moment.js
@@ -1800,13 +1833,13 @@ export class BookingsService {
         let totalValueForCurrentDate = new Prisma.Decimal(0); // Inicializa o total para a data atual
 
         // Calcular o total para a data atual
-        allBookingsEcommerce.forEach((booking) => {
+        allBookingsEcommerce.forEach((booking: any) => {
           const bookingDate = moment.utc(booking.dateService);
 
           // Se a data do booking corresponder à data atual, soma o priceRental
           if (bookingDate.isSame(currentDateEcommerce, 'day')) {
             totalValueForCurrentDate = totalValueForCurrentDate.plus(
-              new Prisma.Decimal(booking.priceRental || 0),
+              new Prisma.Decimal(booking.priceRental|| 0),
             );
           }
         });
@@ -1841,7 +1874,7 @@ export class BookingsService {
         BillingOfEcommerceByPeriod: billingOfEcommerceByPeriod,
       };
     } catch (error) {
-      console.error('Erro ao calcular os KPIs:', error);
+      this.logger.error('Erro ao calcular os KPIs:', error);
       throw new BadRequestException();
     }
   }
@@ -1874,16 +1907,16 @@ export class BookingsService {
     }
 
     // Se houver reservas, calcular os tipos adicionais
-    if (Booking && Array.isArray(Booking) && Booking.length > 0) {
+    if (Booking&& Array.isArray(Booking) && Booking.length > 0) {
       // Regra para Day Use
-      if (checkInHour >= 13 && checkOutHour <= 19 && checkOutMinutes <= 15) {
+      if (checkInHour >= 13&& checkOutHour <= 19 && checkOutMinutes <= 15) {
         return 'DAY_USE';
       }
 
       // Regra para Overnight
       const overnightMinimumStaySeconds = 12 * 3600 + 15 * 60;
       if (
-        checkInHour >= 20 &&
+        checkInHour >= 20&&
         checkInHour <= 23 &&
         checkOutHour >= 8 &&
         (checkOutHour < 12 || (checkOutHour === 12 && checkOutMinutes <= 15)) &&
@@ -1894,7 +1927,7 @@ export class BookingsService {
 
       // Verificação para Diária
       if (
-        occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
+        occupationTimeSeconds > 16 * 3600 + 15 * 60||
         (checkInHour <= 15 &&
           (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
       ) {
@@ -1949,9 +1982,9 @@ ORDER BY "id_tipoorigemreserva";
     );
 
     // Exibe os valores por canal no console
-    console.log(
+    this.logger.debug(
       'Receita por canal:',
-      bookingRevenue.map((r) => {
+      bookingRevenue.map((r: any) => {
         const canais: Record<number, string> = {
           1: 'sistema',
           3: 'guia de motéis',
@@ -1973,7 +2006,7 @@ ORDER BY "id_tipoorigemreserva";
     );
 
     const totalLine = bookingRevenue.find(
-      (r) => r.id_tipoorigemreserva === null,
+      (r: any) => r.id_tipoorigemreserva === null,
     );
 
     const bigNumbers = {

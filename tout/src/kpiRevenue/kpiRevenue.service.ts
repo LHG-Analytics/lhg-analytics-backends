@@ -432,8 +432,9 @@ export class KpiRevenueService {
       };
     } catch (error) {
       console.error('Erro ao buscar KPI Revenue data:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to fetch KPI Revenue data: ${error.message}`,
+        `Failed to fetch KPI Revenue data: ${errorMessage}`,
       );
     }
   }
@@ -642,8 +643,9 @@ export class KpiRevenueService {
       };
     } catch (error) {
       console.error('Erro ao acumular dados por tipo de locação:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to accumulate data by rental type: ${error.message}`,
+        `Failed to accumulate data by rental type: ${errorMessage}`,
       );
     }
   }
@@ -826,8 +828,9 @@ export class KpiRevenueService {
       };
     } catch (error) {
       console.error('Erro ao calcular o faturamento total por período:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to calculate total revenue by period: ${error.message}`,
+        `Failed to calculate total revenue by period: ${errorMessage}`,
       );
     }
   }

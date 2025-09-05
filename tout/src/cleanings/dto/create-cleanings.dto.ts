@@ -64,4 +64,24 @@ export class CreateCleaningsDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  constructor(
+    employeeName: string,
+    totalSuitesCleanings: number,
+    totalAllSuitesCleanings: number,
+    totalDaysWorked: number,
+    shift: string,
+    averageDailyCleaning: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+  ) {
+    this.employeeName = employeeName;
+    this.totalSuitesCleanings = totalSuitesCleanings;
+    this.totalAllSuitesCleanings = totalAllSuitesCleanings;
+    this.totalDaysWorked = totalDaysWorked;
+    this.shift = shift;
+    this.averageDailyCleaning = averageDailyCleaning;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+  }
 }

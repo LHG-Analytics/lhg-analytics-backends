@@ -1,5 +1,6 @@
-import { IsInt, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsDate } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { PeriodEnum } from '@client-online';
 
 export class CreateKpiTotalRentalsDto {
   @ApiProperty({ description: 'ID da categoria da suíte', example: 2 })
@@ -11,7 +12,6 @@ export class CreateKpiTotalRentalsDto {
     description: 'Nome da categoria da suíte',
     example: 'Lush Spa',
   })
-  @IsInt({ message: 'O nome da categoria da suíte deve ser uma string' })
   @IsNotEmpty({ message: 'O nome da categoria da suíte é obrigatório' })
   suiteCategoryName: string;
 
@@ -19,6 +19,7 @@ export class CreateKpiTotalRentalsDto {
     description: 'Data de criação do registro',
     example: '2023-07-15T00:00:00.000Z',
   })
+  @IsDate({ message: 'A data de criação deve ser uma data válida' })
   @IsNotEmpty({ message: 'A data de criação é obrigatória' })
   createdDate: Date;
 
@@ -67,4 +68,30 @@ export class CreateKpiTotalRentalsDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  @ApiProperty({ description: 'Período', example: 'DAILY', required: false })
+  @IsOptional()
+  period?: PeriodEnum;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    createdDate: Date,
+    companyId: number,
+    totalRentalsApartments?: number,
+    totalBookings?: number,
+    totalAllRentalsApartments?: number,
+    totalAllBookings?: number,
+    period?: PeriodEnum,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.totalRentalsApartments = totalRentalsApartments;
+    this.totalBookings = totalBookings;
+    this.totalAllRentalsApartments = totalAllRentalsApartments;
+    this.totalAllBookings = totalAllBookings;
+    this.period = period;
+  }
 }

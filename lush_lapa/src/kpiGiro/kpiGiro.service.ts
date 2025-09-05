@@ -23,7 +23,7 @@ export class KpiGiroService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         // Para LAST_6_M, subtrair um dia para não incluir a data atual
@@ -78,7 +78,7 @@ export class KpiGiroService {
       let totalSuites = 0; // Total de suítes de todas as categorias
       let allRentals = 0; // Total de locações de todas as categorias
 
-      const categoryTotalsMap = {};
+      const categoryTotalsMap: Record<string, any> = {};
 
       // Calcula giro por categoria
       for (const suiteCategory of suiteCategories) {
@@ -106,7 +106,7 @@ export class KpiGiroService {
 
         // Cálculo do giro para a categoria
         if (
-          categoryTotalsMap[suiteCategory.id].rentalsCount > 0 &&
+          categoryTotalsMap[suiteCategory.id].rentalsCount > 0&&
           suitesInCategoryCount > 0
         ) {
           const days =
@@ -137,7 +137,7 @@ export class KpiGiroService {
           giro: new Prisma.Decimal(categoryData.giroTotal),
           totalGiro: new Prisma.Decimal(
             allRentals /
-              (totalSuites || 1) /
+              (totalSuites|| 1) /
               ((adjustedEndDate.getTime() - startDate.getTime()) /
                 (1000 * 86400)),
           ), // Cálculo do totalGiro médio
@@ -174,7 +174,7 @@ export class KpiGiroService {
         },
       ];
     } catch (error) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
@@ -183,7 +183,7 @@ export class KpiGiroService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -334,7 +334,7 @@ export class KpiGiroService {
           totalRentalsByDay[dayOfWeek] += categoryData.rentalsCount;
 
           // Cálculo do giro para a categoria e dia
-          if (categoryData.rentalsCount > 0 && suitesInCategoryCount > 0) {
+          if (categoryData.rentalsCount > 0&& suitesInCategoryCount > 0) {
             const days = dayCountMap[dayOfWeek];
             const giro =
               categoryData.rentalsCount / suitesInCategoryCount / days;
@@ -401,7 +401,7 @@ export class KpiGiroService {
     } catch (error) {
       console.error('Erro ao calcular o total de KpiGiro por período:', error);
       throw new BadRequestException(
-        `Falha ao calcular total de KpiGiro por período: ${error.message}`,
+        `Falha ao calcular total de KpiGiro por período: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -411,7 +411,7 @@ export class KpiGiroService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

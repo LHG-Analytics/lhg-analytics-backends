@@ -18,4 +18,9 @@ export class CreateBookingsTicketAverageDto {
   })
   @IsNotEmpty({ message: 'A data de criação é obrigatória' })
   createdDate: Date;
+
+  constructor(totalAllTicketAverage: Prisma.Decimal, createdDate: Date) {
+    this.totalAllTicketAverage = totalAllTicketAverage;
+    this.createdDate = createdDate;
+  }
 }

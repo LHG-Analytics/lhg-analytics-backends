@@ -47,4 +47,22 @@ export class CreateKpiAlosDto {
   })
   @IsString({ message: 'O tempo médio de ocupação deve ser uma string' })
   totalAverageOccupationTime?: string;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    occupationTime: string,
+    createdDate: Date,
+    companyId: number,
+    averageOccupationTime?: string,
+    totalAverageOccupationTime?: string,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.occupationTime = occupationTime;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.averageOccupationTime = averageOccupationTime;
+    this.totalAverageOccupationTime = totalAverageOccupationTime;
+  }
 }

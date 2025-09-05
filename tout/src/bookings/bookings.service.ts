@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import {
@@ -14,6 +15,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class BookingsService {
+  private readonly logger = new Logger(BookingsService.name);
+  
   constructor(private prisma: PrismaService) {}
 
   async findAllBookings(period: PeriodEnum) {
@@ -98,13 +101,13 @@ export class BookingsService {
       .toDate();
 
     // Exibe as datas geradas
-    console.log('startDate:', startDate);
-    console.log('endDate:', endDate);
-    console.log('startDatePrevious:', startDatePrevious);
-    console.log('endDatePrevious:', endDatePrevious);
+    this.logger.debug('startDate:', startDate);
+    this.logger.debug('endDate:', endDate);
+    this.logger.debug('startDatePrevious:', startDatePrevious);
+    this.logger.debug('endDatePrevious:', endDatePrevious);
 
     // Função de filtro para LAST_6_M
-    const filterByDayOfMonth = (data, dayOfMonth) => {
+    const filterByDayOfMonth = (data: any[], dayOfMonth: number) => {
       return data.filter((item) => {
         const createdDate = moment
           .utc(item.createdDate)
@@ -616,7 +619,7 @@ export class BookingsService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataRevenuePeriod = BookingsRevenueByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRevenuePeriod = filterByDayOfMonth(
         BookingsRevenueByPeriod,
         dayOfMonth,
@@ -637,7 +640,7 @@ export class BookingsService {
     let filteredDataRepresentativenessPeriod =
       BookingsRepresentativenessByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRepresentativenessPeriod = filterByDayOfMonth(
         BookingsRepresentativenessByPeriod,
         dayOfMonth,
@@ -659,7 +662,7 @@ export class BookingsService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataTotalRentalsPeriod = BookingsTotalRentalsByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataTotalRentalsPeriod = filterByDayOfMonth(
         BookingsTotalRentalsByPeriod,
         dayOfMonth,
@@ -679,17 +682,19 @@ export class BookingsService {
     };
 
     const kpiTableByChannelType = {
-      bookingsTotalRentalsByChannelType: {},
-      bookingsRevenueByChannelType: {},
-      bookingsTicketAverageByChannelType: {},
-      bookingsRepresentativenessByChannelType: {},
+      bookingsTotalRentalsByChannelType: {} as Record<string, number>,
+      bookingsRevenueByChannelType: {} as Record<string, number>,
+      bookingsTicketAverageByChannelType: {} as Record<string, number>,
+      bookingsRepresentativenessByChannelType: {} as Record<string, number>,
     };
 
     // Preencher bookingsTotalRentalsByChannelType
     BookingsTotalRentalsByChannelType.forEach((item) => {
-      kpiTableByChannelType.bookingsTotalRentalsByChannelType[
-        item.channelType
-      ] = Number(item.totalBookings);
+      if (item.channelType) {
+        kpiTableByChannelType.bookingsTotalRentalsByChannelType[
+          item.channelType
+        ] = Number(item.totalBookings);
+      }
     });
 
     // Adiciona o total de bookings
@@ -701,8 +706,10 @@ export class BookingsService {
 
     // Preencher bookingsRevenueByChannelType
     BookingsRevenueByChannelType.forEach((item) => {
-      kpiTableByChannelType.bookingsRevenueByChannelType[item.channelType] =
-        Number(item.totalValue); // Garantir que seja um número
+      if (item.channelType) {
+        kpiTableByChannelType.bookingsRevenueByChannelType[item.channelType] =
+          Number(item.totalValue); // Garantir que seja um número
+      }
     });
 
     // Adiciona o total de revenue
@@ -713,9 +720,11 @@ export class BookingsService {
 
     // Preencher bookingsTicketAverageByChannelType
     BookingsTicketAverageByChannelType.forEach((item) => {
-      kpiTableByChannelType.bookingsTicketAverageByChannelType[
-        item.channelType
-      ] = Number(item.totalTicketAverage); // Garantir que seja um número
+      if (item.channelType) {
+        kpiTableByChannelType.bookingsTicketAverageByChannelType[
+          item.channelType
+        ] = Number(item.totalTicketAverage); // Garantir que seja um número
+      }
     });
 
     // Adiciona o total de ticket average
@@ -727,9 +736,11 @@ export class BookingsService {
 
     // Preencher bookingsRepresentativenessByChannelType
     BookingsRepresentativenessByChannelType.forEach((item) => {
-      kpiTableByChannelType.bookingsRepresentativenessByChannelType[
-        item.channelType
-      ] = Number(item.totalRepresentativeness); // Garantir que seja um número
+      if (item.channelType) {
+        kpiTableByChannelType.bookingsRepresentativenessByChannelType[
+          item.channelType
+        ] = Number(item.totalRepresentativeness); // Garantir que seja um número
+      }
     });
 
     // Adiciona o total de representatividade
@@ -754,19 +765,23 @@ export class BookingsService {
         ),
         totalAllTicketAverage: Number(
           BookingsRevenueByChannelTypeEcommerce._sum.totalValue
-            .dividedBy(
-              BookingsTotalRentalsByChannelTypeEcommerce._sum.totalBookings ||
-                1, // Usar 1 como divisor padrão para evitar divisão por zero
-            )
-            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
+            ? BookingsRevenueByChannelTypeEcommerce._sum.totalValue
+                .dividedBy(
+                  BookingsTotalRentalsByChannelTypeEcommerce._sum.totalBookings ||
+                    1, // Usar 1 como divisor padrão para evitar divisão por zero
+                )
+                .toFixed(2)
+            : 0, // Se o resultado for NaN, retorna 0
         ),
 
         totalAllRepresentativeness: Number(
           BookingsRevenueByChannelTypeEcommerce._sum.totalValue
-            .dividedBy(
-              KpiRevenue[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
-            )
-            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
+            ? BookingsRevenueByChannelTypeEcommerce._sum.totalValue
+                .dividedBy(
+                  KpiRevenue[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
+                )
+                .toFixed(2)
+            : 0, // Se o resultado for NaN, retorna 0
         ),
       },
 
@@ -781,19 +796,23 @@ export class BookingsService {
         ),
         totalAllTicketAveragePreviousData: Number(
           BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue
-            .dividedBy(
-              BookingsTotalRentalsByChannelTypeEcommercePrevious._sum
-                .totalBookings || 1, // Usar 1 como divisor padrão para evitar divisão por zero
-            )
-            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
+            ? BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue
+                .dividedBy(
+                  BookingsTotalRentalsByChannelTypeEcommercePrevious._sum
+                    .totalBookings || 1, // Usar 1 como divisor padrão para evitar divisão por zero
+                )
+                .toFixed(2)
+            : 0, // Se o resultado for NaN, retorna 0
         ),
 
         totalAllRepresentativenessPreviousData: Number(
           BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue
-            .dividedBy(
-              KpiRevenuePreviousData[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
-            )
-            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
+            ? BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue
+                .dividedBy(
+                  KpiRevenuePreviousData[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
+                )
+                .toFixed(2)
+            : 0, // Se o resultado for NaN, retorna 0
         ),
       },
     };
@@ -802,7 +821,7 @@ export class BookingsService {
     let filteredDataTotalRentalsByPeriodEcommerce =
       BookingsTotalRentalsByPeriodEcommerce;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataTotalRentalsByPeriodEcommerce = filterByDayOfMonth(
         BookingsTotalRentalsByPeriodEcommerce,
         dayOfMonth,
@@ -824,7 +843,7 @@ export class BookingsService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataRevenueByPeriodEcommerce = BookingsRevenueByPeriodEcommerce;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRevenueByPeriodEcommerce = filterByDayOfMonth(
         BookingsRevenueByPeriodEcommerce,
         dayOfMonth,
@@ -1099,8 +1118,8 @@ export class BookingsService {
 
   async calculateKpisByDateRange(startDate: Date, endDate: Date): Promise<any> {
     try {
-      console.log('startDate:', startDate);
-      console.log('endDate:', endDate);
+      this.logger.debug('startDate:', startDate);
+      this.logger.debug('endDate:', endDate);
 
       const {
         allBookings,
@@ -1236,8 +1255,8 @@ export class BookingsService {
       }
 
       const paymentMethods = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       for (const [
@@ -1359,8 +1378,8 @@ export class BookingsService {
 
       // Cria o objeto final
       const reservationsByRentalType = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       // Processa cada reserva para contar o tipo de locação
@@ -1388,8 +1407,8 @@ export class BookingsService {
       }
 
       const billingOfReservationsByPeriod = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       // Supondo que você tenha startDate e endDate definidos como moment.js
@@ -1428,8 +1447,8 @@ export class BookingsService {
       billingOfReservationsByPeriod.series.reverse();
 
       const representativenessOfReservesByPeriod = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       // Ajustar a endDate para o início do dia seguinte
@@ -1542,8 +1561,8 @@ export class BookingsService {
       representativenessOfReservesByPeriod.series.reverse();
 
       const numberOfReservationsPerPeriod = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       // Ajustar a endDate para o início do dia seguinte
@@ -1782,8 +1801,8 @@ export class BookingsService {
       };
 
       const reservationsOfEcommerceByPeriod = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       // Ajustar a endDate para o início do dia seguinte
@@ -1838,8 +1857,8 @@ export class BookingsService {
       reservationsOfEcommerceByPeriod.series.reverse();
 
       const billingOfEcommerceByPeriod = {
-        categories: [],
-        series: [],
+        categories: [] as string[],
+        series: [] as number[],
       };
 
       // Supondo que você tenha startDate e endDate definidos como moment.js
@@ -1893,8 +1912,11 @@ export class BookingsService {
         BillingOfEcommerceByPeriod: billingOfEcommerceByPeriod,
       };
     } catch (error) {
-      console.error('Erro ao calcular os KPIs:', error);
-      throw new BadRequestException();
+      this.logger.error('Erro ao calcular os KPIs:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new BadRequestException(
+        `Failed to calculate KPIs: ${errorMessage}`,
+      );
     }
   }
 

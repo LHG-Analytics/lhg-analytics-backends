@@ -8,6 +8,42 @@ import { Moment } from 'moment-timezone';
 import { PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 
+// Definindo interfaces para melhor tipagem
+interface CleaningData {
+  employeeName: string;
+  createdDate: Date;
+  averageDailyCleaning: number;
+  shift: string;
+  totalDaysWorked: number;
+  totalSuitesCleanings: number;
+  totalAllSuitesCleanings: number;
+  totalAllAverageDailyCleaning: number;
+}
+
+interface CleaningByDateAcc {
+  [key: string]: { totalSuitesCleanings: number };
+}
+
+interface EmployeeData {
+  name: string;
+  data: number[];
+}
+
+export interface ShiftsData {
+  [key: string]: EmployeeData[];
+}
+
+interface EmployeeReport {
+  employeeName: string;
+  totalSuitesCleanings: number;
+  totalDaysWorked: number;
+  averageDailyCleaning: number;
+}
+
+export interface EmployeeReportByShift {
+  [shift: string]: EmployeeReport[];
+}
+
 @Injectable()
 export class GovernanceService {
   constructor(private prisma: PrismaService) {}
@@ -112,7 +148,7 @@ export class GovernanceService {
     ] = await this.prisma.prismaOnline.$transaction([
       this.prisma.prismaOnline.cleanings.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate, // Filtra pela data inicial
           },
@@ -133,7 +169,7 @@ export class GovernanceService {
       }),
       this.prisma.prismaOnline.cleanings.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -155,7 +191,7 @@ export class GovernanceService {
       }),
       this.prisma.prismaOnline.cleaningsByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate, // Filtra pela data inicial
           },
@@ -170,7 +206,7 @@ export class GovernanceService {
       }),
       this.prisma.prismaOnline.cleaningsByPeriodShift.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate, // Filtra pela data inicial
           },
@@ -187,7 +223,7 @@ export class GovernanceService {
       }),
       this.prisma.prismaOnline.cleaningsByWeek.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -213,7 +249,7 @@ export class GovernanceService {
       }),
       this.prisma.prismaOnline.inspections.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -230,7 +266,7 @@ export class GovernanceService {
       }),
       this.prisma.prismaOnline.inspections.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -305,8 +341,8 @@ export class GovernanceService {
 
     // Formata o retorno para o ApexCharts
     const supervisorsPerformanceFormatted = {
-      categories: performanceArray.map((item) => item.name),
-      series: performanceArray.map((item) => item.value),
+      categories: performanceArray.map((item: any) => item.name),
+      series: performanceArray.map((item: any) => item.value),
     };
 
     // Lógica para calcular a performance das limpezas
@@ -318,7 +354,7 @@ export class GovernanceService {
     };
 
     // Objeto para armazenar os dados mais recentes
-    const latestCleanings = {};
+    const latestCleanings: Record<string, any> = {};
 
     // Itera sobre os dados de limpeza
     for (const cleaning of cleanings) {
@@ -344,7 +380,7 @@ export class GovernanceService {
 
       // Se o empregado é um dos extras, contabiliza apenas no turno Terceirizado
       if (
-        employeeName === 'EXTRA MANHA' ||
+        employeeName === 'EXTRA MANHA'||
         employeeName === 'EXTRA TARDE' ||
         employeeName === 'EXTRA NOITE'
       ) {
@@ -366,7 +402,7 @@ export class GovernanceService {
       series: Object.values(shiftCleaningMap), // Valores agregados
     };
 
-    const cleaningByDate = cleaningsByPeriod.reduce((acc, curr) => {
+    const cleaningByDate = cleaningsByPeriod.reduce((acc: any, curr: any) => {
       const timezone = 'America/Sao_Paulo';
       const createdDate = moment.utc(curr.createdDate); // Data do registro no formato UTC
 
@@ -376,7 +412,7 @@ export class GovernanceService {
         const currentDay = today.date(); // Dia do mês ajustado
 
         // Calcula as datas específicas dos últimos 6 meses no mesmo dia anterior
-        const last6MonthsDates = Array.from({ length: 6 }, (_, i) =>
+        const last6MonthsDates = Array.from({ length: 6 }, (_: any, i: any) =>
           today
             .clone()
             .subtract(i + 1, 'months')
@@ -385,7 +421,7 @@ export class GovernanceService {
         );
 
         // Ajusta a data para UTC no horário 05:59:59.999Z
-        const last6MonthsUTC = last6MonthsDates.map((date) =>
+        const last6MonthsUTC = last6MonthsDates.map((date: any) =>
           date
             .clone()
             .utc()
@@ -393,7 +429,7 @@ export class GovernanceService {
         );
 
         // Verifica se a data está dentro das datas calculadas em UTC
-        const isMatchingDate = last6MonthsUTC.some((date) =>
+        const isMatchingDate = last6MonthsUTC.some((date: any) =>
           createdDate.isSame(date, 'day'),
         );
 
@@ -423,14 +459,14 @@ export class GovernanceService {
     };
 
     // Preenche os arrays com os dados acumulados
-    Object.keys(cleaningByDate).forEach((date) => {
+    Object.keys(cleaningByDate).forEach((date: any) => {
       formattedCleaningByDate.categories.push(date);
       formattedCleaningByDate.series.push(
         cleaningByDate[date].totalSuitesCleanings,
       );
     });
 
-    const formattedForApexCharts = (cleaningsByPeriodShift) => {
+    const formattedForApexCharts = (cleaningsByPeriodShift: any) => {
       // Adicionamos 'period' como parâmetro
       const categories = []; // Para armazenar as datas únicas
       const shiftsData = {
@@ -449,7 +485,7 @@ export class GovernanceService {
         const currentDay = today.date(); // Dia do mês ajustado
 
         // Calcula as datas específicas dos últimos 6 meses no mesmo dia anterior
-        const last6MonthsDates = Array.from({ length: 6 }, (_, i) =>
+        const last6MonthsDates = Array.from({ length: 6 }, (_: any, i: any) =>
           today
             .clone()
             .subtract(i + 1, 'months')
@@ -458,7 +494,7 @@ export class GovernanceService {
         );
 
         // Ajusta as datas para UTC no horário 05:59:59.999Z
-        const last6MonthsUTC = last6MonthsDates.map((date) =>
+        const last6MonthsUTC = last6MonthsDates.map((date: any) =>
           date
             .clone()
             .utc()
@@ -467,22 +503,22 @@ export class GovernanceService {
 
         // Adiciona as datas formatadas para o array de categorias
         categories.push(
-          ...last6MonthsUTC.map((date) => date.format('DD/MM/YYYY')),
+          ...last6MonthsUTC.map((date: any) => date.format('DD/MM/YYYY')),
         );
 
         // Filtra os dados de acordo com as datas calculadas
-        cleaningsByPeriodShift = cleaningsByPeriodShift.filter((cleaning) => {
+        cleaningsByPeriodShift = cleaningsByPeriodShift.filter((cleaning: any) => {
           const createdDate = moment
             .utc(cleaning.createdDate)
             .tz(timezone)
-            .startOf('day'); // Ajusta para início do dia no timezone
+            .startOf('day' ); // Ajusta para início do dia no timezone
 
           // Verifica se a data corresponde a uma das datas no array
-          return last6MonthsUTC.some((date) => createdDate.isSame(date, 'day'));
+          return last6MonthsUTC.some((date: any) => createdDate.isSame(date, 'day'));
         });
       } else {
         // Para outros períodos, define as categorias com base nos dados
-        cleaningsByPeriodShift.forEach((cleaning) => {
+        cleaningsByPeriodShift.forEach((cleaning: any) => {
           const createdDate = moment
             .utc(cleaning.createdDate)
             .tz(timezone)
@@ -494,13 +530,13 @@ export class GovernanceService {
         });
 
         // Ordena as categorias em ordem crescente
-        categories.sort((a, b) =>
+        categories.sort((a: any, b: any) =>
           moment(a, 'DD/MM/YYYY').isBefore(moment(b, 'DD/MM/YYYY')) ? -1 : 1,
         );
       }
 
       // Processa os dados para gerar os valores no gráfico
-      cleaningsByPeriodShift.forEach((cleaning) => {
+      cleaningsByPeriodShift.forEach((cleaning: any) => {
         const createdDate = moment
           .utc(cleaning.createdDate)
           .tz(timezone)
@@ -514,7 +550,7 @@ export class GovernanceService {
         }
 
         let employeeData = shiftsData[shift].find(
-          (e) => e.name === employeeName,
+          (e: any) => e.name === employeeName,
         );
         if (!employeeData) {
           employeeData = {
@@ -533,7 +569,7 @@ export class GovernanceService {
 
       // Preenche dados faltantes caso algum funcionário não tenha dado para uma data
       for (const shift in shiftsData) {
-        shiftsData[shift].forEach((employeeData) => {
+        shiftsData[shift].forEach((employeeData: any) => {
           if (employeeData.data.length < categories.length) {
             employeeData.data = [
               ...employeeData.data,
@@ -560,7 +596,7 @@ export class GovernanceService {
       };
     };
 
-    const employeeReport = cleanings.reduce((acc, cleaning) => {
+    const employeeReport = cleanings.reduce((acc: any, cleaning: any) => {
       const {
         shift,
         employeeName,
@@ -586,7 +622,7 @@ export class GovernanceService {
     }, {});
 
     const teamSizing = cleaningsByWeek.reduce(
-      (acc, cleaning) => {
+      (acc: any, cleaning: any) => {
         const {
           shift,
           createdDate,
@@ -599,7 +635,7 @@ export class GovernanceService {
         } = cleaning;
 
         // Função para remover acentos
-        const removeAccents = (str) => {
+        const removeAccents = (str: any) => {
           return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         };
 
@@ -640,7 +676,7 @@ export class GovernanceService {
     };
 
     // Preenche os totais diretamente
-    cleaningsByWeek.forEach((cleaning) => {
+    cleaningsByWeek.forEach((cleaning: any) => {
       const {
         totalAllAverageShiftCleaning,
         totalIdealShiftMaid,
@@ -659,7 +695,7 @@ export class GovernanceService {
       totals.totalDifference = totalDifference; // Atribui diretamente
 
       // Função para remover acentos
-      const removeAccents = (str) => {
+      const removeAccents = (str: any) => {
         return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       };
 
@@ -1083,13 +1119,13 @@ ORDER BY
     const totalAllInspections = inspectionResult?.[0]?.totalInspections || 0;
 
     const supervisorsPerformanceFormatted = {
-      categories: supervisorPerformanceResult.map((item) => item.name),
-      series: supervisorPerformanceResult.map((item) => item.value),
+      categories: supervisorPerformanceResult.map((item: any) => item.name),
+      series: supervisorPerformanceResult.map((item: any) => item.value),
     };
 
     const shiftCleaningFormatted = {
-      categories: shiftCleaningResult.map((item) => item.name),
-      series: shiftCleaningResult.map((item) => item.value),
+      categories: shiftCleaningResult.map((item: any) => item.name),
+      series: shiftCleaningResult.map((item: any) => item.value),
     };
 
     const totalAllSuitesCleanings =
@@ -1131,12 +1167,12 @@ ORDER BY
     const dateKeys = [...cleaningsGrouped.keys()].sort();
 
     const cleaningsByPeriod = {
-      categories: dateKeys.map((key) =>
+      categories: dateKeys.map((key: any) =>
         isMonthly
           ? moment(key, 'YYYY-MM').format('MM/YYYY')
           : moment(key).format('DD/MM/YYYY'),
       ),
-      series: dateKeys.map((key) =>
+      series: dateKeys.map((key: any) =>
         Number((cleaningsGrouped.get(key) || 0).toFixed(0)),
       ),
     };
@@ -1164,7 +1200,7 @@ ORDER BY
 
     // Usa os mesmos dateKeys já definidos anteriormente
     const cleaningsByPeriodShift = {
-      categories: dateKeys.map((key) =>
+      categories: dateKeys.map((key: any) =>
         isMonthly
           ? moment(key, 'YYYY-MM').format('MM/YYYY')
           : moment(key).format('DD/MM/YYYY'),
@@ -1173,7 +1209,7 @@ ORDER BY
         acc[shift] = Object.entries(employees).map(
           ([employeeName, dateCounts]) => ({
             name: employeeName,
-            data: dateKeys.map((dateKey) => dateCounts[dateKey] || 0),
+            data: dateKeys.map((dateKey: any) => dateCounts[dateKey] || 0),
           }),
         );
         return acc;
@@ -1242,7 +1278,7 @@ ORDER BY
 
     teamSizing['Totals'] = totals;
 
-    Object.keys(totals.totalAverageDailyWeekCleaning).forEach((key) => {
+    Object.keys(totals.totalAverageDailyWeekCleaning).forEach((key: any) => {
       totals.totalAverageDailyWeekCleaning[key] = Number(
         totals.totalAverageDailyWeekCleaning[key].toFixed(2),
       );

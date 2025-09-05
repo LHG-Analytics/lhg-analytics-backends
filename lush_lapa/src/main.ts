@@ -20,7 +20,7 @@ import { CreateKpiAlosDto } from './kpiAlos/dto/create-kpiAlos.dto';
 import { UpdateKpiAlosDto } from './kpiAlos/dto/update-kpiAlos.dto';
 import { CreateKpiRevenueDto } from './kpiRevenue/dto/create-kpiRevenue.dto';
 import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
-import * as helmet from 'helmet';
+import helmet from 'helmet';
 
 async function bootstrap() {
   try {
@@ -107,7 +107,7 @@ async function bootstrap() {
     ];
 
     const corsOptions: CorsOptions = {
-      origin: (origin, callback) => {
+      origin: (origin: any, callback: any) => {
         if (!origin || allowedOrigins.includes(origin)) {
           // Se a origem estiver na lista ou se não houver origem (ex: chamadas de servidor para servidor), permita
           callback(null, true);

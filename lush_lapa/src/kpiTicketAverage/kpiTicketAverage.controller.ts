@@ -69,7 +69,7 @@ export class KpiTicketAverageController {
       );
     } catch (error) {
       throw new BadRequestException(
-        `Failed to create all KpiTicketAverage: ${error.message}`,
+        `Failed to create all KpiTicketAverage: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -81,14 +81,14 @@ export class KpiTicketAverageController {
     if (!dateStr) return undefined;
 
     const [day, month, year] = dateStr.split('/').map(Number);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) {
+    if (isNaN(day)|| isNaN(month) || isNaN(year)) {
       throw new BadRequestException(
         'Invalid date format. Please use DD/MM/YYYY.',
       );
     }
 
     // Cria a nova data no formato YYYY-MM-DD
-    const date = new Date(year, month - 1, day);
+    const date = new Date(year, month - 1, day!);
     if (
       date.getDate() !== day ||
       date.getMonth() !== month - 1 ||
@@ -119,7 +119,7 @@ export class KpiTicketAverageController {
       return await this.kpiTicketAverageService.handleCron();
     } catch (error) {
       throw new BadRequestException(
-        `Failed to run the cron job: ${error.message}`,
+        `Failed to run the cron job: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }

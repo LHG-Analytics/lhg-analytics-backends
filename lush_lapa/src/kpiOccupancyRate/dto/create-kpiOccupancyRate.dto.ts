@@ -1,6 +1,6 @@
-import { IsInt, IsNotEmpty, IsDecimal, IsDate } from 'class-validator';
+import { IsInt, IsNotEmpty, IsDecimal, IsDate, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Prisma } from '@client-online';
+import { Prisma, PeriodEnum } from '@client-online';
 
 export class CreateKpiOccupancyRateDto {
   @ApiProperty({ description: 'ID da categoria da suíte', example: 2 })
@@ -12,7 +12,6 @@ export class CreateKpiOccupancyRateDto {
     description: 'Nome da categoria da suíte',
     example: 'Lush Spa',
   })
-  @IsInt({ message: 'O nome da categoria da suíte deve ser uma string' })
   @IsNotEmpty({ message: 'O nome da categoria da suíte é obrigatório' })
   suiteCategoryName: string;
 
@@ -50,4 +49,32 @@ export class CreateKpiOccupancyRateDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  @ApiProperty({ description: 'Período', example: 'DAILY', required: false })
+  @IsOptional()
+  period?: PeriodEnum;
+
+  @ApiProperty({ description: 'Nome da empresa', example: 'Empresa XYZ', required: false })
+  @IsOptional()
+  companyName?: string;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    occupancyRate: Prisma.Decimal,
+    totalOccupancyRate: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+    period?: PeriodEnum,
+    companyName?: string,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.occupancyRate = occupancyRate;
+    this.totalOccupancyRate = totalOccupancyRate;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.period = period;
+    this.companyName = companyName;
+  }
 }

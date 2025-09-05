@@ -50,4 +50,20 @@ export class CreateKpiOccupancyRateDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    occupancyRate: Prisma.Decimal,
+    totalOccupancyRate: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.occupancyRate = occupancyRate;
+    this.totalOccupancyRate = totalOccupancyRate;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+  }
 }

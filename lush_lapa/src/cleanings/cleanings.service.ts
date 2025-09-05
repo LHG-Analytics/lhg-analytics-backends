@@ -36,7 +36,7 @@ export class CleaningsService {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       }
 
-      const currentDate = new Date(startDate);
+      let currentDate = new Date(startDate);
       currentDate.setUTCHours(4, 0, 0, 0); // Início do dia contábil às 04:00:00
 
       // Obtendo os dados de limpeza dentro do período fornecido
@@ -85,7 +85,7 @@ export class CleaningsService {
 
       // Função auxiliar para determinar o turno com base no businessStartTime
       const getShiftByBusinessStartTime = (
-        businessStartTime: string | null,
+        businessStartTime: string | null | undefined,
       ): string => {
         if (!businessStartTime) {
           return 'Terceirizado';
@@ -95,7 +95,7 @@ export class CleaningsService {
         const totalSeconds = hour * 3600 + minute * 60;
 
         for (const [shift, { start, end }] of Object.entries(shifts)) {
-          if (totalSeconds >= start && totalSeconds <= end) {
+          if (totalSeconds >= start&& totalSeconds <= end) {
             return shift;
           }
         }
@@ -177,7 +177,7 @@ export class CleaningsService {
       const formatAndInsertShiftData = async (
         shiftData: Record<string, any>,
         shift: string,
-        period: PeriodEnum,
+        period?: PeriodEnum,
       ) => {
         for (const employeeName of Object.keys(shiftData)) {
           const data = shiftData[employeeName];
@@ -185,14 +185,14 @@ export class CleaningsService {
 
           // Insere o KPI de limpezas por período
           await this.insertCleanings({
-            employeeName: employeeName,
+            employeeName: employeeName || "",
             shift: shift, // Adicionando o turno correspondente
             averageDailyCleaning: new Prisma.Decimal(data['Média por dia']),
             totalDaysWorked: totalDaysWorked,
             totalSuitesCleanings: data['Total de suítes'],
             totalAllSuitesCleanings: totalAllSuitesCleanings, // Usando o total acumulado
             totalAllAverageDailyCleaning: totalAllAverageDailyCleaning, // Usando o total acumulado
-            period: period,
+            period: period as PeriodEnum,
             createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)),
             companyId,
           });
@@ -201,7 +201,7 @@ export class CleaningsService {
 
       // Formatar e inserir os dados para cada turno
       await Promise.all(
-        Object.keys(groupedByShifts).map((shift) =>
+        Object.keys(groupedByShifts).map((shift: any) =>
           formatAndInsertShiftData(groupedByShifts[shift], shift, period),
         ),
       );
@@ -210,7 +210,7 @@ export class CleaningsService {
     } catch (error) {
       console.error('Error in findAllCleanings:', error);
       throw new BadRequestException(
-        `Failed to fetch Cleanings: ${error.message}`,
+        `Failed to fetch Cleanings: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -219,9 +219,9 @@ export class CleaningsService {
     return this.prisma.prismaOnline.cleanings.upsert({
       where: {
         employeeName_createdDate_period: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
-          employeeName: data.employeeName,
+          employeeName: data.employeeName || "",
         },
       },
       create: {
@@ -300,7 +300,7 @@ export class CleaningsService {
 
         // Insere o KPI de limpezas por período
         await this.insertCleaningsByPeriod({
-          period: period,
+          period: period as PeriodEnum,
           createdDate: createdDateWithTime,
           totalSuitesCleanings: totalCleaningsForCurrentPeriod,
           companyId: 1,
@@ -310,7 +310,7 @@ export class CleaningsService {
       }
 
       // Formatar o resultado final
-      const totalCleaningsForThePeriod = Object.keys(results).map((date) => ({
+      const totalCleaningsForThePeriod = Object.keys(results).map((date: any) => ({
         [date]: results[date],
       }));
 
@@ -320,7 +320,7 @@ export class CleaningsService {
     } catch (error) {
       console.error('Erro ao calcular as limpezas totais por período:', error);
       throw new BadRequestException(
-        `Failed to calculate total cleaning inspections by period: ${error.message}`,
+        `Failed to calculate total cleaning inspections by period: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -331,7 +331,7 @@ export class CleaningsService {
     return this.prisma.prismaOnline.cleaningsByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -397,7 +397,7 @@ export class CleaningsService {
 
       // Função auxiliar para determinar o turno
       const getShiftByBusinessStartTime = (
-        businessStartTime: string | null,
+        businessStartTime: string | null | undefined,
       ): string | null => {
         if (!businessStartTime) return null;
         const [hour, minute] = businessStartTime.split(':').map(Number);
@@ -438,7 +438,7 @@ export class CleaningsService {
         if (!businessStartTime) continue; // Pula para a próxima iteração se businessStartTime não existir
         const shift = getShiftByBusinessStartTime(businessStartTime);
 
-        if (shift && !excludedShifts.has(shift)) {
+        if (shift&& !excludedShifts.has(shift)) {
           // Verifica se o turno não está na lista de excluídos
           // Inicializa os dados para o turno e dia, se ainda não existirem
           if (!cleaningsByShiftAndDay[shift][workDay]) {
@@ -446,8 +446,15 @@ export class CleaningsService {
           }
 
           // Adiciona o ID do funcionário ao conjunto para contar apenas uma vez
-          uniqueEmployeesByShift[shift].add(cleaning.employee.id);
-          cleaningsByShiftAndDay[shift][workDay].totalCleanings++;
+          // Corrige o erro de tipo ao acessar o shift e garante que employee não é nulo
+          if (
+            (shift === 'Manhã' || shift === 'Tarde' || shift === 'Noite') &&
+            cleaning.employee &&
+            typeof cleaning.employee.id === 'number'
+          ) {
+            uniqueEmployeesByShift[shift].add(cleaning.employee.id);
+            cleaningsByShiftAndDay[shift][workDay].totalCleanings++;
+          }
         }
       }
 
@@ -489,14 +496,15 @@ export class CleaningsService {
             shift,
             createdDate: createdDate.toDate(),
             totalSuitesCleanings: dayData.totalCleanings,
-            averageDailyWeekCleaning: +averageDailyWeekCleaning,
-            totalAverageDailyWeekCleaning:
-              +totals.totalAverageDailyWeekCleaning[day].toFixed(2), // Use o valor acumulado
-            totalAverageShiftCleaning: 0,
-            totalAllAverageShiftCleaning: 0,
-            idealShiftMaid: 0,
-            totalIdealShiftMaid: 0,
-            realShiftMaid: uniqueEmployeesByShift[shift].size,
+            averageDailyWeekCleaning: new Prisma.Decimal(+averageDailyWeekCleaning),
+            totalAverageDailyWeekCleaning: new Prisma.Decimal(
+              +totals.totalAverageDailyWeekCleaning[day].toFixed(2)
+            ), // Use o valor acumulado
+            totalAverageShiftCleaning: new Prisma.Decimal(0),
+            totalAllAverageShiftCleaning: new Prisma.Decimal(0),
+            idealShiftMaid: (cleaningsByShiftAndDay as any)[shift].idealShiftMaid,
+            totalIdealShiftMaid: 0, // Será atualizado posteriormente
+            realShiftMaid: (uniqueEmployeesByShift as any)[shift]?.size ?? 0,
             totalRealShiftMaid: 0,
             difference: 0,
             totalDifference: 0,
@@ -511,14 +519,14 @@ export class CleaningsService {
         cleaningsByShiftAndDay[shift].totalAverageShiftCleaning = +(
           shiftTotalCount / Object.keys(cleaningsByShiftAndDay[shift]).length
         ).toFixed(2);
-        cleaningsByShiftAndDay[shift].idealShiftMaid = Math.ceil(
+        (cleaningsByShiftAndDay as any)[shift].idealShiftMaid = Math.ceil(
           cleaningsByShiftAndDay[shift].totalAverageShiftCleaning / 9,
         );
 
         totals.totalIdealShiftMaid +=
           cleaningsByShiftAndDay[shift].idealShiftMaid;
-        cleaningsByShiftAndDay[shift].realShiftMaid =
-          uniqueEmployeesByShift[shift].size;
+        (cleaningsByShiftAndDay as any)[shift].realShiftMaid =
+          (uniqueEmployeesByShift as any)[shift]?.size ?? 0;
         totals.totalRealShiftMaid +=
           cleaningsByShiftAndDay[shift].realShiftMaid;
         cleaningsByShiftAndDay[shift].difference =
@@ -531,19 +539,21 @@ export class CleaningsService {
           cleaningsByShiftAndDay[shift].totalAverageShiftCleaning;
 
         // Atualizar idealShiftMaid nos dados de inserção para o turno
-        for (const data of insertData.filter((d) => d.shift === shift)) {
+        for (const data of insertData.filter((d: any) => d.shift === shift)) {
           data.idealShiftMaid = cleaningsByShiftAndDay[shift].idealShiftMaid;
         }
       }
 
       // Atualiza dados de inserção com os totais calculados
       for (const data of insertData) {
-        data.totalAverageShiftCleaning =
+        data.totalAverageShiftCleaning = new Prisma.Decimal(
           +cleaningsByShiftAndDay[data.shift].totalAverageShiftCleaning.toFixed(
             2,
-          );
-        data.totalAllAverageShiftCleaning =
-          +totals.totalAllAverageShiftCleaning.toFixed(2);
+          )
+        );
+        data.totalAllAverageShiftCleaning = new Prisma.Decimal(
+          +totals.totalAllAverageShiftCleaning.toFixed(2)
+        );
         data.totalIdealShiftMaid = totals.totalIdealShiftMaid;
         data.totalRealShiftMaid = totals.totalRealShiftMaid;
         data.difference = cleaningsByShiftAndDay[data.shift].difference;
@@ -553,8 +563,9 @@ export class CleaningsService {
         const createdDayOfWeek = moment
           .tz(data.createdDate, timezone)
           .format('dddd');
-        data.totalAverageDailyWeekCleaning =
-          totals.totalAverageDailyWeekCleaning[createdDayOfWeek] || 0; // Atribui o valor correto
+        data.totalAverageDailyWeekCleaning = new Prisma.Decimal(
+          totals.totalAverageDailyWeekCleaning[createdDayOfWeek] || 0
+        ); // Atribui o valor correto
       }
 
       // Adiciona totais ao retorno
@@ -588,7 +599,7 @@ export class CleaningsService {
     return this.prisma.prismaOnline.cleaningsByWeek.upsert({
       where: {
         period_shift_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum as PeriodEnum,
           shift: data.shift,
           createdDate: data.createdDate,
         },
@@ -627,13 +638,13 @@ export class CleaningsService {
         };
 
         for (const [shift, { start, end }] of Object.entries(shifts)) {
-          if (totalSeconds >= start && totalSeconds <= end) return shift;
+          if (totalSeconds >= start&& totalSeconds <= end) return shift;
         }
 
         return 'Horário Indefinido';
       };
 
-      let currentDate = moment.utc(startDate).startOf('day').add(6, 'hours');
+      let currentDate = moment.utc(startDate).startOf('day' ).add(6, 'hours');
 
       while (currentDate.isBefore(moment.utc(endDate))) {
         const nextDate = currentDate.clone().add(1, 'day').subtract(1, 'ms');
@@ -663,7 +674,7 @@ export class CleaningsService {
             },
           });
 
-        cleanings.forEach((cleaning) => {
+        cleanings.forEach((cleaning: any) => {
           const employeeName =
             cleaning.employee?.personPaper?.person?.name || 'Desconhecido';
           const businessStartTime =
@@ -692,7 +703,7 @@ export class CleaningsService {
           .subtract(1, 'days');
         const monthsToProcess = Array.from(
           { length: 6 },
-          (_, i) =>
+          (_: any, i: any) =>
             moment
               .tz('America/Sao_Paulo') // Usa o fuso horário de São Paulo
               .subtract(i + 1, 'months') // Subtrai i + 1 meses
@@ -736,7 +747,7 @@ export class CleaningsService {
             )) {
               const createdDateWithTime = moment
                 .utc(groupKey, 'YYYY-MM-DD')
-                .endOf('day');
+                .endOf('day' );
 
               const data = {
                 period,
@@ -764,7 +775,7 @@ export class CleaningsService {
     } catch (error) {
       console.error('Erro ao calcular limpezas por turno:', error);
       throw new BadRequestException(
-        `Failed to calculate cleanings by shift: ${error.message}`,
+        `Failed to calculate cleanings by shift: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -775,9 +786,9 @@ export class CleaningsService {
     return this.prisma.prismaOnline.cleaningsByPeriodShift.upsert({
       where: {
         period_createdDate_employeeName: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
-          employeeName: data.employeeName,
+          employeeName: data.employeeName || "",
         },
       },
       create: {

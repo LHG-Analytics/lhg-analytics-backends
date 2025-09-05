@@ -38,4 +38,18 @@ export class CreateApartmentInspectionDto {
   @IsString({ message: 'O total de inspeções deve ser um número' })
   @IsNotEmpty({ message: 'O total de inspeções é obrigatório' })
   totalInspections: number;
+
+  constructor(
+    companyId: number,
+    createdDate: Date,
+    employeeName: string,
+    totalInspections: number,
+    period?: string,
+  ) {
+    this.companyId = companyId;
+    this.createdDate = createdDate;
+    this.employeeName = employeeName;
+    this.totalInspections = totalInspections;
+    this.period = period;
+  }
 }

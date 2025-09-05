@@ -3,11 +3,163 @@ import { PeriodEnum, Prisma, RentalTypeEnum } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import * as moment from 'moment-timezone';
 
+// Type definitions for better type safety
+interface BigNumbersData {
+  currentDate: {
+    totalAllValue: string;
+    totalAllRentalsApartments: number;
+    totalAllTicketAverage: string;
+    totalAllRevpar: string;
+    totalAllGiro: number;
+    totalAverageOccupationTime: string;
+  };
+  PreviousDate?: {
+    totalAllValuePreviousData: string;
+    totalAllRentalsApartmentsPreviousData: number;
+    totalAllTicketAveragePreviousData: string;
+    totalAllRevparPreviousData: string;
+    totalAllGiroPreviousData: number;
+    totalAverageOccupationTimePreviousData: string;
+  };
+}
+
+interface SuiteCategoryData {
+  [key: string]: {
+    totalRentalsApartments: number;
+    totalValue: string;
+    totalTicketAverage: string;
+    giro: string;
+    revpar: string;
+    trevpar: string;
+    averageOccupationTime: string;
+    occupancyRate: string;
+  };
+}
+
+interface TotalResultData {
+  totalAllRentalsApartments: number;
+  totalAllValue: string;
+  totalAllTicketAverage: string;
+  totalGiro: number;
+  totalRevpar: string;
+  totalTrevpar: string;
+  totalAverageOccupationTime: string;
+  totalOccupancyRate: string;
+}
+
+interface DateValueData {
+  [date: string]: {
+    totalValue: string;
+  };
+}
+
+interface DateRentalsData {
+  [date: string]: {
+    totalAllRentalsApartments: number;
+  };
+}
+
+interface DateRevparData {
+  [date: string]: {
+    totalRevpar: string;
+  };
+}
+
+interface DateTicketData {
+  [date: string]: {
+    totalAllTicketAverage: string;
+  };
+}
+
+interface DateTrevparData {
+  [date: string]: {
+    totalTrevpar: string;
+  };
+}
+
+interface DateOccupancyData {
+  [date: string]: {
+    totalOccupancyRate: string;
+  };
+}
+
+interface OccupancyBySuiteCategoryData {
+  [date: string]: {
+    [suiteCategoryName: string]: {
+      occupancyRate: string;
+    };
+  };
+}
+
+interface WeeklyOccupancyData {
+  [suiteCategory: string]: {
+    [dayOfWeek: string]: {
+      occupancyRate: string;
+      totalOccupancyRate: string;
+    };
+  };
+}
+
+interface WeeklyGiroData {
+  [suiteCategory: string]: {
+    [dayOfWeek: string]: {
+      giro: string;
+      totalGiro: string;
+    };
+  };
+}
+
+interface RentalTypeData {
+  [rentalType: string]: {
+    totalValue: number;
+  };
+}
+
+interface BillingRentalTypeData {
+  [date: string]: Array<{
+    [rentalType: string]: {
+      totalValue: string;
+    };
+  }>;
+}
+
+interface CategoryTotalsMap {
+  [categoryId: number]: {
+    giroTotal: number;
+    rentalsCount: number;
+    totalOccupiedTime: number;
+    unavailableTime: number;
+    availableTime: number;
+    totalValue: Prisma.Decimal;
+    categoryTotalSale: Prisma.Decimal;
+    categoryTotalRental: Prisma.Decimal;
+    categoryTotalRentals: number;
+  };
+}
+
+export interface CompanyKpiResponse {
+  Company: string;
+  BigNumbers: BigNumbersData[];
+  BillingRentalType: Array<{ [date: string]: any }>;
+  RevenueByDate: DateValueData[];
+  RevenueBySuiteCategory: Array<{ [category: string]: { totalValue: string } }>;
+  RentalsByDate: DateRentalsData[];
+  RevparByDate: DateRevparData[];
+  TicketAverageByDate: DateTicketData[];
+  TrevparByDate: DateTrevparData[];
+  OccupancyRateByDate: DateOccupancyData[];
+  OccupancyRateBySuiteCategory: OccupancyBySuiteCategoryData[];
+  DataTableSuiteCategory: SuiteCategoryData[];
+  TotalResult: TotalResultData;
+  DataTableOccupancyRateByWeek: WeeklyOccupancyData[];
+  DataTableGiroByWeek: WeeklyGiroData[];
+}
+
 @Injectable()
 export class CompanyService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async findAllCompany(period: PeriodEnum) {
+  async findAllCompany(period: PeriodEnum): Promise<CompanyKpiResponse> {
     // Define o fuso horário padrão como São Paulo
     moment.tz.setDefault('America/Sao_Paulo');
 
@@ -662,7 +814,7 @@ export class CompanyService {
       totalAllTicketAverage: this.formatCurrency(
         Number(KpiTicketAverage[0]?.totalAllTicketAverage) || 0,
       ),
-      totalGiro: Number(KpiGiro[0]?.totalGiro ?? 0).toFixed(2),
+      totalGiro: Number(Number(KpiGiro[0]?.totalGiro ?? 0).toFixed(2)),
       totalRevpar: this.formatCurrency(Number(KpiRevpar[0]?.totalRevpar) || 0),
       totalTrevpar: this.formatCurrency(
         Number(KpiTrevpar[0]?.totalTrevpar) || 0,
@@ -685,7 +837,7 @@ export class CompanyService {
     ];
 
     // Função para formatar a data para ano e mês
-    function formatYearMonth(date) {
+    function formatYearMonth(date: Date) {
       const year = date.getFullYear();
       const month = date.getMonth() + 1; // getMonth() é zero-based
       return `${month.toString().padStart(2, '0')}/${year}`;
@@ -1372,8 +1524,8 @@ export class CompanyService {
       OccupancyRateBySuiteCategory: formattedOccupancyRateBySuiteCategory,
       DataTableSuiteCategory: dataTableSuiteCategory,
       TotalResult: TotalResult,
-      DataTableOccupancyRateByWeek: occupancyRateByWeekArray,
-      DataTableGiroByWeek: giroByWeekArray,
+      DataTableOccupancyRateByWeek: occupancyRateByWeekArray as WeeklyOccupancyData[],
+      DataTableGiroByWeek: giroByWeekArray as WeeklyGiroData[],
     };
   }
 
@@ -2641,8 +2793,8 @@ export class CompanyService {
       OccupancyRateBySuiteCategory: occupancyRateBySuiteCategory,
       DataTableSuiteCategory: kpisData,
       TotalResult: totalResult,
-      DataTableOccupancyRateByWeek: occupancyRateByWeekArray,
-      DataTableGiroByWeek: giroByWeekArray,
+      DataTableOccupancyRateByWeek: occupancyRateByWeekArray as WeeklyOccupancyData[],
+      DataTableGiroByWeek: giroByWeekArray as WeeklyGiroData[],
     };
   }
 

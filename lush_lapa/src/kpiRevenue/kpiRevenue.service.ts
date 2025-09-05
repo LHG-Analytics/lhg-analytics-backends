@@ -56,7 +56,7 @@ export class KpiRevenueService {
     const groupedByStockOut = new Map<
       string,
       {
-        items: typeof stockOutItems;
+        items: any[];
         discount: Prisma.Decimal;
       }
     >();
@@ -85,7 +85,7 @@ export class KpiRevenueService {
     let total = new Prisma.Decimal(0);
 
     for (const { items, discount } of groupedByStockOut.values()) {
-      const subtotal = items.reduce((sum, item) => {
+      const subtotal = items.reduce((sum: any, item: any) => {
         const itemTotal = new Prisma.Decimal(item.priceSale).times(
           new Prisma.Decimal(item.quantity),
         );
@@ -150,7 +150,7 @@ export class KpiRevenueService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1); // Para LAST_6_M, subtrair um mês
@@ -192,7 +192,7 @@ export class KpiRevenueService {
         }
       >();
 
-      suiteCategories.forEach((suiteCategory) => {
+      suiteCategories.forEach((suiteCategory: any) => {
         categoryTotalsMap.set(suiteCategory.id, {
           permanenceValueTotal: new Prisma.Decimal(0),
           permanenceValueLiquid: new Prisma.Decimal(0),
@@ -207,8 +207,8 @@ export class KpiRevenueService {
 
       // Coletar todos os stockOutSaleLease de uma vez
       const stockOutIds = allRentalApartments
-        .map((rentalApartment) => rentalApartment.saleLease?.stockOutId)
-        .filter((id) => id !== undefined);
+        .map((rentalApartment: any) => rentalApartment.saleLease?.stockOutId)
+        .filter((id: any) => id !== undefined);
 
       const stockOutSaleLeases =
         await this.prisma.prismaLocal.stockOut.findMany({
@@ -232,7 +232,7 @@ export class KpiRevenueService {
         });
 
       const stockOutMap = new Map<number, any>();
-      stockOutSaleLeases.forEach((stockOut) => {
+      stockOutSaleLeases.forEach((stockOut: any) => {
         stockOutMap.set(stockOut.id, stockOut);
       });
 
@@ -249,15 +249,15 @@ export class KpiRevenueService {
         let priceSale = new Prisma.Decimal(0);
         let discountSale = new Prisma.Decimal(0);
 
-        if (saleLease && saleLease.stockOutId) {
+        if (saleLease&& saleLease.stockOutId) {
           const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
 
           if (
-            stockOutSaleLease &&
+            stockOutSaleLease&&
             Array.isArray(stockOutSaleLease.stockOutItem)
           ) {
             priceSale = stockOutSaleLease.stockOutItem.reduce(
-              (acc, current) =>
+              (acc: any, current: any) =>
                 acc.plus(
                   new Prisma.Decimal(current.priceSale).times(
                     new Prisma.Decimal(current.quantity),
@@ -312,13 +312,13 @@ export class KpiRevenueService {
       const totalAllValue: Prisma.Decimal = Array.from(
         categoryTotalsMap.values(),
       ).reduce(
-        (acc, current) => acc.plus(current.totalValue),
+        (acc: any, current: any) => acc.plus(current.totalValue),
         new Prisma.Decimal(0),
       );
 
       for (const [suiteCategoryId, suiteCategory] of categoryTotalsMap) {
         const suiteCategoryData = suiteCategories.find(
-          (category) => category.id === suiteCategoryId,
+          (category: any) => category.id === suiteCategoryId,
         );
 
         if (!suiteCategoryData) {
@@ -360,31 +360,31 @@ export class KpiRevenueService {
 
       const totalResult = {
         permanenceValueTotal: kpiRevenueData.reduce(
-          (acc, current) => acc.plus(current.permanenceValueTotal),
+          (acc: any, current: any) => acc.plus(current.permanenceValueTotal),
           new Prisma.Decimal(0),
         ),
         permanenceValueLiquid: kpiRevenueData.reduce(
-          (acc, current) => acc.plus(current.permanenceValueLiquid),
+          (acc: any, current: any) => acc.plus(current.permanenceValueLiquid),
           new Prisma.Decimal(0),
         ),
         priceSale: kpiRevenueData.reduce(
-          (acc, current) => acc.plus(current.priceSale),
+          (acc: any, current: any) => acc.plus(current.priceSale),
           new Prisma.Decimal(0),
         ),
         discountSale: kpiRevenueData.reduce(
-          (acc, current) => acc.plus(current.discountSale),
+          (acc: any, current: any) => acc.plus(current.discountSale),
           new Prisma.Decimal(0),
         ),
         discountRental: kpiRevenueData.reduce(
-          (acc, current) => acc.plus(current.discountRental),
+          (acc: any, current: any) => acc.plus(current.discountRental),
           new Prisma.Decimal(0),
         ),
         totalDiscount: kpiRevenueData.reduce(
-          (acc, current) => acc.plus(current.totalDiscount),
+          (acc: any, current: any) => acc.plus(current.totalDiscount),
           new Prisma.Decimal(0),
         ),
         totalValue: kpiRevenueData.reduce(
-          (acc, current) => acc.plus(current.totalValue),
+          (acc: any, current: any) => acc.plus(current.totalValue),
           new Prisma.Decimal(0),
         ),
         totalSaleDirect,
@@ -392,7 +392,7 @@ export class KpiRevenueService {
         createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
       };
 
-      const formattedKpiRevenueData = kpiRevenueData.map((category) => ({
+      const formattedKpiRevenueData = kpiRevenueData.map((category: any) => ({
         ...category,
         permanenceValueTotal: this.formatCurrency(
           category.permanenceValueTotal.toNumber(),
@@ -440,7 +440,7 @@ export class KpiRevenueService {
     } catch (error) {
       console.error('Erro ao buscar KPI Revenue data:', error);
       throw new BadRequestException(
-        `Failed to fetch KPI Revenue data: ${error.message}`,
+        `Failed to fetch KPI Revenue data: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -450,7 +450,7 @@ export class KpiRevenueService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -499,7 +499,7 @@ export class KpiRevenueService {
         });
 
       const stockOutIds = allRentalApartments
-        .map((a) => a.saleLease?.stockOutId)
+        .map((a: any) => a.saleLease?.stockOutId)
         .filter((id): id is number => Boolean(id));
 
       const stockOutData = await this.prisma.prismaLocal.stockOut.findMany({
@@ -523,10 +523,10 @@ export class KpiRevenueService {
       });
 
       const stockOutMap: { [key: string]: Prisma.Decimal } =
-        stockOutData.reduce((map, stockOut) => {
+        stockOutData.reduce((map: any, stockOut: any) => {
           const priceSale = stockOut.stockOutItem
             .reduce(
-              (acc, item) =>
+              (acc: any, item: any) =>
                 acc.plus(
                   new Prisma.Decimal(item.priceSale).times(item.quantity),
                 ),
@@ -540,7 +540,7 @@ export class KpiRevenueService {
       while (currentDate < endDate) {
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           nextDate.setDate(nextDate.getDate() + 1); // Inclui o próximo dia
           nextDate.setUTCHours(5, 59, 59, 999);
         } else if (period === PeriodEnum.LAST_6_M) {
@@ -549,7 +549,7 @@ export class KpiRevenueService {
         }
 
         const currentRentalApartments = allRentalApartments.filter(
-          (ra) => ra.checkIn >= currentDate && ra.checkIn <= nextDate,
+          (ra: any) => ra.checkIn >= currentDate&& ra.checkIn <= nextDate,
         );
 
         const totalsMap: {
@@ -593,7 +593,7 @@ export class KpiRevenueService {
         }
 
         const dateKey = currentDate.toISOString().split('T')[0];
-        results[dateKey] = Object.keys(totalsMap).map((rentalType) => ({
+        results[dateKey] = Object.keys(totalsMap).map((rentalType: any) => ({
           rentalType,
           ...totalsMap[rentalType],
         }));
@@ -620,8 +620,8 @@ export class KpiRevenueService {
         currentDate = nextDate; // Avança para a próxima data
       }
 
-      const formattedResults = Object.keys(results).reduce((acc, date) => {
-        acc[date] = results[date].map((data) => ({
+      const formattedResults = Object.keys(results).reduce((acc: any, date: any) => {
+        acc[date] = results[date].map((data: any) => ({
           ...data,
           totalValue: this.formatCurrency(data.totalValue.toNumber()),
         }));
@@ -630,10 +630,10 @@ export class KpiRevenueService {
 
       const totalResult = {
         totalValue: Object.values(results).reduce(
-          (acc, dailyData) =>
+          (acc: any, dailyData: any) =>
             acc +
             dailyData.reduce(
-              (sum, data) => sum + data.totalValue.toNumber(),
+              (sum: any, data: any) => sum + data.totalValue.toNumber(),
               0,
             ),
           0,
@@ -650,7 +650,7 @@ export class KpiRevenueService {
     } catch (error) {
       console.error('Erro ao acumular dados por tipo de locação:', error);
       throw new BadRequestException(
-        `Failed to accumulate data by rental type: ${error.message}`,
+        `Failed to accumulate data by rental type: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -661,9 +661,9 @@ export class KpiRevenueService {
     return this.prisma.prismaOnline.kpiRevenueByRentalType.upsert({
       where: {
         period_createdDate_rentalType: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
-          rentalType: data.rentalType,
+          rentalType: data.rentalType as RentalTypeEnum,
         },
       },
       create: {
@@ -689,7 +689,7 @@ export class KpiRevenueService {
       while (currentDate < endDate) {
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(5, 59, 59, 999); // Fim do dia contábil às 05:59:59 do próximo dia
@@ -720,7 +720,7 @@ export class KpiRevenueService {
         for (const rentalApartment of allRentalApartments) {
           const saleLease = rentalApartment.saleLease;
 
-          if (saleLease && saleLease.stockOutId) {
+          if (saleLease&& saleLease.stockOutId) {
             stockOutIds.push(saleLease.stockOutId);
           }
         }
@@ -752,7 +752,7 @@ export class KpiRevenueService {
             : [];
 
         const stockOutMap = new Map(
-          stockOuts.map((stockOut) => [stockOut.id, stockOut]),
+          stockOuts.map((stockOut: any) => [stockOut.id, stockOut]),
         );
 
         for (const rentalApartment of allRentalApartments) {
@@ -761,12 +761,12 @@ export class KpiRevenueService {
           let priceSale = new Prisma.Decimal(0);
           let discountSale = new Prisma.Decimal(0);
 
-          if (saleLease && saleLease.stockOutId) {
+          if (saleLease&& saleLease.stockOutId) {
             const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
             if (stockOutSaleLease) {
               if (Array.isArray(stockOutSaleLease.stockOutItem)) {
                 priceSale = stockOutSaleLease.stockOutItem.reduce(
-                  (acc, current) =>
+                  (acc: any, current: any) =>
                     acc.plus(
                       new Prisma.Decimal(current.priceSale).times(
                         new Prisma.Decimal(current.quantity),
@@ -814,7 +814,7 @@ export class KpiRevenueService {
         }
 
         await this.insertKpiRevenueByPeriod({
-          period: period,
+          period: period as PeriodEnum,
           createdDate: createdDateWithTime, // Usa a nova data com a hora correta
           totalValue: totalValueForCurrentPeriod,
           companyId: 1,
@@ -824,7 +824,7 @@ export class KpiRevenueService {
       }
 
       // Formatar o resultado final
-      const totalRevenueForThePeriod = Object.keys(results).map((date) => ({
+      const totalRevenueForThePeriod = Object.keys(results).map((date: any) => ({
         [date]: results[date],
       }));
 
@@ -834,7 +834,7 @@ export class KpiRevenueService {
     } catch (error) {
       console.error('Erro ao calcular o faturamento total por período:', error);
       throw new BadRequestException(
-        `Failed to calculate total revenue by period: ${error.message}`,
+        `Failed to calculate total revenue by period: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -845,7 +845,7 @@ export class KpiRevenueService {
     return this.prisma.prismaOnline.kpiRevenueByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -1138,16 +1138,16 @@ export class KpiRevenueService {
     }
 
     // Se houver reservas, calcular os tipos adicionais
-    if (Booking && Array.isArray(Booking) && Booking.length > 0) {
+    if (Booking&& Array.isArray(Booking) && Booking.length > 0) {
       // Regra para Day Use
-      if (checkInHour >= 13 && checkOutHour <= 19 && checkOutMinutes <= 15) {
+      if (checkInHour >= 13&& checkOutHour <= 19 && checkOutMinutes <= 15) {
         return 'DAY_USE';
       }
 
       // Regra para Overnight
       const overnightMinimumStaySeconds = 12 * 3600 + 15 * 60;
       if (
-        checkInHour >= 20 &&
+        checkInHour >= 20&&
         checkInHour <= 23 &&
         checkOutHour >= 8 &&
         (checkOutHour < 12 || (checkOutHour === 12 && checkOutMinutes <= 15)) &&
@@ -1158,7 +1158,7 @@ export class KpiRevenueService {
 
       // Verificação para Diária
       if (
-        occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
+        occupationTimeSeconds > 16 * 3600 + 15 * 60||
         (checkInHour <= 15 &&
           (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
       ) {

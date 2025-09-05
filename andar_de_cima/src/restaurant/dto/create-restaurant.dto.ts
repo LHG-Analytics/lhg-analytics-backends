@@ -6,4 +6,8 @@ export class CreateRestaurantDto {
   @IsNotEmpty({ message: 'O id do restaurante é obrigatório' })
   @IsNumber()
   id: number;
+
+  constructor(id: number) {
+    this.id = id;
+  }
 }

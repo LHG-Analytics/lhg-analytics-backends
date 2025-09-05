@@ -9,9 +9,31 @@ export class KpiOccupancyRate
   occupancyRate: Prisma.Decimal;
   totalOccupancyRate: Prisma.Decimal;
   createdDate: Date;
-  period?: PeriodEnum;
+  period?: PeriodEnum | null;
   companyId: number;
   companyName?: string;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    occupancyRate: Prisma.Decimal,
+    totalOccupancyRate: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+    id?: number,
+    period?: PeriodEnum | null,
+    companyName?: string,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.occupancyRate = occupancyRate;
+    this.totalOccupancyRate = totalOccupancyRate;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.id = id;
+    this.period = period ?? null;
+    this.companyName = companyName;
+  }
 }
 
 export class KpiOccupancyRateByWeek
@@ -23,9 +45,31 @@ export class KpiOccupancyRateByWeek
   occupancyRate: Prisma.Decimal;
   totalOccupancyRate: Prisma.Decimal;
   createdDate: Date;
-  period?: PeriodEnum;
+  period?: PeriodEnum | null;
   companyId: number;
   companyName?: string;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    occupancyRate: Prisma.Decimal,
+    totalOccupancyRate: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+    id?: number,
+    period?: PeriodEnum | null,
+    companyName?: string,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.occupancyRate = occupancyRate;
+    this.totalOccupancyRate = totalOccupancyRate;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.id = id;
+    this.period = period ?? null;
+    this.companyName = companyName;
+  }
 }
 
 export class KpiOccupancyRateByPeriod
@@ -34,9 +78,25 @@ export class KpiOccupancyRateByPeriod
   id?: number;
   totalOccupancyRate: Prisma.Decimal;
   createdDate: Date;
-  period?: PeriodEnum;
+  period?: PeriodEnum | null;
   companyId: number;
   companyName?: string;
+
+  constructor(
+    totalOccupancyRate: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+    id?: number,
+    period?: PeriodEnum | null,
+    companyName?: string,
+  ) {
+    this.totalOccupancyRate = totalOccupancyRate;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.id = id;
+    this.period = period ?? null;
+    this.companyName = companyName;
+  }
 }
 
 export class KpiOccupancyRateBySuiteCategory
@@ -47,7 +107,27 @@ export class KpiOccupancyRateBySuiteCategory
   suiteCategoryName: string;
   occupancyRate: Prisma.Decimal;
   createdDate: Date;
-  period?: PeriodEnum;
+  period?: PeriodEnum | null;
   companyId: number;
   companyName?: string;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    occupancyRate: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+    id?: number,
+    period?: PeriodEnum | null,
+    companyName?: string,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.occupancyRate = occupancyRate;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.id = id;
+    this.period = period ?? null;
+    this.companyName = companyName;
+  }
 }

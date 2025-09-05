@@ -312,7 +312,10 @@ export class KpiTicketAverageService {
         ...totalTicketAverageObject,
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new BadRequestException(
+        `Failed to find all KpiTicketAverage: ${errorMessage}`,
+      );
     }
   }
 

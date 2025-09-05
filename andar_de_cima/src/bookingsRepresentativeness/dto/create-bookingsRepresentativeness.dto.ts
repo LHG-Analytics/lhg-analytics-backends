@@ -15,4 +15,9 @@ export class CreateBookingsRepresentativenessDto {
   })
   @IsNotEmpty({ message: 'A data de criação é obrigatória' })
   createdDate: Date;
+
+  constructor(totalAllRepresentativeness: number, createdDate: Date) {
+    this.totalAllRepresentativeness = totalAllRepresentativeness;
+    this.createdDate = createdDate;
+  }
 }

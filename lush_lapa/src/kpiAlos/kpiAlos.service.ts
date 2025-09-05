@@ -23,7 +23,7 @@ export class KpiAlosService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         // Para LAST_6_M, subtrair um dia para não incluir a data atual
@@ -75,7 +75,7 @@ export class KpiAlosService {
       let totalOccupationTimeSeconds = 0; // Soma de todos os tempos de ocupação
       let totalRentals = 0; // Número total de ocupações
 
-      const categoryTotalsMap = {};
+      const categoryTotalsMap: Record<string, any> = {};
 
       // Calcula ocupação por categoria
       for (const suiteCategory of suiteCategories) {
@@ -127,7 +127,7 @@ export class KpiAlosService {
           suiteCategoryName: suiteCategory.description,
           averageOccupationTime,
           occupationTime: this.formatTime(occupationTime), // Convertendo para o formato legível
-          period: period || null,
+          period: period|| null,
           totalAverageOccupationTime: this.formatTime(
             totalOccupationTimeSeconds / totalRentals,
           ), // Atualizado
@@ -156,7 +156,7 @@ export class KpiAlosService {
         },
       ];
     } catch (error) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
@@ -165,7 +165,7 @@ export class KpiAlosService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

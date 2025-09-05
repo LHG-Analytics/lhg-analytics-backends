@@ -3,11 +3,163 @@ import { PeriodEnum, Prisma, RentalTypeEnum } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import * as moment from 'moment-timezone';
 
+// Type definitions for better type safety
+interface BigNumbersData {
+  currentDate: {
+    totalAllValue: string;
+    totalAllRentalsApartments: number;
+    totalAllTicketAverage: string;
+    totalAllRevpar: string;
+    totalAllGiro: number;
+    totalAverageOccupationTime: string;
+  };
+  PreviousDate?: {
+    totalAllValuePreviousData: string;
+    totalAllRentalsApartmentsPreviousData: number;
+    totalAllTicketAveragePreviousData: string;
+    totalAllRevparPreviousData: string;
+    totalAllGiroPreviousData: number;
+    totalAverageOccupationTimePreviousData: string;
+  };
+}
+
+interface SuiteCategoryData {
+  [key: string]: {
+    totalRentalsApartments: number;
+    totalValue: string;
+    totalTicketAverage: string;
+    giro: string;
+    revpar: string;
+    trevpar: string;
+    averageOccupationTime: string;
+    occupancyRate: string;
+  };
+}
+
+interface TotalResultData {
+  totalAllRentalsApartments: number;
+  totalAllValue: string;
+  totalAllTicketAverage: string;
+  totalGiro: number;
+  totalRevpar: string;
+  totalTrevpar: string;
+  totalAverageOccupationTime: string;
+  totalOccupancyRate: string;
+}
+
+interface DateValueData {
+  [date: string]: {
+    totalValue: string;
+  };
+}
+
+interface DateRentalsData {
+  [date: string]: {
+    totalAllRentalsApartments: number;
+  };
+}
+
+interface DateRevparData {
+  [date: string]: {
+    totalRevpar: string;
+  };
+}
+
+interface DateTicketData {
+  [date: string]: {
+    totalAllTicketAverage: string;
+  };
+}
+
+interface DateTrevparData {
+  [date: string]: {
+    totalTrevpar: string;
+  };
+}
+
+interface DateOccupancyData {
+  [date: string]: {
+    totalOccupancyRate: string;
+  };
+}
+
+interface OccupancyBySuiteCategoryData {
+  [date: string]: {
+    [suiteCategoryName: string]: {
+      occupancyRate: string;
+    };
+  };
+}
+
+interface WeeklyOccupancyData {
+  [suiteCategory: string]: {
+    [dayOfWeek: string]: {
+      occupancyRate: string;
+      totalOccupancyRate: string;
+    };
+  };
+}
+
+interface WeeklyGiroData {
+  [suiteCategory: string]: {
+    [dayOfWeek: string]: {
+      giro: string;
+      totalGiro: string;
+    };
+  };
+}
+
+interface RentalTypeData {
+  [rentalType: string]: {
+    totalValue: number;
+  };
+}
+
+interface BillingRentalTypeData {
+  [date: string]: Array<{
+    [rentalType: string]: {
+      totalValue: string;
+    };
+  }>;
+}
+
+interface CategoryTotalsMap {
+  [categoryId: number]: {
+    giroTotal: number;
+    rentalsCount: number;
+    totalOccupiedTime: number;
+    unavailableTime: number;
+    availableTime: number;
+    totalValue: Prisma.Decimal;
+    categoryTotalSale: Prisma.Decimal;
+    categoryTotalRental: Prisma.Decimal;
+    categoryTotalRentals: number;
+  };
+}
+
+export interface CompanyKpiResponse {
+  Company: string;
+  BigNumbers: BigNumbersData[];
+  BillingRentalType: Array<{ [date: string]: any }>;
+  RevenueByDate: DateValueData[];
+  RevenueBySuiteCategory: Array<{ [category: string]: { totalValue: string } }>;
+  RentalsByDate: DateRentalsData[];
+  RevparByDate: DateRevparData[];
+  TicketAverageByDate: DateTicketData[];
+  TrevparByDate: DateTrevparData[];
+  OccupancyRateByDate: DateOccupancyData[];
+  OccupancyRateBySuiteCategory: OccupancyBySuiteCategoryData[];
+  DataTableSuiteCategory: SuiteCategoryData[];
+  TotalResult: TotalResultData;
+  DataTableOccupancyRateByWeek: WeeklyOccupancyData[];
+  DataTableGiroByWeek: WeeklyGiroData[];
+}
+
 @Injectable()
 export class CompanyService {
   constructor(private prisma: PrismaService) {}
 
-  async findAllCompany(period: PeriodEnum) {
+  async findAllCompany(period: PeriodEnum): Promise<CompanyKpiResponse> {
     // Define o fuso horário padrão como São Paulo
     moment.tz.setDefault('America/Sao_Paulo');
 
@@ -126,7 +278,7 @@ export class CompanyService {
     ] = await this.prisma.prismaOnline.$transaction([
       this.prisma.prismaOnline.kpiRevenue.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate, // Filtra pela data inicial
           },
@@ -144,7 +296,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiRevenue.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -163,7 +315,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiRevenueByRentalType.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate, // Filtra pela data inicial
             lte: endDate,
@@ -180,7 +332,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiRevenueByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate, // Filtra pela data inicial
             lte: endDate,
@@ -196,7 +348,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiTotalRentals.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -214,7 +366,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiTotalRentals.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -233,7 +385,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiTotalRentalsByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -249,7 +401,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiTicketAverage.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -267,7 +419,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiTicketAverage.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -286,7 +438,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiTicketAverageByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -302,7 +454,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiRevpar.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -320,7 +472,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiRevpar.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -339,7 +491,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiRevparByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -355,7 +507,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiOccupancyRate.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -373,7 +525,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiOccupancyRateByWeek.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -391,7 +543,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiOccupancyRateByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -407,7 +559,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiOccupancyRateBySuiteCategory.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -424,7 +576,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiAlos.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -441,7 +593,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiAlos.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -459,7 +611,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiGiro.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -475,7 +627,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiGiro.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -492,7 +644,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiGiroByWeek.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -509,7 +661,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiTrevpar.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
           },
@@ -527,7 +679,7 @@ export class CompanyService {
       }),
       this.prisma.prismaOnline.kpiTrevparByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -599,33 +751,33 @@ export class CompanyService {
     };
 
     // Montando o retorno de DataTableSuiteCategory
-    const dataTableSuiteCategory = suiteCategory.map((suite) => {
+    const dataTableSuiteCategory = suiteCategory.map((suite: any) => {
       const suiteName = suite.description;
 
       // Filtrar os valores de KPI específicos para a suite atual
       const kpiRevenueForSuite = KpiRevenue.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
+        (kpi: any) => kpi.suiteCategoryName === suiteName,
       );
       const kpiTotalRentalsForSuite = KpiTotalRentals.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
+        (kpi: any) => kpi.suiteCategoryName === suiteName,
       );
       const kpiTicketAverageForSuite = KpiTicketAverage.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
+        (kpi: any) => kpi.suiteCategoryName === suiteName,
       );
       const kpiRevparForSuite = KpiRevpar.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
+        (kpi: any) => kpi.suiteCategoryName === suiteName,
       );
       const kpiOccupancyRateForSuite = KpiOccupancyRate.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
+        (kpi: any) => kpi.suiteCategoryName === suiteName,
       );
       const kpiAlosForSuite = KpiAlos.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
+        (kpi: any) => kpi.suiteCategoryName === suiteName,
       );
       const kpiGiroForSuite = KpiGiro.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
+        (kpi: any) => kpi.suiteCategoryName === suiteName,
       );
       const kpiTrevparForSuite = KpiTrevpar.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
+        (kpi: any) => kpi.suiteCategoryName === suiteName,
       );
 
       // Montar o objeto para cada suite
@@ -662,7 +814,7 @@ export class CompanyService {
       totalAllTicketAverage: this.formatCurrency(
         Number(KpiTicketAverage[0]?.totalAllTicketAverage) || 0,
       ),
-      totalGiro: Number(KpiGiro[0]?.totalGiro ?? 0).toFixed(2),
+      totalGiro: Number(KpiGiro[0]?.totalGiro ?? 0),
       totalRevpar: this.formatCurrency(Number(KpiRevpar[0]?.totalRevpar) || 0),
       totalTrevpar: this.formatCurrency(
         Number(KpiTrevpar[0]?.totalTrevpar) || 0,
@@ -685,14 +837,14 @@ export class CompanyService {
     ];
 
     // Função para formatar a data para ano e mês
-    function formatYearMonth(date) {
+    function formatYearMonth(date: Date) {
       const year = date.getFullYear();
       const month = date.getMonth() + 1; // getMonth() é zero-based
       return `${month.toString().padStart(2, '0')}/${year}`;
     }
 
     // Montando o retorno de BillingRentalType
-    const billingRentalType = KpiRevenueByRentalType.reduce((acc, curr) => {
+    const billingRentalType = KpiRevenueByRentalType.reduce((acc: any, curr: any) => {
       const createdDate = curr.createdDate;
       const rentalType = curr.rentalType;
       const totalValue = Number(curr.totalValue); // Certifique-se de que é um número
@@ -724,8 +876,8 @@ export class CompanyService {
 
     // Construindo a tabela de dados de faturamento por tipo de aluguel
     const dataTableBillingRentalType = Object.keys(billingRentalType).map(
-      (key) => {
-        const rentalTypeData = expectedRentalTypes.map((rentalType) => {
+      (key: any) => {
+        const rentalTypeData = expectedRentalTypes.map((rentalType: any) => {
           const totalValue =
             billingRentalType[key][rentalType]?.totalValue || 0;
           return {
@@ -754,7 +906,7 @@ export class CompanyService {
     // Verificar se o period é LAST_6_M
     if (period === 'LAST_6_M') {
       // Filtrar os dados do KpiRevenueByPeriod para incluir apenas os registros do dia atual nos últimos 6 meses
-      const filteredKpiRevenueByPeriod = KpiRevenueByPeriod.filter((record) => {
+      const filteredKpiRevenueByPeriod = KpiRevenueByPeriod.filter((record: any) => {
         const recordDate = moment.utc(record.createdDate); // Converta para UTC
         const recordDay = recordDate.tz('America/Sao_Paulo').date(); // Converta para o fuso horário da aplicação
 
@@ -762,7 +914,7 @@ export class CompanyService {
         return (
           recordDate.isBetween(
             now.clone().subtract(6, 'months').startOf('month').utc(),
-            now.clone().endOf('month').utc(),
+            now.clone().endOf('month' ).utc(),
             null,
             '[]',
           ) && recordDay === currentDayOfMonth
@@ -770,7 +922,7 @@ export class CompanyService {
       });
 
       // Agrupar os dados por data
-      const revenueByDate = filteredKpiRevenueByPeriod.reduce((acc, curr) => {
+      const revenueByDate = filteredKpiRevenueByPeriod.reduce((acc: any, curr: any) => {
         const dateKey = moment
           .utc(curr.createdDate)
           .tz('America/Sao_Paulo')
@@ -787,14 +939,14 @@ export class CompanyService {
       }, {});
 
       // Formatar os dados no formato desejado
-      formattedRevenueData = Object.keys(revenueByDate).map((date) => ({
+      formattedRevenueData = Object.keys(revenueByDate).map((date: any) => ({
         [date]: {
           totalValue: this.formatCurrency(revenueByDate[date].totalValue),
         },
       }));
     } else {
       // Se o period não for LAST_6_M, não aplica o filtro, apenas agrupa e formata normalmente
-      const revenueByDate = KpiRevenueByPeriod.reduce((acc, curr) => {
+      const revenueByDate = KpiRevenueByPeriod.reduce((acc: any, curr: any) => {
         const dateKey = moment
           .utc(curr.createdDate)
           .tz('America/Sao_Paulo')
@@ -811,19 +963,19 @@ export class CompanyService {
       }, {});
 
       // Formatar os dados no formato desejado
-      formattedRevenueData = Object.keys(revenueByDate).map((date) => ({
+      formattedRevenueData = Object.keys(revenueByDate).map((date: any) => ({
         [date]: {
           totalValue: this.formatCurrency(revenueByDate[date].totalValue),
         },
       }));
     }
 
-    const revenueBySuiteCategory = suiteCategory.map((suite) => {
+    const revenueBySuiteCategory = suiteCategory.map((suite: any) => {
       const suiteName = suite.description;
 
       // Filtrar os valores de KPI específicos para a suite atual
       const kpiRevenueForSuite = KpiRevenue.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
+        (kpi: any) => kpi.suiteCategoryName === suiteName,
       );
 
       // Montar o objeto para cada suite
@@ -843,7 +995,7 @@ export class CompanyService {
     if (period === 'LAST_6_M') {
       // Filtrar os dados do KpiTotalRentalsByPeriod para incluir apenas os registros do dia atual nos últimos 6 meses
       const filteredKpiTotalRentalsByPeriod = KpiTotalRentalsByPeriod.filter(
-        (record) => {
+        (record: any) => {
           const recordDate = moment(new Date(record.createdDate));
           const recordDay = recordDate.date();
 
@@ -851,7 +1003,7 @@ export class CompanyService {
           return (
             recordDate.isBetween(
               now.clone().subtract(6, 'months').startOf('month'),
-              now.clone().endOf('month'),
+              now.clone().endOf('month' ),
               null,
               '[]',
             ) && recordDay === currentDayOfMonth
@@ -861,7 +1013,7 @@ export class CompanyService {
 
       // Agrupar os dados por data
       const totalRentalsByDate = filteredKpiTotalRentalsByPeriod.reduce(
-        (acc, curr) => {
+        (acc: any, curr: any) => {
           const dateKey = moment(new Date(curr.createdDate)).format(
             'DD/MM/YYYY',
           ); // Formato desejado
@@ -883,7 +1035,7 @@ export class CompanyService {
 
       // Formatar os dados no formato desejado
       formattedTotalRentalsData = Object.keys(totalRentalsByDate).map(
-        (date) => ({
+        (date: any) => ({
           [date]: {
             totalAllRentalsApartments:
               totalRentalsByDate[date].totalAllRentalsApartments,
@@ -892,7 +1044,7 @@ export class CompanyService {
       );
     } else {
       // Caso contrário, apenas agrupar e formatar os dados sem filtro
-      const totalRentalsByDate = KpiTotalRentalsByPeriod.reduce((acc, curr) => {
+      const totalRentalsByDate = KpiTotalRentalsByPeriod.reduce((acc: any, curr: any) => {
         const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY'); // Formato desejado
         const totalAllRentalsApartments = Number(
           curr.totalAllRentalsApartments,
@@ -910,7 +1062,7 @@ export class CompanyService {
 
       // Formatar os dados no formato desejado
       formattedTotalRentalsData = Object.keys(totalRentalsByDate).map(
-        (date) => ({
+        (date: any) => ({
           [date]: {
             totalAllRentalsApartments:
               totalRentalsByDate[date].totalAllRentalsApartments,
@@ -925,7 +1077,7 @@ export class CompanyService {
     // Verificar se o period é LAST_6_M
     if (period === 'LAST_6_M') {
       // Filtrar os dados do KpiRevparByPeriod para incluir apenas os registros do dia atual nos últimos 6 meses
-      const filteredKpiRevparByPeriod = KpiRevparByPeriod.filter((record) => {
+      const filteredKpiRevparByPeriod = KpiRevparByPeriod.filter((record: any) => {
         const recordDate = moment(new Date(record.createdDate));
         const recordDay = recordDate.date();
 
@@ -933,7 +1085,7 @@ export class CompanyService {
         return (
           recordDate.isBetween(
             now.clone().subtract(6, 'months').startOf('month'),
-            now.clone().endOf('month'),
+            now.clone().endOf('month' ),
             null,
             '[]',
           ) && recordDay === currentDayOfMonth
@@ -941,7 +1093,7 @@ export class CompanyService {
       });
 
       // Agrupar os dados por data
-      const revparByDate = filteredKpiRevparByPeriod.reduce((acc, curr) => {
+      const revparByDate = filteredKpiRevparByPeriod.reduce((acc: any, curr: any) => {
         const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY'); // Formato desejado
         const totalRevpar = Number(curr.totalRevpar);
 
@@ -956,14 +1108,14 @@ export class CompanyService {
       }, {});
 
       // Formatar os dados no formato desejado
-      formattedRevparData = Object.keys(revparByDate).map((date) => ({
+      formattedRevparData = Object.keys(revparByDate).map((date: any) => ({
         [date]: {
           totalRevpar: this.formatCurrency(revparByDate[date].totalRevpar),
         },
       }));
     } else {
       // Caso contrário, apenas agrupar e formatar os dados sem filtro
-      const revparByDate = KpiRevparByPeriod.reduce((acc, curr) => {
+      const revparByDate = KpiRevparByPeriod.reduce((acc: any, curr: any) => {
         const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY'); // Formato desejado
         const totalRevpar = Number(curr.totalRevpar);
 
@@ -978,7 +1130,7 @@ export class CompanyService {
       }, {});
 
       // Formatar os dados no formato desejado
-      formattedRevparData = Object.keys(revparByDate).map((date) => ({
+      formattedRevparData = Object.keys(revparByDate).map((date: any) => ({
         [date]: {
           totalRevpar: this.formatCurrency(revparByDate[date].totalRevpar),
         },
@@ -992,7 +1144,7 @@ export class CompanyService {
     if (period === 'LAST_6_M') {
       // Filtrar os dados do KpiTicketAverageByPeriod para incluir apenas os registros do dia atual nos últimos 6 meses
       const filteredKpiTicketAverageByPeriod = KpiTicketAverageByPeriod.filter(
-        (record) => {
+        (record: any) => {
           const recordDate = moment(new Date(record.createdDate));
           const recordDay = recordDate.date();
 
@@ -1000,7 +1152,7 @@ export class CompanyService {
           return (
             recordDate.isBetween(
               now.clone().subtract(6, 'months').startOf('month'),
-              now.clone().endOf('month'),
+              now.clone().endOf('month' ),
               null,
               '[]',
             ) && recordDay === currentDayOfMonth
@@ -1010,7 +1162,7 @@ export class CompanyService {
 
       // Agrupar os dados por data
       const ticketAverageByDate = filteredKpiTicketAverageByPeriod.reduce(
-        (acc, curr) => {
+        (acc: any, curr: any) => {
           const dateKey = moment(new Date(curr.createdDate)).format(
             'DD/MM/YYYY',
           ); // Formato desejado
@@ -1030,7 +1182,7 @@ export class CompanyService {
 
       // Formatar os dados no formato desejado
       formattedTicketAverageData = Object.keys(ticketAverageByDate).map(
-        (date) => ({
+        (date: any) => ({
           [date]: {
             totalAllTicketAverage: this.formatCurrency(
               ticketAverageByDate[date].totalAllTicketAverage,
@@ -1041,7 +1193,7 @@ export class CompanyService {
     } else {
       // Caso contrário, apenas agrupar e formatar os dados sem filtro
       const ticketAverageByDate = KpiTicketAverageByPeriod.reduce(
-        (acc, curr) => {
+        (acc: any, curr: any) => {
           const dateKey = moment(new Date(curr.createdDate)).format(
             'DD/MM/YYYY',
           ); // Formato desejado
@@ -1061,7 +1213,7 @@ export class CompanyService {
 
       // Formatar os dados no formato desejado
       formattedTicketAverageData = Object.keys(ticketAverageByDate).map(
-        (date) => ({
+        (date: any) => ({
           [date]: {
             totalAllTicketAverage: this.formatCurrency(
               ticketAverageByDate[date].totalAllTicketAverage,
@@ -1077,7 +1229,7 @@ export class CompanyService {
     // Verificar se o period é LAST_6_M
     if (period === 'LAST_6_M') {
       // Filtrar os dados do KpiTrevparByPeriod para incluir apenas os registros do dia atual nos últimos 6 meses
-      const filteredKpiTrevparByPeriod = KpiTrevparByPeriod.filter((record) => {
+      const filteredKpiTrevparByPeriod = KpiTrevparByPeriod.filter((record: any) => {
         const recordDate = moment(new Date(record.createdDate));
         const recordDay = recordDate.date();
 
@@ -1085,7 +1237,7 @@ export class CompanyService {
         return (
           recordDate.isBetween(
             now.clone().subtract(6, 'months').startOf('month'),
-            now.clone().endOf('month'),
+            now.clone().endOf('month' ),
             null,
             '[]',
           ) && recordDay === currentDayOfMonth
@@ -1093,7 +1245,7 @@ export class CompanyService {
       });
 
       // Formatar os dados no formato desejado sem acumular
-      formattedTrevparData = filteredKpiTrevparByPeriod.map((curr) => {
+      formattedTrevparData = filteredKpiTrevparByPeriod.map((curr: any) => {
         const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY'); // Formato desejado
         const totalTrevpar = Number(curr.totalTrevpar);
 
@@ -1105,7 +1257,7 @@ export class CompanyService {
       });
     } else {
       // Caso contrário, apenas formatar os dados sem filtro
-      formattedTrevparData = KpiTrevparByPeriod.map((curr) => {
+      formattedTrevparData = KpiTrevparByPeriod.map((curr: any) => {
         const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY'); // Formato desejado
         const totalTrevpar = Number(curr.totalTrevpar);
 
@@ -1124,7 +1276,7 @@ export class CompanyService {
     if (period === 'LAST_6_M') {
       // Filtrar os dados do KpiOccupancyRateByPeriod para incluir apenas os registros do dia atual nos últimos 6 meses
       const filteredKpiOccupancyRateByPeriod = KpiOccupancyRateByPeriod.filter(
-        (record) => {
+        (record: any) => {
           const recordDate = moment(new Date(record.createdDate));
           const recordDay = recordDate.date();
 
@@ -1132,7 +1284,7 @@ export class CompanyService {
           return (
             recordDate.isBetween(
               now.clone().subtract(6, 'months').startOf('month'),
-              now.clone().endOf('month'),
+              now.clone().endOf('month' ),
               null,
               '[]',
             ) && recordDay === currentDayOfMonth
@@ -1142,7 +1294,7 @@ export class CompanyService {
 
       // Agrupar os dados por data
       const occupancyRateByDate = filteredKpiOccupancyRateByPeriod.reduce(
-        (acc, curr) => {
+        (acc: any, curr: any) => {
           const dateKey = moment(new Date(curr.createdDate)).format(
             'DD/MM/YYYY',
           ); // Formato desejado
@@ -1162,7 +1314,7 @@ export class CompanyService {
 
       // Formatar os dados no formato desejado
       formattedOccupancyRateData = Object.keys(occupancyRateByDate).map(
-        (date) => ({
+        (date: any) => ({
           [date]: {
             totalOccupancyRate: this.formatPercentage(
               occupancyRateByDate[date].totalOccupancyRate,
@@ -1173,7 +1325,7 @@ export class CompanyService {
     } else {
       // Caso contrário, apenas formatar os dados sem filtro
       const occupancyRateByDate = KpiOccupancyRateByPeriod.reduce(
-        (acc, curr) => {
+        (acc: any, curr: any) => {
           const dateKey = moment(new Date(curr.createdDate)).format(
             'DD/MM/YYYY',
           ); // Formato desejado
@@ -1193,7 +1345,7 @@ export class CompanyService {
 
       // Formatar os dados no formato desejado
       formattedOccupancyRateData = Object.keys(occupancyRateByDate).map(
-        (date) => ({
+        (date: any) => ({
           [date]: {
             totalOccupancyRate: this.formatPercentage(
               occupancyRateByDate[date].totalOccupancyRate,
@@ -1210,7 +1362,7 @@ export class CompanyService {
     if (period === 'LAST_6_M') {
       // Filtrar os dados do KpiOccupancyRateBySuiteCategory para incluir apenas os registros do dia atual nos últimos 6 meses
       const filteredKpiOccupancyRateBySuiteCategory =
-        KpiOccupancyRateBySuiteCategory.filter((record) => {
+        KpiOccupancyRateBySuiteCategory.filter((record: any) => {
           const recordDate = moment(new Date(record.createdDate));
           const recordDay = recordDate.date();
 
@@ -1218,7 +1370,7 @@ export class CompanyService {
           return (
             recordDate.isBetween(
               now.clone().subtract(6, 'months').startOf('month'),
-              now.clone().endOf('month'),
+              now.clone().endOf('month' ),
               null,
               '[]',
             ) && recordDay === currentDayOfMonth
@@ -1227,7 +1379,7 @@ export class CompanyService {
 
       // Agrupar os dados por data e por categoria de suíte
       const occupancyRateBySuiteCategory =
-        filteredKpiOccupancyRateBySuiteCategory.reduce((acc, curr) => {
+        filteredKpiOccupancyRateBySuiteCategory.reduce((acc: any, curr: any) => {
           const dateKey = moment(new Date(curr.createdDate)).format(
             'DD/MM/YYYY',
           ); // Formato desejado
@@ -1252,13 +1404,13 @@ export class CompanyService {
       // Formatar o resultado no formato desejado
       formattedOccupancyRateBySuiteCategory = Object.keys(
         occupancyRateBySuiteCategory,
-      ).map((date) => ({
+      ).map((date: any) => ({
         [date]: occupancyRateBySuiteCategory[date],
       }));
     } else {
       // Caso contrário, apenas formatar os dados sem filtro
       const occupancyRateBySuiteCategory =
-        KpiOccupancyRateBySuiteCategory.reduce((acc, curr) => {
+        KpiOccupancyRateBySuiteCategory.reduce((acc: any, curr: any) => {
           const dateKey = moment(new Date(curr.createdDate)).format(
             'DD/MM/YYYY',
           ); // Formato desejado
@@ -1283,13 +1435,13 @@ export class CompanyService {
       // Formatar o resultado no formato desejado
       formattedOccupancyRateBySuiteCategory = Object.keys(
         occupancyRateBySuiteCategory,
-      ).map((date) => ({
+      ).map((date: any) => ({
         [date]: occupancyRateBySuiteCategory[date],
       }));
     }
 
     // Agrupar os dados por categoria de suíte e por dia da semana
-    const occupancyRateByWeek = KpiOccupancyRateByWeek.reduce((acc, curr) => {
+    const occupancyRateByWeek = KpiOccupancyRateByWeek.reduce((acc: any, curr: any) => {
       const createdDate = new Date(curr.createdDate);
       const dayOfWeek = createdDate.toLocaleDateString('pt-BR', {
         weekday: 'long',
@@ -1327,7 +1479,7 @@ export class CompanyService {
     );
 
     // Agrupar os dados por categoria de suíte e por dia da semana
-    const giroByWeek = KpiGiroByWeek.reduce((acc, curr) => {
+    const giroByWeek = KpiGiroByWeek.reduce((acc: any, curr: any) => {
       const createdDate = new Date(curr.createdDate);
       const dayOfWeek = createdDate.toLocaleDateString('pt-BR', {
         weekday: 'long',
@@ -1372,8 +1524,8 @@ export class CompanyService {
       OccupancyRateBySuiteCategory: formattedOccupancyRateBySuiteCategory,
       DataTableSuiteCategory: dataTableSuiteCategory,
       TotalResult: TotalResult,
-      DataTableOccupancyRateByWeek: occupancyRateByWeekArray,
-      DataTableGiroByWeek: giroByWeekArray,
+      DataTableOccupancyRateByWeek: occupancyRateByWeekArray as WeeklyOccupancyData[],
+      DataTableGiroByWeek: giroByWeekArray as WeeklyGiroData[],
     };
   }
 
@@ -1533,7 +1685,7 @@ export class CompanyService {
     const groupedByStockOut = new Map<
       number,
       {
-        items: typeof stockOutItems;
+        items: any[];
         discount: Prisma.Decimal;
       }
     >();
@@ -1561,7 +1713,7 @@ export class CompanyService {
 
     const totalSaleDirect = Array.from(groupedByStockOut.values()).reduce(
       (total, { items, discount }) => {
-        const subtotal = items.reduce((sum, item) => {
+        const subtotal = items.reduce((sum: any, item: any) => {
           const price = new Prisma.Decimal(item.priceSale);
           const quantity = new Prisma.Decimal(item.quantity);
           return sum.plus(price.times(quantity));
@@ -1581,9 +1733,9 @@ export class CompanyService {
     let totalRental = new Prisma.Decimal(0);
     let totalRentals = 0;
 
-    const kpisData = [];
+    const kpisData: any[] = [];
     const daysTimeInSeconds = (endDate.getTime() - startDate.getTime()) / 1000;
-    const categoryTotalsMap = suiteCategories.reduce((acc, suiteCategory) => {
+    const categoryTotalsMap = suiteCategories.reduce((acc: any, suiteCategory: any) => {
       acc[suiteCategory.id] = {
         giroTotal: 0,
         rentalsCount: 0,
@@ -1601,7 +1753,7 @@ export class CompanyService {
 
     // Cálculo do stockOutMap
     const stockOutIds = allRentalApartments
-      .map((a) => a.saleLease?.stockOutId)
+      .map((a: any) => a.saleLease?.stockOutId)
       .filter((id): id is number => Boolean(id));
 
     const stockOutData = await this.prisma.prismaLocal.stockOut.findMany({
@@ -1625,10 +1777,10 @@ export class CompanyService {
     });
 
     const stockOutMap: { [key: string]: Prisma.Decimal } = stockOutData.reduce(
-      (map, stockOut) => {
+      (map: any, stockOut: any) => {
         const priceSale = stockOut.stockOutItem
           .reduce(
-            (acc, item) =>
+            (acc: any, item: any) =>
               acc.plus(new Prisma.Decimal(item.priceSale).times(item.quantity)),
             new Prisma.Decimal(0),
           )
@@ -1670,7 +1822,7 @@ export class CompanyService {
       nextDate.setUTCHours(5, 59, 59, 999); // Ajuste de hora para o início do dia
 
       const currentRentalApartments = allRentalApartments.filter(
-        (ra) => ra.checkIn >= currentDate && ra.checkIn < nextDate,
+        (ra: any) => ra.checkIn >= currentDate && ra.checkIn < nextDate,
       );
 
       const totalsMap: {
@@ -1684,10 +1836,12 @@ export class CompanyService {
 
       // Calcular o tempo ocupado
       for (const rentalApartment of currentRentalApartments) {
+        const checkOut = rentalApartment.checkOut;
+        const checkIn = rentalApartment.checkIn;
+        if (!checkOut || !checkIn) continue;
+        
         const occupiedTimeInSeconds =
-          (new Date(rentalApartment.checkOut).getTime() -
-            new Date(rentalApartment.checkIn).getTime()) /
-          1000;
+          (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 1000;
         totalOccupiedTime += occupiedTimeInSeconds;
 
         const rentalTypeString = this.determineRentalPeriod(
@@ -1720,19 +1874,19 @@ export class CompanyService {
       // Cálculo do tempo indisponível por manutenção e limpeza
       const unavailableTimeMap = new Map(); // Mapa para evitar duplicação
 
-      suiteCategories.forEach((suiteCategory) => {
-        suiteCategory.suites.forEach((suite) => {
+      suiteCategories.forEach((suiteCategory: any) => {
+        suiteCategory.suites.forEach((suite: any) => {
           // Lógica para calcular o tempo de limpeza
           const suiteCleanings = cleanings.filter(
-            (cleaning) => cleaning.suiteState.suiteId === suite.id,
+            (cleaning: any) => cleaning.suiteState.suiteId === suite.id,
           );
 
-          suiteCleanings.forEach((cleaning) => {
+          suiteCleanings.forEach((cleaning: any) => {
             const cleaningStart = new Date(cleaning.startDate);
             const cleaningEnd = new Date(cleaning.endDate);
 
             // Verificar se a limpeza está dentro do período atual
-            if (cleaningEnd > currentDate && cleaningStart < nextDate) {
+            if (cleaningEnd > currentDate&& cleaningStart < nextDate) {
               const overlapStart = Math.max(
                 cleaningStart.getTime(),
                 currentDate.getTime(),
@@ -1754,19 +1908,19 @@ export class CompanyService {
 
           // Lógica para calcular o tempo de manutenção e defeitos
           const suiteDefectsAndMaintenances = blockedMaintenanceDefects.filter(
-            (blockedMaintenanceDefect) =>
+            (blockedMaintenanceDefect: any) =>
               blockedMaintenanceDefect.defect.suite.id === suite.id &&
               blockedMaintenanceDefect.suiteState.suite.id === suite.id,
           );
 
-          suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect) => {
+          suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect: any) => {
             const defectStart = new Date(
               blockedMaintenanceDefect.defect.startDate,
             );
             const defectEnd = new Date(blockedMaintenanceDefect.defect.endDate);
 
             // Verificar se a manutenção está dentro do período atual
-            if (defectEnd > currentDate && defectStart < nextDate) {
+            if (defectEnd > currentDate&& defectStart < nextDate) {
               const overlapStart = Math.max(
                 defectStart.getTime(),
                 currentDate.getTime(),
@@ -1790,7 +1944,7 @@ export class CompanyService {
       });
 
       const totalSuitesCounts = suiteCategories.reduce(
-        (acc, category) => acc + category.suites.length,
+        (acc: any, category: any) => acc + category.suites.length,
         0,
       );
       const daysTimeInSeconds =
@@ -1821,17 +1975,17 @@ export class CompanyService {
       const dateToOccupancyRates: { [key: string]: any } = {};
 
       // Cálculo da taxa de ocupação por categoria de suíte
-      suiteCategories.forEach((suiteCategory) => {
+      suiteCategories.forEach((suiteCategory: any) => {
         let categoryOccupiedTime = 0; // Tempo ocupado para a categoria
         const unavailableTimeMap = new Map(); // Mapa para evitar duplicação
 
-        suiteCategory.suites.forEach((suite) => {
+        suiteCategory.suites.forEach((suite: any) => {
           const suiteRentals = currentRentalApartments.filter(
-            (ra) => ra.suiteStates.suite.id === suite.id,
+            (ra: any) => ra.suiteStates.suite.id === suite.id,
           );
 
           // Calcular o tempo ocupado para a categoria
-          suiteRentals.forEach((rentalApartment) => {
+          suiteRentals.forEach((rentalApartment: any) => {
             const occupiedTimeInSeconds =
               (new Date(rentalApartment.checkOut).getTime() -
                 new Date(rentalApartment.checkIn).getTime()) /
@@ -1841,10 +1995,10 @@ export class CompanyService {
 
           // Cálculo do tempo indisponível por manutenção e limpeza para a categoria
           const suiteCleanings = cleanings.filter(
-            (cleaning) => cleaning.suiteState.suiteId === suite.id,
+            (cleaning: any) => cleaning.suiteState.suiteId === suite.id,
           );
 
-          suiteCleanings.forEach((cleaning) => {
+          suiteCleanings.forEach((cleaning: any) => {
             const cleaningStart = new Date(cleaning.startDate);
             const cleaningEnd = new Date(cleaning.endDate);
 
@@ -1871,19 +2025,19 @@ export class CompanyService {
 
           // Lógica para calcular o tempo de manutenção e defeitos para a categoria
           const suiteDefectsAndMaintenances = blockedMaintenanceDefects.filter(
-            (blockedMaintenanceDefect) =>
+            (blockedMaintenanceDefect: any) =>
               blockedMaintenanceDefect.defect.suite.id === suite.id &&
               blockedMaintenanceDefect.suiteState.suite.id === suite.id,
           );
 
-          suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect) => {
+          suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect: any) => {
             const defectStart = new Date(
               blockedMaintenanceDefect.defect.startDate,
             );
             const defectEnd = new Date(blockedMaintenanceDefect.defect.endDate);
 
             // Verificar se a manutenção está dentro do período atual
-            if (defectEnd > currentDate && defectStart < nextDate) {
+            if (defectEnd > currentDate&& defectStart < nextDate) {
               const overlapStart = Math.max(
                 defectStart.getTime(),
                 currentDate.getTime(),
@@ -1907,7 +2061,7 @@ export class CompanyService {
         // Calcular o tempo indisponível total para a categoria
         const categoryUnavailableTime = Array.from(
           unavailableTimeMap.values(),
-        ).reduce((acc, time) => acc + time, 0);
+        ).reduce((acc: any, time: any) => acc + time, 0);
 
         const totalCategorySuitesCounts = suiteCategory.suites.length;
         let categoryAvailableTimeInSeconds =
@@ -1936,7 +2090,7 @@ export class CompanyService {
       });
 
       // Adicionar o objeto dateToOccupancyRates ao array occupancyRateBySuiteCategory
-      Object.keys(dateToOccupancyRates).forEach((dateKey) => {
+      Object.keys(dateToOccupancyRates).forEach((dateKey: any) => {
         occupancyRateBySuiteCategory.push({
           [dateKey]: dateToOccupancyRates[dateKey],
         });
@@ -1977,17 +2131,17 @@ export class CompanyService {
       let totalRevenue = new Prisma.Decimal(0);
       let totalSuitesCount = 0;
 
-      suiteCategories.forEach((suiteCategory) => {
+      suiteCategories.forEach((suiteCategory: any) => {
         const suitesInCategoryCount = suiteCategory.suites.length;
         totalSuitesCount += suitesInCategoryCount;
 
         const rentalApartmentsInCategory = currentRentalApartments.filter(
-          (rentalApartment) =>
+          (rentalApartment: any) =>
             rentalApartment.suiteStates.suite.suiteCategoryId ===
             suiteCategory.id,
         );
 
-        rentalApartmentsInCategory.forEach((rentalApartment) => {
+        rentalApartmentsInCategory.forEach((rentalApartment: any) => {
           totalRevenue = totalRevenue.plus(
             rentalApartment.permanenceValueLiquid
               ? new Prisma.Decimal(rentalApartment.permanenceValueLiquid)
@@ -2010,7 +2164,7 @@ export class CompanyService {
       });
 
       // Formata os resultados para o dia atual
-      results[dateKey] = Object.keys(rentalTypeMap).map((rentalType) => {
+      results[dateKey] = Object.keys(rentalTypeMap).map((rentalType: any) => {
         const totalValue = totalsMap[rentalType]
           ? totalsMap[rentalType].totalValue.toNumber()
           : 0; // Se não existir, considera como R$ 0,00
@@ -2046,7 +2200,7 @@ export class CompanyService {
 
     // Inicializar a estrutura de ocupação por categoria e dia da semana
     const occupancyByCategoryAndDay: { [key: string]: any } = {};
-    suiteCategories.forEach((suiteCategory) => {
+    suiteCategories.forEach((suiteCategory: any) => {
       occupancyByCategoryAndDay[suiteCategory.description] = {};
       for (const dayOfWeek in dayCountMap) {
         occupancyByCategoryAndDay[suiteCategory.description][dayOfWeek] = {
@@ -2059,14 +2213,14 @@ export class CompanyService {
     });
 
     // Calcular totalOccupiedTime por categoria e dia da semana
-    allRentalApartments.forEach((occupiedSuite) => {
+    allRentalApartments.forEach((occupiedSuite: any) => {
       const suiteCategoryDescription =
         occupiedSuite.suiteStates?.suite?.suiteCategories?.description;
       const dayOfOccupation = moment.tz(occupiedSuite.checkIn, timezone);
       const dayOfWeek = dayOfOccupation.format('dddd');
 
       if (
-        occupancyByCategoryAndDay[suiteCategoryDescription] &&
+        occupancyByCategoryAndDay[suiteCategoryDescription]&&
         occupancyByCategoryAndDay[suiteCategoryDescription][dayOfWeek]
       ) {
         const occupiedTime =
@@ -2088,7 +2242,7 @@ export class CompanyService {
         let unavailableTimeCleaning = 0;
 
         // Calcular o tempo indisponível por limpeza
-        const suiteCleanings = cleanings.filter((cleaning) => {
+        const suiteCleanings = cleanings.filter((cleaning: any) => {
           const cleaningDayOfWeek = moment
             .tz(cleaning.startDate, timezone)
             .format('dddd');
@@ -2098,7 +2252,7 @@ export class CompanyService {
           );
         });
 
-        suiteCleanings.forEach((cleaning) => {
+        suiteCleanings.forEach((cleaning: any) => {
           const cleaningTimeInSeconds =
             (new Date(cleaning.endDate).getTime() -
               new Date(cleaning.startDate).getTime()) /
@@ -2108,7 +2262,7 @@ export class CompanyService {
 
         // Calcular o tempo indisponível por manutenção
         const suiteDefectsAndMaintenances = blockedMaintenanceDefects.filter(
-          (blockedMaintenanceDefect) => {
+          (blockedMaintenanceDefect: any) => {
             const defectDayOfWeek = moment
               .tz(blockedMaintenanceDefect.defect.startDate, timezone)
               .format('dddd');
@@ -2119,7 +2273,7 @@ export class CompanyService {
           },
         );
 
-        suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect) => {
+        suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect: any) => {
           const startDefect = new Date(
             blockedMaintenanceDefect.defect.startDate,
           );
@@ -2207,8 +2361,8 @@ export class CompanyService {
     const endDateAdjustedForGiro = moment.tz(endDate, timezone);
 
     // Inicializar a estrutura de giro por categoria e dia da semana
-    const giroByCategoryAndDay = {};
-    suiteCategories.forEach((suiteCategory) => {
+    const giroByCategoryAndDay: Record<string, any> = {};
+    suiteCategories.forEach((suiteCategory: any) => {
       giroByCategoryAndDay[suiteCategory.description] = {};
       for (const dayOfWeek in dayCountMap) {
         giroByCategoryAndDay[suiteCategory.description][dayOfWeek] = {
@@ -2223,13 +2377,13 @@ export class CompanyService {
       const dayOfWeek = currentDateForGiro.format('dddd');
 
       // Filtrar os apartamentos alugados para o dia atual
-      const rentalsForCurrentDay = allRentalApartments.filter((rental) => {
+      const rentalsForCurrentDay = allRentalApartments.filter((rental: any) => {
         const checkInDate = moment.tz(rental.checkIn, timezone);
         return checkInDate.isSame(currentDateForGiro, 'day');
       });
 
       // Contar o número de locações por categoria
-      rentalsForCurrentDay.forEach((rental) => {
+      rentalsForCurrentDay.forEach((rental: any) => {
         const suiteCategoryDescription =
           rental.suiteStates?.suite?.suiteCategories?.description;
 
@@ -2249,7 +2403,7 @@ export class CompanyService {
     }
 
     // Cálculo do giro por categoria e dia
-    const totalRentalsByDay = {}; // Para acumular locações por dia da semana
+    const totalRentalsByDay: Record<string, any> = {}; // Para acumular locações por dia da semana
     let allSuites = 0;
 
     for (const suiteCategory of suiteCategories) {
@@ -2267,7 +2421,7 @@ export class CompanyService {
         totalRentalsByDay[dayOfWeek] += categoryData.rentalsCount;
 
         // Cálculo do giro para a categoria e dia
-        if (categoryData.rentalsCount > 0 && suitesInCategoryCount > 0) {
+        if (categoryData.rentalsCount > 0&& suitesInCategoryCount > 0) {
           const days = dayCountMap[dayOfWeek];
           const giro = categoryData.rentalsCount / suitesInCategoryCount / days;
 
@@ -2330,13 +2484,13 @@ export class CompanyService {
     while (currentDate <= endDate) {
       const dateKey = new Intl.DateTimeFormat('pt-BR').format(currentDate);
       const allRentalApartmentsForDate = allRentalApartments.filter(
-        (ra) =>
+        (ra: any) =>
           ra.checkIn >= currentDate &&
           ra.checkIn < new Date(currentDate.getTime() + 86400000),
       );
 
       let totalValueForCurrentDate = new Prisma.Decimal(0);
-      allRentalApartmentsForDate.forEach((rentalApartment) => {
+      allRentalApartmentsForDate.forEach((rentalApartment: any) => {
         const permanenceValueLiquid = rentalApartment.permanenceValueLiquid
           ? new Prisma.Decimal(rentalApartment.permanenceValueLiquid)
           : new Prisma.Decimal(0);
@@ -2361,14 +2515,14 @@ export class CompanyService {
     }
 
     // Cálculo do RevenueBySuiteCategory
-    const revenueBySuiteCategory = suiteCategories.map((suiteCategory) => {
+    const revenueBySuiteCategory = suiteCategories.map((suiteCategory: any) => {
       const suitesInCategory = suiteCategory.suites;
       let totalValueForCategory = new Prisma.Decimal(0);
 
-      allRentalApartments.forEach((rentalApartment) => {
+      allRentalApartments.forEach((rentalApartment: any) => {
         if (
           suitesInCategory.some(
-            (suite) => suite.id === rentalApartment.suiteStates?.suite?.id,
+            (suite: any) => suite.id === rentalApartment.suiteStates?.suite?.id,
           )
         ) {
           const permanenceValueLiquid = rentalApartment.permanenceValueLiquid
@@ -2395,10 +2549,10 @@ export class CompanyService {
       };
     });
 
-    suiteCategories.forEach((suiteCategory) => {
+    suiteCategories.forEach((suiteCategory: any) => {
       const suitesInCategoryCount = suiteCategory.suites.length;
       const occupiedSuitesInCategory = allRentalApartments.filter(
-        (rentalApartment) =>
+        (rentalApartment: any) =>
           rentalApartment.suiteStates?.suite?.suiteCategoryId ===
           suiteCategory.id,
       );
@@ -2407,7 +2561,7 @@ export class CompanyService {
       let unavailableTimeCleaning = 0;
       let maxUnavailableTime = 0;
 
-      occupiedSuitesInCategory.forEach((occupiedSuite) => {
+      occupiedSuitesInCategory.forEach((occupiedSuite: any) => {
         const occupiedTimeInSeconds = this.calculateOccupationTime(
           occupiedSuite.checkIn,
           occupiedSuite.checkOut,
@@ -2421,9 +2575,9 @@ export class CompanyService {
         let discountSale = new Prisma.Decimal(0);
 
         const saleLease = occupiedSuite.saleLease;
-        if (saleLease && saleLease.stockOut?.stockOutItem) {
+        if (saleLease&& saleLease.stockOut?.stockOutItem) {
           priceSale = saleLease.stockOut.stockOutItem.reduce(
-            (acc, item) =>
+            (acc: any, item: any) =>
               acc.plus(
                 new Prisma.Decimal(item.priceSale).times(
                   new Prisma.Decimal(item.quantity),
@@ -2461,14 +2615,14 @@ export class CompanyService {
         }
       });
 
-      suiteCategory.suites.forEach((suite) => {
+      suiteCategory.suites.forEach((suite: any) => {
         const suiteDefectsAndMaintenances = blockedMaintenanceDefects.filter(
-          (blockedMaintenanceDefect) =>
-            blockedMaintenanceDefect.defect.suite.id === suite.id &&
+          (blockedMaintenanceDefect: any) =>
+            blockedMaintenanceDefect.defect.suite.id === suite.id&&
             blockedMaintenanceDefect.suiteState.suite.id === suite.id,
         );
 
-        suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect) => {
+        suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect: any) => {
           const startDefect = new Date(
             blockedMaintenanceDefect.defect.startDate,
           );
@@ -2491,8 +2645,8 @@ export class CompanyService {
         });
 
         cleanings
-          .filter((cleaning) => cleaning.suiteState.suiteId === suite.id)
-          .forEach((cleaning) => {
+          .filter((cleaning: any) => cleaning.suiteState.suiteId === suite.id)
+          .forEach((cleaning: any) => {
             unavailableTimeCleaning +=
               (new Date(cleaning.endDate).getTime() -
                 new Date(cleaning.startDate).getTime()) /
@@ -2514,7 +2668,7 @@ export class CompanyService {
       categoryData.rentalsCount += occupiedSuitesInCategory.length;
       allRentals += occupiedSuitesInCategory.length;
 
-      if (categoryData.rentalsCount > 0 && suitesInCategoryCount > 0) {
+      if (categoryData.rentalsCount > 0&& suitesInCategoryCount > 0) {
         const days = (endDate.getTime() - startDate.getTime()) / (1000 * 86400);
         const giro = categoryData.rentalsCount / suitesInCategoryCount / days;
         categoryData.giroTotal += giro;
@@ -2569,9 +2723,9 @@ export class CompanyService {
       ),
     };
 
-    suiteCategories.forEach((suiteCategory) => {
+    suiteCategories.forEach((suiteCategory: any) => {
       const categoryData = categoryTotalsMap[suiteCategory.id];
-      if (categoryData && categoryData.rentalsCount > 0) {
+      if (categoryData&& categoryData.rentalsCount > 0) {
         const occupancyRateDecimal =
           categoryData.availableTime > 0
             ? categoryData.totalOccupiedTime / categoryData.availableTime
@@ -2687,7 +2841,7 @@ export class CompanyService {
     }
 
     // Se houver reservas, calcular os tipos adicionais
-    if (Booking && Array.isArray(Booking) && Booking.length > 0) {
+    if (Booking&& Array.isArray(Booking) && Booking.length > 0) {
       // Regra para Day Use
       if (checkInHour >= 13 && checkOutHour <= 19 && checkOutMinutes <= 15) {
         return 'DAY_USE';

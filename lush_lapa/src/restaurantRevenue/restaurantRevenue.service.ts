@@ -47,7 +47,7 @@ export class RestaurantRevenueService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
@@ -65,8 +65,8 @@ export class RestaurantRevenueService {
 
       // Coletar todos os stockOutSaleLease de uma vez
       const stockOutIds = allRentalApartments
-        .map((rentalApartment) => rentalApartment.saleLease?.stockOutId)
-        .filter((id) => id !== undefined);
+        .map((rentalApartment: any) => rentalApartment.saleLease?.stockOutId)
+        .filter((id: any) => id !== undefined);
 
       const stockOutSaleLeases =
         await this.prisma.prismaLocal.stockOut.findMany({
@@ -90,7 +90,7 @@ export class RestaurantRevenueService {
         });
 
       const stockOutMap = new Map<number, any>();
-      stockOutSaleLeases.forEach((stockOut) => {
+      stockOutSaleLeases.forEach((stockOut: any) => {
         stockOutMap.set(stockOut.id, stockOut);
       });
 
@@ -100,18 +100,18 @@ export class RestaurantRevenueService {
       for (const rentalApartment of allRentalApartments) {
         const saleLease = rentalApartment.saleLease;
 
-        if (saleLease && saleLease.stockOutId) {
+        if (saleLease&& saleLease.stockOutId) {
           const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
 
           if (
-            stockOutSaleLease &&
+            stockOutSaleLease&&
             Array.isArray(stockOutSaleLease.stockOutItem)
           ) {
             let itemTotalValue = new Prisma.Decimal(0);
             let discountSale = new Prisma.Decimal(0);
 
             // Calcular o valor total da venda para este item
-            stockOutSaleLease.stockOutItem.forEach((stockOutItem) => {
+            stockOutSaleLease.stockOutItem.forEach((stockOutItem: any) => {
               const priceSale = new Prisma.Decimal(stockOutItem.priceSale || 0);
               const quantity = new Prisma.Decimal(stockOutItem.quantity || 0);
               itemTotalValue = itemTotalValue.plus(priceSale.times(quantity));
@@ -145,7 +145,7 @@ export class RestaurantRevenueService {
           ? new Prisma.Decimal(0)
           : totalNetRevenue,
         createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
-        period: period,
+        period: period as PeriodEnum,
         companyId,
       });
 
@@ -157,8 +157,9 @@ export class RestaurantRevenueService {
       return formattedRestaurantRevenueData;
     } catch (error) {
       console.error('Erro ao buscar Restaurant Revenue data:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to fetch Restaurant Revenue data: ${error.message}`,
+        `Failed to fetch Restaurant Revenue data: ${errorMessage}`,
       );
     }
   }
@@ -169,7 +170,7 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenue.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -204,7 +205,7 @@ export class RestaurantRevenueService {
         // Use <= para incluir o último dia
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
@@ -237,7 +238,7 @@ export class RestaurantRevenueService {
         for (const rentalApartment of allRentalApartments) {
           const saleLease = rentalApartment.saleLease;
 
-          if (saleLease && saleLease.stockOutId) {
+          if (saleLease&& saleLease.stockOutId) {
             stockOutIds.push(saleLease.stockOutId);
           }
         }
@@ -269,7 +270,7 @@ export class RestaurantRevenueService {
             : [];
 
         const stockOutMap = new Map(
-          stockOuts.map((stockOut) => [stockOut.id, stockOut]),
+          stockOuts.map((stockOut: any) => [stockOut.id, stockOut]),
         );
 
         for (const rentalApartment of allRentalApartments) {
@@ -278,12 +279,12 @@ export class RestaurantRevenueService {
           let priceSale = new Prisma.Decimal(0);
           let discountSale = new Prisma.Decimal(0);
 
-          if (saleLease && saleLease.stockOutId) {
+          if (saleLease&& saleLease.stockOutId) {
             const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
             if (stockOutSaleLease) {
               if (Array.isArray(stockOutSaleLease.stockOutItem)) {
                 priceSale = stockOutSaleLease.stockOutItem.reduce(
-                  (acc, current) =>
+                  (acc: any, current: any) =>
                     acc.plus(
                       new Prisma.Decimal(current.priceSale).times(
                         new Prisma.Decimal(current.quantity),
@@ -321,7 +322,7 @@ export class RestaurantRevenueService {
         }
 
         await this.insertRestaurantRevenueByPeriod({
-          period: period,
+          period: period as PeriodEnum,
           createdDate: createdDateWithTime, // Usa a nova data com a hora correta
           totalValue: totalValueForCurrentPeriod,
           companyId,
@@ -332,7 +333,7 @@ export class RestaurantRevenueService {
 
       // Formatar o resultado final
       const totalRestaurantRevenueByPeriod = Object.keys(results).map(
-        (date) => ({
+        (date: any) => ({
           [date]: results[date],
         }),
       );
@@ -342,8 +343,9 @@ export class RestaurantRevenueService {
       };
     } catch (error) {
       console.error('Erro ao calcular a receita total por período:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to calculate restaurant revenue by period: ${error.message}`,
+        `Failed to calculate restaurant revenue by period: ${errorMessage}`,
       );
     }
   }
@@ -354,7 +356,7 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenueByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -389,7 +391,7 @@ export class RestaurantRevenueService {
         // Use <= para incluir o último dia
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
@@ -423,7 +425,7 @@ export class RestaurantRevenueService {
         for (const rentalApartment of allRentalApartments) {
           const saleLease = rentalApartment.saleLease;
 
-          if (saleLease && saleLease.stockOutId) {
+          if (saleLease&& saleLease.stockOutId) {
             stockOutIds.push(saleLease.stockOutId);
           }
         }
@@ -455,7 +457,7 @@ export class RestaurantRevenueService {
             : [];
 
         const stockOutMap = new Map(
-          stockOuts.map((stockOut) => [stockOut.id, stockOut]),
+          stockOuts.map((stockOut: any) => [stockOut.id, stockOut]),
         );
 
         for (const rentalApartment of allRentalApartments) {
@@ -464,12 +466,12 @@ export class RestaurantRevenueService {
           let priceSale = new Prisma.Decimal(0);
           let discountSale = new Prisma.Decimal(0);
 
-          if (saleLease && saleLease.stockOutId) {
+          if (saleLease&& saleLease.stockOutId) {
             const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
             if (stockOutSaleLease) {
               if (Array.isArray(stockOutSaleLease.stockOutItem)) {
                 priceSale = stockOutSaleLease.stockOutItem.reduce(
-                  (acc, current) =>
+                  (acc: any, current: any) =>
                     acc.plus(
                       new Prisma.Decimal(current.priceSale).times(
                         new Prisma.Decimal(current.quantity),
@@ -522,7 +524,7 @@ export class RestaurantRevenueService {
         }
 
         await this.insertRestaurantRevenueByPeriodPercent({
-          period: period,
+          period: period as PeriodEnum,
           createdDate: createdDateWithTime, // Usa a nova data com a hora correta
           totalValuePercent: new Prisma.Decimal(totalValuePercent),
           companyId,
@@ -533,7 +535,7 @@ export class RestaurantRevenueService {
 
       // Formatar o resultado final
       const totalRestaurantRevenueByPeriodPercent = Object.keys(results).map(
-        (date) => ({
+        (date: any) => ({
           [date]: results[date],
         }),
       );
@@ -543,8 +545,9 @@ export class RestaurantRevenueService {
       };
     } catch (error) {
       console.error('Erro ao calcular a receita total por período:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to calculate restaurant revenue by period: ${error.message}`,
+        `Failed to calculate restaurant revenue by period: ${errorMessage}`,
       );
     }
   }
@@ -555,7 +558,7 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenueByPeriodPercent.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -595,7 +598,7 @@ export class RestaurantRevenueService {
       while (currentDate <= adjustedEndDate) {
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0);
         } else if (period === PeriodEnum.LAST_6_M) {
@@ -622,7 +625,7 @@ export class RestaurantRevenueService {
         const stockOutIds: number[] = [];
         for (const rentalApartment of allRentalApartments) {
           const saleLease = rentalApartment.saleLease;
-          if (saleLease && saleLease.stockOutId) {
+          if (saleLease&& saleLease.stockOutId) {
             stockOutIds.push(saleLease.stockOutId);
           }
         }
@@ -662,7 +665,7 @@ export class RestaurantRevenueService {
             : [];
 
         const stockOutMap = new Map(
-          stockOuts.map((stockOut) => [stockOut.id, stockOut]),
+          stockOuts.map((stockOut: any) => [stockOut.id, stockOut]),
         );
 
         // Resetar os totais para o período atual
@@ -675,7 +678,7 @@ export class RestaurantRevenueService {
         for (const rentalApartment of allRentalApartments) {
           const saleLease = rentalApartment.saleLease;
 
-          if (saleLease && saleLease.stockOutId) {
+          if (saleLease&& saleLease.stockOutId) {
             const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
             if (stockOutSaleLease) {
               for (const stockOutItem of stockOutSaleLease.stockOutItem) {
@@ -781,8 +784,9 @@ export class RestaurantRevenueService {
         'Erro ao calcular a receita do restaurante por grupo e período:',
         error,
       );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to calculate restaurant revenue by group and period: ${error.message}`,
+        `Failed to calculate restaurant revenue by group and period: ${errorMessage}`,
       );
     }
   }
@@ -793,7 +797,7 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenueByGroupByPeriod.upsert({
       where: {
         period_createdDate_consumptionGroup: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
           consumptionGroup: data.consumptionGroup,
         },
@@ -833,7 +837,7 @@ export class RestaurantRevenueService {
           total: number;
         };
       } = {};
-      categories.forEach((category) => {
+      categories.forEach((category: any) => {
         revenueByCategory[category] = { categories: [], series: [], total: 0 };
       });
 
@@ -842,7 +846,7 @@ export class RestaurantRevenueService {
       adjustedEndDate.setUTCHours(23, 59, 59, 999);
 
       const finalTotalByCategory: { [key: string]: Prisma.Decimal } = {};
-      categories.forEach((category) => {
+      categories.forEach((category: any) => {
         finalTotalByCategory[category] = new Prisma.Decimal(0);
       });
 
@@ -895,7 +899,7 @@ export class RestaurantRevenueService {
             })
           : [];
 
-      const stockOutMap = new Map(stockOuts.map((s) => [s.id, s]));
+      const stockOutMap = new Map(stockOuts.map((s: any) => [s.id, s]));
 
       for (const rentalApartment of allRentalApartments) {
         const saleLease = rentalApartment.saleLease;
@@ -923,7 +927,7 @@ export class RestaurantRevenueService {
 
       //calcular total geral para calcular % depois
       const finalTotalGeneral = Object.values(finalTotalByCategory).reduce(
-        (acc, val) => acc.plus(val),
+        (acc: any, val: any) => acc.plus(val),
         new Prisma.Decimal(0),
       );
 
@@ -934,7 +938,7 @@ export class RestaurantRevenueService {
       while (currentDate <= adjustedEndDate) {
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0);
         } else if (period === PeriodEnum.LAST_6_M) {
@@ -988,10 +992,10 @@ export class RestaurantRevenueService {
               })
             : [];
 
-        const outMap = new Map(outs.map((o) => [o.id, o]));
+        const outMap = new Map(outs.map((o: any) => [o.id, o]));
 
         const totalByCategory: { [key: string]: Prisma.Decimal } = {};
-        categories.forEach((category) => {
+        categories.forEach((category: any) => {
           totalByCategory[category] = new Prisma.Decimal(0);
         });
 
@@ -1071,7 +1075,7 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenueByFoodCategory.upsert({
       where: {
         period_createdDate_foodCategory: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
           foodCategory: data.foodCategory,
         },
@@ -1109,7 +1113,7 @@ export class RestaurantRevenueService {
           total: number;
         };
       } = {};
-      categories.forEach((category) => {
+      categories.forEach((category: any) => {
         revenueByCategory[category] = { categories: [], series: [], total: 0 };
       });
 
@@ -1118,7 +1122,7 @@ export class RestaurantRevenueService {
       adjustedEndDate.setUTCHours(23, 59, 59, 999);
 
       const finalTotalByCategory: { [key: string]: Prisma.Decimal } = {};
-      categories.forEach((category) => {
+      categories.forEach((category: any) => {
         finalTotalByCategory[category] = new Prisma.Decimal(0);
       });
 
@@ -1171,7 +1175,7 @@ export class RestaurantRevenueService {
             })
           : [];
 
-      const stockOutMap = new Map(stockOuts.map((s) => [s.id, s]));
+      const stockOutMap = new Map(stockOuts.map((s: any) => [s.id, s]));
 
       for (const rentalApartment of allRentalApartments) {
         const saleLease = rentalApartment.saleLease;
@@ -1199,7 +1203,7 @@ export class RestaurantRevenueService {
 
       //calcular total geral para calcular % depois
       const finalTotalGeneral = Object.values(finalTotalByCategory).reduce(
-        (acc, val) => acc.plus(val),
+        (acc: any, val: any) => acc.plus(val),
         new Prisma.Decimal(0),
       );
 
@@ -1210,7 +1214,7 @@ export class RestaurantRevenueService {
       while (currentDate <= adjustedEndDate) {
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0);
         } else if (period === PeriodEnum.LAST_6_M) {
@@ -1264,10 +1268,10 @@ export class RestaurantRevenueService {
               })
             : [];
 
-        const outMap = new Map(outs.map((o) => [o.id, o]));
+        const outMap = new Map(outs.map((o: any) => [o.id, o]));
 
         const totalByCategory: { [key: string]: Prisma.Decimal } = {};
-        categories.forEach((category) => {
+        categories.forEach((category: any) => {
           totalByCategory[category] = new Prisma.Decimal(0);
         });
 
@@ -1347,7 +1351,7 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenueByDrinkCategory.upsert({
       where: {
         period_createdDate_drinkCategory: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
           drinkCategory: data.drinkCategory,
         },
@@ -1384,7 +1388,7 @@ export class RestaurantRevenueService {
           total: number;
         };
       } = {};
-      categories.forEach((category) => {
+      categories.forEach((category: any) => {
         revenueByCategory[category] = { categories: [], series: [], total: 0 };
       });
 
@@ -1393,7 +1397,7 @@ export class RestaurantRevenueService {
       adjustedEndDate.setUTCHours(23, 59, 59, 999);
 
       const finalTotalByCategory: { [key: string]: Prisma.Decimal } = {};
-      categories.forEach((category) => {
+      categories.forEach((category: any) => {
         finalTotalByCategory[category] = new Prisma.Decimal(0);
       });
 
@@ -1446,7 +1450,7 @@ export class RestaurantRevenueService {
             })
           : [];
 
-      const stockOutMap = new Map(stockOuts.map((s) => [s.id, s]));
+      const stockOutMap = new Map(stockOuts.map((s: any) => [s.id, s]));
 
       for (const rentalApartment of allRentalApartments) {
         const saleLease = rentalApartment.saleLease;
@@ -1474,7 +1478,7 @@ export class RestaurantRevenueService {
 
       //calcular total geral para calcular % depois
       const finalTotalGeneral = Object.values(finalTotalByCategory).reduce(
-        (acc, val) => acc.plus(val),
+        (acc: any, val: any) => acc.plus(val),
         new Prisma.Decimal(0),
       );
 
@@ -1485,7 +1489,7 @@ export class RestaurantRevenueService {
       while (currentDate <= adjustedEndDate) {
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0);
         } else if (period === PeriodEnum.LAST_6_M) {
@@ -1539,10 +1543,10 @@ export class RestaurantRevenueService {
               })
             : [];
 
-        const outMap = new Map(outs.map((o) => [o.id, o]));
+        const outMap = new Map(outs.map((o: any) => [o.id, o]));
 
         const totalByCategory: { [key: string]: Prisma.Decimal } = {};
-        categories.forEach((category) => {
+        categories.forEach((category: any) => {
           totalByCategory[category] = new Prisma.Decimal(0);
         });
 
@@ -1622,7 +1626,7 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenueByOthersCategory.upsert({
       where: {
         period_createdDate_othersCategory: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
           othersCategory: data.othersCategory,
         },

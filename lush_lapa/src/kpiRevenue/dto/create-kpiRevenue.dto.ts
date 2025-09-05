@@ -1,5 +1,6 @@
-import { IsInt, IsNotEmpty, IsOptional, IsDecimal } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsDecimal, IsDate } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Prisma, PeriodEnum, RentalTypeEnum } from '@client-online';
 
 export class CreateKpiRevenueDto {
   @ApiProperty({ description: 'ID da categoria da suíte', example: 2 })
@@ -11,7 +12,6 @@ export class CreateKpiRevenueDto {
     description: 'Nome da categoria da suíte',
     example: 'Lush Spa',
   })
-  @IsInt({ message: 'O nome da categoria da suíte deve ser uma string' })
   @IsNotEmpty({ message: 'O nome da categoria da suíte é obrigatório' })
   suiteCategoryName: string;
 
@@ -24,7 +24,7 @@ export class CreateKpiRevenueDto {
     },
   )
   @IsNotEmpty({ message: 'A receita de locação total é obrigatória' })
-  permanenceValueTotal: number;
+  permanenceValueTotal: Prisma.Decimal;
 
   @ApiProperty({ description: 'Receita de locação líquida', example: 100 })
   @IsDecimal(
@@ -35,7 +35,7 @@ export class CreateKpiRevenueDto {
     },
   )
   @IsNotEmpty({ message: 'A receita de locação líquida é obrigatória' })
-  permanenceValueLiquid: number;
+  permanenceValueLiquid: Prisma.Decimal;
 
   @ApiProperty({
     description: 'Receita de consumo',
@@ -50,7 +50,7 @@ export class CreateKpiRevenueDto {
     },
   )
   @IsOptional()
-  priceSale?: number;
+  priceSale?: Prisma.Decimal;
 
   @ApiProperty({
     description: 'Receita total das vendas diretas',
@@ -64,7 +64,7 @@ export class CreateKpiRevenueDto {
     },
   )
   @IsNotEmpty({ message: 'A receita total das vendas diretas é obrigatória' })
-  totalSaleDirect: number;
+  totalSaleDirect: Prisma.Decimal;
 
   @ApiProperty({ description: 'Receita total', example: 150 })
   @IsDecimal(
@@ -75,12 +75,13 @@ export class CreateKpiRevenueDto {
     },
   )
   @IsNotEmpty({ message: 'A receita total é obrigatória' })
-  totalValue: number;
+  totalValue: Prisma.Decimal;
 
   @ApiProperty({
     description: 'Data de criação do registro',
     example: '2023-07-15T00:00:00.000Z',
   })
+  @IsDate({ message: 'A data de criação deve ser uma data válida' })
   @IsNotEmpty({ message: 'A data de criação é obrigatória' })
   createdDate: Date;
 
@@ -88,4 +89,38 @@ export class CreateKpiRevenueDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  @ApiProperty({ description: 'Período', example: 'DAILY', required: false })
+  @IsOptional()
+  period?: PeriodEnum;
+
+  @ApiProperty({ description: 'Tipo de locação', example: 'DAILY', required: false })
+  @IsOptional()
+  rentalType?: RentalTypeEnum;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    permanenceValueTotal: Prisma.Decimal,
+    permanenceValueLiquid: Prisma.Decimal,
+    totalSaleDirect: Prisma.Decimal,
+    totalValue: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+    priceSale?: Prisma.Decimal,
+    period?: PeriodEnum,
+    rentalType?: RentalTypeEnum,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.permanenceValueTotal = permanenceValueTotal;
+    this.permanenceValueLiquid = permanenceValueLiquid;
+    this.totalSaleDirect = totalSaleDirect;
+    this.totalValue = totalValue;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.priceSale = priceSale;
+    this.period = period;
+    this.rentalType = rentalType;
+  }
 }

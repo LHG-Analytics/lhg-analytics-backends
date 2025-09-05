@@ -29,7 +29,7 @@ export class BookingsTotalRentalsService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
@@ -71,8 +71,9 @@ export class BookingsTotalRentalsService {
         'Total Result': totalResult,
       };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to fetch KpiTotalRentals: ${error.message}`,
+        `Failed to fetch KpiTotalRentals: ${errorMessage}`,
       );
     }
   }
@@ -83,7 +84,7 @@ export class BookingsTotalRentalsService {
     return this.prisma.prismaOnline.bookingsTotalRentals.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -106,7 +107,7 @@ export class BookingsTotalRentalsService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
@@ -146,10 +147,14 @@ export class BookingsTotalRentalsService {
 
       // Processa cada reserva para contar o tipo de locação
       for (const booking of allBookings) {
+        
         const checkIn = booking.rentalApartment?.checkIn; // Acessa checkIn do apartamento
         const checkOut = booking.rentalApartment?.checkOut; // Acessa checkOut do apartamento
 
         // Determina o tipo de locação
+        if (!checkIn || !checkOut) {
+          continue; // Pula esta reserva se checkIn ou checkOut estiverem indefinidos
+        }
         const rentalType = this.determineRentalPeriod(
           checkIn,
           checkOut,
@@ -157,8 +162,8 @@ export class BookingsTotalRentalsService {
         );
 
         // Incrementa o contador para o tipo de locação correspondente
-        if (rentalCounts[rentalType] !== undefined) {
-          rentalCounts[rentalType]++;
+        if (rentalCounts[rentalType as keyof typeof rentalCounts] !== undefined) {
+          rentalCounts[rentalType as keyof typeof rentalCounts]++;
         }
       }
 
@@ -176,7 +181,7 @@ export class BookingsTotalRentalsService {
         await this.insertBookingsTotalRentalsByRentalType({
           totalBookings: count,
           companyId,
-          period: period,
+          period: period as PeriodEnum,
           createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
           rentalType: rentalTypeEnum, // Passa o tipo convertido
         });
@@ -186,8 +191,9 @@ export class BookingsTotalRentalsService {
         'Total Result': totalResult,
       };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to fetch bookings total rentals by rental type: ${error.message}`,
+        `Failed to fetch bookings total rentals by rental type: ${errorMessage}`,
       );
     }
   }
@@ -198,9 +204,9 @@ export class BookingsTotalRentalsService {
     return this.prisma.prismaOnline.bookingsTotalRentalsByRentalType.upsert({
       where: {
         period_createdDate_rentalType: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
-          rentalType: data.rentalType,
+          rentalType: data.rentalType as RentalTypeEnum,
         },
       },
       create: {
@@ -234,7 +240,7 @@ export class BookingsTotalRentalsService {
         // Use <= para incluir o último dia
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
@@ -271,7 +277,7 @@ export class BookingsTotalRentalsService {
         // Inserir os dados no banco de dados
         await this.insertBookingsTotalRentalsByPeriod({
           totalBookings: totalBookingsForCurrentPeriod,
-          period: period,
+          period: period as PeriodEnum,
           createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
           companyId: 1,
         });
@@ -280,7 +286,7 @@ export class BookingsTotalRentalsService {
       }
 
       // Formatar o resultado final
-      const totalBookingsForThePeriod = Object.keys(results).map((date) => ({
+      const totalBookingsForThePeriod = Object.keys(results).map((date: any) => ({
         [date]: results[date],
       }));
 
@@ -290,7 +296,7 @@ export class BookingsTotalRentalsService {
     } catch (error) {
       console.error('Erro ao calcular o total de reservas por período:', error);
       throw new BadRequestException(
-        `Failed to calculate total bookings by period: ${error.message}`,
+        `Failed to calculate total bookings by period: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -301,7 +307,7 @@ export class BookingsTotalRentalsService {
     return this.prisma.prismaOnline.bookingsTotalRentalsByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -326,7 +332,7 @@ export class BookingsTotalRentalsService {
       const adjustedEndDate = new Date(endDate);
 
       if (
-        period === PeriodEnum.LAST_7_D ||
+        period === PeriodEnum.LAST_7_D||
         period === PeriodEnum.LAST_30_D ||
         period === PeriodEnum.LAST_6_M
       ) {
@@ -423,21 +429,24 @@ export class BookingsTotalRentalsService {
 
       // Processa cada reserva para contar o tipo de canal
       for (const booking of allBookings) {
+        if (!booking.originBooking) {
+          continue; // Pula se originBooking for nulo
+        }
         const channelType = getChannelType(
-          booking.originBooking.id, // Acessa o idTypeOriginBooking da reserva
+          booking.originBooking.id, // Usa o id do originBooking como idTypeOriginBooking
           booking.dateService, // Acessa a data do serviço
           booking.startDate, // Passa a data de início
         );
 
         // Incrementa o contador para o tipo de canal correspondente
-        if (channelType && channelCounts[channelType] !== undefined) {
+        if (channelType&& channelCounts[channelType] !== undefined) {
           channelCounts[channelType]++;
         }
       }
 
       // Calcular o total de reservas
       const totalAllBookings = Object.values(channelCounts).reduce(
-        (total, count) => total + count,
+        (total: any, count: any) => total + count,
         0,
       );
 
@@ -456,7 +465,7 @@ export class BookingsTotalRentalsService {
           totalBookings: count, // Contagem de reservas por canal
           totalAllBookings, // Total de reservas de todos os canais
           companyId,
-          period: period,
+          period: period as PeriodEnum,
           createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
           channelType: channelTypeEnum, // Passa o tipo convertido
         });
@@ -467,7 +476,7 @@ export class BookingsTotalRentalsService {
       };
     } catch (error) {
       throw new BadRequestException(
-        `Failed to fetch bookings total rentals by channel type: ${error.message}`,
+        `Failed to fetch bookings total rentals by channel type: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -478,9 +487,9 @@ export class BookingsTotalRentalsService {
     return this.prisma.prismaOnline.bookingsTotalRentalsByChannelType.upsert({
       where: {
         period_createdDate_channelType: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
-          channelType: data.channelType,
+          channelType: data.channelType as ChannelTypeEnum,
         },
       },
       create: {
@@ -513,7 +522,7 @@ export class BookingsTotalRentalsService {
         // Use <= para incluir o último dia
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
@@ -552,7 +561,7 @@ export class BookingsTotalRentalsService {
         // Inserir os dados no banco de dados
         await this.insertBookingsTotalRentalsByPeriodEcommerce({
           totalBookings: totalBookingsForCurrentPeriod,
-          period: period,
+          period: period as PeriodEnum,
           createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
           companyId: 1,
         });
@@ -561,7 +570,7 @@ export class BookingsTotalRentalsService {
       }
 
       // Formatar o resultado final
-      const totalBookingsForThePeriod = Object.keys(results).map((date) => ({
+      const totalBookingsForThePeriod = Object.keys(results).map((date: any) => ({
         [date]: results[date],
       }));
 
@@ -571,7 +580,7 @@ export class BookingsTotalRentalsService {
     } catch (error) {
       console.error('Erro ao calcular o total de reservas por período:', error);
       throw new BadRequestException(
-        `Failed to calculate total bookings by period: ${error.message}`,
+        `Failed to calculate total bookings by period: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -583,7 +592,7 @@ export class BookingsTotalRentalsService {
       {
         where: {
           period_createdDate: {
-            period: data.period,
+            period: data.period as PeriodEnum as PeriodEnum,
             createdDate: data.createdDate,
           },
         },
@@ -925,16 +934,16 @@ export class BookingsTotalRentalsService {
     }
 
     // Se houver reservas, calcular os tipos adicionais
-    if (Booking && Array.isArray(Booking) && Booking.length > 0) {
+    if (Booking&& Array.isArray(Booking) && Booking.length > 0) {
       // Regra para Day Use
-      if (checkInHour >= 13 && checkOutHour <= 19 && checkOutMinutes <= 15) {
+      if (checkInHour >= 13&& checkOutHour <= 19 && checkOutMinutes <= 15) {
         return 'DAY_USE';
       }
 
       // Regra para Overnight
       const overnightMinimumStaySeconds = 12 * 3600 + 15 * 60;
       if (
-        checkInHour >= 20 &&
+        checkInHour >= 20&&
         checkInHour <= 23 &&
         checkOutHour >= 8 &&
         (checkOutHour < 12 || (checkOutHour === 12 && checkOutMinutes <= 15)) &&
@@ -945,7 +954,7 @@ export class BookingsTotalRentalsService {
 
       // Verificação para Diária
       if (
-        occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
+        occupationTimeSeconds > 16 * 3600 + 15 * 60||
         (checkInHour <= 15 &&
           (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
       ) {

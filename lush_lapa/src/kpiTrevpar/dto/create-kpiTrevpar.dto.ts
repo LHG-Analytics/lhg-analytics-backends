@@ -1,6 +1,6 @@
-import { IsInt, IsNotEmpty, IsDecimal, IsDate } from 'class-validator';
+import { IsInt, IsNotEmpty, IsDecimal, IsDate, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Prisma } from '@client-online';
+import { Prisma, PeriodEnum } from '@client-online';
 
 export class CreateKpiTrevparDto {
   @ApiProperty({ description: 'ID do apartamento', example: 1 })
@@ -22,7 +22,6 @@ export class CreateKpiTrevparDto {
     description: 'Nome da categoria da suíte',
     example: 'Lush Spa',
   })
-  @IsInt({ message: 'O nome da categoria da suíte deve ser uma string' })
   @IsNotEmpty({ message: 'O nome da categoria da suíte é obrigatório' })
   suiteCategoryName: string;
 
@@ -57,4 +56,30 @@ export class CreateKpiTrevparDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  @ApiProperty({ description: 'Período', example: 'DAILY', required: false })
+  @IsOptional()
+  period?: PeriodEnum;
+
+  constructor(
+    rentalApartmentId: number,
+    suiteCategoryId: number,
+    suiteId: number,
+    suiteCategoryName: string,
+    trevpar: Prisma.Decimal,
+    totalTrevpar: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+    period?: PeriodEnum,
+  ) {
+    this.rentalApartmentId = rentalApartmentId;
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteId = suiteId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.trevpar = trevpar;
+    this.totalTrevpar = totalTrevpar;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.period = period;
+  }
 }

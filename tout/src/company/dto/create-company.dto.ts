@@ -6,4 +6,8 @@ export class CreateCompanyDto {
   @IsNotEmpty({ message: 'O nome da empresa é obrigatório' })
   @IsString({ message: 'O nome da empresa deve ser uma string' })
   name: string;
+
+  constructor(name: string) {
+    this.name = name;
+  }
 }

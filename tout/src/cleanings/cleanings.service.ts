@@ -204,8 +204,9 @@ export class CleaningsService {
       return groupedByShifts;
     } catch (error) {
       console.error('Error in findAllCleanings:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to fetch Cleanings: ${error.message}`,
+        `Failed to fetch Cleanings: ${errorMessage}`,
       );
     }
   }
@@ -314,8 +315,9 @@ export class CleaningsService {
       };
     } catch (error) {
       console.error('Erro ao calcular as limpezas totais por período:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to calculate total cleaning inspections by period: ${error.message}`,
+        `Failed to calculate total cleaning inspections by period: ${errorMessage}`,
       );
     }
   }
@@ -748,8 +750,9 @@ export class CleaningsService {
       return results;
     } catch (error) {
       console.error('Erro ao calcular limpezas por turno:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to calculate cleanings by shift: ${error.message}`,
+        `Failed to calculate cleanings by shift: ${errorMessage}`,
       );
     }
   }

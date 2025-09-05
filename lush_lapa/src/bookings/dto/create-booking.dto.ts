@@ -5,5 +5,9 @@ export class CreateBookingDto {
   @ApiProperty({ description: 'Id da reserva', example: 1 })
   @IsNotEmpty({ message: 'O id da reserva é obrigatório' })
   @IsNumber()
-  id: number;
+  id!: number;
+
+  constructor(id: number) {
+    this.id = id;
+  }
 }

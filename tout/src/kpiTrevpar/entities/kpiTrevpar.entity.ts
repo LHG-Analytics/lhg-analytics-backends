@@ -6,9 +6,29 @@ export class KpiTrevpar implements Prisma.KpiTrevparUncheckedCreateInput {
   suiteCategoryName: string;
   trevpar: Prisma.Decimal;
   totalTrevpar: Prisma.Decimal;
-  period?: PeriodEnum;
+  period?: PeriodEnum | null;
   createdDate: Date;
   companyId: number;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    trevpar: Prisma.Decimal,
+    totalTrevpar: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+    id?: number,
+    period?: PeriodEnum | null,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.trevpar = trevpar;
+    this.totalTrevpar = totalTrevpar;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.id = id;
+    this.period = period ?? null;
+  }
 }
 
 export class KpiTrevparByPeriod
@@ -16,7 +36,21 @@ export class KpiTrevparByPeriod
 {
   id?: number;
   totalTrevpar: Prisma.Decimal;
-  period?: PeriodEnum;
+  period?: PeriodEnum | null;
   createdDate: Date;
   companyId: number;
+
+  constructor(
+    totalTrevpar: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+    id?: number,
+    period?: PeriodEnum | null,
+  ) {
+    this.totalTrevpar = totalTrevpar;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.id = id;
+    this.period = period ?? null;
+  }
 }

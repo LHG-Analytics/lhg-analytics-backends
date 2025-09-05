@@ -6,4 +6,8 @@ export class CreateBookingDto {
   @IsNotEmpty({ message: 'O id da reserva é obrigatório' })
   @IsNumber()
   id: number;
+
+  constructor(id: number) {
+    this.id = id;
+  }
 }

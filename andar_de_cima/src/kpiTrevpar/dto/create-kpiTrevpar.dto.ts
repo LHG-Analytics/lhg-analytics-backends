@@ -57,4 +57,24 @@ export class CreateKpiTrevparDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  constructor(
+    rentalApartmentId: number,
+    suiteCategoryId: number,
+    suiteId: number,
+    suiteCategoryName: string,
+    trevpar: Prisma.Decimal,
+    totalTrevpar: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+  ) {
+    this.rentalApartmentId = rentalApartmentId;
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteId = suiteId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.trevpar = trevpar;
+    this.totalTrevpar = totalTrevpar;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+  }
 }

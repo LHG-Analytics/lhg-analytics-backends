@@ -20,7 +20,7 @@ import { CreateKpiAlosDto } from './kpiAlos/dto/create-kpiAlos.dto';
 import { UpdateKpiAlosDto } from './kpiAlos/dto/update-kpiAlos.dto';
 import { CreateKpiRevenueDto } from './kpiRevenue/dto/create-kpiRevenue.dto';
 import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
-import * as helmet from 'helmet';
+import helmet from 'helmet';
 
 // Carregar variáveis de ambiente do arquivo .env
 config();

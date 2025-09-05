@@ -22,7 +22,7 @@ export class KpiTrevparService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         // Para LAST_6_M, subtrair um dia para não incluir a data atual
@@ -72,7 +72,7 @@ export class KpiTrevparService {
       ]);
 
       const stockOutIds = rentalApartments
-        .map((rental) => rental.saleLease?.stockOutId)
+        .map((rental: any) => rental.saleLease?.stockOutId)
         .filter((id): id is number => typeof id === 'number');
 
       const stockOutSales = await this.prisma.prismaLocal.stockOut.findMany({
@@ -89,11 +89,11 @@ export class KpiTrevparService {
       });
 
       const stockOutSalesMap = Object.fromEntries(
-        stockOutSales.map((stockOut) => [stockOut.id, stockOut]),
+        stockOutSales.map((stockOut: any) => [stockOut.id, stockOut]),
       );
 
       // Inicializar um mapa para armazenar os totais por categoria
-      const categoryTotalsMap = {};
+      const categoryTotalsMap: Record<string, any> = {};
       let totalRevenue = new Prisma.Decimal(0);
       let totalSuites = 0;
 
@@ -108,7 +108,7 @@ export class KpiTrevparService {
         };
 
         const rentalApartmentsInCategory = rentalApartments.filter(
-          (rentalApartment) =>
+          (rentalApartment: any) =>
             rentalApartment.suiteStates.suite.suiteCategoryId ===
             suiteCategory.id,
         );
@@ -137,7 +137,7 @@ export class KpiTrevparService {
 
           if (stockOutSaleLease) {
             priceSale = stockOutSaleLease.stockOutItem.reduce(
-              (acc, item) =>
+              (acc: any, item: any) =>
                 acc.plus(
                   new Prisma.Decimal(item.priceSale).times(
                     new Prisma.Decimal(item.quantity),
@@ -238,7 +238,7 @@ export class KpiTrevparService {
     } catch (error) {
       console.error('Erro ao calcular o KPI Trevpar:', error);
       throw new BadRequestException(
-        `Falha ao calcular KPI Trevpar: ${error.message}`,
+        `Falha ao calcular KPI Trevpar: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -249,7 +249,7 @@ export class KpiTrevparService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -275,7 +275,7 @@ export class KpiTrevparService {
       while (currentDate < endDate) {
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           // Iteração diária para períodos de 7 e 30 dias
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setHours(5, 59, 59, 999);
@@ -321,7 +321,7 @@ export class KpiTrevparService {
         ]);
 
         const stockOutIds = rentalApartments
-          .map((rental) => rental.saleLease?.stockOutId)
+          .map((rental: any) => rental.saleLease?.stockOutId)
           .filter((id): id is number => typeof id === 'number');
 
         const stockOutSales = await this.prisma.prismaLocal.stockOut.findMany({
@@ -338,7 +338,7 @@ export class KpiTrevparService {
         });
 
         const stockOutSalesMap = Object.fromEntries(
-          stockOutSales.map((stockOut) => [stockOut.id, stockOut]),
+          stockOutSales.map((stockOut: any) => [stockOut.id, stockOut]),
         );
 
         // Inicializar variáveis para TrevPAR
@@ -352,7 +352,7 @@ export class KpiTrevparService {
           totalSuites += suitesInCategoryCount;
 
           const rentalsInCategory = rentalApartments.filter(
-            (rental) =>
+            (rental: any) =>
               rental.suiteStates.suite.suiteCategoryId === suiteCategory.id,
           );
 
@@ -364,7 +364,7 @@ export class KpiTrevparService {
 
             if (stockOutSaleLease) {
               priceSale = stockOutSaleLease.stockOutItem.reduce(
-                (acc, item) =>
+                (acc: any, item: any) =>
                   acc.plus(
                     new Prisma.Decimal(item.priceSale).times(
                       new Prisma.Decimal(item.quantity),
@@ -424,7 +424,7 @@ export class KpiTrevparService {
       }
 
       // Formatar resultado final
-      const totalTrevparForThePeriod = Object.keys(results).map((date) => ({
+      const totalTrevparForThePeriod = Object.keys(results).map((date: any) => ({
         [date]: results[date],
       }));
 
@@ -434,7 +434,7 @@ export class KpiTrevparService {
     } catch (error) {
       console.error('Erro ao calcular o total de TrevPAR por período:', error);
       throw new BadRequestException(
-        `Failed to calculate total TrevPAR by period: ${error.message}`,
+        `Failed to calculate total TrevPAR by period: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -445,7 +445,7 @@ export class KpiTrevparService {
     return this.prisma.prismaOnline.kpiTrevparByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

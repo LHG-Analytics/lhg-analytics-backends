@@ -1,6 +1,6 @@
+import { PeriodEnum } from '@client-online';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional } from 'class-validator';
-import { PeriodEnum, Prisma } from '@client-online';
 
 export class CreateRestaurantSaleDto {
   @ApiProperty({

@@ -44,7 +44,7 @@ export class RestaurantTicketAverageService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
@@ -77,8 +77,8 @@ export class RestaurantTicketAverageService {
       }
 
       const stockOutIds = allRentalApartments
-        .map((r) => r.saleLease?.stockOutId)
-        .filter((id) => id !== undefined);
+        .map((r: any) => r.saleLease?.stockOutId)
+        .filter((id: any) => id !== undefined);
 
       const stockOutSaleLeases =
         await this.prisma.prismaLocal.stockOut.findMany({
@@ -114,7 +114,7 @@ export class RestaurantTicketAverageService {
         });
 
       const stockOutMap = new Map<number, any>();
-      stockOutSaleLeases.forEach((s) => {
+      stockOutSaleLeases.forEach((s: any) => {
         stockOutMap.set(s.id, s);
       });
 
@@ -134,7 +134,7 @@ export class RestaurantTicketAverageService {
         for (const item of stockOut.stockOutItem) {
           const description =
             item.productStock?.product?.typeProduct?.description;
-          if (description && abProductTypes.includes(description)) {
+          if (description&& abProductTypes.includes(description)) {
             const price = new Prisma.Decimal(item.priceSale || 0);
             const quantity = new Prisma.Decimal(item.quantity || 0);
             abItemTotal = abItemTotal.plus(price.times(quantity));
@@ -173,8 +173,9 @@ export class RestaurantTicketAverageService {
       };
     } catch (error) {
       console.error('Erro ao calcular ticket médio de A&B:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Erro ao calcular ticket médio de A&B: ${error.message}`,
+        `Erro ao calcular ticket médio de A&B: ${errorMessage}`,
       );
     }
   }
@@ -185,7 +186,7 @@ export class RestaurantTicketAverageService {
     return this.prisma.prismaOnline.restaurantTicketAverage.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -207,7 +208,7 @@ export class RestaurantTicketAverageService {
       const companyId = 1;
 
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1);
@@ -241,8 +242,8 @@ export class RestaurantTicketAverageService {
       }
 
       const stockOutIds = allRentalApartments
-        .map((r) => r.saleLease?.stockOutId)
-        .filter((id) => id !== undefined);
+        .map((r: any) => r.saleLease?.stockOutId)
+        .filter((id: any) => id !== undefined);
 
       const stockOutSaleLeases =
         await this.prisma.prismaLocal.stockOut.findMany({
@@ -278,7 +279,7 @@ export class RestaurantTicketAverageService {
         });
 
       const stockOutMap = new Map<number, any>();
-      stockOutSaleLeases.forEach((s) => {
+      stockOutSaleLeases.forEach((s: any) => {
         stockOutMap.set(s.id, s);
       });
 
@@ -298,7 +299,7 @@ export class RestaurantTicketAverageService {
         for (const item of stockOut.stockOutItem) {
           const description =
             item.productStock?.product?.typeProduct?.description;
-          if (description && abProductTypes.includes(description)) {
+          if (description&& abProductTypes.includes(description)) {
             const price = new Prisma.Decimal(item.priceSale || 0);
             const quantity = new Prisma.Decimal(item.quantity || 0);
             abItemTotal = abItemTotal.plus(price.times(quantity));
@@ -339,8 +340,9 @@ export class RestaurantTicketAverageService {
       };
     } catch (error) {
       console.error('Erro ao calcular ticket médio de A&B:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Erro ao calcular ticket médio de A&B: ${error.message}`,
+        `Erro ao calcular ticket médio de A&B: ${errorMessage}`,
       );
     }
   }
@@ -352,7 +354,7 @@ export class RestaurantTicketAverageService {
       {
         where: {
           period_createdDate: {
-            period: data.period,
+            period: data.period as PeriodEnum as PeriodEnum,
             createdDate: data.createdDate,
           },
         },
@@ -406,7 +408,7 @@ export class RestaurantTicketAverageService {
       while (currentDate <= adjustedEndDate) {
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0);
         } else if (period === PeriodEnum.LAST_6_M) {
@@ -427,8 +429,8 @@ export class RestaurantTicketAverageService {
         }
 
         const stockOutIds = allRentalApartments
-          .map((r) => r.saleLease?.stockOutId)
-          .filter((id) => id !== undefined);
+          .map((r: any) => r.saleLease?.stockOutId)
+          .filter((id: any) => id !== undefined);
 
         const stockOutSaleLeases =
           await this.prisma.prismaLocal.stockOut.findMany({
@@ -464,7 +466,7 @@ export class RestaurantTicketAverageService {
           });
 
         const stockOutMap = new Map<number, any>();
-        stockOutSaleLeases.forEach((s) => {
+        stockOutSaleLeases.forEach((s: any) => {
           stockOutMap.set(s.id, s);
         });
 
@@ -482,7 +484,7 @@ export class RestaurantTicketAverageService {
           for (const item of stockOut.stockOutItem) {
             const description =
               item.productStock?.product?.typeProduct?.description;
-            if (description && abProductTypes.includes(description)) {
+            if (description&& abProductTypes.includes(description)) {
               const price = new Prisma.Decimal(item.priceSale || 0);
               const quantity = new Prisma.Decimal(item.quantity || 0);
               abItemTotal = abItemTotal.plus(price.times(quantity));
@@ -529,8 +531,9 @@ export class RestaurantTicketAverageService {
       };
     } catch (error) {
       console.error('Erro ao calcular ticket médio de A&B:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Erro ao calcular ticket médio de A&B: ${error.message}`,
+        `Erro ao calcular ticket médio de A&B: ${errorMessage}`,
       );
     }
   }
@@ -541,7 +544,7 @@ export class RestaurantTicketAverageService {
     return this.prisma.prismaOnline.restaurantTicketAverageByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

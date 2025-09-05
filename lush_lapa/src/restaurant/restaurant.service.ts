@@ -94,8 +94,8 @@ export class RestaurantService {
     console.log('endDatePrevious:', endDatePrevious);
 
     // Função de filtro para LAST_6_M
-    const filterByDayOfMonth = (data, dayOfMonth) => {
-      return data.filter((item) => {
+    const filterByDayOfMonth = (data: any, dayOfMonth: any) => {
+      return data.filter((item: any) => {
         const createdDate = moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo');
@@ -127,7 +127,7 @@ export class RestaurantService {
     ] = await this.prisma.prismaOnline.$transaction([
       this.prisma.prismaOnline.restaurantRevenue.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -143,7 +143,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantRevenue.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -160,7 +160,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantSales.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -176,7 +176,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantSales.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -193,7 +193,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantTicketAverage.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -209,7 +209,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantTicketAverage.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -226,7 +226,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantTicketAverageByTotalRentals.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -242,7 +242,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantTicketAverageByTotalRentals.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
@@ -259,7 +259,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantRevenueByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -276,7 +276,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantRevenueByPeriodPercent.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -293,7 +293,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantTicketAverageByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -310,7 +310,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantSalesRanking.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -327,7 +327,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantRevenueByGroupByPeriod.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -345,7 +345,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantRevenueByFoodCategory.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -365,7 +365,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantRevenueByDrinkCategory.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -385,7 +385,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantSalesByDrinkCategory.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -404,7 +404,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantRevenueByOthersCategory.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: startDate,
             lte: endDate,
@@ -424,7 +424,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantSalesByOthersCategory.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -443,7 +443,7 @@ export class RestaurantService {
       }),
       this.prisma.prismaOnline.restaurantSalesByFoodCategory.findMany({
         where: {
-          period: period,
+          period: period as PeriodEnum,
           createdDate: {
             gte: endDate,
           },
@@ -509,13 +509,13 @@ export class RestaurantService {
     }
 
     const revenueAbByPeriod = {
-      categories: filteredDataRevenuePeriod.map((item) =>
+      categories: filteredDataRevenuePeriod.map((item: any) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: filteredDataRevenuePeriod.map((item) => Number(item.totalValue)),
+      series: filteredDataRevenuePeriod.map((item: any) => Number(item.totalValue)),
     };
 
     // Aplicar o filtro se o período for LAST_6_M
@@ -529,13 +529,13 @@ export class RestaurantService {
     }
 
     const revenueAbByPeriodPercent = {
-      categories: filteredDataRevenuePeriodPercent.map((item) =>
+      categories: filteredDataRevenuePeriodPercent.map((item: any) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: filteredDataRevenuePeriodPercent.map((item) =>
+      series: filteredDataRevenuePeriodPercent.map((item: any) =>
         Number(item.totalValuePercent),
       ),
     };
@@ -551,35 +551,35 @@ export class RestaurantService {
     }
 
     const ticketAverageByPeriod = {
-      categories: filteredDataTicketAveragePeriod.map((item) =>
+      categories: filteredDataTicketAveragePeriod.map((item: any) =>
         moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo')
           .format('DD/MM/YYYY'),
       ),
-      series: filteredDataTicketAveragePeriod.map((item) =>
+      series: filteredDataTicketAveragePeriod.map((item: any) =>
         Number(item.totalTicketAverage),
       ),
     };
 
     const top5Sales = [...RestaurantSalesRanking]
-      .sort((a, b) => Number(b.totalSales) - Number(a.totalSales)) // já ordena decrescente
+      .sort((a: any, b: any) => Number(b.totalSales) - Number(a.totalSales)) // já ordena decrescente
       .slice(0, 5); // pega os 5 com maior totalSales
 
     // Como já está ordenado, basta usar top5Sales diretamente
     const bestSellingItems = {
-      categories: top5Sales.map((item) => item.productName),
-      series: top5Sales.map((item) => Number(item.totalSales)),
+      categories: top5Sales.map((item: any) => item.productName),
+      series: top5Sales.map((item: any) => Number(item.totalSales)),
     };
 
     const top5LeastSales = [...RestaurantSalesRanking]
-      .sort((a, b) => Number(a.totalSales) - Number(b.totalSales)) // já ordena crescente
+      .sort((a: any, b: any) => Number(a.totalSales) - Number(b.totalSales)) // já ordena crescente
       .slice(0, 5); // pega os 5 com menor totalSales
 
     // Como já está ordenado, basta usar top5LeastSales diretamente
     const leastSellingItems = {
-      categories: top5LeastSales.map((item) => item.productName),
-      series: top5LeastSales.map((item) => Number(item.totalSales)),
+      categories: top5LeastSales.map((item: any) => item.productName),
+      series: top5LeastSales.map((item: any) => Number(item.totalSales)),
     };
 
     // Aplicar o filtro se o período for LAST_6_M
@@ -592,7 +592,7 @@ export class RestaurantService {
       );
     }
 
-    const formattedData = filteredDataRevenueByGroupPeriod.map((item) => {
+    const formattedData = filteredDataRevenueByGroupPeriod.map((item: any) => {
       const formattedDate = moment
         .utc(item.createdDate)
         .tz('America/Sao_Paulo')
@@ -606,22 +606,22 @@ export class RestaurantService {
     });
 
     // 1. Pegar datas únicas (ordenadas)
-    const categoriesSet = new Set(formattedData.map((item) => item.date));
+    const categoriesSet = new Set(formattedData.map((item: any) => item.date));
     const categories = Array.from(categoriesSet).sort(
-      (a, b) =>
+      (a: any, b: any) =>
         moment(a, 'DD/MM/YYYY').toDate().getTime() -
         moment(b, 'DD/MM/YYYY').toDate().getTime(),
     );
 
     // 2. Pegar todos os grupos únicos
-    const groupSet = new Set(formattedData.map((item) => item.group));
+    const groupSet = new Set(formattedData.map((item: any) => item.group));
     const groupNames = Array.from(groupSet);
 
     // 3. Construir a série para o ApexCharts
-    const series = groupNames.map((groupName) => {
-      const data = categories.map((date) => {
+    const series = groupNames.map((groupName: any) => {
+      const data = categories.map((date: any) => {
         const match = formattedData.find(
-          (item) => item.date === date && item.group === groupName,
+          (item: any) => item.date === date&& item.group === groupName,
         );
         return match ? match.value : 0;
       });
@@ -646,7 +646,7 @@ export class RestaurantService {
       );
     }
 
-    const formattedDataFood = filteredDataRevenueByFoodPeriod.map((item) => {
+    const formattedDataFood = filteredDataRevenueByFoodPeriod.map((item: any) => {
       const formattedDate = moment
         .utc(item.createdDate)
         .tz('America/Sao_Paulo')
@@ -661,23 +661,23 @@ export class RestaurantService {
 
     // 1. Pegar datas únicas (ordenadas)
     const categoriesSetFood = new Set(
-      formattedDataFood.map((item) => item.date),
+      formattedDataFood.map((item: any) => item.date),
     );
     const categoriesFood = Array.from(categoriesSetFood).sort(
-      (a, b) =>
+      (a: any, b: any) =>
         moment(a, 'DD/MM/YYYY').toDate().getTime() -
         moment(b, 'DD/MM/YYYY').toDate().getTime(),
     );
 
     // 2. Pegar todos os grupos únicos
-    const groupSetFood = new Set(formattedDataFood.map((item) => item.group));
+    const groupSetFood = new Set(formattedDataFood.map((item: any) => item.group));
     const groupNamesFood = Array.from(groupSetFood);
 
     // 3. Construir a série para o ApexCharts
-    const seriesFood = groupNamesFood.map((groupNameFood) => {
-      const data = categoriesFood.map((date) => {
+    const seriesFood = groupNamesFood.map((groupNameFood: any) => {
+      const data = categoriesFood.map((date: any) => {
         const match = formattedDataFood.find(
-          (item) => item.date === date && item.group === groupNameFood,
+          (item: any) => item.date === date&& item.group === groupNameFood,
         );
         return match ? match.value : 0;
       });
@@ -702,7 +702,7 @@ export class RestaurantService {
       );
     }
 
-    const formattedDataDrink = filteredDataRevenueByDrinksPeriod.map((item) => {
+    const formattedDataDrink = filteredDataRevenueByDrinksPeriod.map((item: any) => {
       const formattedDate = moment
         .utc(item.createdDate)
         .tz('America/Sao_Paulo')
@@ -717,23 +717,23 @@ export class RestaurantService {
 
     // 1. Pegar datas únicas (ordenadas)
     const categoriesSetDrink = new Set(
-      formattedDataDrink.map((item) => item.date),
+      formattedDataDrink.map((item: any) => item.date),
     );
     const categoriesDrink = Array.from(categoriesSetDrink).sort(
-      (a, b) =>
+      (a: any, b: any) =>
         moment(a, 'DD/MM/YYYY').toDate().getTime() -
         moment(b, 'DD/MM/YYYY').toDate().getTime(),
     );
 
     // 2. Pegar todos os grupos únicos
-    const groupSetDrink = new Set(formattedDataDrink.map((item) => item.group));
+    const groupSetDrink = new Set(formattedDataDrink.map((item: any) => item.group));
     const groupNamesDrink = Array.from(groupSetDrink);
 
     // 3. Construir a série para o ApexCharts
-    const seriesDrink = groupNamesDrink.map((groupNameDrink) => {
-      const data = categoriesDrink.map((date) => {
+    const seriesDrink = groupNamesDrink.map((groupNameDrink: any) => {
+      const data = categoriesDrink.map((date: any) => {
         const match = formattedDataDrink.find(
-          (item) => item.date === date && item.group === groupNameDrink,
+          (item: any) => item.date === date&& item.group === groupNameDrink,
         );
         return match ? match.value : 0;
       });
@@ -1367,19 +1367,19 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
       const dateKeys = [...abGrouped.keys()].sort();
 
       const revenueAbByPeriod = {
-        categories: dateKeys.map((key) =>
+        categories: dateKeys.map((key: any) =>
           isMonthly
             ? moment(key, 'YYYY-MM').format('MM/YYYY')
             : moment(key).format('DD/MM/YYYY'),
         ),
-        series: dateKeys.map((key) =>
+        series: dateKeys.map((key: any) =>
           Number((abGrouped.get(key) || 0).toFixed(2)),
         ),
       };
 
       const revenueAbByPeriodPercent = {
         categories: revenueAbByPeriod.categories,
-        series: dateKeys.map((key) => {
+        series: dateKeys.map((key: any) => {
           const ab = abGrouped.get(key) || 0;
           const total = totalGrouped.get(key) || 0;
           const percent = total > 0 ? ab / total : 0;
@@ -1389,7 +1389,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
 
       const ticketAverageByPeriod = {
         categories: revenueAbByPeriod.categories,
-        series: dateKeys.map((key) => {
+        series: dateKeys.map((key: any) => {
           const ab = abGrouped.get(key) || 0;
           const rentals = rentalsWithAbGrouped.get(key) || 0;
           const ticket = rentals > 0 ? ab / rentals : 0;
@@ -1399,13 +1399,13 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
 
       // --- BestSellingItems / LeastSellingItems ---
       const bestSellingItems = {
-        categories: bestSellingResult.map((item) => item.productName),
-        series: bestSellingResult.map((item) => Number(item.totalSales)),
+        categories: bestSellingResult.map((item: any) => item.productName),
+        series: bestSellingResult.map((item: any) => Number(item.totalSales)),
       };
 
       const leastSellingItems = {
-        categories: leastSellingResult.map((item) => item.productName),
-        series: leastSellingResult.map((item) => Number(item.totalSales)),
+        categories: leastSellingResult.map((item: any) => item.productName),
+        series: leastSellingResult.map((item: any) => Number(item.totalSales)),
       };
 
       // --- RevenueByGroupPeriod ---
@@ -1423,25 +1423,25 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
           revenueGrouped.set(dateKey, { ALIMENTOS: 0, BEBIDAS: 0, OUTROS: 0 });
         }
 
-        const current = revenueGrouped.get(dateKey)!;
+        const current = revenueGrouped.get(dateKey);
         current.ALIMENTOS += Number(row.ALIMENTOS) || 0;
         current.BEBIDAS += Number(row.BEBIDAS) || 0;
         current.OUTROS += Number(row.OUTROS) || 0;
       }
 
       const revenueKeys = [...revenueGrouped.keys()].sort();
-      const alimentosSeries = revenueKeys.map((key) =>
+      const alimentosSeries = revenueKeys.map((key: any) =>
         Number(revenueGrouped.get(key)!.ALIMENTOS.toFixed(2)),
       );
-      const bebidasSeries = revenueKeys.map((key) =>
+      const bebidasSeries = revenueKeys.map((key: any) =>
         Number(revenueGrouped.get(key)!.BEBIDAS.toFixed(2)),
       );
-      const outrosSeries = revenueKeys.map((key) =>
+      const outrosSeries = revenueKeys.map((key: any) =>
         Number(revenueGrouped.get(key)!.OUTROS.toFixed(2)),
       );
 
       const revenueByGroupPeriod = {
-        categories: revenueKeys.map((key) =>
+        categories: revenueKeys.map((key: any) =>
           isMonthly
             ? moment(key, 'YYYY-MM').format('MM/YYYY')
             : moment(key).format('DD/MM/YYYY'),
@@ -1469,20 +1469,20 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
             categoryMap.set(category, new Map());
           }
 
-          const categoryData = categoryMap.get(category)!;
+          const categoryData = categoryMap.get(category);
           const current = categoryData.get(dateKey) || 0;
           categoryData.set(dateKey, current + Number(item.totalValue));
         }
 
         const sortedDates = [...dateSet].sort();
-        const categories = sortedDates.map((key) =>
+        const categories = sortedDates.map((key: any) =>
           isMonthly
             ? moment(key, 'YYYY-MM').format('MM/YYYY')
             : moment(key).format('DD/MM/YYYY'),
         );
 
         const series = [...categoryMap.entries()].map(([category, dateMap]) => {
-          const data = sortedDates.map((date) =>
+          const data = sortedDates.map((date: any) =>
             Number((dateMap.get(date) || 0).toFixed(2)),
           );
           return { name: category, data };
@@ -1514,7 +1514,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         totalQuantity: number,
       ) {
         return [
-          ...data.map((row) => ({
+          ...data.map((row: any) => ({
             name: row.category,
             revenue: Number(row.revenue),
             revenuePercent: totalRevenue
@@ -1536,11 +1536,11 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
       }
 
       const totalRevenueFood = resultByFood.reduce(
-        (acc, row) => acc + Number(row.revenue),
+        (acc: any, row: any) => acc + Number(row.revenue),
         0,
       );
       const totalQuantityFood = resultByFood.reduce(
-        (acc, row) => acc + Number(row.quantity),
+        (acc: any, row: any) => acc + Number(row.quantity),
         0,
       );
       const reportByFood = buildReport(
@@ -1550,11 +1550,11 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
       );
 
       const totalRevenueDrink = resultByDrink.reduce(
-        (acc, row) => acc + Number(row.revenue),
+        (acc: any, row: any) => acc + Number(row.revenue),
         0,
       );
       const totalQuantityDrink = resultByDrink.reduce(
-        (acc, row) => acc + Number(row.quantity),
+        (acc: any, row: any) => acc + Number(row.quantity),
         0,
       );
       const reportByDrink = buildReport(
@@ -1564,11 +1564,11 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
       );
 
       const totalRevenueOthers = resultByOthers.reduce(
-        (acc, row) => acc + Number(row.revenue),
+        (acc: any, row: any) => acc + Number(row.revenue),
         0,
       );
       const totalQuantityOthers = resultByOthers.reduce(
-        (acc, row) => acc + Number(row.quantity),
+        (acc: any, row: any) => acc + Number(row.quantity),
         0,
       );
       const reportByOthers = buildReport(
@@ -1609,7 +1609,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
 
       if (error instanceof Error) {
         throw new BadRequestException(
-          `Falha ao calcular os KPIs do restaurante: ${error.message}`,
+          `Falha ao calcular os KPIs do restaurante: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
       }
 

@@ -80,7 +80,7 @@ export class CleaningsService {
 
       // Função auxiliar para determinar o turno com base no businessStartTime
       const getShiftByBusinessStartTime = (
-        businessStartTime: string | null,
+        businessStartTime: string | null | undefined,
       ): string => {
         if (!businessStartTime) {
           return 'Terceirizado';
@@ -133,7 +133,8 @@ export class CleaningsService {
         }
 
         // Determina o turno com base no businessStartTime do funcionário
-        const shift = getShiftByBusinessStartTime(businessStartTime);
+        // Corrige o tipo para garantir que não seja undefined
+        const shift = getShiftByBusinessStartTime(businessStartTime ?? null);
         // Inicializa os dados para o funcionário no turno, se ainda não existirem
         if (!groupedByShifts[shift][employeeName]) {
           groupedByShifts[shift][employeeName] = {
@@ -197,15 +198,16 @@ export class CleaningsService {
       // Formatar e inserir os dados para cada turno
       await Promise.all(
         Object.keys(groupedByShifts).map((shift) =>
-          formatAndInsertShiftData(groupedByShifts[shift], shift, period),
+          formatAndInsertShiftData(groupedByShifts[shift], shift, period!),
         ),
       );
 
       return groupedByShifts;
     } catch (error) {
       console.error('Error in findAllCleanings:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to fetch Cleanings: ${error.message}`,
+        `Failed to fetch Cleanings: ${errorMessage}`,
       );
     }
   }
@@ -484,9 +486,9 @@ export class CleaningsService {
               +totals.totalAverageDailyWeekCleaning[day].toFixed(2), // Use o valor acumulado
             totalAverageShiftCleaning: 0,
             totalAllAverageShiftCleaning: 0,
-            idealShiftMaid: 0,
+            idealShiftMaid: (cleaningsByShiftAndDay as any)[shift].idealShiftMaid,
             totalIdealShiftMaid: 0,
-            realShiftMaid: uniqueEmployeesByShift[shift].size,
+            realShiftMaid: (uniqueEmployeesByShift as any)[shift]?.size ?? 0,
             totalRealShiftMaid: 0,
             difference: 0,
             totalDifference: 0,
@@ -506,13 +508,12 @@ export class CleaningsService {
         );
 
         totals.totalIdealShiftMaid +=
-          cleaningsByShiftAndDay[shift].idealShiftMaid;
-        cleaningsByShiftAndDay[shift].realShiftMaid =
-          uniqueEmployeesByShift[shift].size;
-        totals.totalRealShiftMaid +=
-          cleaningsByShiftAndDay[shift].realShiftMaid;
-        cleaningsByShiftAndDay[shift].difference =
-          cleaningsByShiftAndDay[shift].realShiftMaid -
+          (cleaningsByShiftAndDay as any)[shift].idealShiftMaid;
+          (cleaningsByShiftAndDay as any)[shift].realShiftMaid =
+            (uniqueEmployeesByShift as any)[shift]?.size ?? 0;
+          totals.totalRealShiftMaid += (cleaningsByShiftAndDay as any)[shift].realShiftMaid;
+          (cleaningsByShiftAndDay as any)[shift].difference =
+            (cleaningsByShiftAndDay as any)[shift].realShiftMaid -
           cleaningsByShiftAndDay[shift].idealShiftMaid;
         totals.totalDifference += cleaningsByShiftAndDay[shift].difference;
 

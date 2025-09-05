@@ -15,4 +15,9 @@ export class CreateBookingsTotalRentalDto {
   })
   @IsNotEmpty({ message: 'A data de criação é obrigatória' })
   createdDate: Date;
+
+  constructor(totalAllRentalsApartments: number, createdDate: Date) {
+    this.totalAllRentalsApartments = totalAllRentalsApartments;
+    this.createdDate = createdDate;
+  }
 }

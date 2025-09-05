@@ -25,7 +25,7 @@ export class CronJobsController {
       };
     } catch (error) {
       throw new HttpException(
-        'Erro ao executar cron jobs manualmente: ' + error.message,
+        'Erro ao executar cron jobs manualmente: ' + (error instanceof Error ? error.message : 'Unknown error'),
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

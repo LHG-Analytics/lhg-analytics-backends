@@ -59,6 +59,10 @@ export class BookingsRevenueController {
         throw new BadRequestException('The period parameter is required.');
       }
 
+      if (!start! || !end) {
+        throw new BadRequestException('Start and end dates are required.');
+      }
+
       // Verifica se a data de início é posterior à data de fim
       if (start > end) {
         throw new BadRequestException('Start date must be before end date.');
@@ -71,8 +75,9 @@ export class BookingsRevenueController {
         period,
       );
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to create all BookingsRevenue: ${error.message}`,
+        `Failed to create all BookingsRevenue: ${errorMessage}`,
       );
     }
   }
@@ -84,14 +89,14 @@ export class BookingsRevenueController {
     if (!dateStr) return undefined;
 
     const [day, month, year] = dateStr.split('/').map(Number);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) {
+    if (isNaN(day)|| isNaN(month) || isNaN(year)) {
       throw new BadRequestException(
         'Invalid date format. Please use DD/MM/YYYY.',
       );
     }
 
     // Cria a nova data no formato YYYY-MM-DD
-    const date = new Date(year, month - 1, day);
+    const date = new Date(year, month - 1, day!);
     if (
       date.getDate() !== day ||
       date.getMonth() !== month - 1 ||
@@ -121,8 +126,9 @@ export class BookingsRevenueController {
       // Chama o método do serviço que executa as operações do cron job
       return await this.bookingsRevenueService.handleCron();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to run the cron job: ${error.message}`,
+        `Failed to run the cron job: ${errorMessage}`,
       );
     }
   }

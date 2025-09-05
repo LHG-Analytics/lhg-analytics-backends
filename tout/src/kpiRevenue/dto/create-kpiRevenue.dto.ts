@@ -88,4 +88,26 @@ export class CreateKpiRevenueDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    permanenceValueTotal: number,
+    permanenceValueLiquid: number,
+    totalSaleDirect: number,
+    totalValue: number,
+    createdDate: Date,
+    companyId: number,
+    priceSale?: number,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.permanenceValueTotal = permanenceValueTotal;
+    this.permanenceValueLiquid = permanenceValueLiquid;
+    this.totalSaleDirect = totalSaleDirect;
+    this.totalValue = totalValue;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.priceSale = priceSale;
+  }
 }

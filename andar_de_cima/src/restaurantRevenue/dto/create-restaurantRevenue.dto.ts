@@ -17,4 +17,9 @@ export class CreateRestaurantRevenueDto {
   })
   @IsNotEmpty({ message: 'A data de criação é obrigatória' })
   createdDate: Date;
+
+  constructor(totalAllValue: number, createdDate: Date) {
+    this.totalAllValue = totalAllValue;
+    this.createdDate = createdDate;
+  }
 }

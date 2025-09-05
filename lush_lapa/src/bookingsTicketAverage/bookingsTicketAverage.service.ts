@@ -57,7 +57,7 @@ export class BookingsTicketAverageService {
       const companyId = 1; // Defina o ID da empresa conforme necessário
 
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
@@ -70,7 +70,7 @@ export class BookingsTicketAverageService {
       }
 
       // Calcular o total de priceRental
-      const totalPriceRental = allBookings.reduce((total, booking) => {
+      const totalPriceRental = allBookings.reduce((total: any, booking: any) => {
         const price = booking.priceRental
           ? new Prisma.Decimal(booking.priceRental)
           : new Prisma.Decimal(0);
@@ -95,7 +95,7 @@ export class BookingsTicketAverageService {
       // Inserir no banco de dados
       await this.insertBookingsTicketAverage({
         totalAllTicketAverage: new Prisma.Decimal(averageTicket),
-        period: period,
+        period: period as PeriodEnum,
         createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
         companyId,
       });
@@ -103,8 +103,9 @@ export class BookingsTicketAverageService {
       return totalResult;
     } catch (error) {
       console.error('Erro ao buscar Bookings TicketAverage data:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to fetch Bookings TicketAverage data: ${error.message}`,
+        `Failed to fetch Bookings TicketAverage data: ${errorMessage}`,
       );
     }
   }
@@ -115,7 +116,7 @@ export class BookingsTicketAverageService {
     return this.prisma.prismaOnline.bookingsTicketAverage.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -137,7 +138,7 @@ export class BookingsTicketAverageService {
 
     // Ajustar a data final para não incluir a data atual
     const adjustedEndDate = new Date(endDate);
-    if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+    if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
       adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
     } else if (period === PeriodEnum.LAST_6_M) {
       adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
@@ -240,8 +241,14 @@ export class BookingsTicketAverageService {
 
     // Processa cada reserva para calcular o total e a contagem por canal
     for (const booking of allBookings) {
+        if (!booking.originBooking) {
+          continue; // Skip if originBooking is null
+        }
+      if (!booking.originBooking) {
+        continue; // Skip if originBooking is null
+      }
       const channelType = getChannelType(
-        booking.originBooking.id, // Acessa o idTypeOriginBooking da reserva
+        booking.originBooking?.id, // Acessa o idTypeOriginBooking da reserva
         booking.dateService, // Acessa a data do serviço
         booking.startDate, // Passa a data de início
       );
@@ -257,7 +264,7 @@ export class BookingsTicketAverageService {
     }
 
     // Monta o resultado total agregado
-    const totalResults = {};
+    const totalResults: Record<string, any> = {};
     let totalCount = 0;
     let totalSum = new Prisma.Decimal(0);
 
@@ -285,7 +292,7 @@ export class BookingsTicketAverageService {
       await this.insertBookingsTicketAverageByChannelType({
         totalAllTicketAverage: new Prisma.Decimal(totalAllTicketAverage),
         totalTicketAverage: new Prisma.Decimal(average),
-        period: period,
+        period: period as PeriodEnum,
         createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
         companyId,
         channelType: channel as ChannelTypeEnum, // Passa o tipo convertido
@@ -304,9 +311,9 @@ export class BookingsTicketAverageService {
     return this.prisma.prismaOnline.bookingsTicketAverageByChannelType.upsert({
       where: {
         period_createdDate_channelType: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
-          channelType: data.channelType,
+          channelType: data.channelType as ChannelTypeEnum,
         },
       },
       create: {

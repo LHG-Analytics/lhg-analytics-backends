@@ -8,6 +8,42 @@ import { Moment } from 'moment-timezone';
 import { PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 
+// Definindo interfaces para melhor tipagem
+interface CleaningData {
+  employeeName: string;
+  createdDate: Date;
+  averageDailyCleaning: number;
+  shift: string;
+  totalDaysWorked: number;
+  totalSuitesCleanings: number;
+  totalAllSuitesCleanings: number;
+  totalAllAverageDailyCleaning: number;
+}
+
+interface CleaningByDateAcc {
+  [key: string]: { totalSuitesCleanings: number };
+}
+
+interface EmployeeData {
+  name: string;
+  data: number[];
+}
+
+export interface ShiftsData {
+  [key: string]: EmployeeData[];
+}
+
+interface EmployeeReport {
+  employeeName: string;
+  totalSuitesCleanings: number;
+  totalDaysWorked: number;
+  averageDailyCleaning: number;
+}
+
+export interface EmployeeReportByShift {
+  [shift: string]: EmployeeReport[];
+}
+
 @Injectable()
 export class GovernanceService {
   constructor(private prisma: PrismaService) {}

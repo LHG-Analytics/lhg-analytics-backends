@@ -26,7 +26,7 @@ export class KpiTotalRentalsService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         // Para LAST_6_M, subtrair um dia para não incluir a data atual
@@ -89,7 +89,7 @@ export class KpiTotalRentalsService {
       const kpiTotalRentalsData = [];
       let totalAllRentalsApartments = 0; // Total de locações agregadas
       let totalAllBookings = 0; // Total de reservas agregadas
-      const categoryTotalsMap = {};
+      const categoryTotalsMap: Record<string, any> = {};
 
       // Inicializa o mapa de totais por categoria
       for (const suiteCategory of suiteCategories) {
@@ -114,7 +114,7 @@ export class KpiTotalRentalsService {
 
         // Acumula total de reservas agregadas
         const bookingsForApartment = allBookings.filter(
-          (booking) =>
+          (booking: any) =>
             booking.rentalApartmentId === rentalApartment.suiteStateId,
         );
         categoryTotalsMap[suiteCategoryId].totalBookings +=
@@ -167,7 +167,7 @@ export class KpiTotalRentalsService {
       return kpiTotalRentalsData;
     } catch (error) {
       throw new BadRequestException(
-        `Failed to fetch KpiTotalRentals: ${error.message}`,
+        `Failed to fetch KpiTotalRentals: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -177,7 +177,7 @@ export class KpiTotalRentalsService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -204,7 +204,7 @@ export class KpiTotalRentalsService {
       while (currentDate < endDate) {
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(5, 59, 59, 999); // Fim do dia contábil às 05:59:59 do próximo dia
@@ -248,7 +248,7 @@ export class KpiTotalRentalsService {
         // Inserir os dados no banco de dados
         await this.insertKpiTotalRentalsByPeriod({
           totalAllRentalsApartments: totalRentalsForCurrentPeriod,
-          period: period,
+          period: period as PeriodEnum,
           createdDate: createdDateWithTime,
           companyId: 1,
         });
@@ -257,7 +257,7 @@ export class KpiTotalRentalsService {
       }
 
       // Formatar o resultado final
-      const totalRentalsForThePeriod = Object.keys(results).map((date) => ({
+      const totalRentalsForThePeriod = Object.keys(results).map((date: any) => ({
         [date]: results[date],
       }));
 
@@ -270,7 +270,7 @@ export class KpiTotalRentalsService {
         error,
       );
       throw new BadRequestException(
-        `Failed to calculate total rentals by period: ${error.message}`,
+        `Failed to calculate total rentals by period: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -281,7 +281,7 @@ export class KpiTotalRentalsService {
     return this.prisma.prismaOnline.kpiTotalRentalsByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

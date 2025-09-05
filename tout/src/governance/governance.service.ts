@@ -5,9 +5,8 @@ import {
 } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { Moment } from 'moment-timezone';
-import { PeriodEnum } from '@client-online';
+import { PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class GovernanceService {
@@ -419,8 +418,8 @@ export class GovernanceService {
 
     // Agora, formatamos o resultado em dois arrays: categories e series
     const formattedCleaningByDate = {
-      categories: [],
-      series: [],
+      categories: [] as string[],
+      series: [] as number[],
     };
 
     // Preenche os arrays com os dados acumulados
@@ -433,12 +432,12 @@ export class GovernanceService {
 
     const formattedForApexCharts = (cleaningsByPeriodShift) => {
       // Adicionamos 'period' como parâmetro
-      const categories = []; // Para armazenar as datas únicas
+      const categories = [] as string[]; // Para armazenar as datas únicas
       const shiftsData = {
-        Manhã: [],
-        Tarde: [],
-        Noite: [],
-        Terceirizado: [],
+        Manhã: [] as Array<{ name: string; data: number[] }>,
+        Tarde: [] as Array<{ name: string; data: number[] }>,
+        Noite: [] as Array<{ name: string; data: number[] }>,
+        Terceirizado: [] as Array<{ name: string; data: number[] }>,
       };
 
       const timezone = 'America/Sao_Paulo';
@@ -1040,21 +1039,21 @@ ORDER BY
       teamSizingResult,
     ] = await Promise.all([
       this.prisma.prismaLocal.$queryRaw<{ totalSuitesCleaned: number }[]>(
-        Prisma.sql([totalSuitesCleanedSql]),
+        Prisma.sql`${totalSuitesCleanedSql}`,
       ),
       this.prisma.prismaLocal.$queryRaw<{ totalInspections: number }[]>(
-        Prisma.sql([totalInspectionsSql]),
+        Prisma.sql`${totalInspectionsSql}`,
       ),
       this.prisma.prismaLocal.$queryRaw<
         { name: string; value: number }[]
-      >(Prisma.sql([supervisorPerformanceSQL])),
+      >(Prisma.sql`${supervisorPerformanceSQL}`),
       this.prisma.prismaLocal.$queryRaw<
         { name: string; value: number }[]
-      >(Prisma.sql([shiftCleaningSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([cleaningsByPeriodSql])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([cleaningsByPeriodShiftSql])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([employeeReportSql])),
-      this.prisma.prismaLocal.$queryRaw<TeamSizingRow[]>(Prisma.sql([teamSizingSQL])),
+      >(Prisma.sql`${shiftCleaningSQL}`),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql`${cleaningsByPeriodSql}`),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql`${cleaningsByPeriodShiftSql}`),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql`${employeeReportSql}`),
+      this.prisma.prismaLocal.$queryRaw<TeamSizingRow[]>(Prisma.sql`${teamSizingSQL}`),
     ]);
 
     const orderedWeekdays = [

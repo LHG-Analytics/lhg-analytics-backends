@@ -54,7 +54,7 @@ export class KpiTicketAverageService {
       },
     });
 
-    return stockOutItems.reduce((total, item) => {
+    return stockOutItems.reduce((total: any, item: any) => {
       const stockOut = item.stockOuts;
       const discountSale = stockOut.sale?.discount
         ? new Prisma.Decimal(stockOut.sale.discount)
@@ -64,7 +64,7 @@ export class KpiTicketAverageService {
       );
 
       if (
-        stockOut &&
+        stockOut&&
         stockOut.saleDirect &&
         item.stockOutId === stockOut.saleDirect.stockOutId
       ) {
@@ -103,7 +103,7 @@ export class KpiTicketAverageService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         // Para LAST_6_M, subtrair um dia para não incluir a data atual
@@ -171,7 +171,7 @@ export class KpiTicketAverageService {
       let totalRental = new Prisma.Decimal(0);
       let totalRentals = 0;
 
-      const categoryTotalsMap = {};
+      const categoryTotalsMap: Record<string, any> = {};
 
       for (const suiteCategory of suiteCategories) {
         categoryTotalsMap[suiteCategory.id] = {
@@ -191,10 +191,10 @@ export class KpiTicketAverageService {
             let priceSale = new Prisma.Decimal(0);
             let discountSale = new Prisma.Decimal(0);
 
-            if (saleLease && saleLease.stockOut) {
+            if (saleLease&& saleLease.stockOut) {
               const stockOutItems = saleLease.stockOut.stockOutItem;
 
-              priceSale = stockOutItems.reduce((acc, item) => {
+              priceSale = stockOutItems.reduce((acc: any, item: any) => {
                 return acc.plus(
                   new Prisma.Decimal(item.priceSale).times(
                     new Prisma.Decimal(item.quantity),
@@ -304,7 +304,7 @@ export class KpiTicketAverageService {
       };
 
       const formattedKpiTicketAverageData = kpiTicketAverageData.map(
-        (category) => ({
+        (category: any) => ({
           ...category,
           ticketAverageSale: this.formatCurrency(category.ticketAverageSale),
           ticketAverageRental: this.formatCurrency(
@@ -319,7 +319,7 @@ export class KpiTicketAverageService {
         ...totalTicketAverageObject,
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
@@ -330,7 +330,7 @@ export class KpiTicketAverageService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -357,7 +357,7 @@ export class KpiTicketAverageService {
       while (currentDate < endDate) {
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(5, 59, 59, 999); // Fim do dia contábil às 05:59:59 do próximo dia
@@ -404,10 +404,10 @@ export class KpiTicketAverageService {
           let priceSale = new Prisma.Decimal(0);
           let discountSale = new Prisma.Decimal(0);
 
-          if (saleLease && saleLease.stockOut) {
+          if (saleLease&& saleLease.stockOut) {
             const stockOutItems = saleLease.stockOut.stockOutItem;
 
-            priceSale = stockOutItems.reduce((acc, item) => {
+            priceSale = stockOutItems.reduce((acc: any, item: any) => {
               return acc.plus(
                 new Prisma.Decimal(item.priceSale).times(
                   new Prisma.Decimal(item.quantity),
@@ -473,7 +473,7 @@ export class KpiTicketAverageService {
 
       // Formatar o resultado final
       const totalTicketAverageForThePeriod = Object.keys(results).map(
-        (date) => ({
+        (date: any) => ({
           [date]: results[date],
         }),
       );
@@ -487,7 +487,7 @@ export class KpiTicketAverageService {
         error,
       );
       throw new BadRequestException(
-        `Failed to calculate total Ticket Average by period: ${error.message}`,
+        `Failed to calculate total Ticket Average by period: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -498,7 +498,7 @@ export class KpiTicketAverageService {
     return this.prisma.prismaOnline.kpiTicketAverageByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

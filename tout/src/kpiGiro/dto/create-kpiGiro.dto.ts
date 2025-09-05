@@ -46,4 +46,20 @@ export class CreateKpiGiroDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    giro: Prisma.Decimal,
+    totalGiro: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.giro = giro;
+    this.totalGiro = totalGiro;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+  }
 }

@@ -67,4 +67,24 @@ export class CreateKpiTotalRentalsDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    createdDate: Date,
+    companyId: number,
+    totalRentalsApartments?: number,
+    totalBookings?: number,
+    totalAllRentalsApartments?: number,
+    totalAllBookings?: number,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.totalRentalsApartments = totalRentalsApartments;
+    this.totalBookings = totalBookings;
+    this.totalAllRentalsApartments = totalAllRentalsApartments;
+    this.totalAllBookings = totalAllBookings;
+  }
 }

@@ -3,15 +3,18 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 
 import * as moment from 'moment-timezone';
-import { apartmentInspection } from './entities/apartment-inspection.entity';
+import { ApartmentInspection } from './entities/apartment-inspection.entity';
 
 @Injectable()
 export class ApartmentInspectionService {
+  private readonly logger = new Logger(ApartmentInspectionService.name);
+  
   constructor(private prisma: PrismaService) {}
 
   async findAllInspections(
@@ -106,7 +109,7 @@ export class ApartmentInspectionService {
             employeeName: supervisorName,
             totalInspections: totalInspections,
             totalAllInspections: totalAllInspections, // Usando o total acumulado
-            period: period,
+            period: period || PeriodEnum.LAST_7_D,
             createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Ajuste conforme necessário
             companyId,
           };
@@ -118,20 +121,21 @@ export class ApartmentInspectionService {
 
       return groupedBySupervisors;
     } catch (error) {
-      console.error('Error in findAllInspections:', error);
+      this.logger.error('Error in findAllInspections:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to fetch Inspections: ${error.message}`,
+        `Failed to fetch Inspections: ${errorMessage}`,
       );
     }
   }
 
   private async insertInspections(
-    data: apartmentInspection,
-  ): Promise<apartmentInspection> {
+    data: ApartmentInspection,
+  ): Promise<ApartmentInspection> {
     return this.prisma.prismaOnline.inspections.upsert({
       where: {
         employeeName_period_createdDate: {
-          period: data.period,
+          period: data.period!,
           createdDate: data.createdDate,
           employeeName: data.employeeName,
         },

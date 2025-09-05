@@ -17,4 +17,9 @@ export class CreateRestaurantTicketAverageDto {
   })
   @IsNotEmpty({ message: 'A data de criação é obrigatória' })
   createdDate: Date;
+
+  constructor(totalAllTicketAverage: number, createdDate: Date) {
+    this.totalAllTicketAverage = totalAllTicketAverage;
+    this.createdDate = createdDate;
+  }
 }

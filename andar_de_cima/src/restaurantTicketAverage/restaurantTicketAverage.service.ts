@@ -172,8 +172,9 @@ export class RestaurantTicketAverageService {
       };
     } catch (error) {
       console.error('Erro ao calcular ticket médio de A&B:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Erro ao calcular ticket médio de A&B: ${error.message}`,
+        `Erro ao calcular ticket médio de A&B: ${errorMessage}`,
       );
     }
   }
@@ -337,8 +338,9 @@ export class RestaurantTicketAverageService {
       };
     } catch (error) {
       console.error('Erro ao calcular ticket médio de A&B:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Erro ao calcular ticket médio de A&B: ${error.message}`,
+        `Erro ao calcular ticket médio de A&B: ${errorMessage}`,
       );
     }
   }
@@ -526,8 +528,9 @@ export class RestaurantTicketAverageService {
       };
     } catch (error) {
       console.error('Erro ao calcular ticket médio de A&B:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Erro ao calcular ticket médio de A&B: ${error.message}`,
+        `Erro ao calcular ticket médio de A&B: ${errorMessage}`,
       );
     }
   }

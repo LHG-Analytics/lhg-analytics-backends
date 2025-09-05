@@ -62,6 +62,9 @@ export class BookingsTotalRentalsController {
         throw new BadRequestException('The period parameter is required.');
       }
 
+      if (!start! || !end) {
+        throw new BadRequestException('Required parameters missing');
+      }
       // Chama o serviço com as datas e o período, se fornecidos
       return await this.bookingsTotalRentalsService.findAllBookingsTotalRentals(
         start,
@@ -69,8 +72,9 @@ export class BookingsTotalRentalsController {
         period,
       );
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to create all BookingsTotalRentals: ${error.message}`,
+        `Failed to create all BookingsTotalRentals: ${errorMessage}`,
       );
     }
   }
@@ -82,14 +86,14 @@ export class BookingsTotalRentalsController {
     if (!dateStr) return undefined;
 
     const [day, month, year] = dateStr.split('/').map(Number);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) {
+    if (isNaN(day)|| isNaN(month) || isNaN(year)) {
       throw new BadRequestException(
         'Invalid date format. Please use DD/MM/YYYY.',
       );
     }
 
     // Cria a nova data no formato YYYY-MM-DD
-    const date = new Date(year, month - 1, day);
+    const date = new Date(year, month - 1, day!);
     if (
       date.getDate() !== day ||
       date.getMonth() !== month - 1 ||
@@ -119,8 +123,9 @@ export class BookingsTotalRentalsController {
       // Chama o método do serviço que executa as operações do cron job
       return await this.bookingsTotalRentalsService.handleCron(); // Se você tiver um método de cron job
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to run the cron job: ${error.message}`,
+        `Failed to run the cron job: ${errorMessage}`,
       );
     }
   }

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDecimal, IsInt, IsNotEmpty } from 'class-validator';
-import { Prisma } from '@client-online';
+import { IsDecimal, IsInt, IsNotEmpty, IsDate, IsOptional } from 'class-validator';
+import { Prisma, PeriodEnum } from '@client-online';
 
 export class CreateKpiTicketAverageDto {
   @ApiProperty({ description: 'ID da categoria da suíte', example: 2 })
@@ -12,7 +12,6 @@ export class CreateKpiTicketAverageDto {
     description: 'Nome da categoria da suíte',
     example: 'Lush Spa',
   })
-  @IsInt({ message: 'O nome da categoria da suíte deve ser uma string' })
   @IsNotEmpty({ message: 'O nome da categoria da suíte é obrigatório' })
   suiteCategoryName: string;
 
@@ -31,6 +30,7 @@ export class CreateKpiTicketAverageDto {
     description: 'Data de criação do registro',
     example: '2023-07-15T00:00:00.000Z',
   })
+  @IsDate({ message: 'A data de criação deve ser uma data válida' })
   @IsNotEmpty({ message: 'A data de criação é obrigatória' })
   createdDate: Date;
 
@@ -38,4 +38,24 @@ export class CreateKpiTicketAverageDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  @ApiProperty({ description: 'Período', example: 'DAILY', required: false })
+  @IsOptional()
+  period?: PeriodEnum;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    totalTicketAverage: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+    period?: PeriodEnum,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.totalTicketAverage = totalTicketAverage;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.period = period;
+  }
 }

@@ -38,4 +38,18 @@ export class CreateKpiTicketAverageDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    totalTicketAverage: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.totalTicketAverage = totalTicketAverage;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+  }
 }
