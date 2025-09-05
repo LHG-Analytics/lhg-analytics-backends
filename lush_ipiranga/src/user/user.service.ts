@@ -71,26 +71,29 @@ export class UserService {
       data: updateUserDto,
     });
 
-    // Remove password from response
-    const { password, ...userResponse } = updatedUser;
-    return userResponse;
+    // Temporarily include password for frontend compatibility
+    // TODO: Remove password from response when frontend is updated
+    // const { password, ...userResponse } = updatedUser;
+    return updatedUser;
   }
 
   async findAll(): Promise<UserResponse[]> {
     try {
       const users = await this.prisma.prismaOnline.user.findMany();
 
-      // Mapeia os usuários e busca o nome da empresa associada (remove senha)
+      // Temporarily include password for frontend compatibility
+      // TODO: Remove password from response when frontend is updated
       const usersWithCompanyNames = await Promise.all(
         users.map(async (user) => {
-          const { password, ...userWithoutPassword } = user;
+          // const { password, ...userWithoutPassword } = user;
           return {
-            id: userWithoutPassword.id,
-            name: userWithoutPassword.name,
-            cpf: userWithoutPassword.cpf,
-            role: userWithoutPassword.role,
-            email: userWithoutPassword.email,
-            company: userWithoutPassword.company,
+            id: user.id,
+            name: user.name,
+            cpf: user.cpf,
+            role: user.role,
+            email: user.email,
+            company: user.company,
+            password: user.password,
           };
         }),
       );
@@ -113,9 +116,10 @@ export class UserService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    // Remove password from response
-    const { password, ...userResponse } = user;
-    return userResponse;
+    // Temporarily include password for frontend compatibility
+    // TODO: Remove password from response when frontend is updated
+    // const { password, ...userResponse } = user;
+    return user;
   }
 
   async findByEmail(email: string): Promise<UserResponse> {
@@ -127,9 +131,10 @@ export class UserService {
       throw new NotFoundException(`User with email ${email} not found`);
     }
 
-    // Remove password from response
-    const { password, ...userResponse } = user;
-    return userResponse;
+    // Temporarily include password for frontend compatibility
+    // TODO: Remove password from response when frontend is updated
+    // const { password, ...userResponse } = user;
+    return user;
   }
 
   async deleteUser(id: number): Promise<void> {
