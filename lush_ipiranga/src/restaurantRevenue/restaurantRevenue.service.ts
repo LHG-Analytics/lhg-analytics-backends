@@ -111,7 +111,7 @@ export class RestaurantRevenueService {
             let discountSale = new Prisma.Decimal(0);
 
             // Calcular o valor total da venda para este item
-            stockOutSaleLease.stockOutItem.forEach((stockOutItem) => {
+            stockOutSaleLease.stockOutItem.forEach((stockOutItem: { priceSale?: string | number; quantity?: string | number }) => {
               const priceSale = new Prisma.Decimal(stockOutItem.priceSale || 0);
               const quantity = new Prisma.Decimal(stockOutItem.quantity || 0);
               itemTotalValue = itemTotalValue.plus(priceSale.times(quantity));
@@ -156,10 +156,17 @@ export class RestaurantRevenueService {
 
       return formattedRestaurantRevenueData;
     } catch (error) {
-      console.error('Erro ao buscar Restaurant Revenue data:', error);
-      throw new BadRequestException(
-        `Failed to fetch Restaurant Revenue data: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        console.error('Erro ao buscar Restaurant Revenue data:', error);
+        throw new BadRequestException(
+          `Failed to fetch Restaurant Revenue data: ${error.message}`,
+        );
+      } else {
+        console.error('Erro ao buscar Restaurant Revenue data:', error);
+        throw new BadRequestException(
+          'Failed to fetch Restaurant Revenue data: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -169,7 +176,7 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenue.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -342,9 +349,15 @@ export class RestaurantRevenueService {
       };
     } catch (error) {
       console.error('Erro ao calcular a receita total por período:', error);
-      throw new BadRequestException(
-        `Failed to calculate restaurant revenue by period: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Failed to calculate restaurant revenue by period: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Failed to calculate restaurant revenue by period: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -354,14 +367,14 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenueByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
       create: {
         ...data,
       },
-      update: {
+      update: { 
         ...data,
       },
     });
@@ -543,9 +556,15 @@ export class RestaurantRevenueService {
       };
     } catch (error) {
       console.error('Erro ao calcular a receita total por período:', error);
-      throw new BadRequestException(
-        `Failed to calculate restaurant revenue by period: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao calcular a receita do restaurante por período: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao calcular a receita do restaurante por período: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -555,7 +574,7 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenueByPeriodPercent.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -782,9 +801,15 @@ export class RestaurantRevenueService {
         'Erro ao calcular a receita do restaurante por grupo e período:',
         error,
       );
-      throw new BadRequestException(
-        `Failed to calculate restaurant revenue by group and period: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Failed to calculate restaurant revenue by group and period: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Failed to calculate restaurant revenue by group and period: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -794,7 +819,7 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenueByGroupByPeriod.upsert({
       where: {
         period_createdDate_consumptionGroup: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
           consumptionGroup: data.consumptionGroup,
         },
@@ -1072,7 +1097,7 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenueByFoodCategory.upsert({
       where: {
         period_createdDate_foodCategory: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
           foodCategory: data.foodCategory,
         },
@@ -1348,7 +1373,7 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenueByDrinkCategory.upsert({
       where: {
         period_createdDate_drinkCategory: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
           drinkCategory: data.drinkCategory,
         },
@@ -1623,10 +1648,10 @@ export class RestaurantRevenueService {
     return this.prisma.prismaOnline.restaurantRevenueByOthersCategory.upsert({
       where: {
         period_createdDate_othersCategory: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
           othersCategory: data.othersCategory,
-        },
+        },  
       },
       create: {
         ...data,

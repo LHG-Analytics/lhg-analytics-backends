@@ -260,7 +260,7 @@ export class KpiRevenueService {
             Array.isArray(stockOutSaleLease.stockOutItem)
           ) {
             priceSale = stockOutSaleLease.stockOutItem.reduce(
-              (acc, current) =>
+              (acc: Prisma.Decimal, current: any) =>
                 acc.plus(
                   new Prisma.Decimal(current.priceSale).times(
                     new Prisma.Decimal(current.quantity),
@@ -342,7 +342,7 @@ export class KpiRevenueService {
           totalAllValue: totalAllValue.plus(totalSaleDirect),
           totalSaleDirect,
           createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)), // Definindo a data de criação
-          period: period || null,
+          period: period || undefined,
           companyId,
         });
 
@@ -442,8 +442,12 @@ export class KpiRevenueService {
       };
     } catch (error) {
       console.error('Erro ao buscar KPI Revenue data:', error);
+      let errorMessage = 'Erro desconhecido';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       throw new BadRequestException(
-        `Failed to fetch KPI Revenue data: ${error.message}`,
+        `Failed to fetch KPI Revenue data: ${errorMessage}`,
       );
     }
   }
@@ -453,7 +457,7 @@ export class KpiRevenueService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -536,9 +540,9 @@ export class KpiRevenueService {
               new Prisma.Decimal(0),
             )
             .minus(stockOut.sale?.discount || new Prisma.Decimal(0));
-          map[stockOut.id] = priceSale;
+          map[stockOut.id.toString()] = priceSale;
           return map;
-        }, {});
+        }, {} as { [key: string]: Prisma.Decimal });
 
       while (currentDate < endDate) {
         let nextDate = new Date(currentDate);
@@ -563,12 +567,16 @@ export class KpiRevenueService {
         } = {};
 
         for (const rentalApartment of currentRentalApartments) {
+          // Corrigido para garantir que checkIn e checkOut nunca sejam nulos
+          if (!rentalApartment.checkIn || !rentalApartment.checkOut) {
+            continue; // Pula este rentalApartment se datas inválidas
+          }
           const rentalTypeString = this.determineRentalPeriod(
             rentalApartment.checkIn,
             rentalApartment.checkOut,
             rentalApartment.Booking?.length ? rentalApartment.Booking : null,
           );
-          const rentalType = rentalTypeMap[rentalTypeString];
+          const rentalType = rentalTypeMap[rentalTypeString as keyof typeof rentalTypeMap];
 
           if (!totalsMap[rentalType]) {
             totalsMap[rentalType] = {
@@ -623,8 +631,8 @@ export class KpiRevenueService {
         currentDate = nextDate; // Avança para a próxima data
       }
 
-      const formattedResults = Object.keys(results).reduce((acc, date) => {
-        acc[date] = results[date].map((data) => ({
+      const formattedResults = Object.keys(results).reduce((acc: Record<string, any[]>, date: string) => {
+        acc[date] = (results[date] as Array<{ totalValue: Prisma.Decimal }>).map((data) => ({
           ...data,
           totalValue: this.formatCurrency(data.totalValue.toNumber()),
         }));
@@ -635,8 +643,8 @@ export class KpiRevenueService {
         totalValue: Object.values(results).reduce(
           (acc, dailyData) =>
             acc +
-            dailyData.reduce(
-              (sum, data) => sum + data.totalValue.toNumber(),
+            (dailyData as Array<{ totalValue: Prisma.Decimal }>).reduce(
+              (sum: number, data: { totalValue: Prisma.Decimal }) => sum + data.totalValue.toNumber(),
               0,
             ),
           0,
@@ -652,9 +660,15 @@ export class KpiRevenueService {
       };
     } catch (error) {
       console.error('Erro ao acumular dados por tipo de locação:', error);
-      throw new BadRequestException(
-        `Failed to accumulate data by rental type: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Failed to accumulate data by rental type: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Failed to accumulate data by rental type: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -664,9 +678,9 @@ export class KpiRevenueService {
     return this.prisma.prismaOnline.kpiRevenueByRentalType.upsert({
       where: {
         period_createdDate_rentalType: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
-          rentalType: data.rentalType,
+          rentalType: data.rentalType as RentalTypeEnum,
         },
       },
       create: {
@@ -836,9 +850,15 @@ export class KpiRevenueService {
       };
     } catch (error) {
       console.error('Erro ao calcular o faturamento total por período:', error);
-      throw new BadRequestException(
-        `Failed to calculate total revenue by period: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao calcular o faturamento total por período: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao calcular o faturamento total por período: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -848,7 +868,7 @@ export class KpiRevenueService {
     return this.prisma.prismaOnline.kpiRevenueByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

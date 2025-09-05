@@ -139,7 +139,13 @@ export class KpiOccupancyRateService {
       let totalOccupiedTimeAllCategories = 0;
       let totalAvailableTimeAllCategories = 0;
 
-      const categoryTotalsMap = {}; // Mapa para acumular os dados por categoria
+      type OccupancyTotals = {
+        totalOccupiedTime: number;
+        unavailableTime: number;
+        availableTime: number;
+      };
+      
+      const categoryTotalsMap: Record<number, OccupancyTotals> = {}; // Mapa para acumular os dados por categoria      
 
       // Inicializa o mapa de totais por categoria
       for (const suiteCategory of suiteCategories) {
@@ -164,6 +170,10 @@ export class KpiOccupancyRateService {
 
         // Calculando o total de tempo ocupado para a categoria
         for (const occupiedSuite of occupiedSuitesInCategory) {
+          if (!occupiedSuite.checkIn || !occupiedSuite.checkOut) {
+            continue; // pula registros com datas nulas
+          }
+
           const occupiedTimeInSeconds =
             (new Date(occupiedSuite.checkOut).getTime() -
               new Date(occupiedSuite.checkIn).getTime()) /
@@ -186,9 +196,16 @@ export class KpiOccupancyRateService {
             )
             .reduce((acc, blockedMaintenanceDefect) => {
               const key = `${blockedMaintenanceDefect.defect.startDate.toISOString()}-${suite.id}`;
+              
 
               if (acc.has(key)) {
                 const existingDefect = acc.get(key);
+
+                if (!existingDefect.defect.endDate || !blockedMaintenanceDefect.defect.endDate) {
+                  // se alguma data for null, apenas mantém o valor existente
+                  return acc;
+                }
+
                 const maxEndDate = new Date(
                   Math.max(
                     new Date(existingDefect.defect.endDate).getTime(),
@@ -237,6 +254,7 @@ export class KpiOccupancyRateService {
           );
 
           for (const cleaning of suiteCleanings) {
+            if (!cleaning.startDate || !cleaning.endDate) continue;
             const cleaningTimeInSeconds =
               (new Date(cleaning.endDate).getTime() -
                 new Date(cleaning.startDate).getTime()) /
@@ -318,11 +336,18 @@ export class KpiOccupancyRateService {
         },
       ];
     } catch (error) {
+    console.error('Erro ao calcular o KpiOccupancyRate:', error);
+    if (error instanceof Error) {
       throw new BadRequestException(
-        `Failed to fetch KpiOccupancyRate: ${error.message}`,
+        `Falha ao calcular KpiOccupancyRate: ${error.message}`,
+      );
+    } else {
+      throw new BadRequestException(
+        'Falha ao calcular KpiOccupancyRate: erro desconhecido',
       );
     }
   }
+}
 
   async insertKpiOccupancyRate(
     data: KpiOccupancyRate,
@@ -331,7 +356,7 @@ export class KpiOccupancyRateService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -384,6 +409,7 @@ export class KpiOccupancyRateService {
 
         // Calcular o tempo ocupado
         for (const occupiedSuite of occupiedSuites) {
+          if (!occupiedSuite.checkOut || !occupiedSuite.checkOut) continue;
           const occupiedTimeInSeconds =
             (new Date(occupiedSuite.checkOut).getTime() -
               new Date(occupiedSuite.checkIn).getTime()) /
@@ -392,7 +418,12 @@ export class KpiOccupancyRateService {
         }
 
         // Calcular o tempo indisponível por manutenção e limpeza
-        const categoryTotalsMap = {}; // Mapa para acumular os dados por categoria
+        type OccupancyTotals = {
+          unavailableTime: number;
+        };
+        
+        const categoryTotalsMap: Record<number, OccupancyTotals> = {}; // Mapa para acumular os dados por categoria      
+  
 
         // Inicializa o mapa de totais por categoria
         for (const suiteCategory of suiteCategories) {
@@ -409,6 +440,7 @@ export class KpiOccupancyRateService {
           );
 
           for (const cleaning of suiteCleanings) {
+            if (!cleaning.startDate || !cleaning.endDate) continue;
             const cleaningStart = new Date(cleaning.startDate);
             const cleaningEnd = new Date(cleaning.endDate);
 
@@ -442,12 +474,17 @@ export class KpiOccupancyRateService {
 
               if (acc.has(key)) {
                 const existingDefect = acc.get(key);
-                const maxEndDate = new Date(
-                  Math.max(
-                    new Date(existingDefect.defect.endDate).getTime(),
-                    new Date(blockedMaintenanceDefect.defect.endDate).getTime(),
-                  ),
-                );
+              
+                // Só cria as datas se existirem, caso contrário usa 0 (ou outra estratégia)
+                const existingEnd = existingDefect?.defect.endDate
+                  ? new Date(existingDefect.defect.endDate).getTime()
+                  : 0;
+                const blockedEnd = blockedMaintenanceDefect.defect.endDate
+                  ? new Date(blockedMaintenanceDefect.defect.endDate).getTime()
+                  : 0;
+              
+                const maxEndDate = new Date(Math.max(existingEnd, blockedEnd));
+              
                 acc.set(key, {
                   ...blockedMaintenanceDefect,
                   defect: {
@@ -458,7 +495,8 @@ export class KpiOccupancyRateService {
               } else {
                 acc.set(key, blockedMaintenanceDefect);
               }
-              return acc;
+              
+              return acc;              
             }, new Map())
             .values();
 
@@ -572,13 +610,16 @@ export class KpiOccupancyRateService {
         WeeklyOccupancyRates: weeklyOccupancyRates,
       };
     } catch (error) {
-      console.error(
-        'Erro ao calcular o total de Occupancy Rate por período:',
-        error,
-      );
-      throw new BadRequestException(
-        `Falha ao calcular total de Occupancy Rate por período: ${error.message}`,
-      );
+      console.error('Erro ao calcular o KpiOccupancyRate:', error);
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao calcular KpiOccupancyRate: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao calcular KpiOccupancyRate: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -598,7 +639,7 @@ export class KpiOccupancyRateService {
     return this.prisma.prismaOnline.kpiOccupancyRateByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -642,7 +683,7 @@ export class KpiOccupancyRateService {
         ] = await this.fetchKpiData(currentDate, nextDate);
 
         // Inicializa o mapa de totais por categoria
-        const categoryTotalsMap = {};
+        const categoryTotalsMap: { [key: number]: { totalOccupiedTime: number; unavailableTime: number; availableTime: number } } = {};
         for (const suiteCategory of suiteCategories) {
           categoryTotalsMap[suiteCategory.id] = {
             totalOccupiedTime: 0,
@@ -653,6 +694,7 @@ export class KpiOccupancyRateService {
 
         // Calcular o tempo ocupado por categoria
         for (const occupiedSuite of occupiedSuites) {
+          if (!occupiedSuite.checkOut || !occupiedSuite.checkIn) continue;
           const occupiedTimeInSeconds =
             (new Date(occupiedSuite.checkOut).getTime() -
               new Date(occupiedSuite.checkIn).getTime()) /
@@ -668,37 +710,29 @@ export class KpiOccupancyRateService {
         // Calcular o tempo não disponível (limpezas e manutenção)
 
         for (const suite of suiteCategories.flatMap((cat) => cat.suites)) {
-          // Lógica para calcular o tempo de limpeza
           const suiteCleanings = cleanings.filter(
             (cleaning) =>
               cleaning.suiteState.suiteId === suite.id &&
               new Date(cleaning.startDate) <= nextDate &&
-              new Date(cleaning.endDate) >= currentDate,
+              (cleaning.endDate ? new Date(cleaning.endDate) : nextDate) >= currentDate
           );
-
+        
           for (const cleaning of suiteCleanings) {
             const cleaningStart = new Date(cleaning.startDate);
-            const cleaningEnd = new Date(cleaning.endDate);
-
+            const cleaningEnd = cleaning.endDate ? new Date(cleaning.endDate) : nextDate; // assume fim como nextDate se null
+        
             // Verificar se a limpeza está dentro do período atual
             if (cleaningEnd > currentDate && cleaningStart < nextDate) {
-              const overlapStart = Math.max(
-                cleaningStart.getTime(),
-                currentDate.getTime(),
-              );
-              const overlapEnd = Math.min(
-                cleaningEnd.getTime(),
-                nextDate.getTime(),
-              );
+              const overlapStart = Math.max(cleaningStart.getTime(), currentDate.getTime());
+              const overlapEnd = Math.min(cleaningEnd.getTime(), nextDate.getTime());
               const cleaningTimeInSeconds = (overlapEnd - overlapStart) / 1000;
-
+        
               const suiteCategoryId = suite.suiteCategoryId;
               if (categoryTotalsMap[suiteCategoryId]) {
-                categoryTotalsMap[suiteCategoryId].unavailableTime +=
-                  cleaningTimeInSeconds;
+                categoryTotalsMap[suiteCategoryId].unavailableTime += cleaningTimeInSeconds;
               }
             }
-          }
+          }        
 
           // Lógica para calcular o tempo de manutenção e defeitos
           const suiteDefectsAndMaintenances = blockedMaintenanceDefects.filter(
@@ -708,30 +742,24 @@ export class KpiOccupancyRateService {
           );
 
           for (const blockedMaintenanceDefect of suiteDefectsAndMaintenances) {
-            const defectStart = new Date(
-              blockedMaintenanceDefect.defect.startDate,
-            );
-            const defectEnd = new Date(blockedMaintenanceDefect.defect.endDate);
-
+            const defectStart = new Date(blockedMaintenanceDefect.defect.startDate);
+            // Se endDate for null, assume nextDate como fim
+            const defectEnd = blockedMaintenanceDefect.defect.endDate
+              ? new Date(blockedMaintenanceDefect.defect.endDate)
+              : nextDate;
+          
             // Verificar se a manutenção está dentro do período atual
             if (defectEnd > currentDate && defectStart < nextDate) {
-              const overlapStart = Math.max(
-                defectStart.getTime(),
-                currentDate.getTime(),
-              );
-              const overlapEnd = Math.min(
-                defectEnd.getTime(),
-                nextDate.getTime(),
-              );
+              const overlapStart = Math.max(defectStart.getTime(), currentDate.getTime());
+              const overlapEnd = Math.min(defectEnd.getTime(), nextDate.getTime());
               const defectTimeInSeconds = (overlapEnd - overlapStart) / 1000;
-
+          
               const suiteCategoryId = suite.suiteCategoryId;
               if (categoryTotalsMap[suiteCategoryId]) {
-                categoryTotalsMap[suiteCategoryId].unavailableTime +=
-                  defectTimeInSeconds;
+                categoryTotalsMap[suiteCategoryId].unavailableTime += defectTimeInSeconds;
               }
             }
-          }
+          }          
         }
 
         // Calcular o tempo disponível por categoria
@@ -827,13 +855,16 @@ export class KpiOccupancyRateService {
         TotalOccupancyRateForThePeriod: totalOccupancyRateForThePeriod,
       };
     } catch (error) {
-      console.error(
-        'Erro ao calcular o total de Occupancy Rate por período:',
-        error,
-      );
-      throw new BadRequestException(
-        `Falha ao calcular total de Occupancy Rate por período: ${error.message}`,
-      );
+      console.error('Erro ao calcular o KpiOccupancyRate:', error);
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao calcular KpiOccupancyRate: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao calcular KpiOccupancyRate: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -844,7 +875,7 @@ export class KpiOccupancyRateService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -918,22 +949,25 @@ export class KpiOccupancyRateService {
         }
       });
 
+      
       // Calcular totalOccupiedTime por categoria e dia da semana
       occupiedSuites.forEach((occupiedSuite) => {
         const suiteCategoryDescription =
-          occupiedSuite.suiteStates?.suite?.suiteCategories?.description;
+        occupiedSuite.suiteStates?.suite?.suiteCategories?.description;
         const dayOfOccupation = moment.tz(occupiedSuite.checkIn, timezone);
         const dayOfWeek = dayOfOccupation.format('dddd');
-
+        
         if (
           occupancyByCategoryAndDay[suiteCategoryDescription] &&
           occupancyByCategoryAndDay[suiteCategoryDescription][dayOfWeek]
         ) {
-          const occupiedTime =
-            occupiedSuite.checkOut.getTime() - occupiedSuite.checkIn.getTime();
-          occupancyByCategoryAndDay[suiteCategoryDescription][
-            dayOfWeek
-          ].totalOccupiedTime += occupiedTime;
+          if (occupiedSuite.checkOut && occupiedSuite.checkIn) {
+            const occupiedTime =
+              occupiedSuite.checkOut.getTime() - occupiedSuite.checkIn.getTime();
+            occupancyByCategoryAndDay[suiteCategoryDescription][
+              dayOfWeek
+            ].totalOccupiedTime += occupiedTime;
+          }
         }
       });
 
@@ -958,11 +992,18 @@ export class KpiOccupancyRateService {
           });
 
           suiteCleanings.forEach((cleaning) => {
-            const cleaningTimeInSeconds =
-              (new Date(cleaning.endDate).getTime() -
-                new Date(cleaning.startDate).getTime()) /
-              1000;
-            unavailableTimeCleaning += cleaningTimeInSeconds;
+            if (cleaning.startDate && cleaning.endDate) {
+              const start = cleaning.startDate instanceof Date
+                ? cleaning.startDate
+                : new Date(cleaning.startDate);
+              const end = cleaning.endDate instanceof Date
+                ? cleaning.endDate
+                : new Date(cleaning.endDate);
+
+              const cleaningTimeInSeconds =
+                (end.getTime() - start.getTime()) / 1000;
+              unavailableTimeCleaning += cleaningTimeInSeconds;
+            }
           });
 
           const suiteDefectsAndMaintenances = blockedMaintenanceDefects.filter(
@@ -978,13 +1019,22 @@ export class KpiOccupancyRateService {
           );
 
           suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect) => {
-            const startDefect = new Date(
-              blockedMaintenanceDefect.defect.startDate,
-            );
-            const endDefect = new Date(blockedMaintenanceDefect.defect.endDate);
-            const defectTimeInSeconds =
-              (endDefect.getTime() - startDefect.getTime()) / 1000;
-            unavailableTimeCleaning += defectTimeInSeconds;
+            const startDefect = blockedMaintenanceDefect.defect.startDate
+              ? new Date(blockedMaintenanceDefect.defect.startDate)
+              : null;
+            const endDefect = blockedMaintenanceDefect.defect.endDate
+              ? new Date(blockedMaintenanceDefect.defect.endDate)
+              : null;
+            if (
+              startDefect instanceof Date &&
+              !isNaN(startDefect.getTime()) &&
+              endDefect instanceof Date &&
+              !isNaN(endDefect.getTime())
+            ) {
+              const defectTimeInSeconds =
+                (endDefect.getTime() - startDefect.getTime()) / 1000;
+              unavailableTimeCleaning += defectTimeInSeconds;
+            }
           });
 
           const daysTimeInSeconds = dayCountMap[dayOfWeek] * 24 * 60 * 60;
@@ -1105,7 +1155,7 @@ export class KpiOccupancyRateService {
           where: {
             suiteCategoryId_period_createdDate: {
               suiteCategoryId: item.suiteCategoryId,
-              period: item.period,
+              period: item.period as PeriodEnum,
               createdDate: item.createdDate,
             },
           },

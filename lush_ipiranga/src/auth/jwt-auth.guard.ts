@@ -47,7 +47,11 @@ export class JwtAuthGuard implements CanActivate {
       request.user = user; // Armazena o usuário na requisição
       return true;
     } catch (error) {
-      console.error('Erro ao validar token:', error.message);
+      if (error instanceof Error) {
+        console.error('Erro ao validar token:', error.message);
+      } else {
+        console.error('Erro ao validar token:', error);
+      }
       throw new UnauthorizedException('Token inválido ou expirado');
     }
   }

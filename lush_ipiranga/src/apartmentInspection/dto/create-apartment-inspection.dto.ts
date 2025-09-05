@@ -6,6 +6,7 @@ import {
   IsOptional,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { PeriodEnum } from '@client-online';
 
 export class CreateApartmentInspectionDto {
   @ApiProperty({ description: 'ID da empresa', example: 1 })
@@ -26,16 +27,30 @@ export class CreateApartmentInspectionDto {
   @IsNotEmpty({ message: 'O nome do funcionário é obrigatório' })
   employeeName: string;
 
-  @ApiProperty({ description: 'Período da inspeção', example: 'LAST_30_D' })
-  @IsOptional() // O período pode ser opcional
+  @ApiProperty({ description: 'Período da inspeção', example: 'LAST_30_D', required: false })
+  @IsOptional()
   @IsString({ message: 'O período deve ser uma string' })
-  period?: string; // Você pode substituir por PeriodEnum se preferir
+  period?: PeriodEnum;
 
   @ApiProperty({
-    description: 'Motivo do término',
-    example: 'Inspeção concluída',
+    description: 'Total de inspeções',
+    example: 10,
   })
-  @IsString({ message: 'O total de inspeções deve ser um número' })
+  @IsInt({ message: 'O total de inspeções deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O total de inspeções é obrigatório' })
   totalInspections: number;
+
+  constructor(
+    companyId: number,
+    createdDate: Date,
+    employeeName: string,
+    totalInspections: number,
+    period?: PeriodEnum,
+  ) {
+    this.companyId = companyId;
+    this.createdDate = createdDate;
+    this.employeeName = employeeName;
+    this.totalInspections = totalInspections;
+    this.period = period;
+  }
 }

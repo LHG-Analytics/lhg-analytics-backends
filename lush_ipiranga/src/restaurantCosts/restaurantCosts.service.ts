@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { PrismaService } from '../prisma/prisma.service';
@@ -9,6 +9,7 @@ import { RestaurantCosts } from './entities/restaurantCosts.entity';
 
 @Injectable()
 export class RestaurantCostsService {
+  private readonly logger = new Logger(RestaurantCostsService.name);
   private apiUrl: string;
   private user: string;
   private pass: string;
@@ -19,10 +20,10 @@ export class RestaurantCostsService {
     private readonly http: HttpService,
     private readonly config: ConfigService,
   ) {
-    this.apiUrl = this.config.get('DESBRAVADOR_API_URL');
-    this.user = this.config.get('DESBRAVADOR_USER');
-    this.pass = this.config.get('DESBRAVADOR_PASS');
-    this.unitId = Number(this.config.get('DESBRAVADOR_IPIRANGA_ID'));
+    this.apiUrl = this.config.get<string>('DESBRAVADOR_API_URL')!;
+    this.user = this.config.get<string>('DESBRAVADOR_USER')!;
+    this.pass = this.config.get<string>('DESBRAVADOR_PASS')!;
+    this.unitId = Number(this.config.get<string>('DESBRAVADOR_IPIRANGA_ID')!);
   }
 
   async calculateCMV(
@@ -36,12 +37,12 @@ export class RestaurantCostsService {
 
     const movimentos = await this.getMovimentos(token, startDate, endDate);
 
-    const saidas = movimentos.filter((m) =>
+    const saidas = movimentos.filter((m: any) =>
       [2].includes(m.codigoTipoMovimento),
     );
 
     const totalCost = saidas.reduce(
-      (acc, item) => acc + Number(item.custo || 0),
+      (acc: number, item: any) => acc + Number(item.custo || 0),
       0,
     );
 
@@ -128,8 +129,7 @@ export class RestaurantCostsService {
   private async getMovimentos(token: string, start: Date, end: Date) {
     const dtInicial = start.toISOString().split('T')[0];
     const dtFinal = end.toISOString().split('T')[0];
-    console.log('dtInicial:', dtInicial);
-    console.log('dtFinal:', dtFinal);
+    this.logger.log(`Date range: ${dtInicial} to ${dtFinal}`);
 
     const url = `${this.apiUrl}/Executar?action=GetMovimentoEstoque&DTINICIAL='${dtInicial}'&DTFINAL='${dtFinal}'&CDEMPRESA=${this.unitId}`;
 
@@ -151,11 +151,11 @@ export class RestaurantCostsService {
       return data.resultado;
     }
 
-    // 🔍 Mostra estrutura completa
-    console.dir(res.data, { depth: null });
+    // Log structure for debugging
+    this.logger.debug('API response structure', res.data);
 
-    // Se não veio nada utilizável
-    console.warn('⚠️ Resposta inesperada da API Desbravador:', data);
+    // Unexpected API response
+    this.logger.warn('Unexpected response from Desbravador API', data);
     return [];
   }
 
@@ -223,8 +223,8 @@ export class RestaurantCostsService {
     const startTimeLast7Days = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob RestaurantRevenue - últimos 7 dias: ${startTimeLast7Days}`,
+    this.logger.log(
+      `Starting CronJob RestaurantCosts - last 7 days: ${startTimeLast7Days}`,
     );
 
     // Chamar a função para o período atual
@@ -243,8 +243,8 @@ export class RestaurantCostsService {
     const endTimeLast7Days = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob RestaurantRevenue - últimos 7 dias: ${endTimeLast7Days}`,
+    this.logger.log(
+      `Finished CronJob RestaurantCosts - last 7 days: ${endTimeLast7Days}`,
     );
 
     // Últimos 30 dias
@@ -287,8 +287,8 @@ export class RestaurantCostsService {
     const startTimeLast30Days = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob RestaurantRevenue - últimos 30 dias: ${startTimeLast30Days}`,
+    this.logger.log(
+      `Starting CronJob RestaurantCosts - last 30 days: ${startTimeLast30Days}`,
     );
 
     // Chamar a função para o período atual
@@ -307,8 +307,8 @@ export class RestaurantCostsService {
     const endTimeLast30Days = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob RestaurantRevenue - últimos 30 dias: ${endTimeLast30Days}`,
+    this.logger.log(
+      `Finished CronJob RestaurantCosts - last 30 days: ${endTimeLast30Days}`,
     );
 
     // Últimos 6 meses (180 dias)
@@ -351,8 +351,8 @@ export class RestaurantCostsService {
     const startTimeLast6Months = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob RestaurantRevenue - últimos 6 meses: ${startTimeLast6Months}`,
+    this.logger.log(
+      `Starting CronJob RestaurantCosts - last 6 months: ${startTimeLast6Months}`,
     );
 
     // Chamar a função para o período atual
@@ -371,8 +371,8 @@ export class RestaurantCostsService {
     const endTimeLast6Months = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob RestaurantRevenue - últimos 6 meses: ${endTimeLast6Months}`,
+    this.logger.log(
+      `Finished CronJob RestaurantCosts - last 6 months: ${endTimeLast6Months}`,
     );
   }
 

@@ -1,6 +1,6 @@
-import { IsInt, IsNotEmpty, IsDecimal, IsDate } from 'class-validator';
+import { IsInt, IsNotEmpty, IsDecimal, IsDate, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Prisma } from '@client-online';
+import { Prisma, PeriodEnum } from '@client-online';
 
 export class CreateKpiGiroDto {
   @ApiProperty({ description: 'ID da categoria da suíte', example: 2 })
@@ -12,7 +12,6 @@ export class CreateKpiGiroDto {
     description: 'Nome da categoria da suíte',
     example: 'Lush Spa',
   })
-  @IsInt({ message: 'O nome da categoria da suíte deve ser uma string' })
   @IsNotEmpty({ message: 'O nome da categoria da suíte é obrigatório' })
   suiteCategoryName: string;
 
@@ -46,4 +45,26 @@ export class CreateKpiGiroDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  @ApiProperty({ description: 'Período', example: 'DAILY', required: false })
+  @IsOptional()
+  period?: PeriodEnum;
+
+  constructor(
+    suiteCategoryId: number,
+    suiteCategoryName: string,
+    giro: Prisma.Decimal,
+    totalGiro: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+    period?: PeriodEnum,
+  ) {
+    this.suiteCategoryId = suiteCategoryId;
+    this.suiteCategoryName = suiteCategoryName;
+    this.giro = giro;
+    this.totalGiro = totalGiro;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.period = period;
+  }
 }

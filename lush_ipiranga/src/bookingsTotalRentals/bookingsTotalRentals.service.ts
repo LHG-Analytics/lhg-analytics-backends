@@ -71,9 +71,15 @@ export class BookingsTotalRentalsService {
         'Total Result': totalResult,
       };
     } catch (error) {
-      throw new BadRequestException(
-        `Failed to fetch KpiTotalRentals: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao buscar KpiTotalRentals: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao buscar KpiTotalRentals: erro desconhecido.',
+        );
+      }
     }
   }
 
@@ -83,7 +89,7 @@ export class BookingsTotalRentalsService {
     return this.prisma.prismaOnline.bookingsTotalRentals.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -150,6 +156,9 @@ export class BookingsTotalRentalsService {
         const checkOut = booking.rentalApartment?.checkOut; // Acessa checkOut do apartamento
 
         // Determina o tipo de locação
+        if (!checkIn || !checkOut) {
+          continue; // Pula esta reserva se checkIn ou checkOut estiverem indefinidos
+        }
         const rentalType = this.determineRentalPeriod(
           checkIn,
           checkOut,
@@ -157,8 +166,8 @@ export class BookingsTotalRentalsService {
         );
 
         // Incrementa o contador para o tipo de locação correspondente
-        if (rentalCounts[rentalType] !== undefined) {
-          rentalCounts[rentalType]++;
+        if (Object.prototype.hasOwnProperty.call(rentalCounts, rentalType)) {
+          rentalCounts[rentalType as keyof typeof rentalCounts]++;
         }
       }
 
@@ -186,9 +195,15 @@ export class BookingsTotalRentalsService {
         'Total Result': totalResult,
       };
     } catch (error) {
-      throw new BadRequestException(
-        `Failed to fetch bookings total rentals by rental type: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao buscar o total de reservas por tipo de locação: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao buscar o total de reservas por tipo de locação: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -198,9 +213,9 @@ export class BookingsTotalRentalsService {
     return this.prisma.prismaOnline.bookingsTotalRentalsByRentalType.upsert({
       where: {
         period_createdDate_rentalType: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
-          rentalType: data.rentalType,
+          rentalType: data.rentalType as RentalTypeEnum,
         },
       },
       create: {
@@ -289,9 +304,15 @@ export class BookingsTotalRentalsService {
       };
     } catch (error) {
       console.error('Erro ao calcular o total de reservas por período:', error);
-      throw new BadRequestException(
-        `Failed to calculate total bookings by period: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao calcular o total de reservas por período: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao calcular o total de reservas por período: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -301,7 +322,7 @@ export class BookingsTotalRentalsService {
     return this.prisma.prismaOnline.bookingsTotalRentalsByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -423,11 +444,14 @@ export class BookingsTotalRentalsService {
 
       // Processa cada reserva para contar o tipo de canal
       for (const booking of allBookings) {
-        const channelType = getChannelType(
-          booking.originBooking.id, // Acessa o idTypeOriginBooking da reserva
-          booking.dateService, // Acessa a data do serviço
-          booking.startDate, // Passa a data de início
-        );
+        // Verifica se originBooking não é nulo antes de acessar o id
+        const channelType = booking.originBooking
+          ? getChannelType(
+              booking.originBooking.id, // Acessa o idTypeOriginBooking da reserva
+              booking.dateService, // Acessa a data do serviço
+              booking.startDate, // Passa a data de início
+            )
+          : null;
 
         // Incrementa o contador para o tipo de canal correspondente
         if (channelType && channelCounts[channelType] !== undefined) {
@@ -466,9 +490,15 @@ export class BookingsTotalRentalsService {
         'Total Result': totalResult,
       };
     } catch (error) {
-      throw new BadRequestException(
-        `Failed to fetch bookings total rentals by channel type: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao buscar o total de reservas por tipo de canal: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao buscar o total de reservas por tipo de canal: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -478,9 +508,9 @@ export class BookingsTotalRentalsService {
     return this.prisma.prismaOnline.bookingsTotalRentalsByChannelType.upsert({
       where: {
         period_createdDate_channelType: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
-          channelType: data.channelType,
+          channelType: data.channelType as ChannelTypeEnum,
         },
       },
       create: {
@@ -570,8 +600,12 @@ export class BookingsTotalRentalsService {
       };
     } catch (error) {
       console.error('Erro ao calcular o total de reservas por período:', error);
+      let errorMessage = 'Erro desconhecido';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       throw new BadRequestException(
-        `Failed to calculate total bookings by period: ${error.message}`,
+        `Failed to calculate total bookings by period: ${errorMessage}`,
       );
     }
   }
@@ -583,7 +617,7 @@ export class BookingsTotalRentalsService {
       {
         where: {
           period_createdDate: {
-            period: data.period,
+            period: data.period as PeriodEnum,
             createdDate: data.createdDate,
           },
         },

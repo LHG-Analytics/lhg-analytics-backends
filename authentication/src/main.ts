@@ -5,7 +5,7 @@ import { PrismaService } from './prisma/prisma.service';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
-import * as helmet from 'helmet';
+import helmet from 'helmet';
 
 config();
 

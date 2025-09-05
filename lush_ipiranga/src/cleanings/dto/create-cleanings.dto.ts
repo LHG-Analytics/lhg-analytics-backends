@@ -4,9 +4,10 @@ import {
   IsDecimal,
   IsDate,
   IsString,
+  IsOptional,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Prisma } from '@client-online';
+import { Prisma, PeriodEnum } from '@client-online';
 
 export class CreateCleaningsDto {
   @ApiProperty({ description: 'Nome do funcionário', example: 'João Silva' })
@@ -64,4 +65,30 @@ export class CreateCleaningsDto {
   @IsInt({ message: 'O ID da empresa deve ser um número inteiro' })
   @IsNotEmpty({ message: 'O ID da empresa é obrigatório' })
   companyId: number;
+
+  @ApiProperty({ description: 'Período', example: 'DAILY', required: false })
+  @IsOptional()
+  period?: PeriodEnum;
+
+  constructor(
+    employeeName: string,
+    totalSuitesCleanings: number,
+    totalAllSuitesCleanings: number,
+    totalDaysWorked: number,
+    shift: string,
+    averageDailyCleaning: Prisma.Decimal,
+    createdDate: Date,
+    companyId: number,
+    period?: PeriodEnum,
+  ) {
+    this.employeeName = employeeName;
+    this.totalSuitesCleanings = totalSuitesCleanings;
+    this.totalAllSuitesCleanings = totalAllSuitesCleanings;
+    this.totalDaysWorked = totalDaysWorked;
+    this.shift = shift;
+    this.averageDailyCleaning = averageDailyCleaning;
+    this.createdDate = createdDate;
+    this.companyId = companyId;
+    this.period = period;
+  }
 }

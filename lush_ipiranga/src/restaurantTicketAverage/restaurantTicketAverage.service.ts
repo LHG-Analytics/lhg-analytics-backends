@@ -174,19 +174,25 @@ export class RestaurantTicketAverageService {
       };
     } catch (error) {
       console.error('Erro ao calcular ticket médio de A&B:', error);
-      throw new BadRequestException(
-        `Erro ao calcular ticket médio de A&B: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Erro ao calcular ticket médio de A&B: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Erro ao calcular ticket médio de A&B: erro desconhecido',
+        );
+      }
     }
   }
-
+  
   private async insertRestaurantTicketAverage(
     data: RestaurantTicketAverage,
   ): Promise<RestaurantTicketAverage> {
     return this.prisma.prismaOnline.restaurantTicketAverage.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -341,9 +347,15 @@ export class RestaurantTicketAverageService {
       };
     } catch (error) {
       console.error('Erro ao calcular ticket médio de A&B:', error);
-      throw new BadRequestException(
-        `Erro ao calcular ticket médio de A&B: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Erro ao calcular ticket médio de A&B: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Erro ao calcular ticket médio de A&B: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -354,7 +366,7 @@ export class RestaurantTicketAverageService {
       {
         where: {
           period_createdDate: {
-            period: data.period,
+            period: data.period as PeriodEnum,
             createdDate: data.createdDate,
           },
         },
@@ -532,19 +544,25 @@ export class RestaurantTicketAverageService {
       };
     } catch (error) {
       console.error('Erro ao calcular ticket médio de A&B:', error);
-      throw new BadRequestException(
-        `Erro ao calcular ticket médio de A&B: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Erro ao calcular ticket médio de A&B: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Erro ao calcular ticket médio de A&B: erro desconhecido',
+        );
+      }
     }
   }
-
+  
   private async insertRestaurantTicketAverageByPeriod(
     data: RestaurantTicketAverageByPeriod,
   ): Promise<RestaurantTicketAverageByPeriod> {
     return this.prisma.prismaOnline.restaurantTicketAverageByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

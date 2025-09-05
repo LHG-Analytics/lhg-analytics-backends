@@ -62,8 +62,9 @@ export class CleaningsController {
       // Chama o serviço para buscar os dados com base nos parâmetros fornecidos
       return await this.cleaningsService.findAllCleanings(start, end, period);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to fetch cleaning inspections: ${error.message}`,
+        `Failed to fetch cleaning inspections: ${errorMessage}`,
       );
     }
   }
@@ -116,8 +117,9 @@ export class CleaningsController {
       // Chama o método do serviço que executa as operações do cron job
       return await this.cleaningsService.handleCron();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to run the cron job: ${error.message}`,
+        `Failed to run the cron job: ${errorMessage}`,
       );
     }
   }

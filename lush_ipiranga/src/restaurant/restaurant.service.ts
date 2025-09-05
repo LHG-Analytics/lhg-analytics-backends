@@ -95,8 +95,8 @@ export class RestaurantService {
     console.log('endDatePrevious:', endDatePrevious);
 
     // Função de filtro para LAST_6_M
-    const filterByDayOfMonth = (data, dayOfMonth) => {
-      return data.filter((item) => {
+    const filterByDayOfMonth = (data: any[], dayOfMonth: number) => {
+      return data.filter((item: any) => {
         const createdDate = moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo');
@@ -502,7 +502,7 @@ export class RestaurantService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataRevenuePeriod = RestaurantRevenueByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRevenuePeriod = filterByDayOfMonth(
         RestaurantRevenueByPeriod,
         dayOfMonth,
@@ -522,7 +522,7 @@ export class RestaurantService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataRevenuePeriodPercent = RestaurantRevenueByPeriodPercent;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRevenuePeriodPercent = filterByDayOfMonth(
         RestaurantRevenueByPeriodPercent,
         dayOfMonth,
@@ -544,7 +544,7 @@ export class RestaurantService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataTicketAveragePeriod = RestaurantTicketAverageByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataTicketAveragePeriod = filterByDayOfMonth(
         RestaurantTicketAverageByPeriod,
         dayOfMonth,
@@ -586,7 +586,7 @@ export class RestaurantService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataRevenueByGroupPeriod = RestaurantRevenueByGroupByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRevenueByGroupPeriod = filterByDayOfMonth(
         RestaurantRevenueByGroupByPeriod,
         dayOfMonth,
@@ -640,7 +640,7 @@ export class RestaurantService {
 
     let filteredDataRevenueByFoodPeriod = RestaurantRevenueByFoodCategory;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRevenueByFoodPeriod = filterByDayOfMonth(
         RestaurantRevenueByFoodCategory,
         dayOfMonth,
@@ -696,7 +696,7 @@ export class RestaurantService {
 
     let filteredDataRevenueByDrinksPeriod = RestaurantRevenueByDrinkCategory;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRevenueByDrinksPeriod = filterByDayOfMonth(
         RestaurantRevenueByDrinkCategory,
         dayOfMonth,
@@ -1250,8 +1250,8 @@ export class RestaurantService {
   ORDER BY revenue DESC
 `;
 
-    const othersProductTypesParam = Prisma.join(othersProductTypes);
-    
+    const othersProductTypesParam = Prisma.join(othersList);
+
     const reportByOthersSql = Prisma.sql`
   SELECT
     tp."descricao" AS "category",

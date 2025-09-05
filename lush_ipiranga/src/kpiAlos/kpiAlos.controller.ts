@@ -53,6 +53,10 @@ export class KpiAlosController {
       const start = this.convertToDate(startDate); // Início
       const end = this.convertToDate(endDate, true); // Fim, com ajuste de horário
 
+      if (!start || !end) {
+        throw new BadRequestException('Start date and end date are required.');
+      }
+
       if (!period) {
         throw new BadRequestException('The period parameter is required.');
       }
@@ -60,8 +64,9 @@ export class KpiAlosController {
       // Chama o serviço com as datas e o período, se fornecidos
       return await this.kpiAlosService.findAllKpiAlos(start, end, period);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to create all KpiAlos: ${error.message}`,
+        `Failed to create all KpiAlos: ${errorMessage}`,
       );
     }
   }
@@ -110,8 +115,9 @@ export class KpiAlosController {
       // Chama o método do serviço que executa as operações do cron job
       return await this.kpiAlosService.handleCron();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to run the cron job: ${error.message}`,
+        `Failed to run the cron job: ${errorMessage}`,
       );
     }
   }

@@ -55,6 +55,10 @@ export class BookingsTicketAverageController {
       const start = this.convertToDate(startDate); // Início
       const end = this.convertToDate(endDate, true); // Fim, com ajuste de horário
 
+      if (!start || !end) {
+        throw new BadRequestException('Start date and end date are required.');
+      }
+
       if (!period) {
         throw new BadRequestException('The period parameter is required.');
       }
@@ -71,8 +75,9 @@ export class BookingsTicketAverageController {
         period,
       );
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to calculate ticket average: ${error.message}`,
+        `Failed to calculate ticket average: ${errorMessage}`,
       );
     }
   }
@@ -121,8 +126,9 @@ export class BookingsTicketAverageController {
       // Chama o método do serviço que executa as operações do cron job
       return await this.bookingsTicketAverageService.handleCron();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to run the cron job: ${error.message}`,
+        `Failed to run the cron job: ${errorMessage}`,
       );
     }
   }

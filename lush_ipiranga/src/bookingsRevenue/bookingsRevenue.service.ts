@@ -186,10 +186,17 @@ export class BookingsRevenueService {
 
       return formattedBookingsRevenueData;
     } catch (error) {
-      console.error('Erro ao buscar Bookings Revenue data:', error);
-      throw new BadRequestException(
-        `Failed to fetch Bookings Revenue data: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        console.error('Erro ao buscar Bookings Revenue data:', error);
+        throw new BadRequestException(
+          `Failed to fetch Bookings Revenue data: ${error.message}`,
+        );
+      } else {
+        console.error('Erro ao buscar Bookings Revenue data:', error);
+        throw new BadRequestException(
+          'Failed to fetch Bookings Revenue data: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -199,7 +206,7 @@ export class BookingsRevenueService {
     return this.prisma.prismaOnline.bookingsRevenue.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -306,22 +313,25 @@ export class BookingsRevenueService {
     };
 
     // Calcular o total de priceRental por channelType
-    allBookingsRevenue.forEach((booking) => {
-      const channelType = getChannelType(
-        booking.idTypeOriginBooking,
-        booking.dateService,
-        booking.startDate,
-      ); // Mapeia o idTypeOriginBooking para channelType
+allBookingsRevenue.forEach((booking) => {
+  const channelType = getChannelType(
+    booking.idTypeOriginBooking,
+    booking.dateService,
+    booking.startDate
+  ); // Mapeia o idTypeOriginBooking para channelType
 
-      if (channelType) {
-        // Acumula o valor atual ao total existente
-        const currentTotal = revenueByChannelType.get(channelType);
-        revenueByChannelType.set(
-          channelType,
-          currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
-        );
-      }
-    });
+  if (channelType) {
+    // Pega o total atual ou inicializa como Decimal(0) se undefined
+    const currentTotal = revenueByChannelType.get(channelType) ?? new Prisma.Decimal(0);
+
+    // Acumula o valor
+    revenueByChannelType.set(
+      channelType,
+      currentTotal.plus(new Prisma.Decimal(booking.priceRental ?? 0))
+    );
+  }
+});
+
 
     // Calcular o total de todos os canais
     const totalAllValue = Array.from(revenueByChannelType.values()).reduce(
@@ -369,9 +379,9 @@ export class BookingsRevenueService {
     return this.prisma.prismaOnline.bookingsRevenueByChannelType.upsert({
       where: {
         period_createdDate_channelType: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
-          channelType: data.channelType,
+          channelType: data.channelType as ChannelTypeEnum,
         },
       },
       create: {
@@ -484,19 +494,25 @@ export class BookingsRevenueService {
       };
     } catch (error) {
       console.error('Erro ao calcular a receita total por período:', error);
-      throw new BadRequestException(
-        `Failed to calculate total booking revenue by period: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao calcular a receita total de reservas por período: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao calcular a receita total de reservas por período: erro desconhecido.',
+        );
+      }
     }
   }
-
+  
   private async insertBookingsRevenueByPeriod(
     data: BookingsRevenueByPeriod,
   ): Promise<BookingsRevenueByPeriod> {
     return this.prisma.prismaOnline.bookingsRevenueByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -550,19 +566,24 @@ export class BookingsRevenueService {
       if (matchingNewRelease) {
         const halfPaymentId = matchingNewRelease.halfPaymentId;
         const paymentName = halfPaymentMap.get(halfPaymentId); // Obtém o nome do meio de pagamento
-
+      
+        // Pule se não houver paymentName
+        if (!paymentName) continue;
+      
         // Inicializa o total para o meio de pagamento se não existir
         if (!revenueByPaymentMethod.has(paymentName)) {
           revenueByPaymentMethod.set(paymentName, new Prisma.Decimal(0));
         }
-
-        // Acumula o valor atual ao total existente
-        const currentTotal = revenueByPaymentMethod.get(paymentName);
+      
+        // Pega o total atual com segurança
+        const currentTotal = revenueByPaymentMethod.get(paymentName)!; // "!" garante que não é undefined
+      
+        // Acumula o valor
         revenueByPaymentMethod.set(
           paymentName,
-          currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
+          currentTotal.plus(new Prisma.Decimal(booking.priceRental ?? 0))
         );
-      }
+      }      
     }
 
     // Monta o resultado total agregado e insere no banco de dados
@@ -581,7 +602,7 @@ export class BookingsRevenueService {
     }
 
     // Monta o resultado total para retorno
-    const totalResults = {};
+    const totalResults: { [key: string]: { total: string } } = {};
     for (const [paymentName, totalValue] of revenueByPaymentMethod.entries()) {
       totalResults[paymentName] = {
         total: this.formatCurrency(totalValue.toNumber()), // Formata o total em reais
@@ -601,7 +622,7 @@ export class BookingsRevenueService {
     return this.prisma.prismaOnline.bookingsRevenueByPayment.upsert({
       where: {
         period_createdDate_paymentMethod: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
           paymentMethod: data.paymentMethod,
         },
@@ -719,9 +740,15 @@ export class BookingsRevenueService {
       };
     } catch (error) {
       console.error('Erro ao calcular a receita total por período:', error);
-      throw new BadRequestException(
-        `Failed to calculate total booking revenue by period: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao calcular a receita total de reservas por período: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao calcular a receita total de reservas por período: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -731,7 +758,7 @@ export class BookingsRevenueService {
     return this.prisma.prismaOnline.bookingsRevenueByPeriodEcommerce.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

@@ -12,6 +12,19 @@ import {
   KpiTotalRentalsByPeriod,
 } from './entities/kpiTotalRental.entity';
 
+type CategoryTotals = {
+  totalRentalsApartments: number;
+  totalBookings: number;
+};
+
+type CategoryResult = {
+  suiteCategoryId: number | null;
+  suiteCategoryName: string;
+  totalRentalsApartments: number;
+  totalBookings: number;
+  createdDate: Date;
+};
+
 @Injectable()
 export class KpiTotalRentalsService {
   constructor(private prisma: PrismaService) {}
@@ -20,16 +33,17 @@ export class KpiTotalRentalsService {
     startDate: Date,
     endDate: Date,
     period?: PeriodEnum,
-  ): Promise<any> {
+  ): Promise<CategoryResult[]> {
     try {
-      const companyId = 1; // Defina o ID da empresa conforme necessário
+      const companyId = 1;
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
-        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
-      } else if (period === PeriodEnum.LAST_6_M) {
-        // Para LAST_6_M, subtrair um dia para não incluir a data atual
+      if (
+        period === PeriodEnum.LAST_7_D ||
+        period === PeriodEnum.LAST_30_D ||
+        period === PeriodEnum.LAST_6_M
+      ) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
       }
 
@@ -89,10 +103,10 @@ export class KpiTotalRentalsService {
         throw new NotFoundException('No rental apartments found.');
       }
 
-      const kpiTotalRentalsData = [];
-      let totalAllRentalsApartments = 0; // Total de locações agregadas
-      let totalAllBookings = 0; // Total de reservas agregadas
-      const categoryTotalsMap = {};
+      const kpiTotalRentalsData: CategoryResult[] = [];
+      let totalAllRentalsApartments = 0;
+      let totalAllBookings = 0;
+      const categoryTotalsMap: Record<number, CategoryTotals> = {};
 
       // Inicializa o mapa de totais por categoria
       for (const suiteCategory of suiteCategories) {
@@ -111,14 +125,11 @@ export class KpiTotalRentalsService {
           continue;
         }
 
-        // Acumula total de locações por categoria
         categoryTotalsMap[suiteCategoryId].totalRentalsApartments++;
         totalAllRentalsApartments++;
 
-        // Acumula total de reservas agregadas
         const bookingsForApartment = allBookings.filter(
-          (booking) =>
-            booking.rentalApartmentId === rentalApartment.suiteStateId,
+          (booking) => booking.rentalApartmentId === rentalApartment.suiteStateId,
         );
         categoryTotalsMap[suiteCategoryId].totalBookings +=
           bookingsForApartment.length;
@@ -129,7 +140,7 @@ export class KpiTotalRentalsService {
       for (const suiteCategory of suiteCategories) {
         const categoryData = categoryTotalsMap[suiteCategory.id];
 
-        const categoryResult = {
+        const categoryResult: CategoryResult = {
           suiteCategoryId: suiteCategory.id,
           suiteCategoryName: suiteCategory.description,
           totalRentalsApartments: categoryData.totalRentalsApartments,
@@ -139,7 +150,6 @@ export class KpiTotalRentalsService {
 
         kpiTotalRentalsData.push(categoryResult);
 
-        // Inserir no banco de dados
         await this.insertKpiTotalRentals({
           suiteCategoryId: suiteCategory.id,
           suiteCategoryName: suiteCategory.description,
@@ -153,25 +163,26 @@ export class KpiTotalRentalsService {
         });
       }
 
-      // Monta o resultado total agregado
-      const totalResult = {
-        totalRentalsApartments: totalAllRentalsApartments, // Total geral de locações
-        totalBookings: totalAllBookings, // Total geral de reservas
-        createdDate: adjustedEndDate,
-      };
-
-      // Adiciona o resultado total no array de dados
+      // Adiciona o resultado total agregado
       kpiTotalRentalsData.push({
-        'Total Result': {
-          ...totalResult,
-        },
+        suiteCategoryId: null,
+        suiteCategoryName: 'Total Result',
+        totalRentalsApartments: totalAllRentalsApartments,
+        totalBookings: totalAllBookings,
+        createdDate: adjustedEndDate,
       });
 
       return kpiTotalRentalsData;
-    } catch (error) {
-      throw new BadRequestException(
-        `Failed to fetch KpiTotalRentals: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao buscar KpiTotalRentals: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao buscar KpiTotalRentals: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -180,7 +191,7 @@ export class KpiTotalRentalsService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -197,27 +208,24 @@ export class KpiTotalRentalsService {
     startDate: Date,
     endDate: Date,
     period: PeriodEnum,
-  ): Promise<any> {
+  ): Promise<{ TotalRentalsForThePeriod: Record<string, any>[] }> {
     try {
-      const results: { [key: string]: any } = {}; // Armazenar resultados
+      const results: Record<string, any> = {};
 
       let currentDate = new Date(startDate);
-      currentDate.setUTCHours(6, 0, 0, 0); // Início do dia contábil às 06:00:00
+      currentDate.setUTCHours(6, 0, 0, 0);
 
       while (currentDate < endDate) {
         let nextDate = new Date(currentDate);
 
         if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
-          // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
-          nextDate.setUTCHours(5, 59, 59, 999); // Fim do dia contábil às 05:59:59 do próximo dia
+          nextDate.setUTCHours(5, 59, 59, 999);
         } else if (period === PeriodEnum.LAST_6_M) {
-          // Para LAST_6_M, iteração mensal
           nextDate.setMonth(nextDate.getMonth() + 1);
-          nextDate.setUTCHours(5, 59, 59, 999); // Fim do mês contábil
+          nextDate.setUTCHours(5, 59, 59, 999);
         }
 
-        // Consultar os apartamentos alugados no período
         const rentals = await this.prisma.prismaLocal.rentalApartment.findMany({
           where: {
             checkIn: {
@@ -228,27 +236,23 @@ export class KpiTotalRentalsService {
           },
         });
 
-        // Contar o total de apartamentos alugados
         const totalRentalsForCurrentPeriod = rentals.length;
 
-        // Adicionar o resultado ao objeto de resultados
-        const dateKey = currentDate.toISOString().split('T')[0]; // Formatar a data para YYYY-MM-DD
+        const dateKey = currentDate.toISOString().split('T')[0];
         results[dateKey] = {
           totalRentalsApartments: totalRentalsForCurrentPeriod,
         };
 
-        let createdDateWithTime;
-        if (period === 'LAST_6_M') {
-          // Cria uma nova instância de Date, subtraindo 1 dia de currentDate
-          createdDateWithTime = new Date(currentDate); // Cria uma nova instância de Date
-          createdDateWithTime.setDate(createdDateWithTime.getDate() - 1); // Remove 1 dia
-          createdDateWithTime.setUTCHours(5, 59, 59, 999); // Define a hora
+        let createdDateWithTime: Date;
+        if (period === PeriodEnum.LAST_6_M) {
+          createdDateWithTime = new Date(currentDate);
+          createdDateWithTime.setDate(createdDateWithTime.getDate() - 1);
+          createdDateWithTime.setUTCHours(5, 59, 59, 999);
         } else {
-          createdDateWithTime = new Date(currentDate); // Cria uma nova instância de Date
+          createdDateWithTime = new Date(currentDate);
           createdDateWithTime.setUTCHours(5, 59, 59, 999);
         }
 
-        // Inserir os dados no banco de dados
         await this.insertKpiTotalRentalsByPeriod({
           totalAllRentalsApartments: totalRentalsForCurrentPeriod,
           period: period,
@@ -259,7 +263,6 @@ export class KpiTotalRentalsService {
         currentDate = new Date(nextDate);
       }
 
-      // Formatar o resultado final
       const totalRentalsForThePeriod = Object.keys(results).map((date) => ({
         [date]: results[date],
       }));
@@ -272,9 +275,12 @@ export class KpiTotalRentalsService {
         'Erro ao calcular o total de apartamentos alugados por período:',
         error,
       );
-      throw new BadRequestException(
-        `Failed to calculate total rentals by period: ${error.message}`,
-      );
+      let errorMessage =
+        'Falha ao calcular o total de apartamentos alugados por período.';
+      if (error instanceof Error) {
+        errorMessage += ` ${error.message}`;
+      }
+      throw new BadRequestException(errorMessage);
     }
   }
 
@@ -284,7 +290,7 @@ export class KpiTotalRentalsService {
     return this.prisma.prismaOnline.kpiTotalRentalsByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -299,20 +305,17 @@ export class KpiTotalRentalsService {
 
   @Cron('0 0 * * *', { disabled: true })
   async handleCron() {
-    const timezone = 'America/Sao_Paulo'; // Defina seu fuso horário
-
-    // Obter a data atual no fuso horário correto
+    const timezone = 'America/Sao_Paulo';
     const currentDate = moment().tz(timezone).toDate();
 
-    // Últimos 7 dias
-    const endDateLast7Days = currentDate;
+    // ---- Últimos 7 dias ----
+    const endDateLast7Days = new Date(currentDate);
     endDateLast7Days.setHours(5, 59, 59, 999);
 
     const startDateLast7Days = new Date(currentDate);
     startDateLast7Days.setDate(startDateLast7Days.getDate() - 7);
     startDateLast7Days.setHours(6, 0, 0, 0);
 
-    // Parse as datas para o formato desejado
     const {
       startDate: parsedStartDateLast7Days,
       endDate: parsedEndDateLast7Days,
@@ -321,15 +324,11 @@ export class KpiTotalRentalsService {
       this.formatDateString(endDateLast7Days),
     );
 
-    // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
-    previousStartDateLast7Days.setHours(6, 0, 0, 0); // Configuração de horas
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
+    previousStartDateLast7Days.setHours(6, 0, 0, 0);
 
-    // Parse as datas para o formato desejado
     const {
       startDate: previousParsedStartDateLast7Days,
       endDate: previousParsedEndDateLast7DaysParsed,
@@ -338,7 +337,6 @@ export class KpiTotalRentalsService {
       this.formatDateString(previousParsedEndDateLast7Days),
     );
 
-    // Log para verificar as datas
     const startTimeLast7Days = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
@@ -346,13 +344,11 @@ export class KpiTotalRentalsService {
       `Início CronJob KpiTotalRentals - últimos 7 dias: ${startTimeLast7Days}`,
     );
 
-    // Chamar a função para o período atual
     await this.findAllKpiTotalRentals(
       parsedStartDateLast7Days,
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
     );
-    // Chamar a função para o período anterior
     await this.findAllKpiTotalRentals(
       previousParsedStartDateLast7Days,
       previousParsedEndDateLast7DaysParsed,
@@ -363,6 +359,7 @@ export class KpiTotalRentalsService {
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
     );
+
     const endTimeLast7Days = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
@@ -370,15 +367,14 @@ export class KpiTotalRentalsService {
       `Final CronJob KpiTotalRentals - últimos 7 dias: ${endTimeLast7Days}`,
     );
 
-    // Últimos 30 dias
-    const endDateLast30Days = currentDate;
+    // ---- Últimos 30 dias ----
+    const endDateLast30Days = new Date(currentDate);
     endDateLast30Days.setHours(5, 59, 59, 999);
 
     const startDateLast30Days = new Date(currentDate);
     startDateLast30Days.setDate(startDateLast30Days.getDate() - 30);
     startDateLast30Days.setHours(6, 0, 0, 0);
 
-    // Parse as datas para o formato desejado
     const {
       startDate: parsedStartDateLast30Days,
       endDate: parsedEndDateLast30Days,
@@ -387,17 +383,11 @@ export class KpiTotalRentalsService {
       this.formatDateString(endDateLast30Days),
     );
 
-    // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
-    previousStartDateLast30Days.setHours(6, 0, 0, 0); // Configuração de horas
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
+    previousStartDateLast30Days.setHours(6, 0, 0, 0);
 
-    // Parse as datas para o formato desejado
     const {
       startDate: previousParsedStartDateLast30Days,
       endDate: previousParsedEndDateLast30DaysParsed,
@@ -406,7 +396,6 @@ export class KpiTotalRentalsService {
       this.formatDateString(previousParsedEndDateLast30Days),
     );
 
-    // Log para verificar as datas
     const startTimeLast30Days = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
@@ -414,13 +403,11 @@ export class KpiTotalRentalsService {
       `Início CronJob KpiTotalRentals - últimos 30 dias: ${startTimeLast30Days}`,
     );
 
-    // Chamar a função para o período atual
     await this.findAllKpiTotalRentals(
       parsedStartDateLast30Days,
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
-    // Chamar a função para o período anterior
     await this.findAllKpiTotalRentals(
       previousParsedStartDateLast30Days,
       previousParsedEndDateLast30DaysParsed,
@@ -431,6 +418,7 @@ export class KpiTotalRentalsService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
+
     const endTimeLast30Days = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
@@ -438,15 +426,14 @@ export class KpiTotalRentalsService {
       `Final CronJob KpiTotalRentals - últimos 30 dias: ${endTimeLast30Days}`,
     );
 
-    // Últimos 6 meses (180 dias)
-    const endDateLast6Months = currentDate;
+    // ---- Últimos 6 meses ----
+    const endDateLast6Months = new Date(currentDate);
     endDateLast6Months.setHours(5, 59, 59, 999);
 
     const startDateLast6Months = new Date(currentDate);
     startDateLast6Months.setMonth(startDateLast6Months.getMonth() - 6);
     startDateLast6Months.setHours(6, 0, 0, 0);
 
-    // Parse as datas para o formato desejado
     const {
       startDate: parsedStartDateLast6Months,
       endDate: parsedEndDateLast6Months,
@@ -455,17 +442,11 @@ export class KpiTotalRentalsService {
       this.formatDateString(endDateLast6Months),
     );
 
-    // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
-    const previousStartDateLast6Months = new Date(
-      previousParsedEndDateLast6Months,
-    );
-    previousStartDateLast6Months.setMonth(
-      previousStartDateLast6Months.getMonth() - 6,
-    );
-    previousStartDateLast6Months.setHours(6, 0, 0, 0); // Configuração de horas
+    const previousStartDateLast6Months = new Date(previousParsedEndDateLast6Months);
+    previousStartDateLast6Months.setMonth(previousStartDateLast6Months.getMonth() - 6);
+    previousStartDateLast6Months.setHours(6, 0, 0, 0);
 
-    // Parse as datas para o formato desejado
     const {
       startDate: previousParsedStartDateLast6Months,
       endDate: previousParsedEndDateLast6MonthsParsed,
@@ -474,7 +455,6 @@ export class KpiTotalRentalsService {
       this.formatDateString(previousParsedEndDateLast6Months),
     );
 
-    // Log para verificar as datas
     const startTimeLast6Months = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
@@ -482,13 +462,11 @@ export class KpiTotalRentalsService {
       `Início CronJob KpiTotalRentals - últimos 6 meses: ${startTimeLast6Months}`,
     );
 
-    // Chamar a função para o período atual
     await this.findAllKpiTotalRentals(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
-    // Chamar a função para o período anterior
     await this.findAllKpiTotalRentals(
       previousParsedStartDateLast6Months,
       previousParsedEndDateLast6MonthsParsed,
@@ -499,6 +477,7 @@ export class KpiTotalRentalsService {
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
+
     const endTimeLast6Months = moment()
       .tz(timezone)
       .format('DD-MM-YYYY HH:mm:ss');
@@ -519,15 +498,15 @@ export class KpiTotalRentalsService {
     );
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
-    parsedStartDate.setUTCHours(6, 0, 0, 0); // Define início às 06:00
-    parsedEndDate.setUTCHours(5, 59, 59, 999); // Define final às 05:59:59.999
+    parsedStartDate.setUTCHours(6, 0, 0, 0);
+    parsedEndDate.setUTCHours(5, 59, 59, 999);
 
     return { startDate: parsedStartDate, endDate: parsedEndDate };
   }
 
   private formatDateString(date: Date): string {
     const day = String(date.getUTCDate()).padStart(2, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Mês é baseado em 0
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
     const year = date.getUTCFullYear();
 
     return `${day}/${month}/${year}`;

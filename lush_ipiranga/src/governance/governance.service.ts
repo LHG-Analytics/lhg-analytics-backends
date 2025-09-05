@@ -8,6 +8,42 @@ import { Moment } from 'moment-timezone';
 import { PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 
+// Definindo interfaces para melhor tipagem
+interface CleaningData {
+  employeeName: string;
+  createdDate: Date;
+  averageDailyCleaning: number;
+  shift: string;
+  totalDaysWorked: number;
+  totalSuitesCleanings: number;
+  totalAllSuitesCleanings: number;
+  totalAllAverageDailyCleaning: number;
+}
+
+interface CleaningByDateAcc {
+  [key: string]: { totalSuitesCleanings: number };
+}
+
+interface EmployeeData {
+  name: string;
+  data: number[];
+}
+
+export interface ShiftsData {
+  [key: string]: EmployeeData[];
+}
+
+interface EmployeeReport {
+  employeeName: string;
+  totalSuitesCleanings: number;
+  totalDaysWorked: number;
+  averageDailyCleaning: number;
+}
+
+export interface EmployeeReportByShift {
+  [shift: string]: EmployeeReport[];
+}
+
 @Injectable()
 export class GovernanceService {
   constructor(private prisma: PrismaService) {}
@@ -16,7 +52,7 @@ export class GovernanceService {
     // Define o fuso horário padrão como São Paulo
     moment.tz.setDefault('America/Sao_Paulo');
 
-    let startDate, endDate, startDatePrevious, endDatePrevious;
+    let startDate: moment.Moment, endDate: moment.Moment, startDatePrevious: moment.Moment, endDatePrevious: moment.Moment;
 
     // Obtém o horário atual em "America/Sao_Paulo" no início do dia
     const today = moment.tz('America/Sao_Paulo').set({
@@ -83,22 +119,22 @@ export class GovernanceService {
     }
 
     // Converte as datas para UTC sem alterar o horário configurado
-    startDate = moment.tz(startDate, 'America/Sao_Paulo').utc(true).toDate();
-    endDate = moment.tz(endDate, 'America/Sao_Paulo').utc(true).toDate();
-    startDatePrevious = moment
+    const startDateUTC = moment.tz(startDate, 'America/Sao_Paulo').utc(true).toDate();
+    const endDateUTC = moment.tz(endDate, 'America/Sao_Paulo').utc(true).toDate();
+    const startDatePreviousUTC = moment
       .tz(startDatePrevious, 'America/Sao_Paulo')
       .utc(true)
       .toDate();
-    endDatePrevious = moment
+    const endDatePreviousUTC = moment
       .tz(endDatePrevious, 'America/Sao_Paulo')
       .utc(true)
       .toDate();
 
     // Exibe as datas geradas
-    console.log('startDate:', startDate);
-    console.log('endDate:', endDate);
-    console.log('startDatePrevious:', startDatePrevious);
-    console.log('endDatePrevious:', endDatePrevious);
+    console.log('startDate:', startDateUTC);
+    console.log('endDate:', endDateUTC);
+    console.log('startDatePrevious:', startDatePreviousUTC);
+    console.log('endDatePrevious:', endDatePreviousUTC);
 
     // Consultas para buscar os dados de KPIs com base nas datas selecionadas
     const [
@@ -114,7 +150,7 @@ export class GovernanceService {
         where: {
           period: period,
           createdDate: {
-            gte: startDate, // Filtra pela data inicial
+            gte: startDateUTC,
           },
         },
         select: {
@@ -135,8 +171,8 @@ export class GovernanceService {
         where: {
           period: period,
           createdDate: {
-            gte: startDatePrevious,
-            lte: endDatePrevious,
+            gte: startDatePreviousUTC,
+            lte: endDatePreviousUTC,
           },
         },
         select: {
@@ -157,7 +193,7 @@ export class GovernanceService {
         where: {
           period: period,
           createdDate: {
-            gte: startDate, // Filtra pela data inicial
+            gte: startDateUTC,
           },
         },
         select: {
@@ -172,7 +208,7 @@ export class GovernanceService {
         where: {
           period: period,
           createdDate: {
-            gte: startDate, // Filtra pela data inicial
+            gte: startDateUTC,
           },
         },
         select: {
@@ -189,7 +225,7 @@ export class GovernanceService {
         where: {
           period: period,
           createdDate: {
-            gte: startDate,
+            gte: startDateUTC,
           },
         },
         select: {
@@ -215,7 +251,7 @@ export class GovernanceService {
         where: {
           period: period,
           createdDate: {
-            gte: startDate,
+            gte: startDateUTC,
           },
         },
         select: {
@@ -232,8 +268,8 @@ export class GovernanceService {
         where: {
           period: period,
           createdDate: {
-            gte: startDatePrevious,
-            lte: endDatePrevious,
+            gte: startDatePreviousUTC,
+            lte: endDatePreviousUTC,
           },
         },
         select: {
@@ -310,15 +346,15 @@ export class GovernanceService {
     };
 
     // Lógica para calcular a performance das limpezas
-    const shiftCleaningMap = {
+    const shiftCleaningMap: Record<string, number> = {
       Manhã: 0,
       Tarde: 0,
       Noite: 0,
-      Terceirizado: 0, // Inicializa a categoria Sem Turno
+      Terceirizado: 0,
     };
 
     // Objeto para armazenar os dados mais recentes
-    const latestCleanings = {};
+    const latestCleanings: Record<string, CleaningData> = {};
 
     // Itera sobre os dados de limpeza
     for (const cleaning of cleanings) {
@@ -333,14 +369,22 @@ export class GovernanceService {
         new Date(latestCleanings[key].createdDate) < new Date(createdDate)
       ) {
         // Atualiza o registro com os dados mais recentes
-        latestCleanings[key] = cleaning;
+        latestCleanings[key] = {
+          shift: cleaning.shift,
+          employeeName: cleaning.employeeName,
+          totalSuitesCleanings: cleaning.totalSuitesCleanings,
+          totalAllSuitesCleanings: cleaning.totalAllSuitesCleanings,
+          totalDaysWorked: cleaning.totalDaysWorked,
+          averageDailyCleaning: Number(cleaning.averageDailyCleaning),
+          totalAllAverageDailyCleaning: cleaning.totalAllAverageDailyCleaning,
+          createdDate: cleaning.createdDate,
+        };
       }
     }
 
     // Agora, agregue os dados mais recentes
     for (const key in latestCleanings) {
-      const { shift, totalSuitesCleanings, employeeName } =
-        latestCleanings[key];
+      const { shift, totalSuitesCleanings, employeeName } = latestCleanings[key];
 
       // Se o empregado é um dos extras, contabiliza apenas no turno Terceirizado
       if (
@@ -350,32 +394,30 @@ export class GovernanceService {
       ) {
         shiftCleaningMap['Terceirizado'] += totalSuitesCleanings;
       } else {
-        // Se o turno já existe no mapa, soma o totalSuitesCleanings
-        if (shiftCleaningMap[shift] !== undefined) {
+        // Para evitar erro de tipagem, só permite turnos conhecidos
+        if (shift in shiftCleaningMap) {
           shiftCleaningMap[shift] += totalSuitesCleanings;
         } else {
-          // Se não existe, inicializa com o totalSuitesCleanings
-          shiftCleaningMap[shift] = totalSuitesCleanings;
+          // Se o turno não for reconhecido, adiciona ao Terceirizado
+          shiftCleaningMap['Terceirizado'] += totalSuitesCleanings;
         }
       }
     }
 
     // Converte o mapa em arrays para o retorno
     const shiftCleaning = {
-      categories: Object.keys(shiftCleaningMap), // Turnos
-      series: Object.values(shiftCleaningMap), // Valores agregados
+      categories: Object.keys(shiftCleaningMap),
+      series: Object.values(shiftCleaningMap),
     };
 
-    const cleaningByDate = cleaningsByPeriod.reduce((acc, curr) => {
+    const cleaningByDate = cleaningsByPeriod.reduce<CleaningByDateAcc>((acc, curr) => {
       const timezone = 'America/Sao_Paulo';
-      const createdDate = moment.utc(curr.createdDate); // Data do registro no formato UTC
+      const createdDate = moment.utc(curr.createdDate);
 
       if (period === 'LAST_6_M') {
-        // Data de referência: dia atual (ajustada para o dia anterior)
         const today = moment.tz(timezone).subtract(1, 'day');
-        const currentDay = today.date(); // Dia do mês ajustado
+        const currentDay = today.date();
 
-        // Calcula as datas específicas dos últimos 6 meses no mesmo dia anterior
         const last6MonthsDates = Array.from({ length: 6 }, (_, i) =>
           today
             .clone()
@@ -384,7 +426,6 @@ export class GovernanceService {
             .startOf('day'),
         );
 
-        // Ajusta a data para UTC no horário 05:59:59.999Z
         const last6MonthsUTC = last6MonthsDates.map((date) =>
           date
             .clone()
@@ -392,19 +433,16 @@ export class GovernanceService {
             .set({ hour: 5, minute: 59, second: 59, millisecond: 999 }),
         );
 
-        // Verifica se a data está dentro das datas calculadas em UTC
         const isMatchingDate = last6MonthsUTC.some((date) =>
           createdDate.isSame(date, 'day'),
         );
 
         if (!isMatchingDate) {
-          return acc; // Ignora se a data não pertence aos últimos 6 meses
+          return acc;
         }
       }
 
-      // Para períodos diferentes de LAST_6_M, não há filtro adicional
-      const dateKey = createdDate.format('DD/MM/YYYY'); // Formato desejado
-
+      const dateKey = createdDate.format('DD/MM/YYYY');
       const totalSuitesCleanings = Number(curr.totalSuitesCleanings);
 
       if (!acc[dateKey]) {
@@ -418,22 +456,13 @@ export class GovernanceService {
 
     // Agora, formatamos o resultado em dois arrays: categories e series
     const formattedCleaningByDate = {
-      categories: [],
-      series: [],
+      categories: Object.keys(cleaningByDate),
+      series: Object.keys(cleaningByDate).map(date => cleaningByDate[date].totalSuitesCleanings),
     };
 
-    // Preenche os arrays com os dados acumulados
-    Object.keys(cleaningByDate).forEach((date) => {
-      formattedCleaningByDate.categories.push(date);
-      formattedCleaningByDate.series.push(
-        cleaningByDate[date].totalSuitesCleanings,
-      );
-    });
-
-    const formattedForApexCharts = (cleaningsByPeriodShift) => {
-      // Adicionamos 'period' como parâmetro
-      const categories = []; // Para armazenar as datas únicas
-      const shiftsData = {
+    const formattedForApexCharts = (cleaningsByPeriodShiftParam: any[], periodParam: PeriodEnum) => {
+      const categories: string[] = [];
+      const shiftsData: ShiftsData = {
         Manhã: [],
         Tarde: [],
         Noite: [],
@@ -442,13 +471,10 @@ export class GovernanceService {
 
       const timezone = 'America/Sao_Paulo';
 
-      // Caso o período seja LAST_6_M, ajusta a data para pegar o dia de ontem dos últimos 6 meses
-      if (period === 'LAST_6_M') {
-        // Data de referência: dia de ontem ajustado
+      if (periodParam === PeriodEnum.LAST_6_M) {
         const today = moment.tz(timezone).subtract(1, 'day');
-        const currentDay = today.date(); // Dia do mês ajustado
+        const currentDay = today.date();
 
-        // Calcula as datas específicas dos últimos 6 meses no mesmo dia anterior
         const last6MonthsDates = Array.from({ length: 6 }, (_, i) =>
           today
             .clone()
@@ -457,7 +483,6 @@ export class GovernanceService {
             .startOf('day'),
         );
 
-        // Ajusta as datas para UTC no horário 05:59:59.999Z
         const last6MonthsUTC = last6MonthsDates.map((date) =>
           date
             .clone()
@@ -465,47 +490,41 @@ export class GovernanceService {
             .set({ hour: 5, minute: 59, second: 59, millisecond: 999 }),
         );
 
-        // Adiciona as datas formatadas para o array de categorias
         categories.push(
           ...last6MonthsUTC.map((date) => date.format('DD/MM/YYYY')),
         );
 
-        // Filtra os dados de acordo com as datas calculadas
-        cleaningsByPeriodShift = cleaningsByPeriodShift.filter((cleaning) => {
+        cleaningsByPeriodShiftParam = cleaningsByPeriodShiftParam.filter((cleaning) => {
           const createdDate = moment
             .utc(cleaning.createdDate)
             .tz(timezone)
-            .startOf('day'); // Ajusta para início do dia no timezone
+            .startOf('day');
 
-          // Verifica se a data corresponde a uma das datas no array
           return last6MonthsUTC.some((date) => createdDate.isSame(date, 'day'));
         });
       } else {
-        // Para outros períodos, define as categorias com base nos dados
-        cleaningsByPeriodShift.forEach((cleaning) => {
+        cleaningsByPeriodShiftParam.forEach((cleaning) => {
           const createdDate = moment
             .utc(cleaning.createdDate)
             .tz(timezone)
-            .format('DD/MM/YYYY'); // Formata a data no padrão esperado
+            .format('DD/MM/YYYY');
 
           if (!categories.includes(createdDate)) {
             categories.push(createdDate);
           }
         });
 
-        // Ordena as categorias em ordem crescente
         categories.sort((a, b) =>
           moment(a, 'DD/MM/YYYY').isBefore(moment(b, 'DD/MM/YYYY')) ? -1 : 1,
         );
       }
 
-      // Processa os dados para gerar os valores no gráfico
-      cleaningsByPeriodShift.forEach((cleaning) => {
+      cleaningsByPeriodShiftParam.forEach((cleaning) => {
         const createdDate = moment
           .utc(cleaning.createdDate)
           .tz(timezone)
-          .format('DD/MM/YYYY'); // Formata a data no padrão esperado
-        const shift = cleaning.shift; // Ex: 'Manhã', 'Tarde', 'Noite', 'Terceirizado'
+          .format('DD/MM/YYYY');
+        const shift = cleaning.shift;
         const employeeName = cleaning.employeeName;
         const totalSuitesCleanings = Number(cleaning.totalSuitesCleanings);
 
@@ -531,59 +550,48 @@ export class GovernanceService {
         }
       });
 
-      // Preenche dados faltantes caso algum funcionário não tenha dado para uma data
       for (const shift in shiftsData) {
         shiftsData[shift].forEach((employeeData) => {
           if (employeeData.data.length < categories.length) {
             employeeData.data = [
               ...employeeData.data,
-              ...new Array(categories.length - employeeData.data.length).fill(
-                0,
-              ),
+              ...new Array(categories.length - employeeData.data.length).fill(0),
             ];
           }
         });
       }
 
-      // Cria a estrutura de série como objeto com turnos como chaves
-      const series = Object.entries(shiftsData).reduce(
-        (acc, [shift, employees]) => {
-          acc[shift] = employees;
-          return acc;
-        },
-        {},
-      );
-
       return {
         categories,
-        series,
+        series: shiftsData,
       };
     };
 
-    const employeeReport = cleanings.reduce((acc, cleaning) => {
-      const {
-        shift,
-        employeeName,
-        totalSuitesCleanings,
-        totalDaysWorked,
-        averageDailyCleaning,
-      } = cleaning;
+    const employeeReport = cleanings.reduce<EmployeeReportByShift>(
+      (acc, cleaning) => {
+        const {
+          shift,
+          employeeName,
+          totalSuitesCleanings,
+          totalDaysWorked,
+          averageDailyCleaning,
+        } = cleaning;
 
-      // Verifica se já existe o turno no acumulador, senão cria como um array
-      if (!acc[shift]) {
-        acc[shift] = [];
-      }
+        if (!acc[shift]) {
+          acc[shift] = [];
+        }
 
-      // Adiciona os dados do funcionário ao turno
-      acc[shift].push({
-        employeeName: employeeName,
-        totalSuitesCleanings: totalSuitesCleanings,
-        totalDaysWorked: totalDaysWorked,
-        averageDailyCleaning: Number(averageDailyCleaning),
-      });
+        acc[shift].push({
+          employeeName,
+          totalSuitesCleanings,
+          totalDaysWorked,
+          averageDailyCleaning: Number(averageDailyCleaning),
+        });
 
-      return acc;
-    }, {});
+        return acc;
+      },
+      {},
+    );
 
     const teamSizing = cleaningsByWeek.reduce(
       (acc, cleaning) => {
@@ -598,18 +606,15 @@ export class GovernanceService {
           difference,
         } = cleaning;
 
-        // Função para remover acentos
-        const removeAccents = (str) => {
+        const removeAccents = (str: string): string => {
           return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         };
 
-        // Configura o timezone e formata o dia da semana
         const timezone = 'America/Sao_Paulo';
         const dayOfWeek = removeAccents(
           moment.tz(createdDate, timezone).format('dddd').replace('-feira', ''),
         );
 
-        // Inicializa o objeto do turno, se não existir
         if (!acc[shift]) {
           acc[shift] = {
             totalAverageShiftCleaning: Number(totalAverageShiftCleaning),
@@ -619,7 +624,6 @@ export class GovernanceService {
           };
         }
 
-        // Adiciona os dados do dia da semana
         acc[shift][dayOfWeek] = {
           totalCleanings: Number(totalSuitesCleanings),
           averageDailyWeekCleaning: Number(averageDailyWeekCleaning),
@@ -630,8 +634,15 @@ export class GovernanceService {
       {} as Record<string, any>,
     );
 
-    // Coleta os totais
-    const totals = {
+    type Totals = {
+      totalAverageDailyWeekCleaning: Record<string, number>;
+      totalIdealShiftMaid: number;
+      totalRealShiftMaid: number;
+      totalDifference: number;
+      totalAllAverageShiftCleaning: number;
+    };
+    
+    const totals: Totals = {
       totalAverageDailyWeekCleaning: {},
       totalIdealShiftMaid: 0,
       totalRealShiftMaid: 0,
@@ -639,7 +650,6 @@ export class GovernanceService {
       totalAllAverageShiftCleaning: 0,
     };
 
-    // Preenche os totais diretamente
     cleaningsByWeek.forEach((cleaning) => {
       const {
         totalAllAverageShiftCleaning,
@@ -650,20 +660,15 @@ export class GovernanceService {
         totalAverageDailyWeekCleaning,
       } = cleaning;
 
-      // Atribui os totais diretamente
-      totals.totalAllAverageShiftCleaning = Number(
-        totalAllAverageShiftCleaning,
-      );
-      totals.totalIdealShiftMaid = totalIdealShiftMaid; // Atribui diretamente
-      totals.totalRealShiftMaid = totalRealShiftMaid; // Atribui diretamente
-      totals.totalDifference = totalDifference; // Atribui diretamente
+      totals.totalAllAverageShiftCleaning = Number(totalAllAverageShiftCleaning);
+      totals.totalIdealShiftMaid = totalIdealShiftMaid;
+      totals.totalRealShiftMaid = totalRealShiftMaid;
+      totals.totalDifference = totalDifference;
 
-      // Função para remover acentos
-      const removeAccents = (str) => {
+      const removeAccents = (str: string): string => {
         return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       };
 
-      // Preenche os totais diários para cada dia da semana como um objeto
       const dayOfWeek = removeAccents(
         moment
           .tz(createdDate, 'America/Sao_Paulo')
@@ -671,14 +676,11 @@ export class GovernanceService {
           .replace('-feira', ''),
       );
 
-      // Atribui o valor diretamente ao totalAverageDailyWeekCleaning
-      // Se o dia já existir, soma os valores, caso contrário, inicializa
       totals.totalAverageDailyWeekCleaning[dayOfWeek] = Number(
         totalAverageDailyWeekCleaning,
       );
     });
 
-    // Adiciona os totais no objeto `teamSizing`
     teamSizing.Totals = totals;
 
     return {
@@ -690,7 +692,7 @@ export class GovernanceService {
         series: shiftCleaning.series,
       },
       CleaningByDate: formattedCleaningByDate,
-      EmployeeCleaningByShift: formattedForApexCharts(cleaningsByPeriodShift),
+      EmployeeCleaningByShift: formattedForApexCharts(cleaningsByPeriodShift, period),
       EmployeeReport: employeeReport,
       TeamSizing: teamSizing,
     };
@@ -1048,9 +1050,22 @@ ORDER BY
       this.prisma.prismaLocal.$queryRaw<
         { name: string; value: number }[]
       >(Prisma.sql([shiftCleaningSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([cleaningsByPeriodSql])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([cleaningsByPeriodShiftSql])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([employeeReportSql])),
+      this.prisma.prismaLocal.$queryRaw<{ date: string; totalCleanings: number }[]>(
+        Prisma.sql([cleaningsByPeriodSql])
+      ),
+      this.prisma.prismaLocal.$queryRaw<{
+        date: string;
+        shift: string;
+        employee_name: string;
+        total_cleanings: number;
+      }[]>(Prisma.sql([cleaningsByPeriodShiftSql])),
+      this.prisma.prismaLocal.$queryRaw<{
+        shift: string;
+        employee_name: string;
+        total_suites: number;
+        total_days: number;
+        average_daily_cleaning: number;
+      }[]>(Prisma.sql([employeeReportSql])),
       this.prisma.prismaLocal.$queryRaw<TeamSizingRow[]>(Prisma.sql([teamSizingSQL])),
     ]);
 
@@ -1142,14 +1157,10 @@ ORDER BY
     const shiftsMap: Record<
       string,
       Record<string, Record<string, number>>
-    > = {}; // shift -> employee -> date -> count
+    > = {};
 
-    for (const {
-      date,
-      shift,
-      employee_name,
-      total_cleanings,
-    } of rawCleaningPeriodShiftResult) {
+    for (const row of rawCleaningPeriodShiftResult) {
+      const { date, shift, employee_name, total_cleanings } = row;
       const key = isMonthly
         ? moment(date, 'YYYY-MM-DD').format('YYYY-MM')
         : moment(date, 'YYYY-MM-DD').format('YYYY-MM-DD');
@@ -1160,22 +1171,24 @@ ORDER BY
       shiftsMap[shift][employee_name][key] = total_cleanings;
     }
 
-    // Usa os mesmos dateKeys já definidos anteriormente
     const cleaningsByPeriodShift = {
       categories: dateKeys.map((key) =>
         isMonthly
           ? moment(key, 'YYYY-MM').format('MM/YYYY')
           : moment(key).format('DD/MM/YYYY'),
       ),
-      series: Object.entries(shiftsMap).reduce((acc, [shift, employees]) => {
-        acc[shift] = Object.entries(employees).map(
-          ([employeeName, dateCounts]) => ({
-            name: employeeName,
-            data: dateKeys.map((dateKey) => dateCounts[dateKey] || 0),
-          }),
-        );
-        return acc;
-      }, {}),
+      series: Object.entries(shiftsMap).reduce<Record<string, { name: string; data: number[] }[]>>(
+        (acc, [shift, employees]) => {
+          acc[shift] = Object.entries(employees).map(
+            ([employeeName, dateCounts]) => ({
+              name: employeeName,
+              data: dateKeys.map((dateKey) => dateCounts[dateKey] || 0),
+            }),
+          );
+          return acc;
+        },
+        {},
+      ),
     };
 
     const employeeReport: Record<string, any[]> = {};
@@ -1192,7 +1205,7 @@ ORDER BY
       });
     }
 
-    const totals = {
+    const totals: Record<string, any> = {
       totalAverageDailyWeekCleaning: {},
       totalIdealShiftMaid: 0,
       totalRealShiftMaid: 0,
@@ -1222,7 +1235,7 @@ ORDER BY
         }
 
         totals.totalAverageDailyWeekCleaning[weekday] += Number(
-          values.averageDailyWeekCleaning,
+          (values as any).averageDailyWeekCleaning,
         );
       }
 

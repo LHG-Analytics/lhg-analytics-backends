@@ -173,9 +173,15 @@ export class BookingsRepresentativenessService {
       };
     } catch (error) {
       console.error('Erro ao buscar Bookings Representativeness data:', error);
-      throw new BadRequestException(
-        `Failed to fetch Bookings Representativeness data: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Failed to fetch Bookings Representativeness data: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Failed to fetch Bookings Representativeness data: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -185,7 +191,7 @@ export class BookingsRepresentativenessService {
     return this.prisma.prismaOnline.bookingsRepresentativeness.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -320,8 +326,12 @@ export class BookingsRepresentativenessService {
         'Erro ao calcular a representatividade de bookings por período:',
         error,
       );
+      let errorMessage = 'Erro desconhecido';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       throw new BadRequestException(
-        `Failed to calculate bookings representativeness by period: ${error.message}`,
+        `Falha ao calcular a representatividade de bookings por período: ${errorMessage}`,
       );
     }
   }
@@ -332,7 +342,7 @@ export class BookingsRepresentativenessService {
     return this.prisma.prismaOnline.bookingsRepresentativenessByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -480,11 +490,13 @@ export class BookingsRepresentativenessService {
 
         if (channelType) {
           // Acumula o valor atual ao total existente
-          const currentTotal = revenueByChannelType.get(channelType);
-          revenueByChannelType.set(
-            channelType,
-            currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
-          );
+          if (channelType) {
+            const currentTotal = revenueByChannelType.get(channelType) ?? new Prisma.Decimal(0);
+            revenueByChannelType.set(
+              channelType,
+              currentTotal.plus(new Prisma.Decimal(booking.priceRental ?? 0))
+            );
+          }          
         }
       });
 
@@ -496,7 +508,8 @@ export class BookingsRepresentativenessService {
       );
 
       // Calcular a representatividade para cada canal
-      const representativenessByChannel = {};
+      const representativenessByChannel: Record<ChannelTypeEnum, number> = {} as Record<ChannelTypeEnum, number>;
+      
       let totalAllRepresentativeness = new Prisma.Decimal(0); // Inicializa a representatividade total
 
       for (const [channelType, totalValue] of revenueByChannelType.entries()) {
@@ -544,9 +557,11 @@ export class BookingsRepresentativenessService {
         'Erro ao calcular a representatividade de bookings por canal:',
         error,
       );
-      throw new BadRequestException(
-        `Failed to calculate bookings representativeness by channel: ${error.message}`,
-      );
+      let errorMessage = 'Falha ao calcular a representatividade de bookings por canal.';
+      if (error instanceof Error) {
+        errorMessage += ` Detalhes: ${error.message}`;
+      }
+      throw new BadRequestException(errorMessage);
     }
   }
 
@@ -557,9 +572,9 @@ export class BookingsRepresentativenessService {
       {
         where: {
           period_createdDate_channelType: {
-            period: data.period,
+            period: data.period as PeriodEnum,
             createdDate: data.createdDate,
-            channelType: data.channelType,
+            channelType: data.channelType as ChannelTypeEnum,
           },
         },
         create: {

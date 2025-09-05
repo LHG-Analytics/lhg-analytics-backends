@@ -74,8 +74,14 @@ export class KpiRevparService {
         }),
       ]);
 
-      // Inicializar um mapa para armazenar os totais por categoria
-      const categoryTotalsMap = {};
+      type CategoryTotals = {
+        categoryTotalRentals: number;
+        categoryTotalRental: Prisma.Decimal;
+        giro: number;
+      };
+
+      const categoryTotalsMap: Record<number, CategoryTotals> = {};
+
 
       let totalRevenue = new Prisma.Decimal(0);
       let totalSuites = 0;
@@ -180,9 +186,15 @@ export class KpiRevparService {
       };
     } catch (error) {
       console.error('Erro ao calcular o KPI Revpar:', error);
-      throw new BadRequestException(
-        `Falha ao calcular KPI Revpar: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao calcular KPI Revpar: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao calcular KPI Revpar: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -191,7 +203,7 @@ export class KpiRevparService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -352,10 +364,17 @@ export class KpiRevparService {
       };
     } catch (error) {
       console.error('Erro ao calcular o total de RevPAR por período:', error);
-      throw new BadRequestException(
-        `Failed to calculate total RevPAR by period: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao calcular o total de RevPAR por período: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao calcular o total de RevPAR por período: erro desconhecido',
+        );
+      }
     }
+
   }
 
   async insertKpiRevparByPeriod(
@@ -364,7 +383,7 @@ export class KpiRevparService {
     return this.prisma.prismaOnline.kpiRevparByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

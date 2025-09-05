@@ -109,9 +109,15 @@ export class RestaurantSalesService {
       return formattedRestaurantRevenueData;
     } catch (error) {
       console.error('Erro ao buscar Restaurant Revenue data:', error);
-      throw new BadRequestException(
-        `Failed to fetch Restaurant Revenue data: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Failed to fetch Restaurant Revenue data: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Failed to fetch Restaurant Revenue data: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -121,8 +127,8 @@ export class RestaurantSalesService {
     return this.prisma.prismaOnline.restaurantSales.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
-          createdDate: data.createdDate,
+          period: data.period as PeriodEnum,
+          createdDate: data.createdDate as Date,
         },
       },
       create: {
@@ -252,19 +258,25 @@ export class RestaurantSalesService {
         'Erro ao calcular ranking de vendas do restaurante:',
         error,
       );
-      throw new BadRequestException(
-        `Failed to calculate restaurant sales ranking: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Failed to calculate restaurant sales ranking: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Failed to calculate restaurant sales ranking: erro desconhecido',
+        );
+      }
     }
   }
-
+       
   private async insertRestaurantSalesRanking(
     data: RestaurantSalesRanking,
   ): Promise<RestaurantSalesRanking> {
     return this.prisma.prismaOnline.restaurantSalesRanking.upsert({
       where: {
         period_createdDate_productName: {
-          period: data.period,
+          period: data.period as PeriodEnum, // Fazendo cast explícito para garantir o tipo correto
           createdDate: data.createdDate,
           productName: data.productName,
         },
@@ -385,7 +397,7 @@ export class RestaurantSalesService {
     return this.prisma.prismaOnline.restaurantSalesByFoodCategory.upsert({
       where: {
         period_createdDate_foodCategory: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
           foodCategory: data.foodCategory,
         },
@@ -503,7 +515,7 @@ export class RestaurantSalesService {
     return this.prisma.prismaOnline.restaurantSalesByDrinkCategory.upsert({
       where: {
         period_createdDate_drinkCategory: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
           drinkCategory: data.drinkCategory,
         },
@@ -620,7 +632,7 @@ export class RestaurantSalesService {
     return this.prisma.prismaOnline.restaurantSalesByOthersCategory.upsert({
       where: {
         period_createdDate_othersCategory: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
           othersCategory: data.othersCategory,
         },

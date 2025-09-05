@@ -20,7 +20,7 @@ import { CreateKpiAlosDto } from './kpiAlos/dto/create-kpiAlos.dto';
 import { UpdateKpiAlosDto } from './kpiAlos/dto/update-kpiAlos.dto';
 import { CreateKpiRevenueDto } from './kpiRevenue/dto/create-kpiRevenue.dto';
 import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
-import * as helmet from 'helmet';
+import helmet from 'helmet';
 
 // Carregar variáveis de ambiente do arquivo .env
 config();
@@ -30,21 +30,7 @@ async function bootstrap() {
     const app = await NestFactory.create(AppModule);
 
     // Configuração de segurança com Helmet
-    app.use(helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          scriptSrc: ["'self'"],
-          imgSrc: ["'self'", "data:", "https:"],
-        },
-      },
-      hsts: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true,
-      },
-    }));
+    app.use(helmet());
 
     const servicePrefix = process.env.SERVICE_PREFIX_IPIRANGA || 'ipiranga';
     app.setGlobalPrefix(`${servicePrefix}/api`);

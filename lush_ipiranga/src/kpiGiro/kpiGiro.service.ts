@@ -81,7 +81,13 @@ export class KpiGiroService {
       let totalSuites = 0; // Total de suítes de todas as categorias
       let allRentals = 0; // Total de locações de todas as categorias
 
-      const categoryTotalsMap = {};
+      type OccupancyTotals = {
+        giroTotal: number;
+        rentalsCount: number;
+      };
+      
+      const categoryTotalsMap: Record<number, OccupancyTotals> = {}; // Mapa para acumular os dados por categoria      
+
 
       // Calcula giro por categoria
       for (const suiteCategory of suiteCategories) {
@@ -176,8 +182,8 @@ export class KpiGiroService {
           totalResult,
         },
       ];
-    } catch (error) {
-      throw new BadRequestException(error.message);
+    } catch (error: any) {
+      throw new BadRequestException(error?.message || 'Erro desconhecido ao calcular KPI Giro');
     }
   }
 
@@ -186,7 +192,7 @@ export class KpiGiroService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -406,9 +412,11 @@ export class KpiGiroService {
       return kpiGiroByCategoryAndDay;
     } catch (error) {
       console.error('Erro ao calcular o total de KpiGiro por período:', error);
-      throw new BadRequestException(
-        `Falha ao calcular total de KpiGiro por período: ${error.message}`,
-      );
+      let mensagemErro = 'Falha ao calcular total de KpiGiro por período.';
+      if (error instanceof Error) {
+        mensagemErro += ` ${error.message}`;
+      }
+      throw new BadRequestException(mensagemErro);
     }
   }
 
@@ -417,7 +425,7 @@ export class KpiGiroService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

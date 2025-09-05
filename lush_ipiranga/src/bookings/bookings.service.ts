@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import {
@@ -14,6 +15,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class BookingsService {
+  private readonly logger = new Logger(BookingsService.name);
+  
   constructor(private prisma: PrismaService) {}
 
   async findAllBookings(period: PeriodEnum) {
@@ -98,14 +101,12 @@ export class BookingsService {
       .toDate();
 
     // Exibe as datas geradas
-    console.log('startDate:', startDate);
-    console.log('endDate:', endDate);
-    console.log('startDatePrevious:', startDatePrevious);
-    console.log('endDatePrevious:', endDatePrevious);
+    this.logger.debug(`Date range: ${startDate} to ${endDate}`);
+    this.logger.debug(`Previous date range: ${startDatePrevious} to ${endDatePrevious}`);
 
     // Função de filtro para LAST_6_M
-    const filterByDayOfMonth = (data, dayOfMonth) => {
-      return data.filter((item) => {
+    const filterByDayOfMonth = (data: any[], dayOfMonth: number) => {
+      return data.filter((item: any) => {
         const createdDate = moment
           .utc(item.createdDate)
           .tz('America/Sao_Paulo');
@@ -616,7 +617,7 @@ export class BookingsService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataRevenuePeriod = BookingsRevenueByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRevenuePeriod = filterByDayOfMonth(
         BookingsRevenueByPeriod,
         dayOfMonth,
@@ -637,7 +638,7 @@ export class BookingsService {
     let filteredDataRepresentativenessPeriod =
       BookingsRepresentativenessByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRepresentativenessPeriod = filterByDayOfMonth(
         BookingsRepresentativenessByPeriod,
         dayOfMonth,
@@ -659,7 +660,7 @@ export class BookingsService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataTotalRentalsPeriod = BookingsTotalRentalsByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataTotalRentalsPeriod = filterByDayOfMonth(
         BookingsTotalRentalsByPeriod,
         dayOfMonth,
@@ -679,17 +680,19 @@ export class BookingsService {
     };
 
     const kpiTableByChannelType = {
-      bookingsTotalRentalsByChannelType: {},
-      bookingsRevenueByChannelType: {},
-      bookingsTicketAverageByChannelType: {},
-      bookingsRepresentativenessByChannelType: {},
+      bookingsTotalRentalsByChannelType: {} as Record<string, number>,
+      bookingsRevenueByChannelType: {} as Record<string, number>,
+      bookingsTicketAverageByChannelType: {} as Record<string, number>,
+      bookingsRepresentativenessByChannelType: {} as Record<string, number>,
     };
 
     // Preencher bookingsTotalRentalsByChannelType
     BookingsTotalRentalsByChannelType.forEach((item) => {
-      kpiTableByChannelType.bookingsTotalRentalsByChannelType[
-        item.channelType
-      ] = Number(item.totalBookings);
+      if (item.channelType) {
+        kpiTableByChannelType.bookingsTotalRentalsByChannelType[
+          item.channelType
+        ] = Number(item.totalBookings);
+      }
     });
 
     // Adiciona o total de bookings
@@ -701,8 +704,10 @@ export class BookingsService {
 
     // Preencher bookingsRevenueByChannelType
     BookingsRevenueByChannelType.forEach((item) => {
-      kpiTableByChannelType.bookingsRevenueByChannelType[item.channelType] =
-        Number(item.totalValue); // Garantir que seja um número
+      if (item.channelType) {
+        kpiTableByChannelType.bookingsRevenueByChannelType[item.channelType] =
+          Number(item.totalValue); // Garantir que seja um número
+      }
     });
 
     // Adiciona o total de revenue
@@ -713,9 +718,11 @@ export class BookingsService {
 
     // Preencher bookingsTicketAverageByChannelType
     BookingsTicketAverageByChannelType.forEach((item) => {
-      kpiTableByChannelType.bookingsTicketAverageByChannelType[
-        item.channelType
-      ] = Number(item.totalTicketAverage); // Garantir que seja um número
+      if (item.channelType) {
+        kpiTableByChannelType.bookingsTicketAverageByChannelType[
+          item.channelType
+        ] = Number(item.totalTicketAverage); // Garantir que seja um número
+      }
     });
 
     // Adiciona o total de ticket average
@@ -727,9 +734,11 @@ export class BookingsService {
 
     // Preencher bookingsRepresentativenessByChannelType
     BookingsRepresentativenessByChannelType.forEach((item) => {
-      kpiTableByChannelType.bookingsRepresentativenessByChannelType[
-        item.channelType
-      ] = Number(item.totalRepresentativeness); // Garantir que seja um número
+      if (item.channelType) {
+        kpiTableByChannelType.bookingsRepresentativenessByChannelType[
+          item.channelType
+        ] = Number(item.totalRepresentativeness); // Garantir que seja um número
+      }
     });
 
     // Adiciona o total de representatividade
@@ -754,19 +763,19 @@ export class BookingsService {
         ),
         totalAllTicketAverage: Number(
           BookingsRevenueByChannelTypeEcommerce._sum.totalValue
-            .dividedBy(
-              BookingsTotalRentalsByChannelTypeEcommerce._sum.totalBookings ||
-                1, // Usar 1 como divisor padrão para evitar divisão por zero
-            )
-            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
+            ? BookingsRevenueByChannelTypeEcommerce._sum.totalValue.dividedBy(
+                BookingsTotalRentalsByChannelTypeEcommerce._sum.totalBookings ||
+                  1, // Usar 1 como divisor padrão para evitar divisão por zero
+              ).toFixed(2)
+            : 0, // Se o resultado for NaN, retorna 0
         ),
 
         totalAllRepresentativeness: Number(
           BookingsRevenueByChannelTypeEcommerce._sum.totalValue
-            .dividedBy(
-              KpiRevenue[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
-            )
-            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
+            ? BookingsRevenueByChannelTypeEcommerce._sum.totalValue.dividedBy(
+                KpiRevenue[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
+              ).toFixed(2)
+            : 0, // Se o resultado for NaN, retorna 0
         ),
       },
 
@@ -781,19 +790,19 @@ export class BookingsService {
         ),
         totalAllTicketAveragePreviousData: Number(
           BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue
-            .dividedBy(
-              BookingsTotalRentalsByChannelTypeEcommercePrevious._sum
-                .totalBookings || 1, // Usar 1 como divisor padrão para evitar divisão por zero
-            )
-            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
+            ? BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue.dividedBy(
+                BookingsTotalRentalsByChannelTypeEcommercePrevious._sum
+                  .totalBookings || 1, // Usar 1 como divisor padrão para evitar divisão por zero
+              ).toFixed(2)
+            : 0, // Se o resultado for NaN, retorna 0
         ),
 
         totalAllRepresentativenessPreviousData: Number(
           BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue
-            .dividedBy(
-              KpiRevenuePreviousData[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
-            )
-            .toFixed(2) || 0, // Se o resultado for NaN, retorna 0
+            ? BookingsRevenueByChannelTypeEcommercePrevious._sum.totalValue.dividedBy(
+                KpiRevenuePreviousData[0]?.totalAllValue || 1, // Usar 1 como divisor padrão para evitar divisão por zero
+              ).toFixed(2)
+            : 0, // Se o resultado for NaN, retorna 0
         ),
       },
     };
@@ -802,7 +811,7 @@ export class BookingsService {
     let filteredDataTotalRentalsByPeriodEcommerce =
       BookingsTotalRentalsByPeriodEcommerce;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataTotalRentalsByPeriodEcommerce = filterByDayOfMonth(
         BookingsTotalRentalsByPeriodEcommerce,
         dayOfMonth,
@@ -824,7 +833,7 @@ export class BookingsService {
     // Aplicar o filtro se o período for LAST_6_M
     let filteredDataRevenueByPeriodEcommerce = BookingsRevenueByPeriodEcommerce;
     if (period === PeriodEnum.LAST_6_M) {
-      const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
+      const dayOfMonth = startDate.getDate(); // Obter o dia do mês do startDate
       filteredDataRevenueByPeriodEcommerce = filterByDayOfMonth(
         BookingsRevenueByPeriodEcommerce,
         dayOfMonth,
@@ -1222,16 +1231,18 @@ export class BookingsService {
           const paymentName = halfPaymentMap.get(halfPaymentId); // Obtém o nome do meio de pagamento
 
           // Inicializa o total para o meio de pagamento se não existir
-          if (!revenueByPaymentMethod.has(paymentName)) {
+          if (paymentName !== undefined && !revenueByPaymentMethod.has(paymentName)) {
             revenueByPaymentMethod.set(paymentName, new Prisma.Decimal(0));
           }
 
           // Acumula o valor atual ao total existente
-          const currentTotal = revenueByPaymentMethod.get(paymentName);
-          revenueByPaymentMethod.set(
-            paymentName,
-            currentTotal.plus(new Prisma.Decimal(booking.priceRental || 0)),
-          );
+          if (paymentName !== undefined) {
+            const currentTotal = revenueByPaymentMethod.get(paymentName) ?? new Prisma.Decimal(0);
+            revenueByPaymentMethod.set(
+              paymentName,
+              currentTotal.plus(new Prisma.Decimal(booking.priceRental || 0)),
+            );
+          }
         }
       }
 
@@ -1245,10 +1256,10 @@ export class BookingsService {
         totalValue,
       ] of revenueByPaymentMethod.entries()) {
         // Adiciona o nome do método de pagamento à array de categorias
-        paymentMethods.categories.push(paymentName);
+        (paymentMethods.categories as string[]).push(paymentName);
 
         // Adiciona o valor total à array de séries
-        paymentMethods.series.push(totalValue.toNumber()); // Converte para número, se necessário
+        (paymentMethods.series as number[]).push(totalValue.toNumber()); // Converte para número, se necessário
       }
 
       // Mapa para armazenar os totais por channelType
@@ -1329,10 +1340,17 @@ export class BookingsService {
         if (channelType) {
           // Acumula o valor atual ao total existente
           const currentTotal = revenueByChannelType.get(channelType);
-          revenueByChannelType.set(
-            channelType,
-            currentTotal.plus(new Prisma.Decimal(booking.priceRental || 0)),
-          );
+          if (currentTotal !== undefined) {
+            revenueByChannelType.set(
+              channelType,
+              currentTotal.plus(new Prisma.Decimal(booking.priceRental || 0)),
+            );
+          } else {
+            revenueByChannelType.set(
+              channelType,
+              new Prisma.Decimal(booking.priceRental || 0),
+            );
+          }
         }
       });
 
@@ -1346,9 +1364,9 @@ export class BookingsService {
         categories,
         series,
       };
-
+      
       // Inicializa um contador para cada tipo de locação
-      const rentalCounts = {
+      const rentalCounts: Record<RentalTypeEnum, number> = {
         [RentalTypeEnum.THREE_HOURS]: 0,
         [RentalTypeEnum.SIX_HOURS]: 0,
         [RentalTypeEnum.TWELVE_HOURS]: 0,
@@ -1356,36 +1374,32 @@ export class BookingsService {
         [RentalTypeEnum.OVERNIGHT]: 0,
         [RentalTypeEnum.DAILY]: 0,
       };
-
+      
       // Cria o objeto final
       const reservationsByRentalType = {
-        categories: [],
-        series: [],
+        categories: [] as RentalTypeEnum[],
+        series: [] as number[],
       };
-
+      
       // Processa cada reserva para contar o tipo de locação
       for (const booking of allBookings) {
-        const checkIn = booking.rentalApartment?.checkIn; // Acessa checkIn do apartamento
-        const checkOut = booking.rentalApartment?.checkOut; // Acessa checkOut do apartamento
-
-        // Determina o tipo de locação
-        const rentalType = this.determineRentalPeriod(
-          checkIn,
-          checkOut,
-          allBookings,
-        );
-
-        // Incrementa o contador para o tipo de locação correspondente
-        if (rentalCounts[rentalType] !== undefined) {
-          rentalCounts[rentalType]++;
+        const checkIn = booking.rentalApartment?.checkIn;
+        const checkOut = booking.rentalApartment?.checkOut;
+      
+        if (checkIn && checkOut) {
+          const rentalType = this.determineRentalPeriod(checkIn, checkOut, allBookings);
+      
+          // Incrementa o contador se o rentalType for válido
+          if (rentalType && Object.prototype.hasOwnProperty.call(rentalCounts, rentalType)) {
+            rentalCounts[rentalType as RentalTypeEnum]++;
+          }
         }
       }
-
       // Preenche as arrays de categorias e séries com os resultados
-      for (const rentalType in rentalCounts) {
+      for (const rentalType of Object.keys(rentalCounts) as RentalTypeEnum[]) {
         reservationsByRentalType.categories.push(rentalType);
         reservationsByRentalType.series.push(rentalCounts[rentalType]);
-      }
+      }      
 
       const billingOfReservationsByPeriod = {
         categories: [],
@@ -1414,8 +1428,8 @@ export class BookingsService {
         });
 
         // Adiciona a data e o total ao objeto de retorno
-        billingOfReservationsByPeriod.categories.push(dateKey);
-        billingOfReservationsByPeriod.series.push(
+        (billingOfReservationsByPeriod.categories as string[]).push(dateKey);
+        (billingOfReservationsByPeriod.series as number[]).push(
           totalValueForCurrentDate.toNumber(),
         ); // Converte para número
 
@@ -1530,8 +1544,8 @@ export class BookingsService {
             : 0; // Se totalRevenue for null ou zero, retorna 0
 
         // Adiciona a data e a representatividade ao objeto de retorno
-        representativenessOfReservesByPeriod.categories.push(dateKey);
-        representativenessOfReservesByPeriod.series.push(representativeness);
+        (representativenessOfReservesByPeriod.categories as string[]).push(dateKey);
+        (representativenessOfReservesByPeriod.series as number[]).push(representativeness);
 
         // Avança para o próximo dia
         currentDateRep = currentDateRep.add(1, 'day'); // Atualiza currentDateRep para o próximo dia
@@ -1575,8 +1589,8 @@ export class BookingsService {
         );
 
         // Adiciona o resultado ao objeto de resultados
-        numberOfReservationsPerPeriod.categories.push(dateKey);
-        numberOfReservationsPerPeriod.series.push(
+        (numberOfReservationsPerPeriod.categories as string[]).push(dateKey);
+        (numberOfReservationsPerPeriod.series as number[]).push(
           totalBookingsForCurrentPeriod,
         );
 
@@ -1588,12 +1602,51 @@ export class BookingsService {
       numberOfReservationsPerPeriod.categories.reverse();
       numberOfReservationsPerPeriod.series.reverse();
 
-      const kpiTableByChannelType = {
-        bookingsTotalRentalsByChannelType: {},
-        bookingsRevenueByChannelType: {},
-        bookingsTicketAverageByChannelType: {},
-        bookingsRepresentativenessByChannelType: {},
-      };
+      type ChannelTypeMap = Record<ChannelTypeEnum, number>;
+
+const kpiTableByChannelType: {
+  bookingsTotalRentalsByChannelType: ChannelTypeMap;
+  bookingsRevenueByChannelType: ChannelTypeMap;
+  bookingsTicketAverageByChannelType: ChannelTypeMap;
+  bookingsRepresentativenessByChannelType: ChannelTypeMap;
+} = {
+  bookingsTotalRentalsByChannelType: {
+    [ChannelTypeEnum.WEBSITE_IMMEDIATE]: 0,
+    [ChannelTypeEnum.WEBSITE_SCHEDULED]: 0,
+    [ChannelTypeEnum.INTERNAL]: 0,
+    [ChannelTypeEnum.GUIA_GO]: 0,
+    [ChannelTypeEnum.GUIA_SCHEDULED]: 0,
+    [ChannelTypeEnum.BOOKING]: 0,
+    [ChannelTypeEnum.EXPEDIA]: 0,
+  },
+  bookingsRevenueByChannelType: {
+    [ChannelTypeEnum.WEBSITE_IMMEDIATE]: 0,
+    [ChannelTypeEnum.WEBSITE_SCHEDULED]: 0,
+    [ChannelTypeEnum.INTERNAL]: 0,
+    [ChannelTypeEnum.GUIA_GO]: 0,
+    [ChannelTypeEnum.GUIA_SCHEDULED]: 0,
+    [ChannelTypeEnum.BOOKING]: 0,
+    [ChannelTypeEnum.EXPEDIA]: 0,
+  },
+  bookingsTicketAverageByChannelType: {
+    [ChannelTypeEnum.WEBSITE_IMMEDIATE]: 0,
+    [ChannelTypeEnum.WEBSITE_SCHEDULED]: 0,
+    [ChannelTypeEnum.INTERNAL]: 0,
+    [ChannelTypeEnum.GUIA_GO]: 0,
+    [ChannelTypeEnum.GUIA_SCHEDULED]: 0,
+    [ChannelTypeEnum.BOOKING]: 0,
+    [ChannelTypeEnum.EXPEDIA]: 0,
+  },
+  bookingsRepresentativenessByChannelType: {
+    [ChannelTypeEnum.WEBSITE_IMMEDIATE]: 0,
+    [ChannelTypeEnum.WEBSITE_SCHEDULED]: 0,
+    [ChannelTypeEnum.INTERNAL]: 0,
+    [ChannelTypeEnum.GUIA_GO]: 0,
+    [ChannelTypeEnum.GUIA_SCHEDULED]: 0,
+    [ChannelTypeEnum.BOOKING]: 0,
+    [ChannelTypeEnum.EXPEDIA]: 0,
+  },
+};
 
       // Inicializa o objeto para armazenar contagem e receita
       const channelData = {
@@ -1621,7 +1674,7 @@ export class BookingsService {
       // Processa cada reserva para contar o tipo de canal e calcular a receita
       for (const booking of allBookings) {
         const channelType = getChannelType(
-          booking.originBooking.id,
+          booking.originBooking?.id ?? 0,
           booking.dateService,
           booking.startDate,
         );
@@ -1652,6 +1705,7 @@ export class BookingsService {
         ...Object.fromEntries(
           Object.entries(channelData).map(([key, { count }]) => [key, count]),
         ),
+        // @ts-expect-error: Propriedade adicional TOTALALLBOOKINGS adicionada intencionalmente
         TOTALALLBOOKINGS: totalAllBookingsChannelType,
       };
 
@@ -1662,6 +1716,7 @@ export class BookingsService {
             revenue.toNumber(),
           ]),
         ),
+        // @ts-expect-error: Propriedade adicional TOTALALLVALUE adicionada intencionalmente
         TOTALALLVALUE: totalAllValueChannelType.toNumber(),
       };
 
@@ -1680,6 +1735,7 @@ export class BookingsService {
             return [key, Number(average.toFixed(2))];
           }),
         ),
+        // @ts-expect-error: Propriedade adicional TOTALALLTICKETAVERAGE adicionada intencionalmente
         TOTALALLTICKETAVERAGE: Number(
           totalAllTicketAverageByChannelType.toFixed(2),
         ),
@@ -1700,11 +1756,14 @@ export class BookingsService {
         const representativeness =
           totalAllRevenue && !totalAllRevenue.isZero() // Se a receita total for 0 ou null
             ? revenue.dividedBy(totalAllRevenue).toNumber() // Receita do canal dividido pela receita total
-            : 0; // Se totalRevenue for null ou zero , retorna 0
+            : 0; // Se totalRevenue for null ou zero, retorna 0
 
-        representativenessByChannel[channelType] = Number(
-          representativeness.toFixed(2),
-        );
+        // Corrigido: representativeness pode ser number, então só chama toFixed se for number
+        // Adiciona assinatura de índice para evitar erro de tipagem
+        (representativenessByChannel as Record<string, number>)[channelType] = 
+          typeof representativeness === 'number'
+            ? Number(representativeness.toFixed(2))
+            : 0;
 
         // Acumula a representatividade total
         totalAllRepresentativenessByChannelType =
@@ -1724,62 +1783,41 @@ export class BookingsService {
       // Adiciona a representatividade ao objeto kpiTableByChannelType
       kpiTableByChannelType.bookingsRepresentativenessByChannelType = {
         ...representativenessByChannel,
-        TOTALALLREPRESENTATIVENESS: Number(
-          finalTotalAllRepresentativeness.toFixed(2),
-        ),
-      };
+        TOTALALLREPRESENTATIVENESS: Number(finalTotalAllRepresentativeness.toFixed(2)),
+      } as Record<string, number>;
+      
 
       const bigNumbersEcommerce = {
         currentDate: {
           // Captura a soma de totalAllValue
-          totalAllValue: Number(
-            kpiTableByChannelType.bookingsRevenueByChannelType[
-              ChannelTypeEnum.WEBSITE_IMMEDIATE
-            ] +
-              kpiTableByChannelType.bookingsRevenueByChannelType[
-                ChannelTypeEnum.WEBSITE_SCHEDULED
-              ],
-          ),
+          totalAllValue:
+            (kpiTableByChannelType.bookingsRevenueByChannelType[ChannelTypeEnum.WEBSITE_IMMEDIATE] ?? 0) +
+            (kpiTableByChannelType.bookingsRevenueByChannelType[ChannelTypeEnum.WEBSITE_SCHEDULED] ?? 0),
+      
           // Captura a soma de totalAllBookings
-          totalAllBookings: Number(
-            kpiTableByChannelType.bookingsTotalRentalsByChannelType[
-              ChannelTypeEnum.WEBSITE_IMMEDIATE
-            ] +
-              kpiTableByChannelType.bookingsTotalRentalsByChannelType[
-                ChannelTypeEnum.WEBSITE_SCHEDULED
-              ],
-          ),
+          totalAllBookings:
+            (kpiTableByChannelType.bookingsTotalRentalsByChannelType[ChannelTypeEnum.WEBSITE_IMMEDIATE] ?? 0) +
+            (kpiTableByChannelType.bookingsTotalRentalsByChannelType[ChannelTypeEnum.WEBSITE_SCHEDULED] ?? 0),
+      
           // Captura a soma de totalAllTicketAverage
-          totalAllTicketAverage: (function () {
+          totalAllTicketAverage: (() => {
             const totalValue =
-              kpiTableByChannelType.bookingsRevenueByChannelType[
-                ChannelTypeEnum.WEBSITE_IMMEDIATE
-              ] +
-              kpiTableByChannelType.bookingsRevenueByChannelType[
-                ChannelTypeEnum.WEBSITE_SCHEDULED
-              ];
+              (kpiTableByChannelType.bookingsRevenueByChannelType[ChannelTypeEnum.WEBSITE_IMMEDIATE] ?? 0) +
+              (kpiTableByChannelType.bookingsRevenueByChannelType[ChannelTypeEnum.WEBSITE_SCHEDULED] ?? 0);
+      
             const totalBookings =
-              kpiTableByChannelType.bookingsTotalRentalsByChannelType[
-                ChannelTypeEnum.WEBSITE_IMMEDIATE
-              ] +
-              kpiTableByChannelType.bookingsTotalRentalsByChannelType[
-                ChannelTypeEnum.WEBSITE_SCHEDULED
-              ];
-            return totalBookings > 0
-              ? Number((totalValue / totalBookings).toFixed(2))
-              : 0; // Evita divisão por zero
+              (kpiTableByChannelType.bookingsTotalRentalsByChannelType[ChannelTypeEnum.WEBSITE_IMMEDIATE] ?? 0) +
+              (kpiTableByChannelType.bookingsTotalRentalsByChannelType[ChannelTypeEnum.WEBSITE_SCHEDULED] ?? 0);
+      
+            return totalBookings > 0 ? Number((totalValue / totalBookings).toFixed(2)) : 0;
           })(),
+      
           // Captura a soma de totalAllRepresentativeness
-          totalAllRepresentativeness: Number(
-            kpiTableByChannelType.bookingsRepresentativenessByChannelType[
-              ChannelTypeEnum.WEBSITE_IMMEDIATE
-            ] +
-              kpiTableByChannelType.bookingsRepresentativenessByChannelType[
-                ChannelTypeEnum.WEBSITE_SCHEDULED
-              ],
-          ),
+          totalAllRepresentativeness:
+            (kpiTableByChannelType.bookingsRepresentativenessByChannelType[ChannelTypeEnum.WEBSITE_IMMEDIATE] ?? 0) +
+            (kpiTableByChannelType.bookingsRepresentativenessByChannelType[ChannelTypeEnum.WEBSITE_SCHEDULED] ?? 0),
         },
-      };
+      };      
 
       const reservationsOfEcommerceByPeriod = {
         categories: [],
@@ -1824,8 +1862,8 @@ export class BookingsService {
         );
 
         // Adiciona o resultado ao objeto de resultados
-        reservationsOfEcommerceByPeriod.categories.push(dateKey);
-        reservationsOfEcommerceByPeriod.series.push(
+        (reservationsOfEcommerceByPeriod.categories as string[]).push(dateKey);
+        (reservationsOfEcommerceByPeriod.series as number[]).push(
           totalBookingsForCurrentPeriod,
         );
 
@@ -1864,8 +1902,8 @@ export class BookingsService {
         });
 
         // Adiciona a data e o total ao objeto de retorno
-        billingOfEcommerceByPeriod.categories.push(dateKey);
-        billingOfEcommerceByPeriod.series.push(
+        (billingOfEcommerceByPeriod.categories as string[]).push(dateKey);
+        (billingOfEcommerceByPeriod.series as number[]).push(
           totalValueForCurrentDate.toNumber(),
         ); // Converte para número
 

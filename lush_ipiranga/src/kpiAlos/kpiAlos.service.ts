@@ -78,7 +78,13 @@ export class KpiAlosService {
       let totalOccupationTimeSeconds = 0; // Soma de todos os tempos de ocupação
       let totalRentals = 0; // Número total de ocupações
 
-      const categoryTotalsMap = {};
+      type OccupancyTotals = {
+        totalOccupationTimeSeconds: number;
+        totalRentals: number;
+      };
+      
+      const categoryTotalsMap: Record<number, OccupancyTotals> = {}; // Mapa para acumular os dados por categoria      
+
 
       // Calcula ocupação por categoria
       for (const suiteCategory of suiteCategories) {
@@ -93,13 +99,16 @@ export class KpiAlosService {
             suiteCategory.id
           ) {
             const suiteCategoryData = categoryTotalsMap[suiteCategory.id];
-            const occupationTimeSeconds = this.calculateOccupationTime(
-              rentalApartment.checkIn,
-              rentalApartment.checkOut,
-            );
+            // Garantir que checkIn e checkOut não sejam nulos antes de calcular
+            let occupationTimeSeconds = 0;
+            if (rentalApartment.checkIn && rentalApartment.checkOut) {
+              occupationTimeSeconds = this.calculateOccupationTime(
+                rentalApartment.checkIn,
+                rentalApartment.checkOut,
+              );
+            }
 
-            suiteCategoryData.totalOccupationTimeSeconds +=
-              occupationTimeSeconds;
+            suiteCategoryData.totalOccupationTimeSeconds += occupationTimeSeconds;
             suiteCategoryData.totalRentals++;
 
             // Acumular os valores para cálculo total
@@ -158,8 +167,12 @@ export class KpiAlosService {
           totalAverageOccupationTime,
         },
       ];
-    } catch (error) {
-      throw new BadRequestException(error.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        throw new BadRequestException(error.message);
+      } else {
+        throw new BadRequestException('Ocorreu um erro desconhecido.');
+      }
     }
   }
 
@@ -168,7 +181,7 @@ export class KpiAlosService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

@@ -68,8 +68,9 @@ export class ApartmentInspectionController {
         period,
       );
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to fetch inspections: ${error.message}`,
+        `Failed to fetch inspections: ${errorMessage}`,
       );
     }
   }
@@ -116,8 +117,9 @@ export class ApartmentInspectionController {
       // Chama o método do serviço que executa as operações do cron job
       return await this.ApartmentInspectionService.handleCron();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to run the cron job: ${error.message}`,
+        `Failed to run the cron job: ${errorMessage}`,
       );
     }
   }

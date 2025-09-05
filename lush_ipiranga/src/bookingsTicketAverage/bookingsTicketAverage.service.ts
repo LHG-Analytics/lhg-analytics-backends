@@ -103,9 +103,11 @@ export class BookingsTicketAverageService {
       return totalResult;
     } catch (error) {
       console.error('Erro ao buscar Bookings TicketAverage data:', error);
-      throw new BadRequestException(
-        `Failed to fetch Bookings TicketAverage data: ${error.message}`,
-      );
+      let errorMessage = 'Erro ao buscar Bookings TicketAverage data.';
+      if (error instanceof Error) {
+        errorMessage = `Failed to fetch Bookings TicketAverage data: ${error.message}`;
+      }
+      throw new BadRequestException(errorMessage);
     }
   }
 
@@ -115,7 +117,7 @@ export class BookingsTicketAverageService {
     return this.prisma.prismaOnline.bookingsTicketAverage.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -240,11 +242,14 @@ export class BookingsTicketAverageService {
 
     // Processa cada reserva para calcular o total e a contagem por canal
     for (const booking of allBookings) {
-      const channelType = getChannelType(
-        booking.originBooking.id, // Acessa o idTypeOriginBooking da reserva
-        booking.dateService, // Acessa a data do serviço
-        booking.startDate, // Passa a data de início
-      );
+      // Verifica se originBooking existe antes de acessar o id
+      const channelType = booking.originBooking
+        ? getChannelType(
+            booking.originBooking.id, // Acessa o idTypeOriginBooking da reserva
+            booking.dateService, // Acessa a data do serviço
+            booking.startDate, // Passa a data de início
+          )
+        : null;
 
       if (channelType) {
         const priceRental = booking.priceRental
@@ -261,9 +266,9 @@ export class BookingsTicketAverageService {
     let totalCount = 0;
     let totalSum = new Prisma.Decimal(0);
 
-    for (const [channel, { total, count }] of Object.entries(channelTotals)) {
+    for (const [channel, { total, count }] of Object.entries(channelTotals) as [string, { total: Prisma.Decimal, count: number }][]) {
       const average = count > 0 ? total.dividedBy(count).toNumber() : 0;
-      totalResults[channel] = {
+      (totalResults as Record<string, { total: string; average: string; count: number }>)[channel] = {
         total: this.formatCurrency(total.toNumber()), // Formata o total em reais
         average: this.formatCurrency(average), // Formata a média em reais
         count,
@@ -304,9 +309,9 @@ export class BookingsTicketAverageService {
     return this.prisma.prismaOnline.bookingsTicketAverageByChannelType.upsert({
       where: {
         period_createdDate_channelType: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
-          channelType: data.channelType,
+          channelType: data.channelType as ChannelTypeEnum,
         },
       },
       create: {

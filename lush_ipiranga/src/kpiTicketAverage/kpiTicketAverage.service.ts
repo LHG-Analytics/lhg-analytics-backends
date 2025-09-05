@@ -174,7 +174,14 @@ export class KpiTicketAverageService {
       let totalRental = new Prisma.Decimal(0);
       let totalRentals = 0;
 
-      const categoryTotalsMap = {};
+        // Tipos auxiliares
+      type CategoryTotals = {
+        categoryTotalSale: Prisma.Decimal;
+        categoryTotalRental: Prisma.Decimal;
+        categoryTotalRentals: number;
+      };
+
+      const categoryTotalsMap: Record<number, CategoryTotals> = {};
 
       for (const suiteCategory of suiteCategories) {
         categoryTotalsMap[suiteCategory.id] = {
@@ -322,7 +329,11 @@ export class KpiTicketAverageService {
         ...totalTicketAverageObject,
       };
     } catch (error) {
-      throw new BadRequestException(error.message);
+      if (error instanceof Error) {
+        throw new BadRequestException(error.message);
+      } else {
+        throw new BadRequestException('Ocorreu um erro desconhecido ao calcular o ticket médio.');
+      }
     }
   }
 
@@ -333,7 +344,7 @@ export class KpiTicketAverageService {
       where: {
         suiteCategoryId_period_createdDate: {
           suiteCategoryId: data.suiteCategoryId,
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -489,9 +500,15 @@ export class KpiTicketAverageService {
         'Erro ao calcular o total de Ticket Average por período:',
         error,
       );
-      throw new BadRequestException(
-        `Failed to calculate total Ticket Average by period: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao calcular o total de Ticket Average por período: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao calcular o total de Ticket Average por período: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -501,7 +518,7 @@ export class KpiTicketAverageService {
     return this.prisma.prismaOnline.kpiTicketAverageByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },

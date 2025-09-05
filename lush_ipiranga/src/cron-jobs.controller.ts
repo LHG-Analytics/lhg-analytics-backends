@@ -24,8 +24,12 @@ export class CronJobsController {
         message: 'Execução manual dos cron jobs concluída com sucesso.',
       };
     } catch (error) {
+      let mensagemErro = 'Erro ao executar cron jobs manualmente.';
+      if (error instanceof Error) {
+        mensagemErro += ' ' + error.message;
+      }
       throw new HttpException(
-        'Erro ao executar cron jobs manualmente: ' + error.message,
+        mensagemErro,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

@@ -28,14 +28,30 @@ export class CreateUserDto {
   @ApiProperty({ example: 'senha123' })
   @IsNotEmpty({ message: 'A senha é obrigatória' })
   @IsString({ message: 'A senha deve conter 8 dígitos' })
-  password?: string;
+  password: string;
 
   @ApiProperty({ example: 'admin' })
   @IsNotEmpty({ message: 'A função (role) é obrigatória' })
   @IsString({ message: 'A função (role) deve ser uma string' })
-  role?: Role;
+  role: Role;
 
   @ApiProperty({ example: 'Lush Ipiranga' })
   @IsString({ message: 'O nome da empresa deve ser uma string' })
   company: string;
+
+  constructor(
+    email: string,
+    name: string,
+    cpf: string,
+    password: string,
+    role: Role,
+    company: string,
+  ) {
+    this.email = email;
+    this.name = name;
+    this.cpf = cpf;
+    this.password = password;
+    this.role = role;
+    this.company = company;
+  }
 }

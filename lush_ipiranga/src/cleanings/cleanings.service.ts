@@ -133,7 +133,8 @@ export class CleaningsService {
         }
 
         // Determina o turno com base no businessStartTime do funcionário
-        const shift = getShiftByBusinessStartTime(businessStartTime);
+        // Corrige o tipo para garantir que não seja undefined
+        const shift = getShiftByBusinessStartTime(businessStartTime ?? null);
         // Inicializa os dados para o funcionário no turno, se ainda não existirem
         if (!groupedByShifts[shift][employeeName]) {
           groupedByShifts[shift][employeeName] = {
@@ -197,16 +198,22 @@ export class CleaningsService {
       // Formatar e inserir os dados para cada turno
       await Promise.all(
         Object.keys(groupedByShifts).map((shift) =>
-          formatAndInsertShiftData(groupedByShifts[shift], shift, period),
+          formatAndInsertShiftData(groupedByShifts[shift], shift, period!),
         ),
       );
 
       return groupedByShifts;
     } catch (error) {
-      console.error('Error in findAllCleanings:', error);
-      throw new BadRequestException(
-        `Failed to fetch Cleanings: ${error.message}`,
-      );
+      console.error('Erro em findAllCleanings:', error);
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao buscar Limpezas: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao buscar Limpezas: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -214,7 +221,7 @@ export class CleaningsService {
     return this.prisma.prismaOnline.cleanings.upsert({
       where: {
         employeeName_createdDate_period: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
           employeeName: data.employeeName,
         },
@@ -314,8 +321,12 @@ export class CleaningsService {
       };
     } catch (error) {
       console.error('Erro ao calcular as limpezas totais por período:', error);
+      let errorMessage = 'Erro desconhecido';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       throw new BadRequestException(
-        `Failed to calculate total cleaning inspections by period: ${error.message}`,
+        `Failed to calculate total cleaning inspections by period: ${errorMessage}`,
       );
     }
   }
@@ -326,7 +337,7 @@ export class CleaningsService {
     return this.prisma.prismaOnline.cleaningsByPeriod.upsert({
       where: {
         period_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
         },
       },
@@ -436,8 +447,15 @@ export class CleaningsService {
           }
 
           // Adiciona o ID do funcionário ao conjunto para contar apenas uma vez
-          uniqueEmployeesByShift[shift].add(cleaning.employee.id);
-          cleaningsByShiftAndDay[shift][workDay].totalCleanings++;
+          // Corrige o erro de tipo ao acessar o shift e garante que employee não é nulo
+          if (
+            (shift === 'Manhã' || shift === 'Tarde' || shift === 'Noite') &&
+            cleaning.employee &&
+            typeof cleaning.employee.id === 'number'
+          ) {
+            uniqueEmployeesByShift[shift].add(cleaning.employee.id);
+            cleaningsByShiftAndDay[shift][workDay].totalCleanings++;
+          }
         }
       }
 
@@ -484,12 +502,12 @@ export class CleaningsService {
               +totals.totalAverageDailyWeekCleaning[day].toFixed(2), // Use o valor acumulado
             totalAverageShiftCleaning: 0,
             totalAllAverageShiftCleaning: 0,
-            idealShiftMaid: 0,
-            totalIdealShiftMaid: 0,
-            realShiftMaid: uniqueEmployeesByShift[shift].size,
-            totalRealShiftMaid: 0,
-            difference: 0,
-            totalDifference: 0,
+            idealShiftMaid: (cleaningsByShiftAndDay as any)[shift].idealShiftMaid,
+            totalIdealShiftMaid: 0, // Será atualizado posteriormente
+            realShiftMaid: (uniqueEmployeesByShift as any)[shift]?.size ?? 0,
+            totalRealShiftMaid: 0, // Será atualizado posteriormente
+            difference: 0, // Será atualizado posteriormente
+            totalDifference: 0, // Será atualizado posteriormente
             companyId: 1,
           });
 
@@ -506,13 +524,12 @@ export class CleaningsService {
         );
 
         totals.totalIdealShiftMaid +=
-          cleaningsByShiftAndDay[shift].idealShiftMaid;
-        cleaningsByShiftAndDay[shift].realShiftMaid =
-          uniqueEmployeesByShift[shift].size;
-        totals.totalRealShiftMaid +=
-          cleaningsByShiftAndDay[shift].realShiftMaid;
-        cleaningsByShiftAndDay[shift].difference =
-          cleaningsByShiftAndDay[shift].realShiftMaid -
+          totals.totalIdealShiftMaid += (cleaningsByShiftAndDay as any)[shift].idealShiftMaid;
+          (cleaningsByShiftAndDay as any)[shift].realShiftMaid =
+            (uniqueEmployeesByShift as any)[shift]?.size ?? 0;
+          totals.totalRealShiftMaid += (cleaningsByShiftAndDay as any)[shift].realShiftMaid;
+          (cleaningsByShiftAndDay as any)[shift].difference =
+            (cleaningsByShiftAndDay as any)[shift].realShiftMaid -
           cleaningsByShiftAndDay[shift].idealShiftMaid;
         totals.totalDifference += cleaningsByShiftAndDay[shift].difference;
 
@@ -562,7 +579,28 @@ export class CleaningsService {
 
       // Inserir dados no banco de dados
       for (const data of insertData) {
-        await this.insertCleaningsByWeek(data);
+        const createdDayOfWeek = moment
+          .tz(data.createdDate, timezone)
+          .format('dddd');
+      
+        // Converte apenas no momento de inserir no banco
+        const dataToInsert = {
+          ...data,
+          totalAverageDailyWeekCleaning: new Prisma.Decimal(
+            totals.totalAverageDailyWeekCleaning[createdDayOfWeek] || 0
+          ),
+          averageDailyWeekCleaning: new Prisma.Decimal(data.averageDailyWeekCleaning),
+          totalAverageShiftCleaning: new Prisma.Decimal(data.totalAverageShiftCleaning),
+          totalAllAverageShiftCleaning: new Prisma.Decimal(data.totalAllAverageShiftCleaning),
+        };
+      
+        // Campos number continuam os mesmos
+        dataToInsert.totalIdealShiftMaid = totals.totalIdealShiftMaid;
+        dataToInsert.totalRealShiftMaid = totals.totalRealShiftMaid;
+        dataToInsert.difference = dataToInsert.totalRealShiftMaid - dataToInsert.idealShiftMaid;
+        dataToInsert.totalDifference = totals.totalDifference;
+      
+        await this.insertCleaningsByWeek(dataToInsert);
       }
 
       return cleaningsByShiftAndDay;
@@ -578,7 +616,7 @@ export class CleaningsService {
     return this.prisma.prismaOnline.cleaningsByWeek.upsert({
       where: {
         period_shift_createdDate: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           shift: data.shift,
           createdDate: data.createdDate,
         },
@@ -748,9 +786,15 @@ export class CleaningsService {
       return results;
     } catch (error) {
       console.error('Erro ao calcular limpezas por turno:', error);
-      throw new BadRequestException(
-        `Failed to calculate cleanings by shift: ${error.message}`,
-      );
+      if (error instanceof Error) {
+        throw new BadRequestException(
+          `Falha ao calcular limpezas por turno: ${error.message}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Falha ao calcular limpezas por turno: erro desconhecido',
+        );
+      }
     }
   }
 
@@ -760,7 +804,7 @@ export class CleaningsService {
     return this.prisma.prismaOnline.cleaningsByPeriodShift.upsert({
       where: {
         period_createdDate_employeeName: {
-          period: data.period,
+          period: data.period as PeriodEnum,
           createdDate: data.createdDate,
           employeeName: data.employeeName,
         },

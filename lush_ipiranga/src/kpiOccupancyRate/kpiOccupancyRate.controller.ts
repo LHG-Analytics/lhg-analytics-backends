@@ -55,6 +55,10 @@ export class KpiOccupancyRateController {
       const start = this.convertToDate(startDate); // Início
       const end = this.convertToDate(endDate, true); // Fim, com ajuste de horário
 
+      if (!start || !end) {
+        throw new BadRequestException('Start date and end date are required.');
+      }
+
       if (!period) {
         throw new BadRequestException('The period parameter is required.');
       }
@@ -66,8 +70,9 @@ export class KpiOccupancyRateController {
         period,
       );
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to create all KpiOcuppancyRate: ${error.message}`,
+        `Failed to create all KpiOccupancyRate: ${errorMessage}`,
       );
     }
   }
@@ -116,8 +121,9 @@ export class KpiOccupancyRateController {
       // Chama o método do serviço que executa as operações do cron job
       return await this.kpiOccupancyRateService.handleCron();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to run the cron job: ${error.message}`,
+        `Failed to run the cron job: ${errorMessage}`,
       );
     }
   }

@@ -56,6 +56,10 @@ export class RestaurantCostsController {
       const start = this.convertToDate(startDate);
       const end = this.convertToDate(endDate, true);
 
+      if (!start || !end) {
+        throw new BadRequestException('Start date and end date are required.');
+      }
+
       if (!period) {
         throw new BadRequestException('The period parameter is required.');
       }
@@ -67,8 +71,9 @@ export class RestaurantCostsController {
       return await this.restaurantCostsService.calculateCMV(start, end, period);
     } catch (error) {
       console.error('Erro ao calcular o CMV:', error); // 👈 Aqui imprime o erro real
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
       throw new BadRequestException(
-        `Failed to calculate CMV: ${error?.message ?? 'Erro desconhecido.'}`,
+        `Failed to calculate CMV: ${errorMessage}`,
       );
     }
   }
@@ -81,8 +86,9 @@ export class RestaurantCostsController {
     try {
       return await this.restaurantCostsService.handleCron();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(
-        `Failed to run the cron job: ${error.message}`,
+        `Failed to run the cron job: ${errorMessage}`,
       );
     }
   }
