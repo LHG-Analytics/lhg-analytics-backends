@@ -71,4 +71,20 @@ export class CreateUserDto {
   ])
   @IsNotEmpty()
   role: UserRole;
+
+  constructor(
+    name: string,
+    email: string,
+    password: string,
+    cpf: string,
+    unit: UserUnit,
+    role: UserRole,
+  ) {
+    this.name = name;
+    this.email = email;
+    this.password = password;
+    this.cpf = cpf;
+    this.unit = unit;
+    this.role = role;
+  }
 }
