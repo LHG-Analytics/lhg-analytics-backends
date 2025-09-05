@@ -72,13 +72,17 @@ async function bootstrap() {
 
     const corsOptions: CorsOptions = {
       origin: (origin, callback) => {
+        // Em produção, seja mais permissivo para evitar problemas com health checks e requests internos
         if (
           !origin ||
           allowedOrigins.includes(origin) ||
-          origin.startsWith('https://lhg-analytics')
+          origin.startsWith('https://lhg-analytics') ||
+          process.env.NODE_ENV === 'production'
         ) {
           callback(null, true);
         } else {
+          // Log da origem rejeitada para debug
+          console.log('CORS rejeitou origem:', origin);
           callback(new Error('Not allowed by CORS'), false);
         }
       },
