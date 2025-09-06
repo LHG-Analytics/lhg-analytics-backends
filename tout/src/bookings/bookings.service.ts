@@ -1482,7 +1482,7 @@ export class BookingsService {
       };
 
       // Supondo que você tenha startDate e endDate definidos como moment.js
-      const currentDate = moment(startDate).utc();
+      let currentDate = moment(startDate).utc();
       const finalDate = moment(endDate).utc();
 
       // Iterar sobre as datas do período
@@ -1934,7 +1934,7 @@ export class BookingsService {
       };
 
       // Supondo que você tenha startDate e endDate definidos como moment.js
-      const currentDateEcommerce = moment(startDate).utc();
+      let currentDateEcommerce = moment(startDate).utc();
       const finalDateEcommerce = moment(endDate).utc();
 
       // Iterar sobre as datas do período

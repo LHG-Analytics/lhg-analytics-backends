@@ -1482,7 +1482,7 @@ export class BookingsService {
       };
 
       // Supondo que você tenha startDate e endDate definidos como moment.js
-      const currentDate = moment(startDate).utc();
+      let currentDate = moment(startDate).utc();
       const finalDate = moment(endDate).utc();
 
       // Iterar sobre as datas do período
@@ -1529,7 +1529,7 @@ export class BookingsService {
 
       // Iterar sobre as datas do período
       while (currentDateRep.isSameOrBefore(adjustedEndDate, 'day')) {
-        const dateKey = currentDateRep.format('DD/MM/YYYY'); // Formata a data como "DD/MM/YYYY"
+        const dateKeyRep = currentDateRep.format('DD/MM/YYYY'); // Formata a data como "DD/MM/YYYY"
 
         // Definir o intervalo para reservas e representatividade (00:00 a 23:59)
         const startOfDay = currentDateRep.clone().startOf('day'); // 00:00
@@ -1604,8 +1604,8 @@ export class BookingsService {
         );
 
         // P0-002: Optimized lookup instead of database query
-        const dateKey = rentalStartDate.format('YYYY-MM-DD');
-        const totalSaleDirectForDate = salesByDateMap.get(dateKey) || 
+        const saleDateKey = rentalStartDate.format('YYYY-MM-DD');
+        const totalSaleDirectForDate = salesByDateMap.get(saleDateKey) || 
           new Prisma.Decimal(0);
 
         // Calcular a receita total combinada (vendas diretas + locação)
@@ -1620,7 +1620,7 @@ export class BookingsService {
             : 0; // Se totalRevenue for null ou zero, retorna 0
 
         // Adiciona a data e a representatividade ao objeto de retorno
-        (representativenessOfReservesByPeriod.categories as string[]).push(dateKey);
+        (representativenessOfReservesByPeriod.categories as string[]).push(dateKeyRep);
         (representativenessOfReservesByPeriod.series as number[]).push(representativeness);
 
         // P0-003: Memory leak fix - increment using assignment instead of mutation
@@ -1957,12 +1957,12 @@ const kpiTableByChannelType: {
       };
 
       // Supondo que você tenha startDate e endDate definidos como moment.js
-      const currentDateEcommerce = moment(startDate).utc();
+      let currentDateEcommerce = moment(startDate).utc();
       const finalDateEcommerce = moment(endDate).utc();
 
       // Iterar sobre as datas do período
       while (currentDateEcommerce.isSameOrBefore(finalDateEcommerce, 'day')) {
-        const dateKey = currentDateEcommerce.format('DD/MM/YYYY'); // Formata a data como "DD/MM/YYYY"
+        const dateKeyEcommerce = currentDateEcommerce.format('DD/MM/YYYY'); // Formata a data como "DD/MM/YYYY"
         let totalValueForCurrentDate = new Prisma.Decimal(0); // Inicializa o total para a data atual
 
         // Calcular o total para a data atual
@@ -1978,7 +1978,7 @@ const kpiTableByChannelType: {
         });
 
         // Adiciona a data e o total ao objeto de retorno
-        (billingOfEcommerceByPeriod.categories as string[]).push(dateKey);
+        (billingOfEcommerceByPeriod.categories as string[]).push(dateKeyEcommerce);
         (billingOfEcommerceByPeriod.series as number[]).push(
           totalValueForCurrentDate.toNumber(),
         ); // Converte para número

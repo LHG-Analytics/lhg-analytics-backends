@@ -19,7 +19,7 @@ import { RestaurantRevenueService } from './restaurantRevenue/restaurantRevenue.
 import { RestaurantSalesService } from './restaurantSales/restaurantSales.service';
 import { RestaurantTicketAverageService } from './restaurantTicketAverage/restaurantTicketAverage.service';
 
-interface JobStatus {
+export interface JobStatus {
   jobId: string;
   status: 'running' | 'completed' | 'error';
   startTime: Date;

@@ -133,10 +133,10 @@ export class CronJobsService {
         { name: 'KpiOccupancyRate', service: this.kpiOccupancyRateService },
         { name: 'Cleanings', service: this.cleaningsService },
         { name: 'Inspections', service: this.apartmentInspectionService },
-        { name: 'BookingsRevenue', service: this.bookingsRevenueService },
-        { name: 'BookingsTotalRentals', service: this.bookingsTotalRentalsService },
-        { name: 'BookingsTicketAverage', service: this.bookingsTicketAverageService },
-        { name: 'BookingsRepresentativeness', service: this.bookingsRepresentativenessService },
+        { name: 'BookingsRevenue', service: this.bookingsRevenue },
+        { name: 'BookingsTotalRentals', service: this.bookingsTotalRental },
+        { name: 'BookingsTicketAverage', service: this.bookingsTicketAverage },
+        { name: 'BookingsRepresentativeness', service: this.bookingsRepresentativeness },
         { name: 'RestaurantRevenue', service: this.restaurantRevenue },
         { name: 'RestaurantSales', service: this.restaurantSales },
         { name: 'RestaurantTicketAverage', service: this.restaurantTicketAverage }
@@ -185,7 +185,7 @@ export class CronJobsService {
     } catch (error) {
       job.status = 'error';
       job.endTime = new Date();
-      job.error = error.message;
+      job.error = error instanceof Error ? error.message : String(error);
       job.currentTask = 'Erro na execução';
     } finally {
       this.isJobRunning = false;

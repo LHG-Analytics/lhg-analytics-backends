@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Param, HttpStatus, HttpException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { CronJobsService } from './cron-jobs.service';
+import { CronJobsService, JobStatus } from './cron-jobs.service';
 
 @ApiTags('CronJobs')
 @Controller('CronJobs')
@@ -36,7 +36,7 @@ export class CronJobsController {
     status: 200,
     description: 'Status do job retornado com sucesso.',
   })
-  async getJobStatus(@Param('jobId') jobId: string) {
+  async getJobStatus(@Param('jobId') jobId: string): Promise<JobStatus> {
     try {
       const status = await this.cronJobsService.getJobStatus(jobId);
       return status;

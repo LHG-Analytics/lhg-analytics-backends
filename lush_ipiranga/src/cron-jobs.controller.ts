@@ -36,7 +36,7 @@ export class CronJobsController {
     status: 200,
     description: 'Status do job retornado com sucesso.',
   })
-  async getJobStatus(@Param('jobId') jobId: string) {
+  async getJobStatus(@Param('jobId') jobId: string): Promise<any> {
     try {
       const status = await this.cronJobsService.getJobStatus(jobId);
       return status;
