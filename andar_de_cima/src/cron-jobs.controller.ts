@@ -45,7 +45,7 @@ export class CronJobsController {
     status: 404,
     description: 'Job não encontrado.',
   })
-  async getJobStatus(@Param('jobId') jobId: string) {
+  async getJobStatus(@Param('jobId') jobId: string): Promise<any> {
     try {
       const status = await this.cronJobsService.getJobStatus(jobId);
       return status;
