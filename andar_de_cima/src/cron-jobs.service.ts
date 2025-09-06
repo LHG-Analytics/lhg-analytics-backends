@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { KpiAlosService } from './kpiAlos/kpiAlos.service';
 import { KpiGiroService } from './kpiGiro/kpiGiro.service';
@@ -19,9 +19,22 @@ import { RestaurantRevenueService } from './restaurantRevenue/restaurantRevenue.
 import { RestaurantSalesService } from './restaurantSales/restaurantSales.service';
 import { RestaurantTicketAverageService } from './restaurantTicketAverage/restaurantTicketAverage.service';
 
+interface JobStatus {
+  id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress: number;
+  startedAt?: Date;
+  completedAt?: Date;
+  results?: any[];
+  error?: string;
+  totalServices: number;
+}
+
 @Injectable()
 export class CronJobsService {
+  private readonly logger = new Logger(CronJobsService.name);
   private isJobRunning = false; // Flag para verificar se o job está em execução
+  private jobStatuses: Map<string, JobStatus> = new Map();
 
   constructor(
     private readonly kpiAlosService: KpiAlosService,
@@ -86,5 +99,151 @@ export class CronJobsService {
       .tz('America/Sao_Paulo')
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(`Fim da execução dos CronJobs do Andar de Cima: ${endTime}`);
+  }
+
+  /**
+   * P0-001: Background Job System Implementation
+   * Solves the critical issue of 60+ minute response times
+   */
+  async startBackgroundExecution(): Promise<any> {
+    if (this.isJobRunning) {
+      throw new Error('Cron jobs já estão em execução. Use GET /status/{jobId} para acompanhar o progresso.');
+    }
+
+    const jobId = this.generateJobId();
+    const services = this.getAllServices();
+    
+    // Create job status
+    const jobStatus: JobStatus = {
+      id: jobId,
+      status: 'pending',
+      progress: 0,
+      startedAt: new Date(),
+      totalServices: services.length,
+    };
+    
+    this.jobStatuses.set(jobId, jobStatus);
+    
+    // Execute in background without blocking the response
+    setImmediate(() => {
+      this.executeJobsInBackground(jobId, services);
+    });
+    
+    return {
+      jobId,
+      message: 'Cron jobs iniciados em background',
+      statusUrl: `/CronJobs/status/${jobId}`,
+      estimatedDuration: '15-30 minutos',
+      totalServices: services.length,
+      startedAt: jobStatus.startedAt
+    };
+  }
+
+  async getJobStatus(jobId: string): Promise<JobStatus> {
+    const status = this.jobStatuses.get(jobId);
+    
+    if (!status) {
+      throw new Error(`Job não encontrado: ${jobId}`);
+    }
+    
+    return status;
+  }
+
+  private async executeJobsInBackground(jobId: string, services: any[]): Promise<void> {
+    const jobStatus = this.jobStatuses.get(jobId);
+    if (!jobStatus) return;
+
+    this.isJobRunning = true;
+    jobStatus.status = 'running';
+    
+    this.logger.log(`Starting background cron job execution. Job ID: ${jobId}`);
+    
+    try {
+      const results = [];
+      
+      for (let i = 0; i < services.length; i++) {
+        const serviceName = services[i].constructor.name;
+        this.logger.log(`Executing cron job ${i + 1}/${services.length}: ${serviceName}`);
+        
+        try {
+          await services[i].handleCron();
+          results.push({ service: serviceName, status: 'success', completedAt: new Date() });
+        } catch (error) {
+          this.logger.error(`Cron job failed for ${serviceName}: ${error.message}`);
+          results.push({ 
+            service: serviceName, 
+            status: 'failed', 
+            error: error.message,
+            completedAt: new Date()
+          });
+        }
+        
+        // Update progress
+        const progress = Math.round(((i + 1) / services.length) * 100);
+        jobStatus.progress = progress;
+        jobStatus.results = results;
+      }
+      
+      // Job completed successfully
+      jobStatus.status = 'completed';
+      jobStatus.completedAt = new Date();
+      jobStatus.progress = 100;
+      
+      const duration = jobStatus.completedAt.getTime() - jobStatus.startedAt!.getTime();
+      this.logger.log(`Cron job execution completed. Job ID: ${jobId}, Duration: ${duration}ms`);
+      
+    } catch (error) {
+      // Job failed
+      jobStatus.status = 'failed';
+      jobStatus.error = error.message;
+      jobStatus.completedAt = new Date();
+      
+      this.logger.error(`Background cron job execution failed. Job ID: ${jobId}, Error: ${error.message}`);
+    } finally {
+      this.isJobRunning = false;
+      
+      // Clean up old job statuses (keep only last 10)
+      this.cleanupOldJobs();
+    }
+  }
+
+  private getAllServices(): any[] {
+    return [
+      this.kpiAlosService,
+      this.kpiGiroService,
+      this.kpiRevparService,
+      this.kpiTotalRentalsService,
+      this.kpiTicketAverageService,
+      this.kpiTrevparService,
+      this.kpiRevenueService,
+      this.kpiOccupancyRateService,
+      this.cleaningsService,
+      this.apartmentInspectionService,
+      this.bookingsRevenue,
+      this.bookingsTotalRental,
+      this.bookingsTicketAverage,
+      this.bookingsRepresentativeness,
+      this.restaurantRevenue,
+      this.restaurantSales,
+      this.restaurantTicketAverage,
+    ];
+  }
+
+  private generateJobId(): string {
+    return `cron-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+  }
+
+  private cleanupOldJobs(): void {
+    const jobs = Array.from(this.jobStatuses.values()).sort((a, b) => 
+      (b.startedAt?.getTime() || 0) - (a.startedAt?.getTime() || 0)
+    );
+    
+    // Keep only the last 10 jobs
+    if (jobs.length > 10) {
+      const jobsToRemove = jobs.slice(10);
+      jobsToRemove.forEach(job => {
+        this.jobStatuses.delete(job.id);
+      });
+    }
   }
 }

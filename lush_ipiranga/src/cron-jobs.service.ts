@@ -19,9 +19,21 @@ import { RestaurantRevenueService } from './restaurantRevenue/restaurantRevenue.
 import { RestaurantSalesService } from './restaurantSales/restaurantSales.service';
 import { RestaurantTicketAverageService } from './restaurantTicketAverage/restaurantTicketAverage.service';
 
+interface JobStatus {
+  jobId: string;
+  status: 'running' | 'completed' | 'error';
+  startTime: Date;
+  endTime?: Date;
+  progress: number;
+  currentTask?: string;
+  error?: string;
+  results?: any;
+}
+
 @Injectable()
 export class CronJobsService {
-  private isJobRunning = false; // Flag para verificar se o job está em execução
+  private isJobRunning = false;
+  private jobs = new Map<string, JobStatus>();
 
   constructor(
     private readonly kpiAlosService: KpiAlosService,
@@ -86,5 +98,110 @@ export class CronJobsService {
       .tz('America/Sao_Paulo')
       .format('DD-MM-YYYY HH:mm:ss');
     console.log(`Fim da execução dos CronJobs do Lush Ipiranga: ${endTime}`);
+  }
+
+  generateJobId(): string {
+    return `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  async startBackgroundExecution(): Promise<any> {
+    if (this.isJobRunning) {
+      throw new Error('Cron jobs já estão em execução. Use GET /status/{jobId} para acompanhar o progresso.');
+    }
+
+    const jobId = this.generateJobId();
+    const jobStatus: JobStatus = {
+      jobId,
+      status: 'running',
+      startTime: new Date(),
+      progress: 0,
+      currentTask: 'Iniciando execução dos cron jobs...'
+    };
+
+    this.jobs.set(jobId, jobStatus);
+    this.isJobRunning = true;
+
+    setImmediate(() => {
+      this.executeJobsInBackground(jobId, [
+        { name: 'KpiAlos', service: this.kpiAlosService },
+        { name: 'KpiGiro', service: this.kpiGiroService },
+        { name: 'KpiRevpar', service: this.kpiRevparService },
+        { name: 'KpiTotalRentals', service: this.kpiTotalRentalsService },
+        { name: 'KpiTicketAverage', service: this.kpiTicketAverageService },
+        { name: 'KpiTrevpar', service: this.kpiTrevparService },
+        { name: 'KpiRevenue', service: this.kpiRevenueService },
+        { name: 'KpiOccupancyRate', service: this.kpiOccupancyRateService },
+        { name: 'Cleanings', service: this.cleaningsService },
+        { name: 'Inspections', service: this.apartmentInspectionService },
+        { name: 'BookingsRevenue', service: this.bookingsRevenueService },
+        { name: 'BookingsTotalRentals', service: this.bookingsTotalRentalsService },
+        { name: 'BookingsTicketAverage', service: this.bookingsTicketAverageService },
+        { name: 'BookingsRepresentativeness', service: this.bookingsRepresentativenessService },
+        { name: 'RestaurantRevenue', service: this.restaurantRevenue },
+        { name: 'RestaurantSales', service: this.restaurantSales },
+        { name: 'RestaurantTicketAverage', service: this.restaurantTicketAverage }
+      ]);
+    });
+
+    return {
+      jobId,
+      message: 'Cron jobs iniciados em background',
+      statusUrl: `/CronJobs/status/${jobId}`
+    };
+  }
+
+  private async executeJobsInBackground(jobId: string, services: any[]) {
+    const job = this.jobs.get(jobId);
+    if (!job) return;
+
+    try {
+      const totalSteps = services.length;
+      let completedSteps = 0;
+
+      for (const { name, service } of services) {
+        if (!job) break;
+
+        job.currentTask = `Executando ${name}...`;
+        job.progress = Math.round((completedSteps / totalSteps) * 100);
+        this.jobs.set(jobId, job);
+
+        try {
+          await service.handleCron();
+          completedSteps++;
+        } catch (error) {
+          console.error(`Erro ao executar ${name}:`, error);
+        }
+      }
+
+      job.status = 'completed';
+      job.endTime = new Date();
+      job.progress = 100;
+      job.currentTask = 'Execução finalizada com sucesso';
+      job.results = {
+        totalServices: services.length,
+        completedServices: completedSteps,
+        executionTime: job.endTime.getTime() - job.startTime.getTime()
+      };
+    } catch (error) {
+      job.status = 'error';
+      job.endTime = new Date();
+      job.error = error.message;
+      job.currentTask = 'Erro na execução';
+    } finally {
+      this.isJobRunning = false;
+      this.jobs.set(jobId, job);
+      
+      setTimeout(() => {
+        this.jobs.delete(jobId);
+      }, 300000);
+    }
+  }
+
+  async getJobStatus(jobId: string): Promise<JobStatus> {
+    const job = this.jobs.get(jobId);
+    if (!job) {
+      throw new Error(`Job com ID ${jobId} não encontrado ou já foi finalizado há mais de 5 minutos.`);
+    }
+    return job;
   }
 }

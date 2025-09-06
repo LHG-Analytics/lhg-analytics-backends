@@ -379,9 +379,13 @@ export class RestaurantTicketAverageService {
       adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Subtrai um dia
       adjustedEndDate.setUTCHours(23, 59, 59, 999); // Define o final do dia
 
-      // Iniciar currentDate no início do dia da startDate
-      let currentDate = new Date(startDate);
-      currentDate.setUTCHours(0, 0, 0, 0); // Início do dia contábil às 00:00:00
+      // P0-003: Memory Leak Fix - Use moment.js for efficient date manipulation
+      let currentMoment = moment(startDate).utc().startOf('day');
+      const adjustedEndMoment = moment(adjustedEndDate).utc();
+      
+      // Reusable date objects to prevent memory leaks
+      const tempStartDate = new Date();
+      const tempEndDate = new Date();
 
       const abProductTypes = [
         '08 - CAFE DA MANHA',
@@ -403,26 +407,28 @@ export class RestaurantTicketAverageService {
       let totalABNetRevenue = new Prisma.Decimal(0);
       let totalRentals = 0;
 
-      while (currentDate <= adjustedEndDate) {
-        let nextDate = new Date(currentDate);
+      while (currentMoment.isSameOrBefore(adjustedEndMoment)) {
+        let nextMoment: moment.Moment;
 
         if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
-          nextDate.setDate(nextDate.getDate() + 1);
-          nextDate.setUTCHours(0, 0, 0, 0);
+          nextMoment = currentMoment.clone().add(1, 'day').startOf('day');
         } else if (period === PeriodEnum.LAST_6_M) {
-          currentDate.setDate(currentDate.getDate() - 1); // Ajuste para último dia do mês anterior
-          currentDate.setUTCHours(23, 59, 59, 999);
-          nextDate.setMonth(nextDate.getMonth() + 1);
-          nextDate.setUTCHours(0, 0, 0, 0);
+          // Adjust to last day of previous month
+          currentMoment = currentMoment.subtract(1, 'day').endOf('day');
+          nextMoment = currentMoment.clone().add(1, 'month').startOf('day');
         }
 
+        // Reuse date objects instead of creating new ones
+        tempStartDate.setTime(currentMoment.valueOf());
+        tempEndDate.setTime(nextMoment!.valueOf());
+
         const [allRentalApartments] = await this.fetchKpiData(
-          currentDate,
-          nextDate,
+          tempStartDate,
+          tempEndDate,
         );
 
         if (!allRentalApartments || allRentalApartments.length === 0) {
-          currentDate = new Date(nextDate);
+          currentMoment = nextMoment!;
           continue;
         }
 
@@ -508,13 +514,14 @@ export class RestaurantTicketAverageService {
           totalTicketAverage: ticketAverage,
           companyId,
           period,
-          createdDate: new Date(currentDate.setUTCHours(5, 59, 59, 999)),
+          createdDate: currentMoment.clone().hour(5).minute(59).second(59).millisecond(999).toDate(),
         });
 
         totalABNetRevenue = totalABNetRevenue.plus(currentPeriodNetRevenue);
         totalRentals += currentPeriodRentals;
 
-        currentDate = new Date(nextDate);
+        // P0-003: Use moment instead of creating new Date object
+        currentMoment = nextMoment!;
       }
 
       const finalAverage =

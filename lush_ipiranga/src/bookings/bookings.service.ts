@@ -936,6 +936,75 @@ export class BookingsService {
     return await this.calculateTotalSaleDirect(startOfDay, endOfDay);
   }
 
+  private async fetchAllSaleDirectDataOptimized(
+    startDate: Date, 
+    endDate: Date
+  ): Promise<Map<string, Prisma.Decimal>> {
+    
+    const stockOutItems = await this.prisma.prismaLocal.stockOutItem.findMany({
+      where: {
+        stockOuts: {
+          createdDate: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        canceled: null,
+        typePriceSale: {
+          not: null,
+        },
+      },
+      include: {
+        stockOuts: {
+          include: {
+            saleDirect: true,
+            sale: {
+              select: {
+                discount: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const salesByDate = new Map<string, Prisma.Decimal>();
+    
+    stockOutItems.forEach(item => {
+      if (item.stockOuts?.createdDate) {
+        const dateKey = moment(item.stockOuts.createdDate)
+          .format('YYYY-MM-DD');
+        
+        const currentTotal = salesByDate.get(dateKey) || new Prisma.Decimal(0);
+        
+        const stockOut = item.stockOuts;
+        let itemValue = new Prisma.Decimal(0);
+
+        if (stockOut && stockOut.saleDirect) {
+          const saleDirects = Array.isArray(stockOut.saleDirect)
+            ? stockOut.saleDirect
+            : [stockOut.saleDirect];
+          const discountSale = stockOut.sale?.discount
+            ? new Prisma.Decimal(stockOut.sale.discount)
+            : new Prisma.Decimal(0);
+
+          saleDirects.forEach((saleDirect) => {
+            if (saleDirect && item.stockOutId === saleDirect.stockOutId) {
+              const itemTotal = new Prisma.Decimal(item.priceSale).times(
+                new Prisma.Decimal(item.quantity),
+              );
+              itemValue = itemValue.plus(itemTotal.minus(discountSale));
+            }
+          });
+        }
+        
+        salesByDate.set(dateKey, currentTotal.plus(itemValue));
+      }
+    });
+
+    return salesByDate;
+  }
+
   private async fetchKpiData(startDate: Date, endDate: Date) {
     // Busca os bookings
     const allBookings = await this.prisma.prismaLocal.booking.findMany({
@@ -1120,6 +1189,12 @@ export class BookingsService {
         stockOutMap,
         totalSaleDirect,
       } = await this.fetchKpiData(startDate, endDate);
+
+      // P0-002: Fetch ALL sale direct data once to avoid N+1 queries
+      const salesByDateMap = await this.fetchAllSaleDirectDataOptimized(
+        startDate, 
+        endDate
+      );
 
       if (!allBookings || allBookings.length === 0) {
         throw new NotFoundException('No booking revenue found.');
@@ -1433,8 +1508,8 @@ export class BookingsService {
           totalValueForCurrentDate.toNumber(),
         ); // Converte para número
 
-        // Avança para o próximo dia
-        currentDate.add(1, 'day');
+        // P0-003: Memory leak fix - increment using assignment instead of mutation
+        currentDate = currentDate.clone().add(1, 'day');
       }
 
       // Inverter a ordem das categorias e séries para ficar em ordem decrescente
@@ -1528,9 +1603,10 @@ export class BookingsService {
           new Prisma.Decimal(0),
         );
 
-        // Calcular a receita total de vendas diretas para a data atual
-        const totalSaleDirectForDate =
-          await this.calculateTotalSaleDirectForDate(rentalStartDate.toDate());
+        // P0-002: Optimized lookup instead of database query
+        const dateKey = rentalStartDate.format('YYYY-MM-DD');
+        const totalSaleDirectForDate = salesByDateMap.get(dateKey) || 
+          new Prisma.Decimal(0);
 
         // Calcular a receita total combinada (vendas diretas + locação)
         const totalRevenue = totalValueForRentalApartments.plus(
@@ -1547,8 +1623,8 @@ export class BookingsService {
         (representativenessOfReservesByPeriod.categories as string[]).push(dateKey);
         (representativenessOfReservesByPeriod.series as number[]).push(representativeness);
 
-        // Avança para o próximo dia
-        currentDateRep = currentDateRep.add(1, 'day'); // Atualiza currentDateRep para o próximo dia
+        // P0-003: Memory leak fix - increment using assignment instead of mutation
+        currentDateRep = currentDateRep.clone().add(1, 'day');
       }
 
       // Inverter a ordem das categorias e séries para ficar em ordem decrescente
@@ -1907,8 +1983,8 @@ const kpiTableByChannelType: {
           totalValueForCurrentDate.toNumber(),
         ); // Converte para número
 
-        // Avança para o próximo dia
-        currentDateEcommerce.add(1, 'day');
+        // P0-003: Memory leak fix - increment using assignment instead of mutation
+        currentDateEcommerce = currentDateEcommerce.clone().add(1, 'day');
       }
 
       // Inverter a ordem das categorias e séries para ficar em ordem decrescente
