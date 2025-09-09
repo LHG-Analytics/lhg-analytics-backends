@@ -72,7 +72,14 @@ export class ApartmentInspectionService {
         });
 
       if (!inspections || inspections.length === 0) {
-        throw new NotFoundException('No inspection data found.');
+        // Return empty structure instead of throwing error
+        return {
+          Company: 'Lush Lapa',
+          inspectionsBySupervisor: { categories: [], series: [] },
+          totalInspections: 0,
+          averageInspectionTime: 0,
+          completionRate: 0
+        };
       }
 
       // Estrutura para armazenar os dados agrupados por supervisor

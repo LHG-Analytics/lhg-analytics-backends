@@ -8,8 +8,22 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   public prismaOnline: PrismaClientOnline;
 
   constructor() {
-    this.prismaLocal = new PrismaClientLocal();
-    this.prismaOnline = new PrismaClientOnline();
+    this.prismaLocal = new PrismaClientLocal({
+      log: ['error'],
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL_LOCAL + '?connection_limit=10&pool_timeout=60&connect_timeout=60'
+        }
+      }
+    });
+    this.prismaOnline = new PrismaClientOnline({
+      log: ['error'],
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL_ONLINE + '?connection_limit=10&pool_timeout=60&connect_timeout=60'
+        }
+      }
+    });
   }
 
   async onModuleInit() {
