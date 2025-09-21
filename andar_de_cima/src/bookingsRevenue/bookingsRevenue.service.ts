@@ -551,17 +551,20 @@ export class BookingsRevenueService {
         const halfPaymentId = matchingNewRelease.halfPaymentId;
         const paymentName = halfPaymentMap.get(halfPaymentId); // Obtém o nome do meio de pagamento
 
-        // Inicializa o total para o meio de pagamento se não existir
-        if (!revenueByPaymentMethod.has(paymentName)) {
-          revenueByPaymentMethod.set(paymentName, new Prisma.Decimal(0));
-        }
+        // Só processa se o paymentName for válido (não undefined/null)
+        if (paymentName) {
+          // Inicializa o total para o meio de pagamento se não existir
+          if (!revenueByPaymentMethod.has(paymentName)) {
+            revenueByPaymentMethod.set(paymentName, new Prisma.Decimal(0));
+          }
 
-        // Acumula o valor atual ao total existente
-        const currentTotal = revenueByPaymentMethod.get(paymentName);
-        revenueByPaymentMethod.set(
-          paymentName,
-          currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
-        );
+          // Acumula o valor atual ao total existente
+          const currentTotal = revenueByPaymentMethod.get(paymentName);
+          revenueByPaymentMethod.set(
+            paymentName,
+            currentTotal.plus(new Prisma.Decimal(booking.priceRental)),
+          );
+        }
       }
     }
 
