@@ -2050,50 +2050,527 @@ HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva
 ORDER BY "id_tipoorigemreserva";
 `;
 
-    const bookingRevenue = await this.prisma.prismaLocal.$queryRaw<any[]>(
-      Prisma.sql([totalBookingRevenueSQL]),
+    const totalBookingCountSQL = `
+  SELECT
+  COALESCE(r."id_tipoorigemreserva", 0) AS "id_tipoorigemreserva",
+  COUNT(r."id") AS "totalAllBookings"
+FROM "reserva" r
+WHERE
+  r."cancelada" IS NULL
+  AND r."valorcontratado" IS NOT NULL
+  AND (
+    (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+    OR
+    (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+  )
+GROUP BY ROLLUP (r."id_tipoorigemreserva")
+HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva" IS NULL
+ORDER BY "id_tipoorigemreserva";
+`;
+
+    const totalRevenueSQL = `
+WITH vendas_diretas AS (
+  SELECT COALESCE(SUM((sei."precovenda" * sei."quantidade") - COALESCE(v."desconto", 0)), 0) AS total
+  FROM "saidaestoqueitem" sei
+  JOIN "saidaestoque" se ON sei."id_saidaestoque" = se."id"
+  JOIN "vendadireta" vd ON se."id" = vd."id_saidaestoque"
+  LEFT JOIN "venda" v ON se."id" = v."id_saidaestoque"
+  WHERE se."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND sei."cancelado" IS NULL
+    AND sei."tipoprecovenda" IS NOT NULL
+),
+locacoes AS (
+  SELECT COALESCE(SUM(la."valortotal"), 0) AS total
+  FROM "locacaoapartamento" la
+  JOIN "apartamentostate" ast ON la."id_apartamentostate" = ast."id"
+  WHERE ast."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND la."fimocupacaotipo" = 'FINALIZADA'
+)
+SELECT
+  ROUND((COALESCE(vd.total, 0) + COALESCE(loc.total, 0))::numeric, 2) AS "totalRevenue"
+FROM vendas_diretas vd, locacoes loc;
+`;
+
+    const paymentMethodsSQL = `
+  WITH reservas_com_pagamento AS (
+    -- Reservas que JÁ têm lançamentos do tipo RESERVA
+    SELECT DISTINCT r."id" as reserva_id
+    FROM "reserva" r
+    JOIN "novo_lancamento" nl ON r."id" = nl."id_originado"
+    WHERE r."cancelada" IS NULL
+      AND r."valorcontratado" IS NOT NULL
+      AND nl."dataexclusao" IS NULL
+      AND nl."tipolancamento" = 'RESERVA'
+      AND nl."id_contapagarreceber" IS NULL
+      AND (
+        (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+        OR
+        (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+      )
+  ),
+  pagamentos_reserva AS (
+    -- Lançamentos do tipo RESERVA (usa valor contratado)
+    SELECT
+      mp."nome" AS "paymentMethod",
+      r."valorcontratado" AS "valor",
+      r."id" as reserva_id
+    FROM "reserva" r
+    JOIN "novo_lancamento" nl ON r."id" = nl."id_originado"
+    JOIN "meiopagamento" mp ON nl."id_meiopagamento" = mp."id"
+    WHERE r."cancelada" IS NULL
+      AND r."valorcontratado" IS NOT NULL
+      AND nl."dataexclusao" IS NULL
+      AND nl."tipolancamento" = 'RESERVA'
+      AND nl."id_contapagarreceber" IS NULL
+      AND mp."dataexclusao" IS NULL
+      AND (
+        (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+        OR
+        (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+      )
+  ),
+  pagamentos_locacao AS (
+    -- Lançamentos do tipo LOCACAO apenas para reservas SEM lançamento RESERVA
+    SELECT
+      mp."nome" AS "paymentMethod",
+      nl."valor" AS "valor",
+      r."id" as reserva_id
+    FROM "reserva" r
+    JOIN "novo_lancamento" nl ON r."id" = nl."id_originado"
+    JOIN "meiopagamento" mp ON nl."id_meiopagamento" = mp."id"
+    WHERE r."cancelada" IS NULL
+      AND r."valorcontratado" IS NOT NULL
+      AND nl."dataexclusao" IS NULL
+      AND nl."tipolancamento" = 'LOCACAO'
+      AND nl."id_contapagarreceber" IS NULL
+      AND mp."dataexclusao" IS NULL
+      AND r."id" NOT IN (SELECT reserva_id FROM reservas_com_pagamento)
+      AND (
+        (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+        OR
+        (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+      )
+  ),
+  todos_pagamentos AS (
+    SELECT "paymentMethod", "valor", reserva_id FROM pagamentos_reserva
+    UNION ALL
+    SELECT "paymentMethod", "valor", reserva_id FROM pagamentos_locacao
+  )
+  SELECT
+    "paymentMethod",
+    ROUND(SUM("valor")::numeric, 2) AS "totalValue",
+    COUNT(DISTINCT reserva_id) AS "quantidadeReservas"
+  FROM todos_pagamentos
+  GROUP BY "paymentMethod"
+  ORDER BY "totalValue" DESC;
+`;
+
+    const rentalTypeSQL = `
+  SELECT
+    r."id",
+    r."dataatendimento",
+    r."datainicio",
+    r."valorcontratado",
+    r."id_tipoorigemreserva",
+    r."id_locacaoapartamento" AS "rentalApartmentId",
+    la."datainicialdaocupacao" AS "checkIn",
+    la."datafinaldaocupacao" AS "checkOut"
+  FROM "reserva" r
+  LEFT JOIN "locacaoapartamento" la ON r."id_locacaoapartamento" = la."id_apartamentostate"
+  WHERE r."cancelada" IS NULL
+    AND r."valorcontratado" IS NOT NULL
+    AND (
+      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+      OR
+      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+    );
+`;
+
+    // SQL para obter dados agrupados por data para os períodos
+    const billingByDateSQL = `
+  SELECT
+    DATE(CASE
+      WHEN r."id_tipoorigemreserva" IN (7, 8) THEN r."datainicio"
+      ELSE r."dataatendimento"
+    END) as booking_date,
+    ROUND(SUM(r."valorcontratado")::numeric, 2) AS total_value,
+    COUNT(*) AS total_bookings
+  FROM "reserva" r
+  WHERE r."cancelada" IS NULL
+    AND r."valorcontratado" IS NOT NULL
+    AND (
+      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+      OR
+      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+    )
+    AND DATE(CASE
+      WHEN r."id_tipoorigemreserva" IN (7, 8) THEN r."datainicio"
+      ELSE r."dataatendimento"
+    END) BETWEEN DATE('${formattedStart}') AND DATE('${formattedEnd}')
+  GROUP BY booking_date
+  ORDER BY booking_date DESC;
+`;
+
+    // SQL para dados de ecommerce por data (canal 4 = RESERVA_API)
+    const ecommerceByDateSQL = `
+  SELECT
+    DATE(CASE
+      WHEN r."id_tipoorigemreserva" IN (7, 8) THEN r."datainicio"
+      ELSE r."dataatendimento"
+    END) as booking_date,
+    ROUND(SUM(r."valorcontratado")::numeric, 2) AS total_value,
+    COUNT(*) AS total_bookings
+  FROM "reserva" r
+  WHERE r."cancelada" IS NULL
+    AND r."valorcontratado" IS NOT NULL
+    AND r."id_tipoorigemreserva" = 4
+    AND (
+      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+      OR
+      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+    )
+    AND DATE(CASE
+      WHEN r."id_tipoorigemreserva" IN (7, 8) THEN r."datainicio"
+      ELSE r."dataatendimento"
+    END) BETWEEN DATE('${formattedStart}') AND DATE('${formattedEnd}')
+  GROUP BY booking_date
+  ORDER BY booking_date DESC;
+`;
+
+    // Query SQL para classificação refinada de canais (sem AIRBNB)
+    const billingPerChannelSQL = `
+  WITH reservas_com_canal_refinado AS (
+    SELECT
+      r."id",
+      r."valorcontratado",
+      r."id_tipoorigemreserva",
+      r."datainicio",
+      r."dataatendimento",
+      r."reserva_programada_guia",
+      CASE
+        WHEN r."id_tipoorigemreserva" = 1 THEN 'INTERNAL'
+        WHEN r."id_tipoorigemreserva" = 6 THEN 'INTERNAL'
+        WHEN r."id_tipoorigemreserva" = 7 THEN 'BOOKING'
+        WHEN r."id_tipoorigemreserva" = 8 THEN 'EXPEDIA'
+        WHEN r."id_tipoorigemreserva" = 10 THEN 'GIFT_CARD'
+        WHEN r."id_tipoorigemreserva" = 3 THEN
+          CASE
+            WHEN COALESCE(r."reserva_programada_guia", false) = true THEN 'GUIA_SCHEDULED'
+            ELSE 'GUIA_GO'
+          END
+        WHEN r."id_tipoorigemreserva" = 4 THEN
+          CASE
+            -- Verifica se a hora é "fechada" (20:00, 15:00, 13:00) - reserva programada
+            WHEN EXTRACT(HOUR FROM r."datainicio") IN (20, 15, 13)
+                 AND EXTRACT(MINUTE FROM r."datainicio") = 0
+                 AND EXTRACT(SECOND FROM r."datainicio") = 0 THEN 'WEBSITE_SCHEDULED'
+            ELSE 'WEBSITE_IMMEDIATE'
+          END
+        ELSE CONCAT('CANAL_', r."id_tipoorigemreserva")
+      END AS channel_type
+    FROM "reserva" r
+    WHERE r."cancelada" IS NULL
+      AND r."valorcontratado" IS NOT NULL
+      AND (
+        (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+        OR
+        (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+      )
+  )
+  SELECT
+    channel_type,
+    ROUND(SUM("valorcontratado")::numeric, 2) AS "totalValue",
+    COUNT(*) AS "totalBookings"
+  FROM reservas_com_canal_refinado
+  GROUP BY channel_type
+  ORDER BY "totalValue" DESC;
+`;
+
+    const [bookingRevenue, bookingCount, totalRevenue, paymentMethodsData, rentalTypeData, billingPerChannelData, billingByDateData, ecommerceByDateData] = await Promise.all([
+      this.prisma.prismaLocal.$queryRaw<any[]>(
+        Prisma.sql([totalBookingRevenueSQL]),
+      ),
+      this.prisma.prismaLocal.$queryRaw<any[]>(
+        Prisma.sql([totalBookingCountSQL]),
+      ),
+      this.prisma.prismaLocal.$queryRaw<any[]>(
+        Prisma.sql([totalRevenueSQL]),
+      ),
+      this.prisma.prismaLocal.$queryRaw<any[]>(
+        Prisma.sql([paymentMethodsSQL]),
+      ),
+      this.prisma.prismaLocal.$queryRaw<any[]>(
+        Prisma.sql([rentalTypeSQL]),
+      ),
+      this.prisma.prismaLocal.$queryRaw<any[]>(
+        Prisma.sql([billingPerChannelSQL]),
+      ),
+      this.prisma.prismaLocal.$queryRaw<any[]>(
+        Prisma.sql([billingByDateSQL]),
+      ),
+      this.prisma.prismaLocal.$queryRaw<any[]>(
+        Prisma.sql([ecommerceByDateSQL]),
+      ),
+    ]);
+
+    const totalLineRevenue = bookingRevenue.find(
+      (r: any) => r.id_tipoorigemreserva === null || r.id_tipoorigemreserva === 0,
     );
 
-    // Exibe os valores por canal no console
-    this.logger.debug(
-      'Receita por canal:',
-      bookingRevenue.map((r: any) => {
-        const canais: Record<number, string> = {
-          1: 'sistema',
-          3: 'guia de motéis',
-          4: 'reserva api',
-          6: 'interna',
-          7: 'booking',
-          8: 'expedia',
-        };
+    const totalLineCount = bookingCount.find(
+      (r: any) => r.id_tipoorigemreserva === null || r.id_tipoorigemreserva === 0,
+    );
 
-        return {
-          canal:
-            r.id_tipoorigemreserva === null
-              ? 'TOTAL GERAL'
-              : (canais[r.id_tipoorigemreserva] ??
-                `Canal ${r.id_tipoorigemreserva}`),
-          totalAllValue: Number(r.totalAllValue),
-        };
+    // Calcula o ticket médio
+    const totalValue = Number(totalLineRevenue?.totalAllValue ?? 0);
+    const totalBookings = Number(totalLineCount?.totalAllBookings ?? 0);
+    const ticketAverage = totalBookings > 0 ? Number((totalValue / totalBookings).toFixed(2)) : 0;
+
+    // Extrai a receita total
+    const revenueTotal = Number(totalRevenue[0]?.totalRevenue ?? 0);
+
+    // Calcula a representatividade
+    const representativeness = revenueTotal > 0
+      ? Number((totalValue / revenueTotal).toFixed(4))
+      : 0;
+
+    // Processa os dados dos métodos de pagamento
+    const paymentMethods = {
+      categories: paymentMethodsData.map((item: any) => item.paymentMethod),
+      series: paymentMethodsData.map((item: any) => Number(item.totalValue)),
+    };
+
+    const billingPerChannel = {
+      categories: billingPerChannelData.map((item: any) => item.channel_type),
+      series: billingPerChannelData.map((item: any) => Number(item.totalValue)),
+    };
+
+    // Processa os tipos de locação usando a lógica existente
+    const rentalCounts = {
+      'THREE_HOURS': 0,
+      'SIX_HOURS': 0,
+      'TWELVE_HOURS': 0,
+      'DAY_USE': 0,
+      'OVERNIGHT': 0,
+      'DAILY': 0,
+    };
+
+    let validRecordsCount = 0;
+    let invalidRecordsCount = 0;
+
+    // Objetos para armazenar receita por tipo de reserva
+    const rentalRevenue = {
+      'THREE_HOURS': 0,
+      'SIX_HOURS': 0,
+      'TWELVE_HOURS': 0,
+      'DAY_USE': 0,
+      'OVERNIGHT': 0,
+      'DAILY': 0,
+    };
+
+    // Calcula o tipo de locação para cada reserva
+    rentalTypeData.forEach((booking: any) => {
+      if (booking.datainicio) {
+        validRecordsCount++;
+
+        // Primeiro verifica se é um período programado (dayuse, daily, overnight)
+        const dataInicio = new Date(booking.datainicio);
+        const hora = dataInicio.getHours();
+
+        let rentalType = '';
+
+        // Períodos programados - não precisa calcular encerramento_previsto
+        if (hora === 13) {
+          rentalType = 'DAY_USE'; // 13:00 - Dayuse
+        } else if (hora === 20) {
+          rentalType = 'OVERNIGHT'; // 20:00 - Pernoite
+        } else if (hora === 15) {
+          rentalType = 'DAILY'; // 15:00 - Diária
+        } else {
+          // Para períodos imediatos, usa checkIn/checkOut da locacaoapartamento
+          if (booking.checkIn && booking.checkOut) {
+              const checkInDate = new Date(booking.checkIn);
+            const checkOutDate = new Date(booking.checkOut);
+            rentalType = this.determineRentalPeriod(checkInDate, checkOutDate, rentalTypeData);
+          } else {
+            // Default para THREE_HOURS quando não tem locacaoapartamento vinculada
+            rentalType = 'THREE_HOURS';
+          }
+        }
+
+        if (rentalCounts[rentalType as keyof typeof rentalCounts] !== undefined) {
+          rentalCounts[rentalType as keyof typeof rentalCounts]++;
+          // Acumula também a receita por tipo
+          rentalRevenue[rentalType as keyof typeof rentalRevenue] += Number(booking.valorcontratado || 0);
+        }
+      } else {
+        invalidRecordsCount++;
+      }
+    });
+
+    const reservationsByRentalType = {
+      categories: Object.keys(rentalCounts),
+      series: Object.values(rentalCounts),
+    };
+
+    // Cria KpiTableByChannelType consolidado
+    const kpiTableByChannelType = {
+      bookingsTotalRentalsByChannelType: {} as Record<string, number>,
+      bookingsRevenueByChannelType: {} as Record<string, number>,
+      bookingsTicketAverageByChannelType: {} as Record<string, number>,
+      bookingsRepresentativenessByChannelType: {} as Record<string, number>,
+    };
+
+    // Popula dados por canal usando dados refinados de classificação
+    let totalChannelBookings = 0;
+    let totalChannelRevenue = 0;
+
+    billingPerChannelData.forEach((channelItem: any) => {
+      const channelName = channelItem.channel_type;
+      const revenue = Number(channelItem.totalValue);
+      const count = Number(channelItem.totalBookings);
+
+      // Calcula ticket médio
+      const ticketAverage = count > 0 ? Number((revenue / count).toFixed(2)) : 0;
+
+      // Calcula representatividade
+      const representativeness = revenueTotal > 0 ? Number((revenue / revenueTotal).toFixed(4)) : 0;
+
+      // Popula os dados
+      kpiTableByChannelType.bookingsTotalRentalsByChannelType[channelName] = count;
+      kpiTableByChannelType.bookingsRevenueByChannelType[channelName] = Number(revenue.toFixed(2));
+      kpiTableByChannelType.bookingsTicketAverageByChannelType[channelName] = ticketAverage;
+      kpiTableByChannelType.bookingsRepresentativenessByChannelType[channelName] = representativeness;
+
+      totalChannelBookings += count;
+      totalChannelRevenue += revenue;
+    });
+
+    // Adiciona totais
+    kpiTableByChannelType.bookingsTotalRentalsByChannelType['TOTALALLBOOKINGS'] = totalChannelBookings;
+    kpiTableByChannelType.bookingsRevenueByChannelType['TOTALALLVALUE'] = Number(totalChannelRevenue.toFixed(2));
+    kpiTableByChannelType.bookingsTicketAverageByChannelType['TOTALALLTICKETAVERAGE'] =
+      totalChannelBookings > 0 ? Number((totalChannelRevenue / totalChannelBookings).toFixed(2)) : 0;
+    kpiTableByChannelType.bookingsRepresentativenessByChannelType['TOTALALLREPRESENTATIVENESS'] =
+      revenueTotal > 0 ? Number((totalChannelRevenue / revenueTotal).toFixed(4)) : 0;
+
+    // Calcula BigNumbersEcommerce (soma WEBSITE_IMMEDIATE + WEBSITE_SCHEDULED)
+    const ecommerceRevenueImediata = kpiTableByChannelType.bookingsRevenueByChannelType['WEBSITE_IMMEDIATE'] || 0;
+    const ecommerceRevenueProgramada = kpiTableByChannelType.bookingsRevenueByChannelType['WEBSITE_SCHEDULED'] || 0;
+    const ecommerceRevenue = ecommerceRevenueImediata + ecommerceRevenueProgramada;
+
+    const ecommerceBookingsImediata = kpiTableByChannelType.bookingsTotalRentalsByChannelType['WEBSITE_IMMEDIATE'] || 0;
+    const ecommerceBookingsProgramada = kpiTableByChannelType.bookingsTotalRentalsByChannelType['WEBSITE_SCHEDULED'] || 0;
+    const ecommerceBookings = ecommerceBookingsImediata + ecommerceBookingsProgramada;
+
+    const ecommerceTicketAverage = ecommerceBookings > 0 ? Number((ecommerceRevenue / ecommerceBookings).toFixed(2)) : 0;
+    const ecommerceRepresentativeness = revenueTotal > 0 ? Number((ecommerceRevenue / revenueTotal).toFixed(4)) : 0;
+
+    const bigNumbersEcommerce = {
+      currentDate: {
+        totalAllValue: ecommerceRevenue,
+        totalAllBookings: ecommerceBookings,
+        totalAllTicketAverage: ecommerceTicketAverage,
+        totalAllRepresentativeness: ecommerceRepresentativeness,
+      },
+    };
+
+    // Gera array completo de datas no período solicitado
+    const periodsArray: string[] = [];
+    let currentDate = moment(startDate).utc();
+    const finalDate = moment(endDate).utc();
+
+    while (currentDate.isSameOrBefore(finalDate, 'day')) {
+      periodsArray.push(currentDate.format('DD/MM/YYYY'));
+      currentDate.add(1, 'day');
+    }
+
+    // Cria mapeamento de dados por data
+    const billingDataMap = new Map();
+    billingByDateData.forEach((item: any) => {
+      const dateKey = new Date(item.booking_date).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      billingDataMap.set(dateKey, item);
+    });
+
+    const ecommerceDataMap = new Map();
+    ecommerceByDateData.forEach((item: any) => {
+      const dateKey = new Date(item.booking_date).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      ecommerceDataMap.set(dateKey, item);
+    });
+
+    // Calcula dados por período de data (dia a dia) baseado na lógica original
+    const billingOfReservationsByPeriod = {
+      categories: [...periodsArray], // Ordem crescente (01/07 até 31/07)
+      series: [...periodsArray].map((dateKey: string) => {
+        const item = billingDataMap.get(dateKey);
+        return item ? Number(item.total_value) : 0;
       }),
-    );
+    };
 
-    const totalLine = bookingRevenue.find(
-      (r: any) => r.id_tipoorigemreserva === null,
-    );
+    const representativenessOfReservesByPeriod = {
+      categories: [...periodsArray],
+      series: [...periodsArray].map((dateKey: string) => {
+        const item = billingDataMap.get(dateKey);
+        const dayRevenue = item ? Number(item.total_value) : 0;
+        return totalValue > 0 ? Number((dayRevenue / totalValue).toFixed(2)) : 0;
+      }),
+    };
+
+    const numberOfReservationsPerPeriod = {
+      categories: [...periodsArray],
+      series: [...periodsArray].map((dateKey: string) => {
+        const item = billingDataMap.get(dateKey);
+        return item ? Number(item.total_bookings) : 0;
+      }),
+    };
+
+    const reservationsOfEcommerceByPeriod = {
+      categories: [...periodsArray],
+      series: [...periodsArray].map((dateKey: string) => {
+        const item = ecommerceDataMap.get(dateKey);
+        return item ? Number(item.total_bookings) : 0;
+      }),
+    };
+
+    const billingOfEcommerceByPeriod = {
+      categories: [...periodsArray],
+      series: [...periodsArray].map((dateKey: string) => {
+        const item = ecommerceDataMap.get(dateKey);
+        return item ? Number(item.total_value) : 0;
+      }),
+    };
 
     const bigNumbers = {
       currentDate: {
-        totalAllValue: Number(totalLine?.totalAllValue ?? 0),
-        totalAllBookings: null, // será preenchido depois
-        totalAllTicketAverage: null, // será preenchido depois
-        totalAllRepresentativeness: null, // será preenchido depois
+        totalAllValue: totalValue,
+        totalAllBookings: totalBookings,
+        totalAllTicketAverage: ticketAverage,
+        totalAllRepresentativeness: representativeness,
       },
     };
 
     return {
       Company: 'Lush Lapa',
       BigNumbers: [bigNumbers],
+      PaymentMethods: paymentMethods,
+        BillingPerChannel: billingPerChannel,
+        ReservationsByRentalType: reservationsByRentalType,
+        BillingOfReservationsByPeriod: billingOfReservationsByPeriod,
+        RepresentativenessOfReservesByPeriod:
+          representativenessOfReservesByPeriod,
+        NumberOfReservationsPerPeriod: numberOfReservationsPerPeriod,
+        KpiTableByChannelType: [kpiTableByChannelType],
+        BigNumbersEcommerce: [bigNumbersEcommerce],
+        ReservationsOfEcommerceByPeriod: reservationsOfEcommerceByPeriod,
+        BillingOfEcommerceByPeriod: billingOfEcommerceByPeriod,
     };
   }
 }

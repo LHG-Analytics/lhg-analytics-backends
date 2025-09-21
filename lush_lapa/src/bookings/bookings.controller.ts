@@ -12,7 +12,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { $Enums } from '@client-online';
+import { PeriodEnum } from '@client-online';
 import { BookingsService } from './bookings.service';
 
 @ApiTags('Bookings')
@@ -26,10 +26,10 @@ export class BookingsController {
     required: true,
     description: 'Período para o qual o booking será calculado',
     example: 'LAST_7_D',
-    enum: $Enums.PeriodEnum, // Adiciona o enum como parâmetro na documentação da API
+    enum: PeriodEnum, // Adiciona o enum como parâmetro na documentação da API
   })
   async getAllBookings(
-    @Query('period') period: $Enums.PeriodEnum, // Adiciona o período como parâmetro opcional
+    @Query('period') period: PeriodEnum, // Adiciona o período como parâmetro opcional
   ) {
     if (!period) {
       throw new BadRequestException('The period parameter is required.');
@@ -64,7 +64,7 @@ export class BookingsController {
       const start = this.convertToDate(startDate); // Início
       const end = this.convertToDate(endDate, true); // Fim, com ajuste de horário
 
-      if (!start! || !end) {
+      if (!start || !end) {
         throw new BadRequestException('Both startDate and endDate are required and must be valid dates.');
       }
 
@@ -83,14 +83,14 @@ export class BookingsController {
     if (!dateStr) return undefined;
 
     const [day, month, year] = dateStr.split('/').map(Number);
-    if (isNaN(day)|| isNaN(month) || isNaN(year)) {
+    if (isNaN(day) || isNaN(month) || isNaN(year)) {
       throw new BadRequestException(
         'Invalid date format. Please use DD/MM/YYYY.',
       );
     }
 
     // Cria a nova data no formato YYYY-MM-DD
-    const date = new Date(year, month - 1, day!);
+    const date = new Date(year, month - 1, day);
     if (
       date.getDate() !== day ||
       date.getMonth() !== month - 1 ||
@@ -103,9 +103,9 @@ export class BookingsController {
 
     // Ajusta as horas conforme necessário
     if (isEndDate) {
-      date.setUTCHours(23, 59, 59, 999); // Define o final às 05:59:59.999
+      date.setUTCHours(5,59, 59, 999); // Define o final às 05:59:59.999
     } else {
-      date.setUTCHours(0, 0, 0, 0); // Define o início às 06:00
+      date.setUTCHours(6,0, 0, 0); // Define o início às 06:00
     }
 
     return date;

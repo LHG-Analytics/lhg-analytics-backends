@@ -12,7 +12,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { $Enums } from '@client-online';
+import { PeriodEnum } from '@client-online';
 import { BookingsService } from './bookings.service';
 
 @ApiTags('Bookings')
@@ -26,10 +26,10 @@ export class BookingsController {
     required: true,
     description: 'Período para o qual o booking será calculado',
     example: 'LAST_7_D',
-    enum: $Enums.PeriodEnum, // Adiciona o enum como parâmetro na documentação da API
+    enum: PeriodEnum, // Adiciona o enum como parâmetro na documentação da API
   })
   async getAllBookings(
-    @Query('period') period: $Enums.PeriodEnum, // Adiciona o período como parâmetro opcional
+    @Query('period') period: PeriodEnum, // Adiciona o período como parâmetro opcional
   ) {
     if (!period) {
       throw new BadRequestException('The period parameter is required.');
@@ -69,7 +69,7 @@ export class BookingsController {
       }
 
       // Chama o serviço com as datas e o período, se fornecidos
-      return await this.bookingsService.calculateKpisByDateRange(start, end);
+      return await this.bookingsService.calculateKpibyDateRangeSQL(start, end);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(`Failed to fetch KPIs: ${errorMessage}`);
@@ -103,9 +103,9 @@ export class BookingsController {
 
     // Ajusta as horas conforme necessário
     if (isEndDate) {
-      date.setUTCHours(23, 59, 59, 999); // Define o final às 05:59:59.999
+      date.setUTCHours(5,59, 59, 999); // Define o final às 05:59:59.999
     } else {
-      date.setUTCHours(0, 0, 0, 0); // Define o início às 06:00
+      date.setUTCHours(6,0, 0, 0); // Define o início às 06:00
     }
 
     return date;
