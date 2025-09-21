@@ -2028,29 +2028,19 @@ const kpiTableByChannelType: {
 
     const totalBookingRevenueSQL = `
   SELECT
-  COALESCE(sub."id_tipoorigemreserva", 0) AS "id_tipoorigemreserva",
-  ROUND(SUM(sub."valor_final")::numeric, 2) AS "totalAllValue"
-FROM (
-  SELECT
-    r."id_tipoorigemreserva",
-    CASE
-      WHEN r."id_tipoorigemreserva" = 3 AND r."reserva_programada_guia" = false THEN
-        r."valorcontratado" - COALESCE(r."desconto_reserva", 0)
-      ELSE
-        r."valorcontratado"
-    END AS "valor_final"
-  FROM "reserva" r
-  WHERE
-    r."cancelada" IS NULL
-    AND r."valorcontratado" IS NOT NULL
-    AND (
-      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      OR
-      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-    )
-) AS sub
-GROUP BY ROLLUP (sub."id_tipoorigemreserva")
-HAVING sub."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR sub."id_tipoorigemreserva" IS NULL
+  COALESCE(r."id_tipoorigemreserva", 0) AS "id_tipoorigemreserva",
+  ROUND(SUM(r."valorcontratado")::numeric, 2) AS "totalAllValue"
+FROM "reserva" r
+WHERE
+  r."cancelada" IS NULL
+  AND r."valorcontratado" IS NOT NULL
+  AND (
+    (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+    OR
+    (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
+  )
+GROUP BY ROLLUP (r."id_tipoorigemreserva")
+HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva" IS NULL
 ORDER BY "id_tipoorigemreserva";
 `;
 
