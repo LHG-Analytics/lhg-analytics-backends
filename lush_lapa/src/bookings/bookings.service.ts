@@ -2345,9 +2345,27 @@ FROM vendas_diretas vd, locacoes loc;
       series: paymentMethodsData.map((item: any) => Number(item.totalValue)),
     };
 
+    // Definir todas as categorias de canal possíveis na ordem desejada
+    const allChannelCategories = [
+      'EXPEDIA',
+      'BOOKING',
+      'GUIA_SCHEDULED',
+      'GUIA_GO',
+      'INTERNAL',
+      'WEBSITE_IMMEDIATE',
+      'WEBSITE_SCHEDULED'
+    ];
+
+    // Criar mapa dos dados retornados da query
+    const channelDataMap = new Map();
+    billingPerChannelData.forEach((item: any) => {
+      channelDataMap.set(item.channel_type, Number(item.totalValue));
+    });
+
+    // Garantir que todas as categorias sejam incluídas, mesmo com valor 0
     const billingPerChannel = {
-      categories: billingPerChannelData.map((item: any) => item.channel_type),
-      series: billingPerChannelData.map((item: any) => Number(item.totalValue)),
+      categories: allChannelCategories,
+      series: allChannelCategories.map(category => channelDataMap.get(category) || 0),
     };
 
 
