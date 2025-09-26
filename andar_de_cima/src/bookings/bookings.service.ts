@@ -673,6 +673,8 @@ export class BookingsService {
       ),
     };
 
+    const allChannelCategories = ['EXPEDIA', 'BOOKING', 'AIRBNB', 'GUIA_SCHEDULED', 'GUIA_GO', 'INTERNAL', 'WEBSITE_IMMEDIATE', 'WEBSITE_SCHEDULED'];
+
     const kpiTableByChannelType = {
       bookingsTotalRentalsByChannelType: {} as Record<string, number>,
       bookingsRevenueByChannelType: {} as Record<string, number>,
@@ -680,68 +682,58 @@ export class BookingsService {
       bookingsRepresentativenessByChannelType: {} as Record<string, number>,
     };
 
-    // Preencher bookingsTotalRentalsByChannelType
+    // Criar mapa para busca eficiente dos dados
+    const totalRentalsMap = new Map();
     BookingsTotalRentalsByChannelType.forEach((item: any) => {
       if (item.channelType) {
-        kpiTableByChannelType.bookingsTotalRentalsByChannelType[
-          item.channelType
-        ] = Number(item.totalBookings);
+        totalRentalsMap.set(item.channelType, Number(item.totalBookings));
       }
     });
 
-    // Adiciona o total de bookings
-    if (BookingsTotalRentalsByChannelType.length > 0) {
-      kpiTableByChannelType.bookingsTotalRentalsByChannelType[
-        'TOTALALLBOOKINGS'
-      ] = Number(BookingsTotalRentalsByChannelType[0].totalAllBookings);
-    }
-
-    // Preencher bookingsRevenueByChannelType
+    const revenueMap = new Map();
     BookingsRevenueByChannelType.forEach((item: any) => {
       if (item.channelType) {
-        kpiTableByChannelType.bookingsRevenueByChannelType[item.channelType] =
-          Number(item.totalValue); // Garantir que seja um número
+        revenueMap.set(item.channelType, Number(item.totalValue));
       }
     });
 
-    // Adiciona o total de revenue
-    if (BookingsRevenueByChannelType.length > 0) {
-      kpiTableByChannelType.bookingsRevenueByChannelType['TOTALALLVALUE'] =
-        Number(BookingsRevenueByChannelType[0].totalAllValue); // Garantir que seja um número
-    }
-
-    // Preencher bookingsTicketAverageByChannelType
+    const ticketAverageMap = new Map();
     BookingsTicketAverageByChannelType.forEach((item: any) => {
       if (item.channelType) {
-        kpiTableByChannelType.bookingsTicketAverageByChannelType[
-          item.channelType
-        ] = Number(item.totalTicketAverage); // Garantir que seja um número
+        ticketAverageMap.set(item.channelType, Number(item.totalTicketAverage));
       }
     });
 
-    // Adiciona o total de ticket average
-    if (BookingsTicketAverageByChannelType.length > 0) {
-      kpiTableByChannelType.bookingsTicketAverageByChannelType[
-        'TOTALALLTICKETAVERAGE'
-      ] = Number(BookingsTicketAverageByChannelType[0].totalAllTicketAverage); // Garantir que seja um número
-    }
-
-    // Preencher bookingsRepresentativenessByChannelType
+    const representativenessMap = new Map();
     BookingsRepresentativenessByChannelType.forEach((item: any) => {
       if (item.channelType) {
-        kpiTableByChannelType.bookingsRepresentativenessByChannelType[
-          item.channelType
-        ] = Number(item.totalRepresentativeness); // Garantir que seja um número
+        representativenessMap.set(item.channelType, Number(item.totalRepresentativeness));
       }
     });
 
-    // Adiciona o total de representatividade
+    // Garantir que todas as categorias estejam presentes
+    allChannelCategories.forEach(category => {
+      kpiTableByChannelType.bookingsTotalRentalsByChannelType[category] = totalRentalsMap.get(category) || 0;
+      kpiTableByChannelType.bookingsRevenueByChannelType[category] = revenueMap.get(category) || 0;
+      kpiTableByChannelType.bookingsTicketAverageByChannelType[category] = ticketAverageMap.get(category) || 0;
+      kpiTableByChannelType.bookingsRepresentativenessByChannelType[category] = representativenessMap.get(category) || 0;
+    });
+
+    // Adiciona os totais
+    if (BookingsTotalRentalsByChannelType.length > 0) {
+      kpiTableByChannelType.bookingsTotalRentalsByChannelType['TOTALALLBOOKINGS'] = Number(BookingsTotalRentalsByChannelType[0].totalAllBookings);
+    }
+
+    if (BookingsRevenueByChannelType.length > 0) {
+      kpiTableByChannelType.bookingsRevenueByChannelType['TOTALALLVALUE'] = Number(BookingsRevenueByChannelType[0].totalAllValue);
+    }
+
+    if (BookingsTicketAverageByChannelType.length > 0) {
+      kpiTableByChannelType.bookingsTicketAverageByChannelType['TOTALALLTICKETAVERAGE'] = Number(BookingsTicketAverageByChannelType[0].totalAllTicketAverage);
+    }
+
     if (BookingsRepresentativenessByChannelType.length > 0) {
-      kpiTableByChannelType.bookingsRepresentativenessByChannelType[
-        'TOTALALLREPRESENTATIVENESS'
-      ] = Number(
-        BookingsRepresentativenessByChannelType[0].totalAllRepresentativeness,
-      ); // Garantir que seja um número
+      kpiTableByChannelType.bookingsRepresentativenessByChannelType['TOTALALLREPRESENTATIVENESS'] = Number(BookingsRepresentativenessByChannelType[0].totalAllRepresentativeness);
     }
 
     // Montando o retorno de BigNumbers do E-commerce

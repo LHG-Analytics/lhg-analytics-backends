@@ -2452,14 +2452,34 @@ FROM vendas_diretas vd, locacoes loc;
       bookingsRepresentativenessByChannelType: {} as Record<string, number>,
     };
 
-    // Popula dados por canal usando dados refinados de classificação
+    // Definir todas as categorias de canal possíveis
+    const allChannelCategories = [
+      'EXPEDIA',
+      'BOOKING',
+      'GUIA_SCHEDULED',
+      'GUIA_GO',
+      'INTERNAL',
+      'WEBSITE_IMMEDIATE',
+      'WEBSITE_SCHEDULED'
+    ];
+
+    // Criar mapa dos dados retornados da query
+    const channelKpiDataMap = new Map();
+    billingPerChannelData.forEach((channelItem: any) => {
+      channelKpiDataMap.set(channelItem.channel_type, {
+        revenue: Number(channelItem.totalValue),
+        count: Number(channelItem.totalBookings)
+      });
+    });
+
+    // Popula dados por canal garantindo que todos apareçam
     let totalChannelBookings = 0;
     let totalChannelRevenue = 0;
 
-    billingPerChannelData.forEach((channelItem: any) => {
-      const channelName = channelItem.channel_type;
-      const revenue = Number(channelItem.totalValue);
-      const count = Number(channelItem.totalBookings);
+    allChannelCategories.forEach((channelName) => {
+      const channelData = channelKpiDataMap.get(channelName) || { revenue: 0, count: 0 };
+      const revenue = channelData.revenue;
+      const count = channelData.count;
 
       // Calcula ticket médio
       const ticketAverage = count > 0 ? Number((revenue / count).toFixed(2)) : 0;
