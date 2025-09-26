@@ -2462,17 +2462,6 @@ FROM vendas_diretas vd, locacoes loc;
       bookingsRepresentativenessByChannelType: {} as Record<string, number>,
     };
 
-    // Definir todas as categorias de canal possíveis
-    const allChannelCategories = [
-      'EXPEDIA',
-      'BOOKING',
-      'GUIA_SCHEDULED',
-      'GUIA_GO',
-      'INTERNAL',
-      'WEBSITE_IMMEDIATE',
-      'WEBSITE_SCHEDULED'
-    ];
-
     // Criar mapa dos dados retornados da query
     const channelKpiDataMap = new Map();
     billingPerChannelData.forEach((channelItem: any) => {
