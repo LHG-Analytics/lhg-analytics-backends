@@ -13,13 +13,21 @@ interface BigNumbersDataSQL {
     totalAllGiro: number;
     totalAverageOccupationTime: string;
   };
-  PreviousDate?: {
+  previousDate?: {
     totalAllValuePreviousData: number;
     totalAllRentalsApartmentsPreviousData: number;
     totalAllTicketAveragePreviousData: number;
-    totalAllRevparPreviousData: number;
+    totalAllTrevparPreviousData: number;
     totalAllGiroPreviousData: number;
     totalAverageOccupationTimePreviousData: string;
+  };
+  monthlyForecast?: {
+    totalAllValueForecast: number;
+    totalAllRentalsApartmentsForecast: number;
+    totalAllTicketAverageForecast: number;
+    totalAllTrevparForecast: number;
+    totalAllGiroForecast: number;
+    totalAverageOccupationTimeForecast: string;
   };
 }
 
@@ -766,7 +774,57 @@ export class CompanyService {
         totalAverageOccupationTime:
           KpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00',
       },
+      previousDate: {
+        totalAllValuePreviousData: Number(KpiRevenuePreviousData[0]?.totalAllValue ?? 0),
+        totalAllRentalsApartmentsPreviousData:
+          KpiTotalRentalsPreviousData[0]?.totalAllRentalsApartments ?? 0,
+        totalAllTicketAveragePreviousData: Number(KpiTicketAveragePreviousData[0]?.totalAllTicketAverage ?? 0),
+        totalAllTrevparPreviousData: Number(KpiRevparPreviousData[0]?.totalRevpar ?? 0),
+        totalAllGiroPreviousData: Number(KpiGiroPreviousData[0]?.totalGiro ?? 0),
+        totalAverageOccupationTimePreviousData:
+          KpiAlosPreviousData[0]?.totalAverageOccupationTime ?? '00:00:00',
+      },
     };
+
+    // Calcular previsão de fechamento do mês somente para LAST_30_D (último mês)
+    if (period === PeriodEnum.LAST_30_D) {
+      const now = moment.tz('America/Sao_Paulo');
+      const currentMonthStart = now.clone().startOf('month');
+      const currentMonthEnd = now.clone().endOf('month');
+      const today = now.clone().startOf('day');
+      const yesterday = today.clone().subtract(1, 'day');
+
+      // Verificar se estamos no mês corrente
+      const isCurrentMonth = now.month() === currentMonthStart.month() && now.year() === currentMonthStart.year();
+
+      if (isCurrentMonth) {
+        // Dias que já passaram no mês (do dia 1 até ontem)
+        const daysElapsed = yesterday.date(); // dia de ontem = quantos dias passaram
+        // Total de dias no mês
+        const totalDaysInMonth = currentMonthEnd.date();
+        // Dias restantes (de hoje até o fim do mês)
+        const remainingDays = totalDaysInMonth - daysElapsed;
+
+        // Se temos dados suficientes e ainda restam dias no mês
+        if (daysElapsed > 0 && remainingDays > 0) {
+          // Média diária baseada nos dados acumulados
+          const dailyAverageValue = bigNumbers.currentDate.totalAllValue / daysElapsed;
+          const dailyAverageRentals = bigNumbers.currentDate.totalAllRentalsApartments / daysElapsed;
+          const dailyAverageTrevpar = bigNumbers.currentDate.totalAllTrevpar / daysElapsed;
+          const dailyAverageGiro = bigNumbers.currentDate.totalAllGiro / daysElapsed;
+
+          // Projeção: dados atuais + (média diária × dias restantes)
+          bigNumbers.monthlyForecast = {
+            totalAllValueForecast: Number((bigNumbers.currentDate.totalAllValue + (dailyAverageValue * remainingDays)).toFixed(2)),
+            totalAllRentalsApartmentsForecast: Math.round(bigNumbers.currentDate.totalAllRentalsApartments + (dailyAverageRentals * remainingDays)),
+            totalAllTicketAverageForecast: Number(bigNumbers.currentDate.totalAllTicketAverage), // Ticket médio não muda com projeção
+            totalAllTrevparForecast: Number((bigNumbers.currentDate.totalAllTrevpar + (dailyAverageTrevpar * remainingDays)).toFixed(2)),
+            totalAllGiroForecast: Number((bigNumbers.currentDate.totalAllGiro + (dailyAverageGiro * remainingDays)).toFixed(2)),
+            totalAverageOccupationTimeForecast: bigNumbers.currentDate.totalAverageOccupationTime, // Tempo médio não muda com projeção
+          };
+        }
+      }
+    }
 
     // Montando o retorno de DataTableSuiteCategory
     const dataTableSuiteCategory = suiteCategory.map((suite) => {
