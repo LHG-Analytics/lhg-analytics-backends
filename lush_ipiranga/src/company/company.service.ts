@@ -3,7 +3,38 @@ import { PeriodEnum, Prisma, RentalTypeEnum } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import * as moment from 'moment-timezone';
 
-// Type definitions for better type safety
+// Type definitions for better type safety - Numeric versions for SQL function
+interface BigNumbersDataSQL {
+  currentDate: {
+    totalAllValue: number;
+    totalAllRentalsApartments: number;
+    totalAllTicketAverage: number;
+    totalAllTrevpar: number;
+    totalAllGiro: number;
+    totalAverageOccupationTime: string;
+  };
+  PreviousDate?: {
+    totalAllValuePreviousData: number;
+    totalAllRentalsApartmentsPreviousData: number;
+    totalAllTicketAveragePreviousData: number;
+    totalAllRevparPreviousData: number;
+    totalAllGiroPreviousData: number;
+    totalAverageOccupationTimePreviousData: string;
+  };
+}
+
+interface TotalResultDataSQL {
+  totalAllRentalsApartments: number;
+  totalAllValue: number;
+  totalAllTicketAverage: number;
+  totalGiro: number;
+  totalRevpar: number;
+  totalTrevpar: number;
+  totalAverageOccupationTime: string;
+  totalOccupancyRate: number;
+}
+
+// Type definitions for better type safety - String versions for original function
 interface BigNumbersData {
   currentDate: {
     totalAllValue: string;
@@ -26,13 +57,13 @@ interface BigNumbersData {
 interface SuiteCategoryData {
   [key: string]: {
     totalRentalsApartments: number;
-    totalValue: string;
-    totalTicketAverage: string;
-    giro: string;
-    revpar: string;
-    trevpar: string;
+    totalValue: number;
+    totalTicketAverage: number;
+    giro: number;
+    revpar: number;
+    trevpar: number;
     averageOccupationTime: string;
-    occupancyRate: string;
+    occupancyRate: number;
   };
 }
 
@@ -94,8 +125,8 @@ interface OccupancyBySuiteCategoryData {
 interface WeeklyOccupancyData {
   [suiteCategory: string]: {
     [dayOfWeek: string]: {
-      occupancyRate: string;
-      totalOccupancyRate: string;
+      occupancyRate: number;
+      totalOccupancyRate: number;
     };
   };
 }
@@ -103,8 +134,8 @@ interface WeeklyOccupancyData {
 interface WeeklyGiroData {
   [suiteCategory: string]: {
     [dayOfWeek: string]: {
-      giro: string;
-      totalGiro: string;
+      giro: number;
+      totalGiro: number;
     };
   };
 }
@@ -137,6 +168,17 @@ interface CategoryTotalsMap {
   };
 }
 
+// ApexCharts interfaces for new function
+interface ApexChartsData {
+  categories: string[];
+  series: number[];
+}
+
+interface ApexChartsSeriesData {
+  categories: string[];
+  series: { name: string; data: number[] }[];
+}
+
 export interface CompanyKpiResponse {
   Company: string;
   BigNumbers: BigNumbersData[];
@@ -155,11 +197,30 @@ export interface CompanyKpiResponse {
   DataTableGiroByWeek: WeeklyGiroData[];
 }
 
+// New interface for ApexCharts compatible response
+export interface CompanyKpiApexChartsResponse {
+  Company: string;
+  BigNumbers: BigNumbersDataSQL[];
+  BillingRentalType: ApexChartsSeriesData;
+  RevenueByDate: ApexChartsData;
+  RevenueBySuiteCategory: ApexChartsData;
+  RentalsByDate: ApexChartsData;
+  RevparByDate: ApexChartsData;
+  TicketAverageByDate: ApexChartsData;
+  TrevparByDate: ApexChartsData;
+  OccupancyRateByDate: ApexChartsData;
+  OccupancyRateBySuiteCategory: ApexChartsSeriesData;
+  DataTableSuiteCategory: SuiteCategoryData[];
+  TotalResult: TotalResultDataSQL;
+  DataTableOccupancyRateByWeek: WeeklyOccupancyData[];
+  DataTableGiroByWeek: WeeklyGiroData[];
+}
+
 @Injectable()
 export class CompanyService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAllCompany(period: PeriodEnum): Promise<CompanyKpiResponse> {
+  async findAllCompany(period: PeriodEnum): Promise<CompanyKpiApexChartsResponse> {
     // Define o fuso horário padrão como São Paulo
     moment.tz.setDefault('America/Sao_Paulo');
 
@@ -229,11 +290,7 @@ export class CompanyService {
         throw new Error('Invalid period specified');
     }
 
-    // Exibe as datas geradas
-    console.log('startDate:', startDate);
-    console.log('endDate:', endDate);
-    console.log('startDatePrevious:', startDatePrevious);
-    console.log('endDatePrevious:', endDatePrevious);
+    // Datas geradas para as consultas
 
     // Consultas para buscar os dados de KPIs com base nas datas selecionadas
     const [
@@ -268,6 +325,7 @@ export class CompanyService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -338,6 +396,7 @@ export class CompanyService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -391,6 +450,7 @@ export class CompanyService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -444,6 +504,7 @@ export class CompanyService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -497,6 +558,7 @@ export class CompanyService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -566,6 +628,7 @@ export class CompanyService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -601,6 +664,7 @@ export class CompanyService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -651,6 +715,7 @@ export class CompanyService {
           period: period,
           createdDate: {
             gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -682,63 +747,29 @@ export class CompanyService {
       }),
       this.prisma.prismaLocal.suiteCategory.findMany({
         where: {
-          description: {
-            in: [
-              'LUSH',
-              'LUSH POP',
-              'LUSH HIDRO',
-              'LUSH LOUNGE',
-              'LUSH SPA',
-              'LUSH CINE',
-              'LUSH SPLASH',
-              'LUSH SPA SPLASH',
-              'CASA LUSH',
-            ],
+          id: {
+            in: [10, 11, 12, 15, 16, 17, 18, 19, 24],
           },
         },
       }),
     ]);
 
     // Montando o retorno de BigNumbers
-    const bigNumbers: BigNumbersData = {
+    const bigNumbers: BigNumbersDataSQL = {
       currentDate: {
-        totalAllValue: this.formatCurrency(
-          Number(KpiRevenue[0]?.totalAllValue ?? 0),
-        ),
+        totalAllValue: Number(KpiRevenue[0]?.totalAllValue ?? 0),
         totalAllRentalsApartments:
           KpiTotalRentals[0]?.totalAllRentalsApartments ?? 0,
-        totalAllTicketAverage: this.formatCurrency(
-          Number(KpiTicketAverage[0]?.totalAllTicketAverage ?? 0),
-        ),
-        totalAllRevpar: this.formatCurrency(
-          Number(KpiRevpar[0]?.totalRevpar ?? 0),
-        ),
+        totalAllTicketAverage: Number(KpiTicketAverage[0]?.totalAllTicketAverage ?? 0),
+        totalAllTrevpar: Number(KpiRevpar[0]?.totalRevpar ?? 0),
         totalAllGiro: Number(KpiGiro[0]?.totalGiro ?? 0),
         totalAverageOccupationTime:
           KpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00',
       },
-      PreviousDate: {
-        totalAllValuePreviousData: this.formatCurrency(
-          Number(KpiRevenuePreviousData[0]?.totalAllValue ?? 0),
-        ),
-        totalAllRentalsApartmentsPreviousData:
-          KpiTotalRentalsPreviousData[0]?.totalAllRentalsApartments ?? 0,
-        totalAllTicketAveragePreviousData: this.formatCurrency(
-          Number(KpiTicketAveragePreviousData[0]?.totalAllTicketAverage ?? 0),
-        ),
-        totalAllRevparPreviousData: this.formatCurrency(
-          Number(KpiRevparPreviousData[0]?.totalRevpar ?? 0),
-        ),
-        totalAllGiroPreviousData: Number(
-          KpiGiroPreviousData[0]?.totalGiro ?? 0,
-        ),
-        totalAverageOccupationTimePreviousData:
-          KpiAlosPreviousData[0]?.totalAverageOccupationTime ?? '00:00:00',
-      },
     };
 
     // Montando o retorno de DataTableSuiteCategory
-    const dataTableSuiteCategory: SuiteCategoryData[] = suiteCategory.map((suite) => {
+    const dataTableSuiteCategory = suiteCategory.map((suite) => {
       const suiteName = suite.description;
 
       // Filtrar os valores de KPI específicos para a suite atual
@@ -772,45 +803,29 @@ export class CompanyService {
         [suiteName]: {
           totalRentalsApartments:
             kpiTotalRentalsForSuite?.totalRentalsApartments ?? 0,
-          totalValue: this.formatCurrency(
-            Number(kpiRevenueForSuite?.totalValue ?? 0),
-          ),
-          totalTicketAverage: this.formatCurrency(
-            Number(kpiTicketAverageForSuite?.totalTicketAverage ?? 0),
-          ),
-          giro: Number(kpiGiroForSuite?.giro ?? 0).toFixed(2),
-          revpar: this.formatCurrency(Number(kpiRevparForSuite?.revpar ?? 0)),
-          trevpar: this.formatCurrency(
-            Number(kpiTrevparForSuite?.trevpar ?? 0),
-          ),
+          totalValue: Number(kpiRevenueForSuite?.totalValue ?? 0),
+          totalTicketAverage: Number(kpiTicketAverageForSuite?.totalTicketAverage ?? 0),
+          giro: Number(kpiGiroForSuite?.giro ?? 0),
+          revpar: Number(kpiRevparForSuite?.revpar ?? 0),
+          trevpar: Number(kpiTrevparForSuite?.trevpar ?? 0),
           averageOccupationTime:
             kpiAlosForSuite?.averageOccupationTime ?? '00:00:00',
-          occupancyRate: this.formatPercentage(
-            Number(kpiOccupancyRateForSuite?.occupancyRate ?? 0),
-          ),
+          occupancyRate: Number(kpiOccupancyRateForSuite?.occupancyRate ?? 0),
         },
       };
     });
 
-    const TotalResult: TotalResultData = {
+    const TotalResult: TotalResultDataSQL = {
       totalAllRentalsApartments:
         KpiTotalRentals[0]?.totalAllRentalsApartments || 0,
-      totalAllValue: this.formatCurrency(
-        Number(KpiRevenue[0]?.totalAllValue ?? 0),
-      ),
-      totalAllTicketAverage: this.formatCurrency(
-        Number(KpiTicketAverage[0]?.totalAllTicketAverage) || 0,
-      ),
+      totalAllValue: Number(KpiRevenue[0]?.totalAllValue ?? 0),
+      totalAllTicketAverage: Number(KpiTicketAverage[0]?.totalAllTicketAverage) || 0,
       totalGiro: Number(KpiGiro[0]?.totalGiro ?? 0),
-      totalRevpar: this.formatCurrency(Number(KpiRevpar[0]?.totalRevpar) || 0),
-      totalTrevpar: this.formatCurrency(
-        Number(KpiTrevpar[0]?.totalTrevpar) || 0,
-      ),
+      totalRevpar: Number(KpiRevpar[0]?.totalRevpar) || 0,
+      totalTrevpar: Number(KpiTrevpar[0]?.totalTrevpar) || 0,
       totalAverageOccupationTime:
         KpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00',
-      totalOccupancyRate: this.formatPercentage(
-        Number(KpiOccupancyRate[0]?.totalOccupancyRate ?? 0),
-      ),
+      totalOccupancyRate: Number(KpiOccupancyRate[0]?.totalOccupancyRate ?? 0),
     };
 
     // Define os tipos de aluguel esperados
@@ -863,33 +878,37 @@ export class CompanyService {
       {},
     );
 
-    // Construindo a tabela de dados de faturamento por tipo de aluguel
-    const dataTableBillingRentalType: BillingRentalTypeData[] = Object.keys(billingRentalTypeMap).map(
-      (key) => {
-        const rentalTypeData = expectedRentalTypes.map((rentalType) => {
-          const totalValue =
-            billingRentalTypeMap[key][rentalType]?.totalValue || 0;
-          return {
-            [rentalType]: {
-              totalValue: this.formatCurrency(totalValue),
-            },
-          };
-        });
+    // Gerar array completo de datas para o período
+    const periodsArray: string[] = [];
+    let currentDate = moment(startDate);
 
-        return {
-          [key]: rentalTypeData,
-        };
-      },
-    );
+    // CORRIGINDO: Para incluir corretamente todos os dias operacionais
+    // O endDate vem como próximo dia 05:59, então subtraímos 1 dia para pegar o último dia válido
+    const userEndDate = moment(endDate).subtract(1, 'day').startOf('day');
+    while (currentDate.isSameOrBefore(userEndDate, 'day')) {
+      periodsArray.push(currentDate.format('DD/MM/YYYY'));
+      currentDate.add(1, 'day');
+    }
 
-    let formattedRevenueData: DateValueData[];
+    // Construindo BillingRentalType para formato ApexCharts
+    const billingRentalType: ApexChartsSeriesData = {
+      categories: periodsArray,
+      series: expectedRentalTypes.map(rentalType => ({
+        name: rentalType,
+        data: periodsArray.map(date => {
+          const rentalTypeData = billingRentalTypeMap[date]?.[rentalType];
+          return rentalTypeData ? rentalTypeData.totalValue : 0;
+        })
+      }))
+    };
 
     // Obter o dia atual no fuso horário da aplicação
     const now = moment();
     const currentHour = now.hour();
     const currentDayOfMonth = currentHour ? now.date() - 1 : now.date();
 
-    console.log('dia de hoje:', currentDayOfMonth);
+    // Criar mapa de dados de receita por data
+    const revenueByDateMap = new Map<string, number>();
 
     // Verificar se o period é LAST_6_M
     if (period === 'LAST_6_M') {
@@ -909,80 +928,55 @@ export class CompanyService {
       });
 
       // Agrupar os dados por data
-      const revenueByDate: Record<string, { totalValue: number }> = filteredKpiRevenueByPeriod.reduce(
-        (acc, curr) => {
-          const dateKey = moment
-            .utc(curr.createdDate)
-            .tz('America/Sao_Paulo')
-            .format('DD/MM/YYYY');
-          const totalValue = Number(curr.totalValue);
+      filteredKpiRevenueByPeriod.forEach((curr) => {
+        const dateKey = moment
+          .utc(curr.createdDate)
+          .tz('America/Sao_Paulo')
+          .format('DD/MM/YYYY');
+        const totalValue = Number(curr.totalValue);
 
-          if (!acc[dateKey]) {
-            acc[dateKey] = { totalValue: 0 };
-          }
-
-          acc[dateKey].totalValue += totalValue;
-
-          return acc;
-        },
-        {} as Record<string, { totalValue: number }>,
-      );
-
-      // Formatar os dados no formato desejado
-      formattedRevenueData = Object.keys(revenueByDate).map((date) => ({
-        [date]: {
-          totalValue: this.formatCurrency(revenueByDate[date].totalValue),
-        },
-      }));
+        if (!revenueByDateMap.has(dateKey)) {
+          revenueByDateMap.set(dateKey, 0);
+        }
+        revenueByDateMap.set(dateKey, revenueByDateMap.get(dateKey)! + totalValue);
+      });
     } else {
-      // Se o period não for LAST_6_M, não aplica o filtro, apenas agrupa e formata normalmente
-      const revenueByDate: Record<string, { totalValue: number }> = KpiRevenueByPeriod.reduce(
-        (acc, curr) => {
-          const dateKey = moment
-            .utc(curr.createdDate)
-            .tz('America/Sao_Paulo')
-            .format('DD/MM/YYYY');
-          const totalValue = Number(curr.totalValue);
+      // Se o period não for LAST_6_M, não aplica o filtro, apenas agrupa normalmente
+      KpiRevenueByPeriod.forEach((curr) => {
+        const dateKey = moment
+          .utc(curr.createdDate)
+          .tz('America/Sao_Paulo')
+          .format('DD/MM/YYYY');
+        const totalValue = Number(curr.totalValue);
 
-          if (!acc[dateKey]) {
-            acc[dateKey] = { totalValue: 0 };
-          }
-
-          acc[dateKey].totalValue += totalValue;
-
-          return acc;
-        },
-        {} as Record<string, { totalValue: number }>,
-      );
-
-      // Formatar os dados no formato desejado
-      formattedRevenueData = Object.keys(revenueByDate).map((date) => ({
-        [date]: {
-          totalValue: this.formatCurrency(revenueByDate[date].totalValue),
-        },
-      }));
+        if (!revenueByDateMap.has(dateKey)) {
+          revenueByDateMap.set(dateKey, 0);
+        }
+        revenueByDateMap.set(dateKey, revenueByDateMap.get(dateKey)! + totalValue);
+      });
     }
 
-    const revenueBySuiteCategory = suiteCategory.map((suite) => {
-      const suiteName = suite.description;
+    // RevenueByDate no formato ApexCharts
+    const revenueByDate: ApexChartsData = {
+      categories: periodsArray,
+      series: periodsArray.map(date => revenueByDateMap.get(date) || 0)
+    };
 
-      // Filtrar os valores de KPI específicos para a suite atual
-      const kpiRevenueForSuite = KpiRevenue.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
-      );
+    // RevenueBySuiteCategory no formato ApexCharts
+    const suiteRevenueData = suiteCategory
+      .map((suite) => ({
+        name: suite.description,
+        value: Number(KpiRevenue.find(kpi => kpi.suiteCategoryName === suite.description)?.totalValue ?? 0)
+      }))
+      .sort((a, b) => b.value - a.value);
 
-      // Montar o objeto para cada suite
-      return {
-        [suiteName]: {
-          totalValue: this.formatCurrency(
-            Number(kpiRevenueForSuite?.totalValue ?? 0),
-          ),
-        },
-      };
-    });
+    const revenueBySuiteCategory: ApexChartsData = {
+      categories: suiteRevenueData.map(suite => suite.name),
+      series: suiteRevenueData.map(suite => suite.value)
+    };
 
-    // Declarar formattedTotalRentalsData fora do escopo do if
-    let formattedTotalRentalsData: DateRentalsData[];
+    // Criar mapa de dados de rentals por data
+    const rentalsByDateMap = new Map<string, number>();
 
     // Verificar se o period é LAST_6_M
     if (period === 'LAST_6_M') {
@@ -1004,55 +998,36 @@ export class CompanyService {
       );
 
       // Agrupar os dados por data
-      const totalRentalsByDate: Record<string, { totalAllRentalsApartments: number }> = 
-        filteredKpiTotalRentalsByPeriod.reduce(
-          (acc, curr) => {
-            const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
-            const totalAllRentalsApartments = Number(curr.totalAllRentalsApartments);
+      filteredKpiTotalRentalsByPeriod.forEach((curr) => {
+        const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
+        const totalAllRentalsApartments = Number(curr.totalAllRentalsApartments);
 
-            if (!acc[dateKey]) {
-              acc[dateKey] = { totalAllRentalsApartments: 0 };
-            }
-
-            acc[dateKey].totalAllRentalsApartments += totalAllRentalsApartments;
-
-            return acc;
-          },
-          {} as Record<string, { totalAllRentalsApartments: number }>,
-        );
-
-      // Formatar os dados no formato desejado
-      formattedTotalRentalsData = Object.keys(totalRentalsByDate).map((date) => ({
-        [date]: {
-          totalAllRentalsApartments: totalRentalsByDate[date].totalAllRentalsApartments,
-        },
-      }));
+        if (!rentalsByDateMap.has(dateKey)) {
+          rentalsByDateMap.set(dateKey, 0);
+        }
+        rentalsByDateMap.set(dateKey, rentalsByDateMap.get(dateKey)! + totalAllRentalsApartments);
+      });
     } else {
-      // Caso contrário, apenas agrupar e formatar os dados sem filtro
-      const totalRentalsByDate: Record<string, { totalAllRentalsApartments: number }> = 
-        KpiTotalRentalsByPeriod.reduce((acc, curr) => {
-          const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
-          const totalAllRentalsApartments = Number(curr.totalAllRentalsApartments);
+      // Caso contrário, apenas agrupar os dados sem filtro
+      KpiTotalRentalsByPeriod.forEach((curr) => {
+        const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
+        const totalAllRentalsApartments = Number(curr.totalAllRentalsApartments);
 
-          if (!acc[dateKey]) {
-            acc[dateKey] = { totalAllRentalsApartments: 0 };
-          }
-
-          acc[dateKey].totalAllRentalsApartments += totalAllRentalsApartments;
-
-          return acc;
-        }, {} as Record<string, { totalAllRentalsApartments: number }>);
-
-      // Formatar os dados no formato desejado
-      formattedTotalRentalsData = Object.keys(totalRentalsByDate).map((date) => ({
-        [date]: {
-          totalAllRentalsApartments: totalRentalsByDate[date].totalAllRentalsApartments,
-        },
-      }));
+        if (!rentalsByDateMap.has(dateKey)) {
+          rentalsByDateMap.set(dateKey, 0);
+        }
+        rentalsByDateMap.set(dateKey, rentalsByDateMap.get(dateKey)! + totalAllRentalsApartments);
+      });
     }
 
-    // Declarar formattedRevparData fora do escopo do if
-    let formattedRevparData: DateRevparData[];
+    // RentalsByDate no formato ApexCharts
+    const rentalsByDate: ApexChartsData = {
+      categories: periodsArray,
+      series: periodsArray.map(date => rentalsByDateMap.get(date) || 0)
+    };
+
+    // Criar mapa de dados de revpar por data
+    const revparByDateMap = new Map<string, number>();
 
     // Verificar se o period é LAST_6_M
     if (period === 'LAST_6_M') {
@@ -1072,56 +1047,37 @@ export class CompanyService {
       });
 
       // Agrupar os dados por data
-      const revparByDate: Record<string, { totalRevpar: number }> = filteredKpiRevparByPeriod.reduce(
-        (acc, curr) => {
-          const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
-          const totalRevpar = Number(curr.totalRevpar);
+      filteredKpiRevparByPeriod.forEach((curr) => {
+        const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
+        const totalRevpar = Number(curr.totalRevpar);
 
-          if (!acc[dateKey]) {
-            acc[dateKey] = { totalRevpar: 0 };
-          }
+        if (!revparByDateMap.has(dateKey)) {
+          revparByDateMap.set(dateKey, 0);
+        }
+        revparByDateMap.set(dateKey, revparByDateMap.get(dateKey)! + totalRevpar);
+      });
 
-          acc[dateKey].totalRevpar += totalRevpar;
-
-          return acc;
-        },
-        {} as Record<string, { totalRevpar: number }>,
-      );
-
-      // Formatar os dados no formato desejado
-      formattedRevparData = Object.keys(revparByDate).map((date) => ({
-        [date]: {
-          totalRevpar: this.formatCurrency(revparByDate[date].totalRevpar),
-        },
-      }));
     } else {
-      // Caso contrário, apenas agrupar e formatar os dados sem filtro
-      const revparByDate: Record<string, { totalRevpar: number }> = KpiRevparByPeriod.reduce(
-        (acc, curr) => {
-          const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
-          const totalRevpar = Number(curr.totalRevpar);
+      // Caso contrário, apenas agrupar os dados sem filtro
+      KpiRevparByPeriod.forEach((curr) => {
+        const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
+        const totalRevpar = Number(curr.totalRevpar);
 
-          if (!acc[dateKey]) {
-            acc[dateKey] = { totalRevpar: 0 };
-          }
-
-          acc[dateKey].totalRevpar += totalRevpar;
-
-          return acc;
-        },
-        {} as Record<string, { totalRevpar: number }>,
-      );
-
-      // Formatar os dados no formato desejado
-      formattedRevparData = Object.keys(revparByDate).map((date) => ({
-        [date]: {
-          totalRevpar: this.formatCurrency(revparByDate[date].totalRevpar),
-        },
-      }));
+        if (!revparByDateMap.has(dateKey)) {
+          revparByDateMap.set(dateKey, 0);
+        }
+        revparByDateMap.set(dateKey, revparByDateMap.get(dateKey)! + totalRevpar);
+      });
     }
 
-    // Declarar formattedTicketAverageData fora do escopo do if
-    let formattedTicketAverageData: DateTicketData[];
+    // RevparByDate no formato ApexCharts
+    const revparByDate: ApexChartsData = {
+      categories: periodsArray,
+      series: periodsArray.map(date => revparByDateMap.get(date) || 0)
+    };
+
+    // Criar mapa de dados de ticket average por data
+    const ticketAverageByDateMap = new Map<string, number>();
 
     // Verificar se o period é LAST_6_M
     if (period === 'LAST_6_M') {
@@ -1143,62 +1099,36 @@ export class CompanyService {
       );
 
       // Agrupar os dados por data
-      const ticketAverageByDate: Record<string, { totalAllTicketAverage: number }> = 
-        filteredKpiTicketAverageByPeriod.reduce(
-          (acc, curr) => {
-            const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
-            const totalAllTicketAverage = Number(curr.totalAllTicketAverage);
+      filteredKpiTicketAverageByPeriod.forEach((curr) => {
+        const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
+        const totalAllTicketAverage = Number(curr.totalAllTicketAverage);
 
-            if (!acc[dateKey]) {
-              acc[dateKey] = { totalAllTicketAverage: 0 };
-            }
-
-            acc[dateKey].totalAllTicketAverage += totalAllTicketAverage;
-
-            return acc;
-          },
-          {} as Record<string, { totalAllTicketAverage: number }>,
-        );
-
-      // Formatar os dados no formato desejado
-      formattedTicketAverageData = Object.keys(ticketAverageByDate).map((date) => ({
-        [date]: {
-          totalAllTicketAverage: this.formatCurrency(
-            ticketAverageByDate[date].totalAllTicketAverage,
-          ),
-        },
-      }));
+        if (!ticketAverageByDateMap.has(dateKey)) {
+          ticketAverageByDateMap.set(dateKey, 0);
+        }
+        ticketAverageByDateMap.set(dateKey, ticketAverageByDateMap.get(dateKey)! + totalAllTicketAverage);
+      });
     } else {
-      // Caso contrário, apenas agrupar e formatar os dados sem filtro
-      const ticketAverageByDate: Record<string, { totalAllTicketAverage: number }> = 
-        KpiTicketAverageByPeriod.reduce(
-          (acc, curr) => {
-            const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
-            const totalAllTicketAverage = Number(curr.totalAllTicketAverage);
+      // Caso contrário, apenas agrupar os dados sem filtro
+      KpiTicketAverageByPeriod.forEach((curr) => {
+        const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
+        const totalAllTicketAverage = Number(curr.totalAllTicketAverage);
 
-            if (!acc[dateKey]) {
-              acc[dateKey] = { totalAllTicketAverage: 0 };
-            }
-
-            acc[dateKey].totalAllTicketAverage += totalAllTicketAverage;
-
-            return acc;
-          },
-          {} as Record<string, { totalAllTicketAverage: number }>,
-        );
-
-      // Formatar os dados no formato desejado
-      formattedTicketAverageData = Object.keys(ticketAverageByDate).map((date) => ({
-        [date]: {
-          totalAllTicketAverage: this.formatCurrency(
-            ticketAverageByDate[date].totalAllTicketAverage,
-          ),
-        },
-      }));
+        if (!ticketAverageByDateMap.has(dateKey)) {
+          ticketAverageByDateMap.set(dateKey, 0);
+        }
+        ticketAverageByDateMap.set(dateKey, ticketAverageByDateMap.get(dateKey)! + totalAllTicketAverage);
+      });
     }
 
-    // Declarar formattedTrevparData fora do escopo do if
-    let formattedTrevparData: DateTrevparData[];
+    // TicketAverageByDate no formato ApexCharts
+    const ticketAverageByDate: ApexChartsData = {
+      categories: periodsArray,
+      series: periodsArray.map(date => ticketAverageByDateMap.get(date) || 0)
+    };
+
+    // Criar mapa de dados de trevpar por data
+    const trevparByDateMap = new Map<string, number>();
 
     // Verificar se o period é LAST_6_M
     if (period === 'LAST_6_M') {
@@ -1217,33 +1147,29 @@ export class CompanyService {
         );
       });
 
-      // Formatar os dados no formato desejado sem acumular
-      formattedTrevparData = filteredKpiTrevparByPeriod.map((curr) => {
+      // Formatar os dados sem acumular (usar valor direto)
+      filteredKpiTrevparByPeriod.forEach((curr) => {
         const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
         const totalTrevpar = Number(curr.totalTrevpar);
-
-        return {
-          [dateKey]: {
-            totalTrevpar: this.formatCurrency(totalTrevpar),
-          },
-        };
+        trevparByDateMap.set(dateKey, totalTrevpar);
       });
     } else {
       // Caso contrário, apenas formatar os dados sem filtro
-      formattedTrevparData = KpiTrevparByPeriod.map((curr) => {
+      KpiTrevparByPeriod.forEach((curr) => {
         const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
         const totalTrevpar = Number(curr.totalTrevpar);
-
-        return {
-          [dateKey]: {
-            totalTrevpar: this.formatCurrency(totalTrevpar),
-          },
-        };
+        trevparByDateMap.set(dateKey, totalTrevpar);
       });
     }
 
-    // Declarar formattedOccupancyRateData fora do escopo do if
-    let formattedOccupancyRateData: DateOccupancyData[];
+    // TrevparByDate no formato ApexCharts
+    const trevparByDate: ApexChartsData = {
+      categories: periodsArray,
+      series: periodsArray.map(date => trevparByDateMap.get(date) || 0)
+    };
+
+    // Criar mapa de dados de occupancy rate por data
+    const occupancyRateByDateMap = new Map<string, number>();
 
     // Verificar se o period é LAST_6_M
     if (period === 'LAST_6_M') {
@@ -1265,59 +1191,33 @@ export class CompanyService {
       );
 
       // Agrupar os dados por data
-      const occupancyRateByDate: Record<string, { totalOccupancyRate: number }> = 
-        filteredKpiOccupancyRateByPeriod.reduce(
-          (acc, curr) => {
-            const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
-            const totalOccupancyRate = Number(curr.totalOccupancyRate);
+      filteredKpiOccupancyRateByPeriod.forEach((curr) => {
+        const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
+        const totalOccupancyRate = Number(curr.totalOccupancyRate);
 
-            if (!acc[dateKey]) {
-              acc[dateKey] = { totalOccupancyRate: 0 };
-            }
-
-            acc[dateKey].totalOccupancyRate += totalOccupancyRate;
-
-            return acc;
-          },
-          {} as Record<string, { totalOccupancyRate: number }>,
-        );
-
-      // Formatar os dados no formato desejado
-      formattedOccupancyRateData = Object.keys(occupancyRateByDate).map((date) => ({
-        [date]: {
-          totalOccupancyRate: this.formatPercentage(
-            occupancyRateByDate[date].totalOccupancyRate,
-          ),
-        },
-      }));
+        if (!occupancyRateByDateMap.has(dateKey)) {
+          occupancyRateByDateMap.set(dateKey, 0);
+        }
+        occupancyRateByDateMap.set(dateKey, occupancyRateByDateMap.get(dateKey)! + totalOccupancyRate);
+      });
     } else {
-      // Caso contrário, apenas formatar os dados sem filtro
-      const occupancyRateByDate: Record<string, { totalOccupancyRate: number }> = 
-        KpiOccupancyRateByPeriod.reduce(
-          (acc, curr) => {
-            const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
-            const totalOccupancyRate = Number(curr.totalOccupancyRate);
+      // Caso contrário, apenas agrupar os dados sem filtro
+      KpiOccupancyRateByPeriod.forEach((curr) => {
+        const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
+        const totalOccupancyRate = Number(curr.totalOccupancyRate);
 
-            if (!acc[dateKey]) {
-              acc[dateKey] = { totalOccupancyRate: 0 };
-            }
-
-            acc[dateKey].totalOccupancyRate += totalOccupancyRate;
-
-            return acc;
-          },
-          {} as Record<string, { totalOccupancyRate: number }>,
-        );
-
-      // Formatar os dados no formato desejado
-      formattedOccupancyRateData = Object.keys(occupancyRateByDate).map((date) => ({
-        [date]: {
-          totalOccupancyRate: this.formatPercentage(
-            occupancyRateByDate[date].totalOccupancyRate,
-          ),
-        },
-      }));
+        if (!occupancyRateByDateMap.has(dateKey)) {
+          occupancyRateByDateMap.set(dateKey, 0);
+        }
+        occupancyRateByDateMap.set(dateKey, occupancyRateByDateMap.get(dateKey)! + totalOccupancyRate);
+      });
     }
+
+    // OccupancyRateByDate no formato ApexCharts
+    const occupancyRateByDate: ApexChartsData = {
+      categories: periodsArray,
+      series: periodsArray.map(date => occupancyRateByDateMap.get(date) || 0)
+    };
 
     // Declarar formattedOccupancyRateBySuiteCategory fora do escopo do if
     let formattedOccupancyRateBySuiteCategory: OccupancyBySuiteCategoryData[];
@@ -1388,7 +1288,7 @@ export class CompanyService {
     }
 
     // Agrupar os dados por categoria de suíte e por dia da semana
-    const occupancyRateByWeek: Record<string, Record<string, { occupancyRate: string; totalOccupancyRate: string }>> = 
+    const occupancyRateByWeek: Record<string, Record<string, { occupancyRate: number; totalOccupancyRate: number }>> = 
       KpiOccupancyRateByWeek.reduce((acc, curr) => {
         const createdDate = new Date(curr.createdDate);
         const dayOfWeek = createdDate.toLocaleDateString('pt-BR', {
@@ -1402,17 +1302,15 @@ export class CompanyService {
 
         if (!acc[suiteCategoryName][dayOfWeek]) {
           acc[suiteCategoryName][dayOfWeek] = {
-            occupancyRate: this.formatPercentage(0),
-            totalOccupancyRate: this.formatPercentage(Number(curr.totalOccupancyRate)),
+            occupancyRate: 0,
+            totalOccupancyRate: Number(curr.totalOccupancyRate),
           };
         }
 
-        acc[suiteCategoryName][dayOfWeek].occupancyRate = this.formatPercentage(
-          Number(curr.occupancyRate),
-        );
+        acc[suiteCategoryName][dayOfWeek].occupancyRate = Number(curr.occupancyRate);
 
         return acc;
-      }, {} as Record<string, Record<string, { occupancyRate: string; totalOccupancyRate: string }>>);
+      }, {} as Record<string, Record<string, { occupancyRate: number; totalOccupancyRate: number }>>);
 
     // Converte o objeto em um array de objetos
     const occupancyRateByWeekArray: WeeklyOccupancyData[] = Object.entries(occupancyRateByWeek).map(
@@ -1452,25 +1350,41 @@ export class CompanyService {
         Object.entries(value).map(([dayKey, dayValue]) => [
           dayKey,
           {
-            giro: dayValue.giro.toFixed(2),
-            totalGiro: dayValue.totalGiro.toFixed(2),
+            giro: Number(dayValue.giro.toFixed(2)),
+            totalGiro: Number(dayValue.totalGiro.toFixed(2)),
           },
         ]),
       ),
     }));
 
+    // OccupancyRateBySuiteCategory no formato ApexCharts
+    const suiteOccupancyData = suiteCategory
+      .map((suite) => ({
+        name: suite.description,
+        value: Number(KpiOccupancyRate.find(kpi => kpi.suiteCategoryName === suite.description)?.occupancyRate || 0)
+      }))
+      .sort((a, b) => b.value - a.value);
+
+    const occupancyRateBySuiteCategory: ApexChartsSeriesData = {
+      categories: suiteOccupancyData.map(suite => suite.name),
+      series: [{
+        name: "Taxa de Ocupação (%)",
+        data: suiteOccupancyData.map(suite => suite.value)
+      }]
+    };
+
     return {
       Company: 'Lush Ipiranga',
       BigNumbers: [bigNumbers],
-      BillingRentalType: dataTableBillingRentalType,
-      RevenueByDate: formattedRevenueData,
+      BillingRentalType: billingRentalType,
+      RevenueByDate: revenueByDate,
       RevenueBySuiteCategory: revenueBySuiteCategory,
-      RentalsByDate: formattedTotalRentalsData,
-      RevparByDate: formattedRevparData,
-      TicketAverageByDate: formattedTicketAverageData,
-      TrevparByDate: formattedTrevparData,
-      OccupancyRateByDate: formattedOccupancyRateData,
-      OccupancyRateBySuiteCategory: formattedOccupancyRateBySuiteCategory,
+      RentalsByDate: rentalsByDate,
+      RevparByDate: revparByDate,
+      TicketAverageByDate: ticketAverageByDate,
+      TrevparByDate: trevparByDate,
+      OccupancyRateByDate: occupancyRateByDate,
+      OccupancyRateBySuiteCategory: occupancyRateBySuiteCategory,
       DataTableSuiteCategory: dataTableSuiteCategory,
       TotalResult: TotalResult,
       DataTableOccupancyRateByWeek: occupancyRateByWeekArray,
@@ -1532,18 +1446,8 @@ export class CompanyService {
       }),
       this.prisma.prismaLocal.suiteCategory.findMany({
         where: {
-          description: {
-            in: [
-              'LUSH',
-              'LUSH POP',
-              'LUSH HIDRO',
-              'LUSH LOUNGE',
-              'LUSH SPA',
-              'LUSH CINE',
-              'LUSH SPLASH',
-              'LUSH SPA SPLASH',
-              'CASA LUSH',
-            ],
+          id: {
+            in: [10, 11, 12, 15, 16, 17, 18, 19, 24],
           },
         },
         include: {
@@ -1620,8 +1524,6 @@ export class CompanyService {
   }
 
   async calculateKpisByDateRange(startDate: Date, endDate: Date): Promise<CompanyKpiResponse> {
-    console.log('startDate:', startDate);
-    console.log('endDate:', endDate);
 
     const [
       allRentalApartments,
@@ -2279,10 +2181,8 @@ export class CompanyService {
         const dayData = occupancyByCategoryAndDay[suiteCategory][dayOfWeek];
 
         categoryData[suiteCategory][dayOfWeek.toLowerCase()] = {
-          occupancyRate: this.formatPercentage(dayData.occupancyRate),
-          totalOccupancyRate: this.formatPercentage(
-            totalOccupancyRateByDay[dayOfWeek],
-          ),
+          occupancyRate: Number(dayData.occupancyRate.toFixed(2)),
+          totalOccupancyRate: Number(totalOccupancyRateByDay[dayOfWeek].toFixed(2)),
         };
       }
 
@@ -2391,8 +2291,8 @@ export class CompanyService {
         const dayData = giroByCategoryAndDay[suiteCategory][dayOfWeek];
 
         categoryData[suiteCategory][dayOfWeek.toLowerCase()] = {
-          giro: dayData.giroTotal.toFixed(2),
-          totalGiro: dayData.totalGiro.toFixed(2),
+          giro: Number(dayData.giroTotal.toFixed(2)),
+          totalGiro: Number(dayData.totalGiro.toFixed(2)),
         };
       }
 
@@ -2678,19 +2578,15 @@ export class CompanyService {
         kpisData.push({
           [suiteCategory.description]: {
             totalRentalsApartments: categoryData.rentalsCount,
-            totalValue: this.formatCurrency(Number(categoryData.totalValue)),
-            totalTicketAverage: this.formatCurrency(totalTicketAverage),
-            giro: Number(categoryData.giroTotal).toFixed(2),
-            revpar: this.formatCurrency(
-              categoryData.giroTotal * ticketAverageRental,
-            ),
-            trevpar: this.formatCurrency(
-              categoryData.giroTotal * totalTicketAverage,
-            ),
+            totalValue: Number(categoryData.totalValue),
+            totalTicketAverage: totalTicketAverage,
+            giro: Number(categoryData.giroTotal),
+            revpar: categoryData.giroTotal * ticketAverageRental,
+            trevpar: categoryData.giroTotal * totalTicketAverage,
             averageOccupationTime: this.formatTime(
               categoryData.totalOccupiedTime / (categoryData.rentalsCount || 1),
             ),
-            occupancyRate: this.formatPercentageUpdate(occupancyRateDecimal),
+            occupancyRate: occupancyRateDecimal,
           },
         });
       }
@@ -2741,6 +2637,964 @@ export class CompanyService {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
+  async calculateKpisByDateRangeSQL(startDate: Date, endDate: Date): Promise<CompanyKpiApexChartsResponse> {
+    // Controller já adiciona D+1, não precisa fazer novamente aqui
+    // Formatação das datas para SQL (seguindo padrão do bookings.service)
+    const formattedStart = moment
+      .utc(startDate)
+      .format('YYYY-MM-DD HH:mm:ss');
+
+    const formattedEnd = moment
+      .utc(endDate)
+      .format('YYYY-MM-DD HH:mm:ss');
+
+    // Gera array completo de datas APENAS no período solicitado pelo usuário (exibição)
+    const periodsArray: string[] = [];
+    let currentDate = moment(startDate).utc();
+
+    // CORRIGINDO: Para incluir corretamente todos os dias operacionais
+    // Se o usuário pede 01/07 até 31/07, o endDate vem como 01/08 05:59
+    // O SQL pode retornar dados para 31/07 (período 31/07 06:00 até 01/08 05:59)
+    // Então precisamos incluir até 31/07 no periodsArray
+    const userEndDate = moment(endDate).utc().startOf('day').subtract(1, 'day'); // 31/07 00:00
+    while (currentDate.isSameOrBefore(userEndDate, 'day')) {
+      periodsArray.push(currentDate.format('DD/MM/YYYY'));
+      currentDate.add(1, 'day');
+    }
+
+    // Função SQL para calcular receita completa (locação + vendas diretas)
+    const getTotalRevenueSQL = () => `(
+      COALESCE(CAST(la.valorliquidolocacao AS DECIMAL), 0) +
+      COALESCE(
+        CASE
+          WHEN vd.stockoutid IS NOT NULL THEN (
+            SELECT COALESCE(SUM(
+              (CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))) -
+              COALESCE((CAST(v.desconto AS DECIMAL(15,4)) /
+                NULLIF((SELECT COUNT(*) FROM saidaestoqueitem sei2 WHERE sei2.id_saidaestoque = sei.id_saidaestoque AND sei2.cancelado IS NULL), 0)
+              ), 0)
+            ), 0)
+            FROM saidaestoqueitem sei
+            LEFT JOIN venda v ON sei.id_saidaestoque = v.id_saidaestoque
+            WHERE sei.id_saidaestoque = vd.stockoutid
+              AND sei.cancelado IS NULL
+          )
+          ELSE 0
+        END, 0
+      )
+    )`;
+
+    // SQL BigNumbers - CORRIGIDO para não duplicar desconto
+    const bigNumbersSQL = `
+      WITH receita_consumo AS (
+        -- Calcula receita de consumo usando saidaestoque com relação para locações
+        -- Filtrando apenas locações de apartamentos das categorias corretas (10,11,12,15,16,17,18,19,24)
+        -- Mas incluindo TODOS os produtos consumidos nessas locações
+        SELECT
+          la.id_apartamentostate as id_locacao,
+          COALESCE(SUM(
+            (CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))) -
+            COALESCE((CAST(v.desconto AS DECIMAL(15,4)) /
+              NULLIF((SELECT COUNT(*) FROM saidaestoqueitem sei2 WHERE sei2.id_saidaestoque = se.id AND sei2.cancelado IS NULL), 0)
+            ), 0)
+          ), 0) as valor_consumo
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca_apt ON a.id_categoriaapartamento = ca_apt.id
+        INNER JOIN vendalocacao vl ON la.id_apartamentostate = vl.id_locacaoapartamento
+        INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
+        INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+        LEFT JOIN venda v ON se.id = v.id_saidaestoque
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'
+          AND la.datainicialdaocupacao <= '${formattedEnd}'
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND sei.cancelado IS NULL
+          AND ca_apt.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY la.id_apartamentostate, vl.id_locacaoapartamento
+      )
+      SELECT
+        COUNT(*) as total_rentals,
+        -- totalAllValue: permanenceValueLiquid + priceSale das locações
+        COALESCE(SUM(
+          COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0) +
+          COALESCE(rc.valor_consumo, 0)
+        ), 0) as total_all_value,
+        -- Receita apenas de locação (permanenceValueLiquid)
+        COALESCE(SUM(COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)), 0) as total_rental_revenue,
+        -- Tempo total de ocupação em segundos
+        COALESCE(SUM(
+          EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao)
+        ), 0) as total_occupied_time
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      INNER JOIN apartamento a ON aps.id_apartamento = a.id
+      INNER JOIN categoriaapartamento ca_apt ON a.id_categoriaapartamento = ca_apt.id
+      LEFT JOIN receita_consumo rc ON la.id_apartamentostate = rc.id_locacao
+      WHERE la.datainicialdaocupacao >= '${formattedStart}'
+        AND la.datainicialdaocupacao <= '${formattedEnd}'
+        AND la.fimocupacaotipo = 'FINALIZADA'
+        AND ca_apt.id IN (10,11,12,15,16,17,18,19,24)
+    `;
+
+    // SQL para vendas diretas - removendo filtro de categoria de produtos
+    // As vendas diretas devem incluir TODOS os produtos vendidos diretamente no período
+    const totalSaleDirectSQL = `
+      SELECT
+        COALESCE(SUM(CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))), 0) AS receita_bruta,
+        COALESCE(SUM(DISTINCT COALESCE(CAST(v.desconto AS DECIMAL(15,4)), 0)), 0) AS total_descontos,
+        COALESCE(SUM(CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))), 0) -
+        COALESCE(SUM(DISTINCT COALESCE(CAST(v.desconto AS DECIMAL(15,4)), 0)), 0) AS total_sale_direct,
+        COUNT(DISTINCT sei.id) AS total_itens,
+        COUNT(DISTINCT se.id) AS total_vendas_diretas
+      FROM saidaestoque se
+      INNER JOIN vendadireta vd ON se.id = vd.id_saidaestoque
+      INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+      LEFT JOIN venda v ON se.id = v.id_saidaestoque
+      WHERE vd.venda_completa = true
+        AND sei.cancelado IS NULL
+        AND sei.datasaidaitem >= '${formattedStart}'
+        AND sei.datasaidaitem <= '${formattedEnd}'
+    `;
+
+    const totalSuitesSQL = `
+      SELECT COUNT(*) as total_suites
+      FROM apartamento a
+      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+      WHERE ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
+    `;
+
+    const revenueByDateSQL = `
+      SELECT
+        CASE
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        END as date,
+        COALESCE(SUM(${getTotalRevenueSQL()}), 0) as daily_revenue
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      LEFT JOIN (
+        SELECT se.id as stockoutid, sd.id_saidaestoque
+        FROM saidaestoque se
+        INNER JOIN vendadireta sd ON se.id = sd.id_saidaestoque
+        WHERE sd.venda_completa = true
+      ) vd ON FALSE
+      WHERE la.datainicialdaocupacao >= '${formattedStart}'
+        AND la.datainicialdaocupacao <= '${formattedEnd}'
+        AND la.fimocupacaotipo = 'FINALIZADA'
+      GROUP BY CASE
+        WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+      END
+      ORDER BY date
+    `;
+
+    const billingRentalTypeSQL = `
+      SELECT
+        CASE
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        END as date,
+        CASE
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 11.5 AND 12.5 THEN 'TWELVE_HOURS'
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 13 THEN 'DAY_USE'
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 15 THEN 'DAILY'
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 20 THEN 'OVERNIGHT'
+          ELSE 'THREE_HOURS'
+        END as rental_type,
+        COALESCE(SUM(${getTotalRevenueSQL()}), 0) as total_revenue
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      LEFT JOIN (
+        SELECT se.id as stockoutid, sd.id_saidaestoque
+        FROM saidaestoque se
+        INNER JOIN vendadireta sd ON se.id = sd.id_saidaestoque
+        WHERE sd.venda_completa = true
+      ) vd ON FALSE
+      WHERE la.datainicialdaocupacao >= '${formattedStart}'
+        AND la.datainicialdaocupacao <= '${formattedEnd}'
+        AND la.fimocupacaotipo = 'FINALIZADA'
+      GROUP BY
+        CASE
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        END,
+        CASE
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 11.5 AND 12.5 THEN 'TWELVE_HOURS'
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 13 THEN 'DAY_USE'
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 15 THEN 'DAILY'
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 20 THEN 'OVERNIGHT'
+          ELSE 'THREE_HOURS'
+        END
+      ORDER BY date, rental_type
+    `;
+
+    // Define consultas SQL adicionais para incluir no Promise.all
+    const revenueBySuiteCategorySQL = `
+      SELECT
+        ca.descricao as suite_category,
+        COALESCE(SUM(${getTotalRevenueSQL()}), 0) as category_revenue
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      INNER JOIN apartamento a ON aps.id_apartamento = a.id
+      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+      LEFT JOIN (
+        SELECT se.id as stockoutid, sd.id_saidaestoque
+        FROM saidaestoque se
+        INNER JOIN vendadireta sd ON se.id = sd.id_saidaestoque
+        WHERE sd.venda_completa = true
+      ) vd ON FALSE
+      WHERE la.datainicialdaocupacao >= '${formattedStart}'
+        AND la.datainicialdaocupacao <= '${formattedEnd}'
+        AND la.fimocupacaotipo = 'FINALIZADA'
+        AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
+      GROUP BY ca.descricao
+      ORDER BY category_revenue DESC
+    `;
+
+    const rentalsByDateSQL = `
+      SELECT
+        CASE
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        END as date,
+        COUNT(*) as total_rentals
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      INNER JOIN apartamento a ON aps.id_apartamento = a.id
+      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+      WHERE la.datainicialdaocupacao >= '${formattedStart}'
+        AND la.datainicialdaocupacao <= '${formattedEnd}'
+        AND la.fimocupacaotipo = 'FINALIZADA'
+        AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
+      GROUP BY CASE
+        WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+      END
+      ORDER BY date
+    `;
+
+    const ticketAverageByDateSQL = `
+      SELECT
+        CASE
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        END as date,
+        COALESCE(AVG(CAST(la.valortotal AS DECIMAL)), 0) as avg_ticket
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      WHERE la.datainicialdaocupacao >= '${formattedStart}'
+        AND la.datainicialdaocupacao <= '${formattedEnd}'
+        AND la.fimocupacaotipo = 'FINALIZADA'
+      GROUP BY CASE
+        WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+      END
+      ORDER BY date
+    `;
+
+    const trevparByDateSQL = `
+      SELECT
+        CASE
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        END as date,
+        COALESCE(SUM(${getTotalRevenueSQL()} + CAST(la.gorjeta AS DECIMAL)), 0) as total_revenue
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      LEFT JOIN (
+        SELECT se.id as stockoutid, sd.id_saidaestoque
+        FROM saidaestoque se
+        INNER JOIN vendadireta sd ON se.id = sd.id_saidaestoque
+        WHERE sd.venda_completa = true
+      ) vd ON FALSE
+      WHERE la.datainicialdaocupacao >= '${formattedStart}'
+        AND la.datainicialdaocupacao <= '${formattedEnd}'
+        AND la.fimocupacaotipo = 'FINALIZADA'
+      GROUP BY CASE
+        WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+      END
+      ORDER BY date
+    `;
+
+    const occupancyRateBySuiteCategorySQL = `
+      SELECT
+        ca.descricao as suite_category,
+        COUNT(la.id_apartamentostate) as total_rentals
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      INNER JOIN apartamento a ON aps.id_apartamento = a.id
+      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+      WHERE la.datainicialdaocupacao >= '${formattedStart}'
+        AND la.datainicialdaocupacao <= '${formattedEnd}'
+        AND la.fimocupacaotipo = 'FINALIZADA'
+        AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
+      GROUP BY ca.descricao
+      ORDER BY total_rentals DESC
+    `;
+
+    const suitesByCategorySQL = `
+      SELECT
+        ca.descricao as suite_category,
+        COUNT(a.id) as total_suites_in_category
+      FROM apartamento a
+      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+      WHERE ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
+      GROUP BY ca.descricao
+    `;
+
+    // Executa TODAS as consultas SQL em paralelo (seguindo padrão do bookings.service)
+    const [
+      bigNumbersResult,
+      totalSaleDirectResult,
+      totalSuitesResult,
+      revenueByDateResult,
+      billingRentalTypeResult,
+      revenueBySuiteCategoryResult,
+      rentalsByDateResult,
+      ticketAverageByDateResult,
+      trevparByDateResult,
+      occupancyRateBySuiteCategoryResult,
+      suitesByCategoryResult
+    ] = await Promise.all([
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([bigNumbersSQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalSaleDirectSQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalSuitesSQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueByDateSQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([billingRentalTypeSQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueBySuiteCategorySQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([rentalsByDateSQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([ticketAverageByDateSQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([trevparByDateSQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([occupancyRateBySuiteCategorySQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([suitesByCategorySQL])),
+    ]);
+
+    // Processa BigNumbers
+    const totalSuitesCount = totalSuitesResult.length > 0 ? Number(totalSuitesResult[0].total_suites) || 1 : 1;
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
+
+    const bigNumbers: BigNumbersDataSQL = {
+      currentDate: {
+        totalAllValue: 0,
+        totalAllRentalsApartments: 0,
+        totalAllTicketAverage: 0,
+        totalAllTrevpar: 0,
+        totalAllGiro: 0,
+        totalAverageOccupationTime: '00:00:00',
+      },
+    };
+
+    if (bigNumbersResult && bigNumbersResult.length > 0) {
+      const result = bigNumbersResult[0];
+      const totalAllValue = Number(result.total_all_value) || 0; // locações
+      const totalRentals = Number(result.total_rentals) || 0;
+      const totalOccupiedTime = Number(result.total_occupied_time) || 0;
+
+      // Vendas diretas com correção para 100% precisão
+      const totalSaleDirect = totalSaleDirectResult && totalSaleDirectResult.length > 0
+        ? Number(totalSaleDirectResult[0].total_sale_direct) || 0
+        : 0;
+
+      // 🔍 INVESTIGAÇÃO REAL DAS VENDAS DIRETAS:
+
+
+
+      // Executar a query investigativa
+      try {
+        const investigationResult = await this.prisma.prismaLocal.$queryRaw`
+          SELECT
+            se.id as venda_id,
+            vd.venda_completa,
+            sei.id as item_id,
+            sei.precovenda,
+            sei.quantidade,
+            (CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))) as valor_item,
+            v.desconto as desconto_venda,
+            sei.datasaidaitem,
+            sei.cancelado
+          FROM saidaestoque se
+          INNER JOIN vendadireta vd ON se.id = vd.id_saidaestoque
+          INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+          LEFT JOIN venda v ON se.id = v.id_saidaestoque
+          WHERE vd.venda_completa = true
+            AND sei.cancelado IS NULL
+            AND sei.datasaidaitem >= ${formattedStart}::timestamp
+            AND sei.datasaidaitem <= ${formattedEnd}::timestamp
+          ORDER BY se.id, sei.id
+        `;
+
+
+        // Agrupar por venda para análise
+        const vendasDetalhadas: any = {};
+        let totalReceitaManual = 0;
+        let totalDescontoManual = 0;
+
+        (investigationResult as any[]).forEach((item: any) => {
+          const vendaId = item.venda_id;
+
+          if (!vendasDetalhadas[vendaId]) {
+            vendasDetalhadas[vendaId] = {
+              venda_id: vendaId,
+              desconto: Number(item.desconto_venda) || 0,
+              itens: [],
+              receita_bruta: 0
+            };
+          }
+
+          const valorItem = Number(item.valor_item);
+          vendasDetalhadas[vendaId].itens.push({
+            item_id: item.item_id,
+            precovenda: Number(item.precovenda),
+            quantidade: Number(item.quantidade),
+            valor_item: valorItem
+          });
+
+          vendasDetalhadas[vendaId].receita_bruta += valorItem;
+        });
+
+        // Calcular totais manualmente
+        Object.values(vendasDetalhadas).forEach((venda: any) => {
+          totalReceitaManual += venda.receita_bruta;
+          totalDescontoManual += venda.desconto;
+
+        });
+
+
+
+      } catch (error) {
+        // Erro na investigação ignorado para não quebrar o fluxo
+      }
+
+
+
+
+      // totalAllValue = locação + vendas diretas
+      const finalTotalAllValue = totalAllValue + totalSaleDirect;
+
+      // Cálculos baseados na função original
+      const avgTicket = totalRentals > 0 ? Number((finalTotalAllValue / totalRentals).toFixed(2)) : 0;
+      const giro = totalSuitesCount > 0 && daysDiff > 0 ? Number((totalRentals / totalSuitesCount / daysDiff).toFixed(2)) : 0;
+      const trevpar = totalSuitesCount > 0 && daysDiff > 0 ? Number((finalTotalAllValue / totalSuitesCount / daysDiff).toFixed(2)) : 0;
+      const avgOccupationTime = totalRentals > 0 ? this.formatTime(totalOccupiedTime / totalRentals) : '00:00:00';
+
+      bigNumbers.currentDate = {
+        totalAllValue: Number(finalTotalAllValue.toFixed(2)),
+        totalAllRentalsApartments: totalRentals,
+        totalAllTicketAverage: avgTicket,
+        totalAllTrevpar: trevpar,
+        totalAllGiro: giro,
+        totalAverageOccupationTime: avgOccupationTime,
+      };
+    }
+
+    // Cria mapeamento de dados por data (seguindo padrão do bookings.service)
+    const revenueDataMap = new Map();
+
+    // DEBUG: verificar dados retornados
+
+    revenueByDateResult.forEach((item: any) => {
+      // Usar moment para padronizar formato igual ao periodsArray
+      const dateKey = moment.utc(item.date).format('DD/MM/YYYY');
+      revenueDataMap.set(dateKey, item);
+    });
+
+
+    const revenueByDate: ApexChartsData = {
+      categories: [...periodsArray],
+      series: [...periodsArray].map((dateKey: string) => {
+        const item = revenueDataMap.get(dateKey);
+        return item ? Number(item.daily_revenue) : 0;
+      }),
+    };
+
+
+    const revenueBySuiteCategory: ApexChartsData = {
+      categories: revenueBySuiteCategoryResult.map(item => item.suite_category),
+      series: revenueBySuiteCategoryResult.map(item => Number(item.category_revenue) || 0)
+    };
+
+    // Mapeamento de dados do BillingRentalType
+    const billingDataMap = new Map();
+    billingRentalTypeResult.forEach((item: any) => {
+      // Usar moment para padronizar formato igual ao periodsArray
+      const dateKey = moment.utc(item.date).format('DD/MM/YYYY');
+      if (!billingDataMap.has(dateKey)) {
+        billingDataMap.set(dateKey, {});
+      }
+      billingDataMap.get(dateKey)[item.rental_type] = Number(item.total_revenue);
+    });
+
+    // BillingRentalType seguindo padrão do bookings.service
+    const allRentalTypes = ['THREE_HOURS', 'SIX_HOURS', 'TWELVE_HOURS', 'DAY_USE', 'DAILY', 'OVERNIGHT'];
+
+    const billingRentalType: ApexChartsSeriesData = {
+      categories: [...periodsArray],
+      series: allRentalTypes.map(rentalType => ({
+        name: rentalType,
+        data: [...periodsArray].map((dateKey: string) => {
+          const item = billingDataMap.get(dateKey);
+          return item && item[rentalType] ? item[rentalType] : 0;
+        })
+      }))
+    };
+
+
+    // Criar mapeamento de dados para RentalsByDate (seguindo padrão do bookings.service)
+    const rentalsDataMap = new Map();
+    rentalsByDateResult.forEach((item: any) => {
+      // Usar moment para padronizar formato igual ao periodsArray
+      const dateKey = moment.utc(item.date).format('DD/MM/YYYY');
+      rentalsDataMap.set(dateKey, item);
+    });
+
+    const rentalsByDate: ApexChartsData = {
+      categories: [...periodsArray],
+      series: [...periodsArray].map((dateKey: string) => {
+        const item = rentalsDataMap.get(dateKey);
+        return item ? Number(item.total_rentals) : 0;
+      }),
+    };
+
+    // Obter total de suítes (já consultado no Promise.all)
+    const totalSuites = totalSuitesResult.length > 0 ? Number(totalSuitesResult[0].total_suites) || 1 : 1;
+
+    // Calcular REVPAR usando a receita já calculada e o número de suítes
+    const revparByDate: ApexChartsData = {
+      categories: revenueByDate.categories,
+      series: revenueByDate.series.map(revenue => Number((revenue / totalSuites).toFixed(2)))
+    };
+
+
+    // Criar mapeamento de dados para TicketAverageByDate (seguindo padrão do bookings.service)
+    const ticketDataMap = new Map();
+    ticketAverageByDateResult.forEach((item: any) => {
+      // Usar moment para padronizar formato igual ao periodsArray
+      const dateKey = moment.utc(item.date).format('DD/MM/YYYY');
+      ticketDataMap.set(dateKey, item);
+    });
+
+    const ticketAverageByDate: ApexChartsData = {
+      categories: [...periodsArray],
+      series: [...periodsArray].map((dateKey: string) => {
+        const item = ticketDataMap.get(dateKey);
+        return item ? Number((Number(item.avg_ticket) || 0).toFixed(2)) : 0;
+      }),
+    };
+
+
+    // Criar mapeamento de dados para TrevparByDate (seguindo padrão do bookings.service)
+    const trevparDataMap = new Map();
+    trevparByDateResult.forEach((item: any) => {
+      // Usar moment para padronizar formato igual ao periodsArray
+      const dateKey = moment.utc(item.date).format('DD/MM/YYYY');
+      trevparDataMap.set(dateKey, item);
+    });
+
+    const trevparByDate: ApexChartsData = {
+      categories: [...periodsArray],
+      series: [...periodsArray].map((dateKey: string) => {
+        const item = trevparDataMap.get(dateKey);
+        return item ? Number((Number(item.total_revenue) / totalSuites).toFixed(2)) : 0;
+      }),
+    };
+
+    // Calcular OccupancyRateByDate - Taxa de ocupação por data (usando dados já coletados)
+    const occupancyRateByDate: ApexChartsData = {
+      categories: rentalsByDate.categories,
+      series: rentalsByDate.series.map(rentals => {
+        const occupancyRate = (rentals / totalSuites);
+        return Number(occupancyRate.toFixed(2));
+      })
+    };
+
+
+    // Calcular taxa de ocupação por categoria (formato multi-séries para ApexCharts)
+    const occupancyRateBySuiteCategory: ApexChartsSeriesData = {
+      categories: occupancyRateBySuiteCategoryResult.map(item => item.suite_category),
+      series: [{
+        name: 'Taxa de Ocupação (%)',
+        data: occupancyRateBySuiteCategoryResult.map(item => {
+          const categoryInfo = suitesByCategoryResult.find(s => s.suite_category === item.suite_category);
+          const totalSuitesInCategory = categoryInfo ? Number(categoryInfo.total_suites_in_category) : 1;
+          const occupancyRate = (Number(item.total_rentals) / totalSuitesInCategory);
+          return Number(occupancyRate.toFixed(2));
+        })
+      }]
+    };
+
+    // === IMPLEMENTAÇÃO DO DATATABLESUITEACATEGORY ===
+    // Consulta SQL para KPIs por categoria de suíte usando campos corretos do schema
+    const suiteCategoryKpisResult: any[] = await this.prisma.prismaLocal.$queryRaw`
+      WITH suite_category_data AS (
+        SELECT
+          ca.descricao as suite_category_name,
+          COUNT(*) as total_rentals,
+          -- Receita total (locação + consumo)
+          COALESCE(SUM(
+            COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0) +
+            COALESCE(
+              (
+                SELECT COALESCE(SUM(
+                  (CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))) -
+                  COALESCE((CAST(v.desconto AS DECIMAL(15,4)) /
+                    NULLIF((SELECT COUNT(*) FROM saidaestoqueitem sei2 WHERE sei2.id_saidaestoque = sei.id_saidaestoque AND sei2.cancelado IS NULL), 0)
+                  ), 0)
+                ), 0)
+                FROM vendalocacao vl
+                INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
+                INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+                LEFT JOIN venda v ON se.id = v.id_saidaestoque
+                WHERE vl.id_locacaoapartamento = la.id_apartamentostate
+                  AND sei.cancelado IS NULL
+              ), 0
+            )
+          ), 0) as total_value,
+          -- Receita apenas de locação
+          COALESCE(SUM(COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)), 0) as rental_revenue,
+          -- Tempo total de ocupação em segundos
+          COALESCE(SUM(
+            EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao)
+          ), 0) as total_occupied_time
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
+          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND ca.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY ca.id, ca.descricao
+      ),
+      suite_counts AS (
+        SELECT
+          ca.descricao as suite_category_name,
+          COUNT(DISTINCT a.id) as total_suites_in_category
+        FROM categoriaapartamento ca
+        INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
+        WHERE ca.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY ca.id, ca.descricao
+      )
+      SELECT
+        scd.suite_category_name,
+        scd.total_rentals,
+        scd.total_value,
+        scd.rental_revenue,
+        scd.total_occupied_time,
+        sc.total_suites_in_category
+      FROM suite_category_data scd
+      INNER JOIN suite_counts sc ON scd.suite_category_name = sc.suite_category_name
+      ORDER BY scd.suite_category_name
+    `;
+
+    // Calcular período em dias (igual ao BigNumbers)
+    const periodDays = (moment(endDate).diff(moment(startDate), 'days')) + 1;
+
+    // Transformar os resultados no formato esperado com cálculos corretos
+    const dataTableSuiteCategory: any[] = suiteCategoryKpisResult.map(item => {
+      const totalRentals = Number(item.total_rentals) || 0;
+      const totalValue = Number(item.total_value) || 0;
+      const rentalRevenue = Number(item.rental_revenue) || 0;
+      const totalOccupiedTime = Number(item.total_occupied_time) || 0;
+      const totalSuitesInCategory = Number(item.total_suites_in_category) || 1;
+
+      // Aplicar as mesmas fórmulas do BigNumbers
+      const ticketAverage = totalRentals > 0 ? totalValue / totalRentals : 0;
+      const giro = totalSuitesInCategory > 0 && periodDays > 0 ? totalRentals / totalSuitesInCategory / periodDays : 0;
+      const revpar = totalSuitesInCategory > 0 && periodDays > 0 ? rentalRevenue / totalSuitesInCategory / periodDays : 0;
+      const trevpar = totalSuitesInCategory > 0 && periodDays > 0 ? totalValue / totalSuitesInCategory / periodDays : 0;
+      const avgOccupationTime = totalRentals > 0 ? totalOccupiedTime / totalRentals : 0;
+      const occupancyRate = totalSuitesInCategory > 0 ? totalRentals / totalSuitesInCategory : 0;
+
+      return {
+        [item.suite_category_name]: {
+          totalRentalsApartments: totalRentals,
+          totalValue: Number(totalValue.toFixed(2)),
+          totalTicketAverage: Number(ticketAverage.toFixed(2)),
+          giro: Number(giro.toFixed(2)),
+          revpar: Number(revpar.toFixed(2)),
+          trevpar: Number(trevpar.toFixed(2)),
+          averageOccupationTime: this.formatTime(avgOccupationTime),
+          occupancyRate: Number(occupancyRate.toFixed(2)),
+        }
+      };
+    });
+
+    // === IMPLEMENTAÇÃO DO DATATABLEOCCUPANCYRATEBYWEEK ===
+    // Consulta SQL para taxa de ocupação semanal por categoria
+    const occupancyRateByWeekResult: any[] = await this.prisma.prismaLocal.$queryRaw`
+      WITH weekly_occupancy AS (
+        SELECT
+          ca.descricao as suite_category_name,
+          EXTRACT(DOW FROM la.datainicialdaocupacao) as day_of_week_num,
+          CASE EXTRACT(DOW FROM la.datainicialdaocupacao)
+            WHEN 0 THEN 'domingo'
+            WHEN 1 THEN 'segunda-feira'
+            WHEN 2 THEN 'terça-feira'
+            WHEN 3 THEN 'quarta-feira'
+            WHEN 4 THEN 'quinta-feira'
+            WHEN 5 THEN 'sexta-feira'
+            WHEN 6 THEN 'sábado'
+          END as day_of_week,
+          COUNT(*) as day_rentals,
+          COUNT(DISTINCT a.id) as suites_used,
+          -- Tempo total ocupado no dia da semana (em segundos)
+          COALESCE(SUM(
+            EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao)
+          ), 0) as total_occupied_time
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
+          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND ca.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM la.datainicialdaocupacao)
+      ),
+      suite_counts_by_category AS (
+        SELECT
+          ca.descricao as suite_category_name,
+          COUNT(DISTINCT a.id) as total_suites_in_category
+        FROM categoriaapartamento ca
+        INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
+        WHERE ca.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY ca.id, ca.descricao
+      ),
+      days_in_period AS (
+        SELECT
+          EXTRACT(DOW FROM d::date) as day_of_week_num,
+          CASE EXTRACT(DOW FROM d::date)
+            WHEN 0 THEN 'domingo'
+            WHEN 1 THEN 'segunda-feira'
+            WHEN 2 THEN 'terça-feira'
+            WHEN 3 THEN 'quarta-feira'
+            WHEN 4 THEN 'quinta-feira'
+            WHEN 5 THEN 'sexta-feira'
+            WHEN 6 THEN 'sábado'
+          END as day_of_week,
+          COUNT(*) as days_count
+        FROM generate_series(${formattedStart}::timestamp, ${formattedEnd}::timestamp, '1 day'::interval) d
+        GROUP BY EXTRACT(DOW FROM d::date)
+      )
+      SELECT
+        wo.suite_category_name,
+        wo.day_of_week,
+        wo.day_rentals,
+        sc.total_suites_in_category,
+        dp.days_count,
+        -- Taxa de ocupação específica por categoria e dia da semana
+        CASE
+          WHEN sc.total_suites_in_category > 0 AND dp.days_count > 0 THEN
+            wo.day_rentals::DECIMAL / (sc.total_suites_in_category * dp.days_count)
+          ELSE 0
+        END as category_occupancy_rate,
+        -- Total geral de ocupação para o dia da semana (será calculado posteriormente)
+        0 as total_occupancy_rate
+      FROM weekly_occupancy wo
+      INNER JOIN suite_counts_by_category sc ON wo.suite_category_name = sc.suite_category_name
+      INNER JOIN days_in_period dp ON wo.day_of_week_num = dp.day_of_week_num
+      ORDER BY wo.suite_category_name, wo.day_of_week_num
+    `;
+
+    // Calcular taxa de ocupação total por dia da semana
+    const totalOccupancyByDay: { [key: string]: number } = {};
+    const dayTotals: { [key: string]: { rentals: number, totalSuites: number, days: number } } = {};
+
+    occupancyRateByWeekResult.forEach(item => {
+      const dayKey = item.day_of_week;
+      if (!dayTotals[dayKey]) {
+        dayTotals[dayKey] = { rentals: 0, totalSuites: 0, days: Number(item.days_count) };
+      }
+      dayTotals[dayKey].rentals += Number(item.day_rentals);
+      dayTotals[dayKey].totalSuites = totalSuites; // usar o totalSuites global
+    });
+
+    Object.entries(dayTotals).forEach(([day, totals]) => {
+      totalOccupancyByDay[day] = totals.totalSuites > 0 && totals.days > 0
+        ? totals.rentals / (totals.totalSuites * totals.days)
+        : 0;
+    });
+
+    // Transformar os resultados no formato esperado (WeeklyOccupancyData[])
+    const occupancyByCategory: { [category: string]: { [day: string]: any } } = {};
+
+    occupancyRateByWeekResult.forEach(item => {
+      const categoryName = item.suite_category_name;
+      const dayName = item.day_of_week;
+
+      if (!occupancyByCategory[categoryName]) {
+        occupancyByCategory[categoryName] = {};
+      }
+
+      occupancyByCategory[categoryName][dayName] = {
+        occupancyRate: Number(Number(item.category_occupancy_rate).toFixed(2)),
+        totalOccupancyRate: Number((totalOccupancyByDay[dayName] || 0).toFixed(2)),
+      };
+    });
+
+    const dataTableOccupancyRateByWeek: any[] = Object.entries(occupancyByCategory).map(
+      ([categoryName, dayData]) => ({
+        [categoryName]: dayData,
+      })
+    );
+
+    // === IMPLEMENTAÇÃO DO DATATABLEGIROBYWEEK ===
+    // Consulta SQL para giro semanal por categoria
+    const giroByWeekResult: any[] = await this.prisma.prismaLocal.$queryRaw`
+      WITH weekly_giro AS (
+        SELECT
+          ca.descricao as suite_category_name,
+          EXTRACT(DOW FROM la.datainicialdaocupacao) as day_of_week_num,
+          CASE EXTRACT(DOW FROM la.datainicialdaocupacao)
+            WHEN 0 THEN 'domingo'
+            WHEN 1 THEN 'segunda-feira'
+            WHEN 2 THEN 'terça-feira'
+            WHEN 3 THEN 'quarta-feira'
+            WHEN 4 THEN 'quinta-feira'
+            WHEN 5 THEN 'sexta-feira'
+            WHEN 6 THEN 'sábado'
+          END as day_of_week,
+          COUNT(*) as day_rentals
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
+          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND ca.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM la.datainicialdaocupacao)
+      ),
+      suite_counts_by_category AS (
+        SELECT
+          ca.descricao as suite_category_name,
+          COUNT(DISTINCT a.id) as total_suites_in_category
+        FROM categoriaapartamento ca
+        INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
+        WHERE ca.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY ca.id, ca.descricao
+      ),
+      days_in_period AS (
+        SELECT
+          EXTRACT(DOW FROM d::date) as day_of_week_num,
+          CASE EXTRACT(DOW FROM d::date)
+            WHEN 0 THEN 'domingo'
+            WHEN 1 THEN 'segunda-feira'
+            WHEN 2 THEN 'terça-feira'
+            WHEN 3 THEN 'quarta-feira'
+            WHEN 4 THEN 'quinta-feira'
+            WHEN 5 THEN 'sexta-feira'
+            WHEN 6 THEN 'sábado'
+          END as day_of_week,
+          COUNT(*) as days_count
+        FROM generate_series(${formattedStart}::timestamp, ${formattedEnd}::timestamp, '1 day'::interval) d
+        GROUP BY EXTRACT(DOW FROM d::date)
+      ),
+      total_rentals_by_day AS (
+        SELECT
+          EXTRACT(DOW FROM la.datainicialdaocupacao) as day_of_week_num,
+          CASE EXTRACT(DOW FROM la.datainicialdaocupacao)
+            WHEN 0 THEN 'domingo'
+            WHEN 1 THEN 'segunda-feira'
+            WHEN 2 THEN 'terça-feira'
+            WHEN 3 THEN 'quarta-feira'
+            WHEN 4 THEN 'quinta-feira'
+            WHEN 5 THEN 'sexta-feira'
+            WHEN 6 THEN 'sábado'
+          END as day_of_week,
+          COUNT(*) as total_day_rentals
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
+          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND ca.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY EXTRACT(DOW FROM la.datainicialdaocupacao)
+      )
+      SELECT
+        wg.suite_category_name,
+        wg.day_of_week,
+        wg.day_rentals,
+        sc.total_suites_in_category,
+        dp.days_count,
+        tr.total_day_rentals,
+        -- Giro por categoria e dia da semana (locações por suíte por dia)
+        CASE
+          WHEN sc.total_suites_in_category > 0 AND dp.days_count > 0 THEN
+            wg.day_rentals::DECIMAL / (sc.total_suites_in_category * dp.days_count)
+          ELSE 0
+        END as category_giro,
+        -- Giro total para o dia da semana (todas as categorias)
+        CASE
+          WHEN ${totalSuites}::DECIMAL > 0 AND dp.days_count > 0 THEN
+            tr.total_day_rentals::DECIMAL / (${totalSuites}::DECIMAL * dp.days_count)
+          ELSE 0
+        END as total_giro
+      FROM weekly_giro wg
+      INNER JOIN suite_counts_by_category sc ON wg.suite_category_name = sc.suite_category_name
+      INNER JOIN days_in_period dp ON wg.day_of_week_num = dp.day_of_week_num
+      INNER JOIN total_rentals_by_day tr ON wg.day_of_week_num = tr.day_of_week_num
+      ORDER BY wg.suite_category_name, wg.day_of_week_num
+    `;
+
+    // Transformar os resultados no formato esperado (WeeklyGiroData[])
+    const giroByCategory: { [category: string]: { [day: string]: any } } = {};
+
+    giroByWeekResult.forEach(item => {
+      const categoryName = item.suite_category_name;
+      const dayName = item.day_of_week;
+
+      if (!giroByCategory[categoryName]) {
+        giroByCategory[categoryName] = {};
+      }
+
+      giroByCategory[categoryName][dayName] = {
+        giro: Number(Number(item.category_giro).toFixed(2)),
+        totalGiro: Number(Number(item.total_giro).toFixed(2)),
+      };
+    });
+
+    const dataTableGiroByWeek: any[] = Object.entries(giroByCategory).map(
+      ([categoryName, dayData]) => ({
+        [categoryName]: dayData,
+      })
+    );
+
+    // Retornos temporários (serão implementados um por vez)
+    return {
+      Company: 'Lush Ipiranga',
+      BigNumbers: [bigNumbers],
+      BillingRentalType: billingRentalType,
+      RevenueByDate: revenueByDate,
+      RevenueBySuiteCategory: revenueBySuiteCategory,
+      RentalsByDate: rentalsByDate,
+      RevparByDate: revparByDate,
+      TicketAverageByDate: ticketAverageByDate,
+      TrevparByDate: trevparByDate,
+      OccupancyRateByDate: occupancyRateByDate,
+      OccupancyRateBySuiteCategory: occupancyRateBySuiteCategory,
+      DataTableSuiteCategory: dataTableSuiteCategory,
+      TotalResult: {
+        totalAllRentalsApartments: bigNumbers.currentDate.totalAllRentalsApartments,
+        totalAllValue: Number(bigNumbers.currentDate.totalAllValue.toFixed(2)),
+        totalAllTicketAverage: Number(bigNumbers.currentDate.totalAllTicketAverage.toFixed(2)),
+        totalGiro: Number(bigNumbers.currentDate.totalAllGiro.toFixed(2)),
+        totalRevpar: Number((bigNumbers.currentDate.totalAllRentalsApartments > 0 ? (revenueByDate.series.reduce((sum, val) => sum + val, 0) / totalSuites / daysDiff) : 0).toFixed(2)),
+        totalTrevpar: Number(bigNumbers.currentDate.totalAllTrevpar.toFixed(2)),
+        totalAverageOccupationTime: bigNumbers.currentDate.totalAverageOccupationTime,
+        totalOccupancyRate: Number((bigNumbers.currentDate.totalAllRentalsApartments / totalSuites).toFixed(2)),
+      },
+      DataTableOccupancyRateByWeek: dataTableOccupancyRateByWeek,
+      DataTableGiroByWeek: dataTableGiroByWeek,
+    };
+  }
+
   private determineRentalPeriod(
     checkIn: Date,
     checkOut: Date,
@@ -2787,7 +3641,7 @@ export class CompanyService {
         return 'OVERNIGHT';
       }
 
-      // Verificação para Diária
+      // Verificacao para Diaria
       if (
         occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
         (checkInHour <= 15 &&

@@ -65,7 +65,7 @@ export class CompanyController {
       const end = this.convertToDate(endDate, true); // Fim, com ajuste de horário
 
       // Chama o serviço com as datas e o período, se fornecidos
-      return await this.companyService.calculateKpisByDateRange(start, end);
+      return await this.companyService.calculateKpisByDateRangeSQL(start, end);
     } catch (error) {
       throw new BadRequestException(`Failed to fetch KPIs: ${error.message}`);
     }

@@ -69,7 +69,7 @@ export class CompanyController {
       }
 
       // Chama o serviço com as datas e o período, se fornecidos
-      return await this.companyService.calculateKpisByDateRange(start, end);
+      return await this.companyService.calculateKpisByDateRangeSQL(start, end);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(`Failed to fetch KPIs: ${errorMessage}`);
