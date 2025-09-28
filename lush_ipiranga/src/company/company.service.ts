@@ -235,7 +235,7 @@ export class CompanyService {
     let startDate: Date, endDate: Date, startDatePrevious: Date, endDatePrevious: Date;
 
     // Obtém o horário atual em "America/Sao_Paulo" no início do dia
-    const today = moment.tz('America/Sao_Paulo').set({
+    const todayInitial = moment.tz('America/Sao_Paulo').set({
       hour: 5,
       minute: 59,
       second: 59,
@@ -243,7 +243,7 @@ export class CompanyService {
     });
 
     // Define o `endDate` como o dia anterior às 05:59:59 no fuso horário local
-    endDate = today.clone().subtract(1, 'day').set({
+    endDate = todayInitial.clone().subtract(1, 'day').set({
       hour: 5,
       minute: 59,
       second: 59,
@@ -254,7 +254,7 @@ export class CompanyService {
     switch (period) {
       case PeriodEnum.LAST_7_D:
         // Período atual: últimos 7 dias (considerando 7 dias completos)
-        startDate = today.clone().subtract(7, 'days').set({
+        startDate = todayInitial.clone().subtract(7, 'days').set({
           hour: 5,
           minute: 59,
           second: 59,
@@ -268,7 +268,7 @@ export class CompanyService {
 
       case PeriodEnum.LAST_30_D:
         // Período atual: últimos 30 dias
-        startDate = today.clone().subtract(30, 'days').set({
+        startDate = todayInitial.clone().subtract(30, 'days').set({
           hour: 5,
           minute: 59,
           second: 59,
@@ -282,7 +282,7 @@ export class CompanyService {
 
       case PeriodEnum.LAST_6_M:
         // Período atual: últimos 6 meses
-        startDate = today.clone().subtract(6, 'months').set({
+        startDate = todayInitial.clone().subtract(6, 'months').set({
           hour: 5,
           minute: 59,
           second: 59,
@@ -786,43 +786,115 @@ export class CompanyService {
       },
     };
 
-    // Calcular previsão de fechamento do mês somente para LAST_30_D (último mês)
-    if (period === PeriodEnum.LAST_30_D) {
-      const now = moment.tz('America/Sao_Paulo');
-      const currentMonthStart = now.clone().startOf('month');
-      const currentMonthEnd = now.clone().endOf('month');
-      const today = now.clone().startOf('day');
-      const yesterday = today.clone().subtract(1, 'day');
+    // Calcular previsão de fechamento do mês para qualquer período
+    // Sempre baseado nos dados desde o primeiro dia do mês até hoje
+    const nowForForecast = moment.tz('America/Sao_Paulo');
+    const currentMonthStart = nowForForecast.clone().startOf('month');
+    const currentMonthEnd = nowForForecast.clone().endOf('month');
+    const todayForForecast = nowForForecast.clone().startOf('day');
+    const yesterday = todayForForecast.clone().subtract(1, 'day');
 
-      // Verificar se estamos no mês corrente
-      const isCurrentMonth = now.month() === currentMonthStart.month() && now.year() === currentMonthStart.year();
+    // Verificar se estamos no mês corrente
+    const isCurrentMonth = nowForForecast.month() === currentMonthStart.month() && nowForForecast.year() === currentMonthStart.year();
 
-      if (isCurrentMonth) {
-        // Dias que já passaram no mês (do dia 1 até ontem)
-        const daysElapsed = yesterday.date(); // dia de ontem = quantos dias passaram
-        // Total de dias no mês
-        const totalDaysInMonth = currentMonthEnd.date();
-        // Dias restantes (de hoje até o fim do mês)
-        const remainingDays = totalDaysInMonth - daysElapsed;
+    if (isCurrentMonth) {
+      // Dias que já passaram no mês (do dia 1 até ontem)
+      const daysElapsed = yesterday.date(); // dia de ontem = quantos dias passaram
+      // Total de dias no mês
+      const totalDaysInMonth = currentMonthEnd.date();
+      // Dias restantes (de hoje até o fim do mês)
+      const remainingDays = totalDaysInMonth - daysElapsed;
 
-        // Se temos dados suficientes e ainda restam dias no mês
-        if (daysElapsed > 0 && remainingDays > 0) {
-          // Média diária baseada nos dados acumulados
-          const dailyAverageValue = bigNumbers.currentDate.totalAllValue / daysElapsed;
-          const dailyAverageRentals = bigNumbers.currentDate.totalAllRentalsApartments / daysElapsed;
-          const dailyAverageTrevpar = bigNumbers.currentDate.totalAllTrevpar / daysElapsed;
-          const dailyAverageGiro = bigNumbers.currentDate.totalAllGiro / daysElapsed;
+      // Se temos dados suficientes e ainda restam dias no mês
+      if (daysElapsed > 0 && remainingDays > 0) {
+        // Buscar dados do mês completo (desde dia 1) para calcular previsão
+        const monthStartDate = currentMonthStart.toDate();
+        const monthCurrentDate = nowForForecast.clone().endOf('day').toDate();
 
-          // Projeção: dados atuais + (média diária × dias restantes)
-          bigNumbers.monthlyForecast = {
-            totalAllValueForecast: Number((bigNumbers.currentDate.totalAllValue + (dailyAverageValue * remainingDays)).toFixed(2)),
-            totalAllRentalsApartmentsForecast: Math.round(bigNumbers.currentDate.totalAllRentalsApartments + (dailyAverageRentals * remainingDays)),
-            totalAllTicketAverageForecast: Number(bigNumbers.currentDate.totalAllTicketAverage), // Ticket médio não muda com projeção
-            totalAllTrevparForecast: Number((bigNumbers.currentDate.totalAllTrevpar + (dailyAverageTrevpar * remainingDays)).toFixed(2)),
-            totalAllGiroForecast: Number((bigNumbers.currentDate.totalAllGiro + (dailyAverageGiro * remainingDays)).toFixed(2)),
-            totalAverageOccupationTimeForecast: bigNumbers.currentDate.totalAverageOccupationTime, // Tempo médio não muda com projeção
-          };
-        }
+        // Query para buscar dados do mês completo
+        const monthlyKpiRevenue = await this.prisma.prismaOnline.kpiRevenue.findMany({
+          where: {
+            createdDate: {
+              gte: monthStartDate,
+              lte: monthCurrentDate,
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+
+        const monthlyKpiTotalRentals = await this.prisma.prismaOnline.kpiTotalRentals.findMany({
+          where: {
+            createdDate: {
+              gte: monthStartDate,
+              lte: monthCurrentDate,
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+
+        const monthlyKpiTrevpar = await this.prisma.prismaOnline.kpiTrevpar.findMany({
+          where: {
+            createdDate: {
+              gte: monthStartDate,
+              lte: monthCurrentDate,
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+
+        const monthlyKpiGiro = await this.prisma.prismaOnline.kpiGiro.findMany({
+          where: {
+            createdDate: {
+              gte: monthStartDate,
+              lte: monthCurrentDate,
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+
+        const monthlyKpiTicketAverage = await this.prisma.prismaOnline.kpiTicketAverage.findMany({
+          where: {
+            createdDate: {
+              gte: monthStartDate,
+              lte: monthCurrentDate,
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+
+        const monthlyKpiAlos = await this.prisma.prismaOnline.kpiAlos.findMany({
+          where: {
+            createdDate: {
+              gte: monthStartDate,
+              lte: monthCurrentDate,
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+
+        // Calcular totais do mês
+        const monthlyTotalValue = Number(monthlyKpiRevenue[0]?.totalAllValue ?? 0);
+        const monthlyTotalRentals = monthlyKpiTotalRentals[0]?.totalAllRentalsApartments || 0;
+        const monthlyTotalTrevpar = Number(monthlyKpiTrevpar[0]?.totalTrevpar ?? 0);
+        const monthlyTotalGiro = Number(monthlyKpiGiro[0]?.totalGiro ?? 0);
+        const monthlyTicketAverage = Number(monthlyKpiTicketAverage[0]?.totalAllTicketAverage ?? 0);
+        const monthlyAverageOccupationTime = monthlyKpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00';
+
+        // Média diária baseada nos dados do mês completo
+        const dailyAverageValue = monthlyTotalValue / daysElapsed;
+        const dailyAverageRentals = monthlyTotalRentals / daysElapsed;
+        const dailyAverageTrevpar = monthlyTotalTrevpar / daysElapsed;
+        const dailyAverageGiro = monthlyTotalGiro / daysElapsed;
+
+        // Projeção: dados atuais do mês + (média diária × dias restantes)
+        bigNumbers.monthlyForecast = {
+          totalAllValueForecast: Number((monthlyTotalValue + (dailyAverageValue * remainingDays)).toFixed(2)),
+          totalAllRentalsApartmentsForecast: Math.round(monthlyTotalRentals + (dailyAverageRentals * remainingDays)),
+          totalAllTicketAverageForecast: Number(monthlyTicketAverage), // Ticket médio não muda com projeção
+          totalAllTrevparForecast: Number((monthlyTotalTrevpar + (dailyAverageTrevpar * remainingDays)).toFixed(2)),
+          totalAllGiroForecast: Number((monthlyTotalGiro + (dailyAverageGiro * remainingDays)).toFixed(2)),
+          totalAverageOccupationTimeForecast: monthlyAverageOccupationTime, // Tempo médio não muda com projeção
+        };
       }
     }
 
@@ -961,9 +1033,9 @@ export class CompanyService {
     };
 
     // Obter o dia atual no fuso horário da aplicação
-    const now = moment();
-    const currentHour = now.hour();
-    const currentDayOfMonth = currentHour ? now.date() - 1 : now.date();
+    const nowForCurrentDay = moment();
+    const currentHour = nowForCurrentDay.hour();
+    const currentDayOfMonth = currentHour ? nowForCurrentDay.date() - 1 : nowForCurrentDay.date();
 
     // Criar mapa de dados de receita por data
     const revenueByDateMap = new Map<string, number>();
@@ -977,8 +1049,8 @@ export class CompanyService {
 
         return (
           recordDate.isBetween(
-            now.clone().subtract(6, 'months').startOf('month').utc(),
-            now.clone().endOf('month').utc(),
+            nowForCurrentDay.clone().subtract(6, 'months').startOf('month').utc(),
+            nowForCurrentDay.clone().endOf('month').utc(),
             null,
             '[]',
           ) && recordDay === currentDayOfMonth
@@ -1046,8 +1118,8 @@ export class CompanyService {
 
           return (
             recordDate.isBetween(
-              now.clone().subtract(6, 'months').startOf('month'),
-              now.clone().endOf('month'),
+              nowForCurrentDay.clone().subtract(6, 'months').startOf('month'),
+              nowForCurrentDay.clone().endOf('month'),
               null,
               '[]',
             ) && recordDay === currentDayOfMonth
@@ -1096,8 +1168,8 @@ export class CompanyService {
 
         return (
           recordDate.isBetween(
-            now.clone().subtract(6, 'months').startOf('month'),
-            now.clone().endOf('month'),
+            nowForCurrentDay.clone().subtract(6, 'months').startOf('month'),
+            nowForCurrentDay.clone().endOf('month'),
             null,
             '[]',
           ) && recordDay === currentDayOfMonth
@@ -1147,8 +1219,8 @@ export class CompanyService {
 
           return (
             recordDate.isBetween(
-              now.clone().subtract(6, 'months').startOf('month'),
-              now.clone().endOf('month'),
+              nowForCurrentDay.clone().subtract(6, 'months').startOf('month'),
+              nowForCurrentDay.clone().endOf('month'),
               null,
               '[]',
             ) && recordDay === currentDayOfMonth
@@ -1197,8 +1269,8 @@ export class CompanyService {
 
         return (
           recordDate.isBetween(
-            now.clone().subtract(6, 'months').startOf('month'),
-            now.clone().endOf('month'),
+            nowForCurrentDay.clone().subtract(6, 'months').startOf('month'),
+            nowForCurrentDay.clone().endOf('month'),
             null,
             '[]',
           ) && recordDay === currentDayOfMonth
@@ -1239,8 +1311,8 @@ export class CompanyService {
 
           return (
             recordDate.isBetween(
-              now.clone().subtract(6, 'months').startOf('month'),
-              now.clone().endOf('month'),
+              nowForCurrentDay.clone().subtract(6, 'months').startOf('month'),
+              nowForCurrentDay.clone().endOf('month'),
               null,
               '[]',
             ) && recordDay === currentDayOfMonth
@@ -1290,8 +1362,8 @@ export class CompanyService {
 
           return (
             recordDate.isBetween(
-              now.clone().subtract(6, 'months').startOf('month'),
-              now.clone().endOf('month'),
+              nowForCurrentDay.clone().subtract(6, 'months').startOf('month'),
+              nowForCurrentDay.clone().endOf('month'),
               null,
               '[]',
             ) && recordDay === currentDayOfMonth
