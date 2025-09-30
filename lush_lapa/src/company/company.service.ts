@@ -3053,8 +3053,9 @@ export class CompanyService {
     `;
 
     const occupancyRateBySuiteCategorySQL = `
-      SELECT
+     SELECT
         ca.descricao as suite_category,
+        DATE(la.datainicialdaocupacao) as rental_date,
         COUNT(la.id_apartamentostate) as total_rentals
       FROM locacaoapartamento la
       INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
@@ -3064,8 +3065,8 @@ export class CompanyService {
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.descricao IN ('LUSH', 'LUSH HIDRO', 'LUSH LOUNGE HIDRO', 'LUSH SPA', 'LUSH SPLASH', 'LUSH SPA SPLASH')
-      GROUP BY ca.descricao
-      ORDER BY total_rentals DESC
+      GROUP BY ca.descricao, DATE(la.datainicialdaocupacao)
+      ORDER BY rental_date, ca.descricao
     `;
 
     const suitesByCategorySQL = `
@@ -3343,20 +3344,48 @@ export class CompanyService {
       })
     };
 
+     // Calcular taxa de ocupação por categoria (formato ApexCharts com dates em categories e suites em series)
+     const occupancyBySuiteCategoryMap = new Map<string, Map<string, number>>();
+     const allSuiteCategoriesSet = new Set<string>();
+     const allDatesSet = new Set<string>();
+ 
+     // Processar dados do occupancyRateBySuiteCategoryResult
+     occupancyRateBySuiteCategoryResult.forEach(item => {
+       const dateKey = moment(item.rental_date).format('DD/MM/YYYY');
+       const suiteCategoryName = item.suite_category;
+       const totalRentals = Number(item.total_rentals) || 0;
+ 
+       // Calcular taxa de ocupação baseada no número de suítes da categoria
+       const categoryInfo = suitesByCategoryResult.find(s => s.suite_category === suiteCategoryName);
+       const totalSuitesInCategory = categoryInfo ? Number(categoryInfo.total_suites_in_category) : 1;
+       const occupancyRate = Number((totalRentals / totalSuitesInCategory).toFixed(2));
+ 
+       allDatesSet.add(dateKey);
+       allSuiteCategoriesSet.add(suiteCategoryName);
+ 
+       if (!occupancyBySuiteCategoryMap.has(dateKey)) {
+         occupancyBySuiteCategoryMap.set(dateKey, new Map());
+       }
+       occupancyBySuiteCategoryMap.get(dateKey)!.set(suiteCategoryName, occupancyRate);
+     });
+ 
+    // Criar array de datas ordenadas
+    const sortedDates = Array.from(allDatesSet).sort((a, b) => {
+      const dateA = moment(a, 'DD/MM/YYYY');
+      const dateB = moment(b, 'DD/MM/YYYY');
+      return dateA.isBefore(dateB) ? -1 : 1;
+    });
 
-    // Calcular taxa de ocupação por categoria (formato multi-séries para ApexCharts)
-    const occupancyRateBySuiteCategory: ApexChartsSeriesData = {
-      categories: occupancyRateBySuiteCategoryResult.map(item => item.suite_category),
-      series: [{
-        name: 'Taxa de Ocupação (%)',
-        data: occupancyRateBySuiteCategoryResult.map(item => {
-          const categoryInfo = suitesByCategoryResult.find(s => s.suite_category === item.suite_category);
-          const totalSuitesInCategory = categoryInfo ? Number(categoryInfo.total_suites_in_category) : 1;
-          const occupancyRate = (Number(item.total_rentals) / totalSuitesInCategory);
-          return Number(occupancyRate.toFixed(2));
-        })
-      }]
-    };
+   // Criar series para cada categoria de suíte
+   const occupancyRateBySuiteCategory: ApexChartsSeriesData = {
+    categories: sortedDates,
+    series: Array.from(allSuiteCategoriesSet).map(suiteCategoryName => ({
+      name: suiteCategoryName,
+      data: sortedDates.map(date =>
+        occupancyBySuiteCategoryMap.get(date)?.get(suiteCategoryName) || 0
+      )
+    }))
+  };
 
     // === IMPLEMENTAÇÃO DO DATATABLESUITEACATEGORY ===
     // Consulta SQL para KPIs por categoria de suíte usando campos corretos do schema
