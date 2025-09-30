@@ -234,7 +234,7 @@ export class CompanyService {
 
     let startDate: Date, endDate: Date, startDatePrevious: Date, endDatePrevious: Date;
 
-    // Obtém o horário atual em "America/Sao_Paulo" no início do dia
+    // Obtém o horário atual em "America/Sao_Paulo"
     const todayInitial = moment.tz('America/Sao_Paulo').set({
       hour: 5,
       minute: 59,
@@ -242,18 +242,13 @@ export class CompanyService {
       millisecond: 999,
     });
 
-    // Define o `endDate` como o dia anterior às 05:59:59 no fuso horário local
-    endDate = todayInitial.clone().subtract(1, 'day').set({
-      hour: 5,
-      minute: 59,
-      second: 59,
-      millisecond: 999,
-    }).toDate();
+    // Define o `endDate` como hoje às 05:59:59 no fuso horário local
+    endDate = todayInitial.clone().toDate();
 
     // Calcula o `startDate` e os períodos anteriores com base no `period`
     switch (period) {
       case PeriodEnum.LAST_7_D:
-        // Período atual: últimos 7 dias (considerando 7 dias completos)
+        // Período atual: últimos 7 dias das 05:59 (ex: 22/09 05:59 até 29/09 05:59)
         startDate = todayInitial.clone().subtract(7, 'days').set({
           hour: 5,
           minute: 59,
@@ -269,10 +264,10 @@ export class CompanyService {
       case PeriodEnum.LAST_30_D:
         // Período atual: últimos 30 dias
         startDate = todayInitial.clone().subtract(30, 'days').set({
-          hour: 5,
-          minute: 59,
-          second: 59,
-          millisecond: 999,
+          hour: 6,
+          minute: 0,
+          second: 0,
+          millisecond: 0,
         }).toDate();
 
         // Período anterior: 30 dias antes do início do período atual
@@ -283,10 +278,10 @@ export class CompanyService {
       case PeriodEnum.LAST_6_M:
         // Período atual: últimos 6 meses
         startDate = todayInitial.clone().subtract(6, 'months').set({
-          hour: 5,
-          minute: 59,
-          second: 59,
-          millisecond: 999,
+          hour: 6,
+          minute: 0,
+          second: 0,
+          millisecond: 0,
         }).toDate();
 
         // Período anterior: 6 meses antes do início do período atual
@@ -1487,20 +1482,33 @@ export class CompanyService {
       ),
     }));
 
-    // OccupancyRateBySuiteCategory no formato ApexCharts
-    const suiteOccupancyData = suiteCategory
-      .map((suite) => ({
-        name: suite.description,
-        value: Number(KpiOccupancyRate.find(kpi => kpi.suiteCategoryName === suite.description)?.occupancyRate || 0)
-      }))
-      .sort((a, b) => b.value - a.value);
+    // OccupancyRateBySuiteCategory no formato ApexCharts com dates em categories e suites em series
+    const occupancyBySuiteCategoryMap = new Map<string, Map<string, number>>();
+    const allSuiteCategories = new Set<string>();
 
+    // Processar dados do KpiOccupancyRateBySuiteCategory
+    KpiOccupancyRateBySuiteCategory.forEach(item => {
+      const dateKey = moment(item.createdDate).format('DD/MM/YYYY');
+      const suiteCategoryName = item.suiteCategoryName;
+      const occupancyRate = Number(item.occupancyRate) || 0;
+
+      allSuiteCategories.add(suiteCategoryName);
+
+      if (!occupancyBySuiteCategoryMap.has(dateKey)) {
+        occupancyBySuiteCategoryMap.set(dateKey, new Map());
+      }
+      occupancyBySuiteCategoryMap.get(dateKey)!.set(suiteCategoryName, occupancyRate);
+    });
+
+    // Criar series para cada categoria de suíte usando periodsArray como base (mesma lógica do OccupancyRateByDate)
     const occupancyRateBySuiteCategory: ApexChartsSeriesData = {
-      categories: suiteOccupancyData.map(suite => suite.name),
-      series: [{
-        name: "Taxa de Ocupação (%)",
-        data: suiteOccupancyData.map(suite => suite.value)
-      }]
+      categories: periodsArray,
+      series: Array.from(allSuiteCategories).map(suiteCategoryName => ({
+        name: suiteCategoryName,
+        data: periodsArray.map(date =>
+          occupancyBySuiteCategoryMap.get(date)?.get(suiteCategoryName) || 0
+        )
+      }))
     };
 
     return {
@@ -2781,13 +2789,9 @@ export class CompanyService {
     // Gera array completo de datas APENAS no período solicitado pelo usuário (exibição)
     const periodsArray: string[] = [];
     let currentDate = moment(startDate).utc();
+    const userEndDate = moment(endDate).utc();
 
-    // CORRIGINDO: Para incluir corretamente todos os dias operacionais
-    // Se o usuário pede 01/07 até 31/07, o endDate vem como 01/08 05:59
-    // O SQL pode retornar dados para 31/07 (período 31/07 06:00 até 01/08 05:59)
-    // Então precisamos incluir até 31/07 no periodsArray
-    const userEndDate = moment(endDate).utc().startOf('day').subtract(1, 'day'); // 31/07 00:00
-    while (currentDate.isSameOrBefore(userEndDate, 'day')) {
+    while (currentDate.isBefore(userEndDate, 'day')) {
       periodsArray.push(currentDate.format('DD/MM/YYYY'));
       currentDate.add(1, 'day');
     }
@@ -3053,6 +3057,7 @@ export class CompanyService {
     const occupancyRateBySuiteCategorySQL = `
       SELECT
         ca.descricao as suite_category,
+        DATE(la.datainicialdaocupacao) as rental_date,
         COUNT(la.id_apartamentostate) as total_rentals
       FROM locacaoapartamento la
       INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
@@ -3062,8 +3067,8 @@ export class CompanyService {
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
-      GROUP BY ca.descricao
-      ORDER BY total_rentals DESC
+      GROUP BY ca.descricao, DATE(la.datainicialdaocupacao)
+      ORDER BY rental_date, ca.descricao
     `;
 
     const suitesByCategorySQL = `
@@ -3342,18 +3347,47 @@ export class CompanyService {
     };
 
 
-    // Calcular taxa de ocupação por categoria (formato multi-séries para ApexCharts)
+    // Calcular taxa de ocupação por categoria (formato ApexCharts com dates em categories e suites em series)
+    const occupancyBySuiteCategoryMap = new Map<string, Map<string, number>>();
+    const allSuiteCategoriesSet = new Set<string>();
+    const allDatesSet = new Set<string>();
+
+    // Processar dados do occupancyRateBySuiteCategoryResult
+    occupancyRateBySuiteCategoryResult.forEach(item => {
+      const dateKey = moment(item.rental_date).format('DD/MM/YYYY');
+      const suiteCategoryName = item.suite_category;
+      const totalRentals = Number(item.total_rentals) || 0;
+
+      // Calcular taxa de ocupação baseada no número de suítes da categoria
+      const categoryInfo = suitesByCategoryResult.find(s => s.suite_category === suiteCategoryName);
+      const totalSuitesInCategory = categoryInfo ? Number(categoryInfo.total_suites_in_category) : 1;
+      const occupancyRate = Number((totalRentals / totalSuitesInCategory).toFixed(2));
+
+      allDatesSet.add(dateKey);
+      allSuiteCategoriesSet.add(suiteCategoryName);
+
+      if (!occupancyBySuiteCategoryMap.has(dateKey)) {
+        occupancyBySuiteCategoryMap.set(dateKey, new Map());
+      }
+      occupancyBySuiteCategoryMap.get(dateKey)!.set(suiteCategoryName, occupancyRate);
+    });
+
+    // Criar array de datas ordenadas
+    const sortedDates = Array.from(allDatesSet).sort((a, b) => {
+      const dateA = moment(a, 'DD/MM/YYYY');
+      const dateB = moment(b, 'DD/MM/YYYY');
+      return dateA.isBefore(dateB) ? -1 : 1;
+    });
+
+    // Criar series para cada categoria de suíte
     const occupancyRateBySuiteCategory: ApexChartsSeriesData = {
-      categories: occupancyRateBySuiteCategoryResult.map(item => item.suite_category),
-      series: [{
-        name: 'Taxa de Ocupação (%)',
-        data: occupancyRateBySuiteCategoryResult.map(item => {
-          const categoryInfo = suitesByCategoryResult.find(s => s.suite_category === item.suite_category);
-          const totalSuitesInCategory = categoryInfo ? Number(categoryInfo.total_suites_in_category) : 1;
-          const occupancyRate = (Number(item.total_rentals) / totalSuitesInCategory);
-          return Number(occupancyRate.toFixed(2));
-        })
-      }]
+      categories: sortedDates,
+      series: Array.from(allSuiteCategoriesSet).map(suiteCategoryName => ({
+        name: suiteCategoryName,
+        data: sortedDates.map(date =>
+          occupancyBySuiteCategoryMap.get(date)?.get(suiteCategoryName) || 0
+        )
+      }))
     };
 
     // === IMPLEMENTAÇÃO DO DATATABLESUITEACATEGORY ===

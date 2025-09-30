@@ -226,27 +226,22 @@ export class CompanyService {
 
     let startDate: Date, endDate: Date, startDatePrevious: Date, endDatePrevious: Date;
 
-    // Obtém o horário atual em "America/Sao_Paulo" no início do dia
-    const today = moment.tz('America/Sao_Paulo').set({
+    // Obtém o horário atual em "America/Sao_Paulo"
+    const todayInitial = moment.tz('America/Sao_Paulo').set({
       hour: 5,
       minute: 59,
       second: 59,
       millisecond: 999,
     });
 
-    // Define o `endDate` como o dia anterior às 05:59:59 no fuso horário local
-    endDate = today.clone().subtract(1, 'day').set({
-      hour: 5,
-      minute: 59,
-      second: 59,
-      millisecond: 999,
-    }).toDate();
+    // Define o `endDate` como hoje às 05:59:59 no fuso horário local
+    endDate = todayInitial.clone().toDate();
 
     // Calcula o `startDate` e os períodos anteriores com base no `period`
     switch (period) {
       case PeriodEnum.LAST_7_D:
-        // Período atual: últimos 7 dias (considerando 7 dias completos)
-        startDate = today.clone().subtract(7, 'days').set({
+        // Período atual: últimos 7 dias das 05:59 (ex: 22/09 05:59 até 29/09 05:59)
+        startDate = todayInitial.clone().subtract(7, 'days').set({
           hour: 5,
           minute: 59,
           second: 59,
@@ -260,7 +255,7 @@ export class CompanyService {
 
       case PeriodEnum.LAST_30_D:
         // Período atual: últimos 30 dias
-        startDate = today.clone().subtract(30, 'days').set({
+        startDate = todayInitial.clone().subtract(30, 'days').set({
           hour: 5,
           minute: 59,
           second: 59,
@@ -274,7 +269,7 @@ export class CompanyService {
 
       case PeriodEnum.LAST_6_M:
         // Período atual: últimos 6 meses
-        startDate = today.clone().subtract(6, 'months').set({
+        startDate = todayInitial.clone().subtract(6, 'months').set({
           hour: 5,
           minute: 59,
           second: 59,
@@ -878,14 +873,12 @@ export class CompanyService {
       {},
     );
 
-    // Gerar array completo de datas para o período
+    // Gerar array completo de datas para o período usando periodsArray como base (mesma lógica do Lush Ipiranga)
     const periodsArray: string[] = [];
     let currentDate = moment(startDate);
+    const userEndDate = moment(endDate);
 
-    // CORRIGINDO: Para incluir corretamente todos os dias operacionais
-    // O endDate vem como próximo dia 05:59, então subtraímos 1 dia para pegar o último dia válido
-    const userEndDate = moment(endDate).subtract(1, 'day').startOf('day');
-    while (currentDate.isSameOrBefore(userEndDate, 'day')) {
+    while (currentDate.isBefore(userEndDate, 'day')) {
       periodsArray.push(currentDate.format('DD/MM/YYYY'));
       currentDate.add(1, 'day');
     }
@@ -1357,20 +1350,33 @@ export class CompanyService {
       ),
     }));
 
-    // OccupancyRateBySuiteCategory no formato ApexCharts
-    const suiteOccupancyData = suiteCategory
-      .map((suite) => ({
-        name: suite.description,
-        value: Number(KpiOccupancyRate.find(kpi => kpi.suiteCategoryName === suite.description)?.occupancyRate || 0)
-      }))
-      .sort((a, b) => b.value - a.value);
+    // OccupancyRateBySuiteCategory no formato ApexCharts com dates em categories e suites em series
+    const occupancyBySuiteCategoryMap = new Map<string, Map<string, number>>();
+    const allSuiteCategories = new Set<string>();
 
+    // Processar dados do KpiOccupancyRateBySuiteCategory
+    KpiOccupancyRateBySuiteCategory.forEach(item => {
+      const dateKey = moment(item.createdDate).format('DD/MM/YYYY');
+      const suiteCategoryName = item.suiteCategoryName;
+      const occupancyRate = Number(item.occupancyRate) || 0;
+
+      allSuiteCategories.add(suiteCategoryName);
+
+      if (!occupancyBySuiteCategoryMap.has(dateKey)) {
+        occupancyBySuiteCategoryMap.set(dateKey, new Map());
+      }
+      occupancyBySuiteCategoryMap.get(dateKey)!.set(suiteCategoryName, occupancyRate);
+    });
+
+    // Criar series para cada categoria de suíte usando periodsArray como base (mesma lógica do OccupancyRateByDate)
     const occupancyRateBySuiteCategory: ApexChartsSeriesData = {
-      categories: suiteOccupancyData.map(suite => suite.name),
-      series: [{
-        name: "Taxa de Ocupação (%)",
-        data: suiteOccupancyData.map(suite => suite.value)
-      }]
+      categories: periodsArray,
+      series: Array.from(allSuiteCategories).map(suiteCategoryName => ({
+        name: suiteCategoryName,
+        data: periodsArray.map(date =>
+          occupancyBySuiteCategoryMap.get(date)?.get(suiteCategoryName) || 0
+        )
+      }))
     };
 
     return {
@@ -2651,13 +2657,9 @@ export class CompanyService {
     // Gera array completo de datas APENAS no período solicitado pelo usuário (exibição)
     const periodsArray: string[] = [];
     let currentDate = moment(startDate).utc();
+    const userEndDate = moment(endDate).utc();
 
-    // CORRIGINDO: Para incluir corretamente todos os dias operacionais
-    // Se o usuário pede 01/07 até 31/07, o endDate vem como 01/08 05:59
-    // O SQL pode retornar dados para 31/07 (período 31/07 06:00 até 01/08 05:59)
-    // Então precisamos incluir até 31/07 no periodsArray
-    const userEndDate = moment(endDate).utc().startOf('day').subtract(1, 'day'); // 31/07 00:00
-    while (currentDate.isSameOrBefore(userEndDate, 'day')) {
+    while (currentDate.isBefore(userEndDate, 'day')) {
       periodsArray.push(currentDate.format('DD/MM/YYYY'));
       currentDate.add(1, 'day');
     }
