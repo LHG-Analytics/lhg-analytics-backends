@@ -13,13 +13,21 @@ interface BigNumbersDataSQL {
     totalAllGiro: number;
     totalAverageOccupationTime: string;
   };
-  PreviousDate?: {
+  previousDate?: {
     totalAllValuePreviousData: number;
     totalAllRentalsApartmentsPreviousData: number;
     totalAllTicketAveragePreviousData: number;
-    totalAllRevparPreviousData: number;
+    totalAllTrevparPreviousData: number;
     totalAllGiroPreviousData: number;
     totalAverageOccupationTimePreviousData: string;
+  };
+  monthlyForecast?: {
+    totalAllValueForecast: number;
+    totalAllRentalsApartmentsForecast: number;
+    totalAllTicketAverageForecast: number;
+    totalAllTrevparForecast: number;
+    totalAllGiroForecast: number;
+    totalAverageOccupationTimeForecast: string;
   };
 }
 
@@ -761,7 +769,129 @@ export class CompanyService {
         totalAverageOccupationTime:
           KpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00',
       },
+      previousDate: {
+        totalAllValuePreviousData: Number(KpiRevenuePreviousData[0]?.totalAllValue ?? 0),
+        totalAllRentalsApartmentsPreviousData:
+          KpiTotalRentalsPreviousData[0]?.totalAllRentalsApartments ?? 0,
+        totalAllTicketAveragePreviousData: Number(KpiTicketAveragePreviousData[0]?.totalAllTicketAverage ?? 0),
+        totalAllTrevparPreviousData: Number(KpiRevparPreviousData[0]?.totalRevpar ?? 0),
+        totalAllGiroPreviousData: Number(KpiGiroPreviousData[0]?.totalGiro ?? 0),
+        totalAverageOccupationTimePreviousData:
+          KpiAlosPreviousData[0]?.totalAverageOccupationTime ?? '00:00:00',
+      },
     };
+
+    // Calcular previsão de fechamento do mês para qualquer período
+    // Sempre baseado nos dados desde o primeiro dia do mês até hoje
+    const nowForForecast = moment.tz('America/Sao_Paulo');
+    const currentMonthStart = nowForForecast.clone().startOf('month');
+    const currentMonthEnd = nowForForecast.clone().endOf('month');
+    const todayForForecast = nowForForecast.clone().startOf('day');
+    const yesterday = todayForForecast.clone().subtract(1, 'day');
+
+    // Verificar se estamos no mês corrente
+    const isCurrentMonth = nowForForecast.month() === currentMonthStart.month() && nowForForecast.year() === currentMonthStart.year();
+
+    if (isCurrentMonth) {
+      // Dias que já passaram no mês (do dia 1 até ontem)
+      const daysElapsed = yesterday.date(); // dia de ontem = quantos dias passaram
+      // Total de dias no mês
+      const totalDaysInMonth = currentMonthEnd.date();
+      // Dias restantes (de hoje até o fim do mês)
+      const remainingDays = totalDaysInMonth - daysElapsed;
+
+      // Se temos dados suficientes e ainda restam dias no mês
+      if (daysElapsed > 0 && remainingDays > 0) {
+        // Buscar dados do mês completo (desde dia 1) para calcular previsão
+        const monthStartDate = currentMonthStart.toDate();
+        const monthCurrentDate = nowForForecast.clone().endOf('day').toDate();
+
+        // Query para buscar dados do mês completo
+        const monthlyKpiRevenue = await this.prisma.prismaOnline.kpiRevenue.findMany({
+          where: {
+            createdDate: {
+              gte: monthStartDate,
+              lte: monthCurrentDate,
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+
+        const monthlyKpiTotalRentals = await this.prisma.prismaOnline.kpiTotalRentals.findMany({
+          where: {
+            createdDate: {
+              gte: monthStartDate,
+              lte: monthCurrentDate,
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+
+        const monthlyKpiTrevpar = await this.prisma.prismaOnline.kpiTrevpar.findMany({
+          where: {
+            createdDate: {
+              gte: monthStartDate,
+              lte: monthCurrentDate,
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+
+        const monthlyKpiGiro = await this.prisma.prismaOnline.kpiGiro.findMany({
+          where: {
+            createdDate: {
+              gte: monthStartDate,
+              lte: monthCurrentDate,
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+
+        const monthlyKpiTicketAverage = await this.prisma.prismaOnline.kpiTicketAverage.findMany({
+          where: {
+            createdDate: {
+              gte: monthStartDate,
+              lte: monthCurrentDate,
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+
+        const monthlyKpiAlos = await this.prisma.prismaOnline.kpiAlos.findMany({
+          where: {
+            createdDate: {
+              gte: monthStartDate,
+              lte: monthCurrentDate,
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+
+        // Calcular totais do mês
+        const monthlyTotalValue = Number(monthlyKpiRevenue[0]?.totalAllValue ?? 0);
+        const monthlyTotalRentals = monthlyKpiTotalRentals[0]?.totalAllRentalsApartments || 0;
+        const monthlyTotalTrevpar = Number(monthlyKpiTrevpar[0]?.totalTrevpar ?? 0);
+        const monthlyTotalGiro = Number(monthlyKpiGiro[0]?.totalGiro ?? 0);
+        const monthlyTicketAverage = Number(monthlyKpiTicketAverage[0]?.totalAllTicketAverage ?? 0);
+        const monthlyAverageOccupationTime = monthlyKpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00';
+
+        // Média diária baseada nos dados do mês completo
+        const dailyAverageValue = monthlyTotalValue / daysElapsed;
+        const dailyAverageRentals = monthlyTotalRentals / daysElapsed;
+        const dailyAverageTrevpar = monthlyTotalTrevpar / daysElapsed;
+        const dailyAverageGiro = monthlyTotalGiro / daysElapsed;
+
+        // Projeção: dados atuais do mês + (média diária × dias restantes)
+        bigNumbers.monthlyForecast = {
+          totalAllValueForecast: Number((monthlyTotalValue + (dailyAverageValue * remainingDays)).toFixed(2)),
+          totalAllRentalsApartmentsForecast: Math.round(monthlyTotalRentals + (dailyAverageRentals * remainingDays)),
+          totalAllTicketAverageForecast: Number(monthlyTicketAverage), // Ticket médio não muda com projeção
+          totalAllTrevparForecast: Number((monthlyTotalTrevpar + (dailyAverageTrevpar * remainingDays)).toFixed(2)),
+          totalAllGiroForecast: Number((monthlyTotalGiro + (dailyAverageGiro * remainingDays)).toFixed(2)),
+          totalAverageOccupationTimeForecast: monthlyAverageOccupationTime, // Tempo médio não muda com projeção
+        };
+      }
+    }
 
     // Montando o retorno de DataTableSuiteCategory
     const dataTableSuiteCategory = suiteCategory.map((suite) => {

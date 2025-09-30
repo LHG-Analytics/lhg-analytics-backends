@@ -264,10 +264,10 @@ export class CompanyService {
       case PeriodEnum.LAST_30_D:
         // Período atual: últimos 30 dias
         startDate = todayInitial.clone().subtract(30, 'days').set({
-          hour: 6,
-          minute: 0,
-          second: 0,
-          millisecond: 0,
+          hour: 5,
+          minute: 59,
+          second: 59,
+          millisecond: 999,
         }).toDate();
 
         // Período anterior: 30 dias antes do início do período atual
@@ -278,10 +278,10 @@ export class CompanyService {
       case PeriodEnum.LAST_6_M:
         // Período atual: últimos 6 meses
         startDate = todayInitial.clone().subtract(6, 'months').set({
-          hour: 6,
-          minute: 0,
-          second: 0,
-          millisecond: 0,
+          hour: 5,
+          minute: 59,
+          second: 59,
+          millisecond: 999,
         }).toDate();
 
         // Período anterior: 6 meses antes do início do período atual
