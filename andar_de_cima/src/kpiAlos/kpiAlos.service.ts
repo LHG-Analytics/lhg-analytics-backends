@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PeriodEnum } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,11 +9,7 @@ import * as moment from 'moment-timezone';
 export class KpiAlosService {
   constructor(private prisma: PrismaService) {}
 
-  async findAllKpiAlos(
-    startDate: Date,
-    endDate: Date,
-    period?: PeriodEnum,
-  ): Promise<any[]> {
+  async findAllKpiAlos(startDate: Date, endDate: Date, period?: PeriodEnum): Promise<any[]> {
     try {
       const companyId = 1; // Defina o ID da empresa conforme necessário
 
@@ -54,14 +46,7 @@ export class KpiAlosService {
         this.prisma.prismaLocal.suiteCategory.findMany({
           where: {
             description: {
-              in: [
-                'ESPUMA LOUNGE',
-                'POP COPAN',
-                'POP',
-                'LOVE',
-                'ESPUMA COPAN',
-                'ESPUMA',
-              ],
+              in: ['ESPUMA LOUNGE', 'POP COPAN', 'POP', 'LOVE', 'ESPUMA COPAN', 'ESPUMA'],
             },
           },
         }),
@@ -85,18 +70,14 @@ export class KpiAlosService {
         };
 
         for (const rentalApartment of allRentalApartments) {
-          if (
-            rentalApartment.suiteStates.suite.suiteCategoryId ===
-            suiteCategory.id
-          ) {
+          if (rentalApartment.suiteStates.suite.suiteCategoryId === suiteCategory.id) {
             const suiteCategoryData = categoryTotalsMap[suiteCategory.id];
             const occupationTimeSeconds = this.calculateOccupationTime(
               rentalApartment.checkIn,
               rentalApartment.checkOut,
             );
 
-            suiteCategoryData.totalOccupationTimeSeconds +=
-              occupationTimeSeconds;
+            suiteCategoryData.totalOccupationTimeSeconds += occupationTimeSeconds;
             suiteCategoryData.totalRentals++;
 
             // Acumular os valores para cálculo total
@@ -112,11 +93,8 @@ export class KpiAlosService {
         if (suiteCategoryData.totalRentals === 0) continue;
 
         const averageOccupationTimeSeconds =
-          suiteCategoryData.totalOccupationTimeSeconds /
-          suiteCategoryData.totalRentals;
-        const averageOccupationTime = this.formatTime(
-          averageOccupationTimeSeconds,
-        );
+          suiteCategoryData.totalOccupationTimeSeconds / suiteCategoryData.totalRentals;
+        const averageOccupationTime = this.formatTime(averageOccupationTimeSeconds);
 
         // Calculando occupationTime em segundos
         const occupationTime = suiteCategoryData.totalOccupationTimeSeconds;
@@ -128,9 +106,7 @@ export class KpiAlosService {
           averageOccupationTime,
           occupationTime: this.formatTime(occupationTime), // Convertendo para o formato legível
           period: period || null,
-          totalAverageOccupationTime: this.formatTime(
-            totalOccupationTimeSeconds / totalRentals,
-          ), // Atualizado
+          totalAverageOccupationTime: this.formatTime(totalOccupationTimeSeconds / totalRentals), // Atualizado
           createdDate: new Date(adjustedEndDate.setUTCHours(5, 59, 59, 999)),
           companyId,
         });
@@ -145,9 +121,7 @@ export class KpiAlosService {
       }
 
       // Calcular o tempo médio total: totalOccupationTimeSeconds / totalRentals
-      const totalAverageOccupationTime = this.formatTime(
-        totalOccupationTimeSeconds / totalRentals,
-      );
+      const totalAverageOccupationTime = this.formatTime(totalOccupationTimeSeconds / totalRentals);
 
       return [
         {
@@ -193,29 +167,21 @@ export class KpiAlosService {
     startDateLast7Days.setDate(startDateLast7Days.getDate() - 7);
     startDateLast7Days.setHours(6, 0, 0, 0);
 
-    const {
-      startDate: parsedStartDateLast7Days,
-      endDate: parsedEndDateLast7Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast7Days),
-      this.formatDateString(endDateLast7Days),
-    );
+    const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
     previousStartDateLast7Days.setHours(6, 0, 0, 0); // Configuração de horas
 
     // Log para verificar as datas
-    const startTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiAlos - últimos 7 dias: ${startTimeLast7Days}`,
-    );
+    const startTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiAlos - últimos 7 dias: ${startTimeLast7Days}`);
     await this.findAllKpiAlos(
       parsedStartDateLast7Days,
       parsedEndDateLast7Days,
@@ -226,9 +192,7 @@ export class KpiAlosService {
       previousParsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
     );
-    const endTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
+    const endTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
     console.log(`Final CronJob KpiAlos - últimos 7 dias: ${endTimeLast7Days}`);
 
     // Últimos 30 dias
@@ -239,31 +203,21 @@ export class KpiAlosService {
     startDateLast30Days.setDate(startDateLast30Days.getDate() - 30);
     startDateLast30Days.setHours(6, 0, 0, 0);
 
-    const {
-      startDate: parsedStartDateLast30Days,
-      endDate: parsedEndDateLast30Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast30Days),
-      this.formatDateString(endDateLast30Days),
-    );
+    const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
     previousStartDateLast30Days.setHours(6, 0, 0, 0); // Configuração de horas
 
     // Log para verificar as datas
-    const startTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiAlos - últimos 30 dias: ${startTimeLast30Days}`,
-    );
+    const startTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiAlos - últimos 30 dias: ${startTimeLast30Days}`);
     await this.findAllKpiAlos(
       parsedStartDateLast30Days,
       parsedEndDateLast30Days,
@@ -274,12 +228,8 @@ export class KpiAlosService {
       previousParsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
-    const endTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiAlos - últimos 30 dias: ${endTimeLast30Days}`,
-    );
+    const endTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiAlos - últimos 30 dias: ${endTimeLast30Days}`);
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = currentDate;
@@ -289,31 +239,21 @@ export class KpiAlosService {
     startDateLast6Months.setMonth(startDateLast6Months.getMonth() - 6);
     startDateLast6Months.setHours(6, 0, 0, 0);
 
-    const {
-      startDate: parsedStartDateLast6Months,
-      endDate: parsedEndDateLast6Months,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast6Months),
-      this.formatDateString(endDateLast6Months),
-    );
+    const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
-    const previousStartDateLast6Months = new Date(
-      previousParsedEndDateLast6Months,
-    );
-    previousStartDateLast6Months.setMonth(
-      previousStartDateLast6Months.getMonth() - 6,
-    );
+    const previousStartDateLast6Months = new Date(previousParsedEndDateLast6Months);
+    previousStartDateLast6Months.setMonth(previousStartDateLast6Months.getMonth() - 6);
     previousStartDateLast6Months.setHours(6, 0, 0, 0); // Configuração de horas
 
     // Log para verificar as datas
-    const startTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiAlos - últimos 6 meses: ${startTimeLast6Months}`,
-    );
+    const startTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiAlos - últimos 6 meses: ${startTimeLast6Months}`);
     await this.findAllKpiAlos(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
@@ -324,12 +264,8 @@ export class KpiAlosService {
       previousParsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
-    const endTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiAlos - últimos 6 meses: ${endTimeLast6Months}`,
-    );
+    const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiAlos - últimos 6 meses: ${endTimeLast6Months}`);
   }
 
   private formatDateString(date: Date): string {
@@ -347,9 +283,7 @@ export class KpiAlosService {
     const [startDay, startMonth, startYear] = startDateString.split('/');
     const [endDay, endMonth, endYear] = endDateString.split('/');
 
-    const parsedStartDate = new Date(
-      Date.UTC(+startYear, +startMonth - 1, +startDay),
-    );
+    const parsedStartDate = new Date(Date.UTC(+startYear, +startMonth - 1, +startDay));
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
     parsedStartDate.setUTCHours(6, 0, 0, 0);

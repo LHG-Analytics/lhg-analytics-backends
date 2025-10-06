@@ -70,10 +70,7 @@ export class CronJobsController {
       if (error instanceof Error) {
         mensagemErro += ' ' + error.message;
       }
-      throw new HttpException(
-        mensagemErro,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException(mensagemErro, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }

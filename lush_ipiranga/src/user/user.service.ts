@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -23,9 +19,7 @@ export class UserService {
     }
 
     // Hash da senha do usuário
-    const hashedPassword = await this.authService.hashPassword(
-      createUserDto.password,
-    );
+    const hashedPassword = await this.authService.hashPassword(createUserDto.password);
 
     // Criar o usuário no banco de dados online
     await this.prisma.prismaOnline.user.create({
@@ -58,9 +52,7 @@ export class UserService {
 
     // Somente encripta a senha se um novo valor for fornecido
     if (updateUserDto.password) {
-      updateUserDto.password = await this.authService.hashPassword(
-        updateUserDto.password,
-      );
+      updateUserDto.password = await this.authService.hashPassword(updateUserDto.password);
     } else {
       // Se o password estiver vazio, remove do updateUserDto para não sobrescrever
       delete updateUserDto.password;

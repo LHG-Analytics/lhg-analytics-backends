@@ -20,8 +20,7 @@ export class CreateKpiOccupancyRateDto {
   @IsDecimal(
     { decimal_digits: '2' },
     {
-      message:
-        'A taxa de ocupação deve ser um número decimal com duas casas decimais',
+      message: 'A taxa de ocupação deve ser um número decimal com duas casas decimais',
     },
   )
   @IsNotEmpty({ message: 'A taxa de ocupação é obrigatória' })
@@ -31,8 +30,7 @@ export class CreateKpiOccupancyRateDto {
   @IsDecimal(
     { decimal_digits: '2' },
     {
-      message:
-        'A taxa de ocupação total deve ser um número decimal com duas casas decimais',
+      message: 'A taxa de ocupação total deve ser um número decimal com duas casas decimais',
     },
   )
   @IsNotEmpty({ message: 'A taxa de ocupação total é obrigatória' })

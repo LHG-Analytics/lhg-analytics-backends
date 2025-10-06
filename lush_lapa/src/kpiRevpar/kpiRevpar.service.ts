@@ -23,7 +23,7 @@ export class KpiRevparService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         // Para LAST_6_M, subtrair um dia para não incluir a data atual
@@ -87,8 +87,7 @@ export class KpiRevparService {
 
         const rentalApartmentsInCategory = rentalApartments.filter(
           (rentalApartment: any) =>
-            rentalApartment.suiteStates.suite.suiteCategoryId ===
-            suiteCategory.id,
+            rentalApartment.suiteStates.suite.suiteCategoryId === suiteCategory.id,
         );
 
         const rentalsCount = rentalApartmentsInCategory.length;
@@ -96,8 +95,7 @@ export class KpiRevparService {
 
         let giro = 0;
         if (suitesInCategoryCount > 0) {
-          const daysTimeInSeconds =
-            (endDate.getTime() - startDate.getTime()) / 1000;
+          const daysTimeInSeconds = (endDate.getTime() - startDate.getTime()) / 1000;
           const days = daysTimeInSeconds / 86400;
           giro = rentalsCount / suitesInCategoryCount / days;
         }
@@ -105,12 +103,13 @@ export class KpiRevparService {
         // Acumular os valores para cada categoria
         for (const rentalApartment of rentalApartmentsInCategory) {
           categoryTotalsMap[suiteCategory.id].categoryTotalRentals++;
-          categoryTotalsMap[suiteCategory.id].categoryTotalRental =
-            categoryTotalsMap[suiteCategory.id].categoryTotalRental.plus(
-              rentalApartment.permanenceValueLiquid
-                ? new Prisma.Decimal(rentalApartment.permanenceValueLiquid)
-                : new Prisma.Decimal(0),
-            );
+          categoryTotalsMap[suiteCategory.id].categoryTotalRental = categoryTotalsMap[
+            suiteCategory.id
+          ].categoryTotalRental.plus(
+            rentalApartment.permanenceValueLiquid
+              ? new Prisma.Decimal(rentalApartment.permanenceValueLiquid)
+              : new Prisma.Decimal(0),
+          );
           totalRevenue = totalRevenue.plus(
             rentalApartment.permanenceValueLiquid
               ? new Prisma.Decimal(rentalApartment.permanenceValueLiquid)
@@ -135,8 +134,7 @@ export class KpiRevparService {
 
         const revpar = categoryData.giro * ticketAverageRental;
 
-        const daysTimeInSeconds =
-          (endDate.getTime() - startDate.getTime()) / 1000;
+        const daysTimeInSeconds = (endDate.getTime() - startDate.getTime()) / 1000;
         const days = daysTimeInSeconds / 86400;
         const totalRevparGlobal = totalRevenue
           .dividedBy(totalSuites)
@@ -161,8 +159,7 @@ export class KpiRevparService {
         });
       }
 
-      const daysTimeInSeconds =
-        (endDate.getTime() - startDate.getTime()) / 1000;
+      const daysTimeInSeconds = (endDate.getTime() - startDate.getTime()) / 1000;
       const days = daysTimeInSeconds / 86400;
       const totalRevparGlobal = totalRevenue
         .dividedBy(totalSuites)
@@ -215,7 +212,7 @@ export class KpiRevparService {
       while (currentDate < endDate) {
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(5, 59, 59, 999); // Fim do dia contábil às 05:59:59 do próximo dia
@@ -278,8 +275,7 @@ export class KpiRevparService {
 
           const rentalApartmentsInCategory = rentalApartments.filter(
             (rentalApartment: any) =>
-              rentalApartment.suiteStates.suite.suiteCategoryId ===
-              suiteCategory.id,
+              rentalApartment.suiteStates.suite.suiteCategoryId === suiteCategory.id,
           );
 
           for (const rentalApartment of rentalApartmentsInCategory) {
@@ -292,16 +288,13 @@ export class KpiRevparService {
         }
 
         // Calcular o giro
-        const daysTimeInSeconds =
-          (nextDate.getTime() - currentDate.getTime()) / 1000;
+        const daysTimeInSeconds = (nextDate.getTime() - currentDate.getTime()) / 1000;
         const days = daysTimeInSeconds / 86400;
         const giro = totalRentalsCount / totalSuites / days;
 
         // Calcular o ticket médio
         const ticketAverageRental =
-          totalRentalsCount > 0
-            ? totalRevenue.dividedBy(totalRentalsCount).toNumber()
-            : 0;
+          totalRentalsCount > 0 ? totalRevenue.dividedBy(totalRentalsCount).toNumber() : 0;
 
         // Calcular o RevPAR
         const totalRevpar = giro * ticketAverageRental;
@@ -352,9 +345,7 @@ export class KpiRevparService {
     }
   }
 
-  async insertKpiRevparByPeriod(
-    data: KpiRevparByPeriod,
-  ): Promise<KpiRevparByPeriod> {
+  async insertKpiRevparByPeriod(data: KpiRevparByPeriod): Promise<KpiRevparByPeriod> {
     return this.prisma.prismaOnline.kpiRevparByPeriod.upsert({
       where: {
         period_createdDate: {
@@ -386,29 +377,21 @@ export class KpiRevparService {
     startDateLast7Days.setDate(startDateLast7Days.getDate() - 7);
     startDateLast7Days.setHours(6, 0, 0, 0);
 
-    const {
-      startDate: parsedStartDateLast7Days,
-      endDate: parsedEndDateLast7Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast7Days),
-      this.formatDateString(endDateLast7Days),
-    );
+    const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
     previousStartDateLast7Days.setHours(6, 0, 0, 0); // Configuração de horas
 
     // Log para verificar as datas
-    const startTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiRevpar - últimos 7 dias: ${startTimeLast7Days}`,
-    );
+    const startTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiRevpar - últimos 7 dias: ${startTimeLast7Days}`);
     await this.findAllKpiRevpar(
       parsedStartDateLast7Days,
       parsedEndDateLast7Days,
@@ -424,12 +407,8 @@ export class KpiRevparService {
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
     );
-    const endTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiRevpar - últimos 7 dias: ${endTimeLast7Days}`,
-    );
+    const endTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiRevpar - últimos 7 dias: ${endTimeLast7Days}`);
 
     // Últimos 30 dias
     const endDateLast30Days = currentDate;
@@ -439,31 +418,21 @@ export class KpiRevparService {
     startDateLast30Days.setDate(startDateLast30Days.getDate() - 30);
     startDateLast30Days.setHours(6, 0, 0, 0);
 
-    const {
-      startDate: parsedStartDateLast30Days,
-      endDate: parsedEndDateLast30Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast30Days),
-      this.formatDateString(endDateLast30Days),
-    );
+    const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
     previousStartDateLast30Days.setHours(6, 0, 0, 0); // Configuração de horas
 
     // Log para verificar as datas
-    const startTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiRevpar - últimos 30 dias: ${startTimeLast30Days}`,
-    );
+    const startTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiRevpar - últimos 30 dias: ${startTimeLast30Days}`);
     await this.findAllKpiRevpar(
       parsedStartDateLast30Days,
       parsedEndDateLast30Days,
@@ -479,12 +448,8 @@ export class KpiRevparService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
-    const endTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiRevpar - últimos 30 dias: ${endTimeLast30Days}`,
-    );
+    const endTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiRevpar - últimos 30 dias: ${endTimeLast30Days}`);
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = currentDate;
@@ -494,31 +459,21 @@ export class KpiRevparService {
     startDateLast6Months.setMonth(startDateLast6Months.getMonth() - 6);
     startDateLast6Months.setHours(6, 0, 0, 0);
 
-    const {
-      startDate: parsedStartDateLast6Months,
-      endDate: parsedEndDateLast6Months,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast6Months),
-      this.formatDateString(endDateLast6Months),
-    );
+    const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
-    const previousStartDateLast6Months = new Date(
-      previousParsedEndDateLast6Months,
-    );
-    previousStartDateLast6Months.setMonth(
-      previousStartDateLast6Months.getMonth() - 6,
-    );
+    const previousStartDateLast6Months = new Date(previousParsedEndDateLast6Months);
+    previousStartDateLast6Months.setMonth(previousStartDateLast6Months.getMonth() - 6);
     previousStartDateLast6Months.setHours(6, 0, 0, 0); // Configuração de horas
 
     // Log para verificar as datas
-    const startTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiRevpar - últimos 6 meses: ${startTimeLast6Months}`,
-    );
+    const startTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiRevpar - últimos 6 meses: ${startTimeLast6Months}`);
     await this.findAllKpiRevpar(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
@@ -534,12 +489,8 @@ export class KpiRevparService {
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
-    const endTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiRevpar - últimos 6 meses: ${endTimeLast6Months}`,
-    );
+    const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiRevpar - últimos 6 meses: ${endTimeLast6Months}`);
   }
 
   private formatDateString(date: Date): string {
@@ -557,9 +508,7 @@ export class KpiRevparService {
     const [startDay, startMonth, startYear] = startDateString.split('/');
     const [endDay, endMonth, endYear] = endDateString.split('/');
 
-    const parsedStartDate = new Date(
-      Date.UTC(+startYear, +startMonth - 1, +startDay),
-    );
+    const parsedStartDate = new Date(Date.UTC(+startYear, +startMonth - 1, +startDay));
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
     parsedStartDate.setUTCHours(6, 0, 0, 0);

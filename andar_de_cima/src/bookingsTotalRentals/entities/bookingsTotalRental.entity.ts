@@ -1,13 +1,6 @@
-import {
-  ChannelTypeEnum,
-  PeriodEnum,
-  Prisma,
-  RentalTypeEnum,
-} from '@client-online';
+import { ChannelTypeEnum, PeriodEnum, Prisma, RentalTypeEnum } from '@client-online';
 
-export class BookingsTotalRental
-  implements Prisma.BookingsTotalRentalsUncheckedCreateInput
-{
+export class BookingsTotalRental implements Prisma.BookingsTotalRentalsUncheckedCreateInput {
   id?: number;
   period?: PeriodEnum;
   totalAllBookings: number;

@@ -20,8 +20,7 @@ export class CreateKpiTicketAverageDto {
   @IsDecimal(
     { decimal_digits: '2' },
     {
-      message:
-        'O ticket médio total deve ser um número decimal com duas casas decimais',
+      message: 'O ticket médio total deve ser um número decimal com duas casas decimais',
     },
   )
   @IsNotEmpty({ message: 'O ticket médio total é obrigatório' })

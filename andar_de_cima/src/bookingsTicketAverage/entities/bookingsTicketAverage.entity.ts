@@ -1,8 +1,6 @@
 import { ChannelTypeEnum, PeriodEnum, Prisma } from '@client-online';
 
-export class BookingsTicketAverage
-  implements Prisma.BookingsTicketAverageUncheckedCreateInput
-{
+export class BookingsTicketAverage implements Prisma.BookingsTicketAverageUncheckedCreateInput {
   id?: number;
   period?: PeriodEnum;
   totalAllTicketAverage: Prisma.Decimal;

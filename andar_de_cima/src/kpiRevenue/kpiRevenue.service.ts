@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as moment from 'moment-timezone';
 import { PeriodEnum, Prisma, RentalTypeEnum } from '@client-online';
@@ -24,10 +20,7 @@ export class KpiRevenueService {
     });
   }
 
-  private async calculateTotalSaleDirect(
-    startDate: Date,
-    endDate: Date,
-  ): Promise<Prisma.Decimal> {
+  private async calculateTotalSaleDirect(startDate: Date, endDate: Date): Promise<Prisma.Decimal> {
     const stockOutItems = await this.prisma.prismaLocal.stockOutItem.findMany({
       where: {
         stockOuts: {
@@ -126,25 +119,14 @@ export class KpiRevenueService {
       this.prisma.prismaLocal.suiteCategory.findMany({
         where: {
           description: {
-            in: [
-              'ESPUMA LOUNGE',
-              'POP COPAN',
-              'POP',
-              'LOVE',
-              'ESPUMA COPAN',
-              'ESPUMA',
-            ],
+            in: ['ESPUMA LOUNGE', 'POP COPAN', 'POP', 'LOVE', 'ESPUMA COPAN', 'ESPUMA'],
           },
         },
       }),
     ]);
   }
 
-  async findAllKpiRevenue(
-    startDate: Date,
-    endDate: Date,
-    period?: PeriodEnum,
-  ): Promise<any> {
+  async findAllKpiRevenue(startDate: Date, endDate: Date, period?: PeriodEnum): Promise<any> {
     try {
       const companyId = 1;
 
@@ -157,8 +139,10 @@ export class KpiRevenueService {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       }
 
-      const [totalSaleDirect, allRentalApartments, suiteCategories] =
-        await this.fetchKpiData(startDate, endDate);
+      const [totalSaleDirect, allRentalApartments, suiteCategories] = await this.fetchKpiData(
+        startDate,
+        endDate,
+      );
 
       if (!allRentalApartments || allRentalApartments.length === 0) {
         throw new NotFoundException('No rental apartments found.');
@@ -210,26 +194,25 @@ export class KpiRevenueService {
         .map((rentalApartment) => rentalApartment.saleLease?.stockOutId)
         .filter((id) => id !== undefined);
 
-      const stockOutSaleLeases =
-        await this.prisma.prismaLocal.stockOut.findMany({
-          where: { id: { in: stockOutIds } },
-          include: {
-            stockOutItem: {
-              where: { canceled: null },
-              select: {
-                id: true,
-                priceSale: true,
-                quantity: true,
-                stockOutId: true,
-              },
-            },
-            sale: {
-              select: {
-                discount: true,
-              },
+      const stockOutSaleLeases = await this.prisma.prismaLocal.stockOut.findMany({
+        where: { id: { in: stockOutIds } },
+        include: {
+          stockOutItem: {
+            where: { canceled: null },
+            select: {
+              id: true,
+              priceSale: true,
+              quantity: true,
+              stockOutId: true,
             },
           },
-        });
+          sale: {
+            select: {
+              discount: true,
+            },
+          },
+        },
+      });
 
       const stockOutMap = new Map<number, any>();
       stockOutSaleLeases.forEach((stockOut) => {
@@ -237,8 +220,7 @@ export class KpiRevenueService {
       });
 
       for (const rentalApartment of allRentalApartments) {
-        const suiteCategoryId =
-          rentalApartment.suiteStates.suite.suiteCategoryId;
+        const suiteCategoryId = rentalApartment.suiteStates.suite.suiteCategoryId;
         const suiteCategory = categoryTotalsMap.get(suiteCategoryId);
 
         if (!suiteCategory) {
@@ -252,16 +234,11 @@ export class KpiRevenueService {
         if (saleLease && saleLease.stockOutId) {
           const stockOutSaleLease = stockOutMap.get(saleLease.stockOutId);
 
-          if (
-            stockOutSaleLease &&
-            Array.isArray(stockOutSaleLease.stockOutItem)
-          ) {
+          if (stockOutSaleLease && Array.isArray(stockOutSaleLease.stockOutItem)) {
             priceSale = stockOutSaleLease.stockOutItem.reduce(
               (acc, current) =>
                 acc.plus(
-                  new Prisma.Decimal(current.priceSale).times(
-                    new Prisma.Decimal(current.quantity),
-                  ),
+                  new Prisma.Decimal(current.priceSale).times(new Prisma.Decimal(current.quantity)),
                 ),
               new Prisma.Decimal(0),
             );
@@ -300,18 +277,13 @@ export class KpiRevenueService {
         suiteCategory.permanenceValueLiquid =
           suiteCategory.permanenceValueLiquid.plus(permanenceValueLiquid);
         suiteCategory.priceSale = suiteCategory.priceSale.plus(priceSale);
-        suiteCategory.discountSale =
-          suiteCategory.discountSale.plus(discountSale);
-        suiteCategory.discountRental =
-          suiteCategory.discountRental.plus(discountRental);
-        suiteCategory.totalDiscount =
-          suiteCategory.totalDiscount.plus(totalDiscount);
+        suiteCategory.discountSale = suiteCategory.discountSale.plus(discountSale);
+        suiteCategory.discountRental = suiteCategory.discountRental.plus(discountRental);
+        suiteCategory.totalDiscount = suiteCategory.totalDiscount.plus(totalDiscount);
         suiteCategory.totalValue = suiteCategory.totalValue.plus(totalValue);
       }
 
-      const totalAllValue: Prisma.Decimal = Array.from(
-        categoryTotalsMap.values(),
-      ).reduce(
+      const totalAllValue: Prisma.Decimal = Array.from(categoryTotalsMap.values()).reduce(
         (acc, current) => acc.plus(current.totalValue),
         new Prisma.Decimal(0),
       );
@@ -394,12 +366,8 @@ export class KpiRevenueService {
 
       const formattedKpiRevenueData = kpiRevenueData.map((category) => ({
         ...category,
-        permanenceValueTotal: this.formatCurrency(
-          category.permanenceValueTotal.toNumber(),
-        ),
-        permanenceValueLiquid: this.formatCurrency(
-          category.permanenceValueLiquid.toNumber(),
-        ),
+        permanenceValueTotal: this.formatCurrency(category.permanenceValueTotal.toNumber()),
+        permanenceValueLiquid: this.formatCurrency(category.permanenceValueLiquid.toNumber()),
         priceSale: this.formatCurrency(category.priceSale.toNumber()),
         discountSale: this.formatCurrency(category.discountSale.toNumber()),
         discountRental: this.formatCurrency(category.discountRental.toNumber()),
@@ -412,36 +380,20 @@ export class KpiRevenueService {
         kpiRevenueData: formattedKpiRevenueData,
         totalResult: {
           ...totalResult,
-          permanenceValueTotal: this.formatCurrency(
-            totalResult.permanenceValueTotal.toNumber(),
-          ),
-          permanenceValueLiquid: this.formatCurrency(
-            totalResult.permanenceValueLiquid.toNumber(),
-          ),
+          permanenceValueTotal: this.formatCurrency(totalResult.permanenceValueTotal.toNumber()),
+          permanenceValueLiquid: this.formatCurrency(totalResult.permanenceValueLiquid.toNumber()),
           priceSale: this.formatCurrency(totalResult.priceSale.toNumber()),
-          discountSale: this.formatCurrency(
-            totalResult.discountSale.toNumber(),
-          ),
-          discountRental: this.formatCurrency(
-            totalResult.discountRental.toNumber(),
-          ),
-          totalDiscount: this.formatCurrency(
-            totalResult.totalDiscount.toNumber(),
-          ),
-          totalSaleDirect: this.formatCurrency(
-            totalResult.totalSaleDirect.toNumber(),
-          ),
+          discountSale: this.formatCurrency(totalResult.discountSale.toNumber()),
+          discountRental: this.formatCurrency(totalResult.discountRental.toNumber()),
+          totalDiscount: this.formatCurrency(totalResult.totalDiscount.toNumber()),
+          totalSaleDirect: this.formatCurrency(totalResult.totalSaleDirect.toNumber()),
           totalValue: this.formatCurrency(totalResult.totalValue.toNumber()),
-          totalAllValue: this.formatCurrency(
-            Number(totalAllValue.plus(totalSaleDirect)),
-          ),
+          totalAllValue: this.formatCurrency(Number(totalAllValue.plus(totalSaleDirect))),
         },
       };
     } catch (error) {
       console.error('Erro ao buscar KPI Revenue data:', error);
-      throw new BadRequestException(
-        `Failed to fetch KPI Revenue data: ${error.message}`,
-      );
+      throw new BadRequestException(`Failed to fetch KPI Revenue data: ${error.message}`);
     }
   }
 
@@ -483,20 +435,19 @@ export class KpiRevenueService {
       currentDate.setUTCHours(6, 0, 0, 0);
 
       // Recuperação de dados para os `stockOutId` em batch
-      const allRentalApartments =
-        await this.prisma.prismaLocal.rentalApartment.findMany({
-          where: {
-            checkIn: { gte: currentDate, lte: endDate },
-            endOccupationType: 'FINALIZADA',
+      const allRentalApartments = await this.prisma.prismaLocal.rentalApartment.findMany({
+        where: {
+          checkIn: { gte: currentDate, lte: endDate },
+          endOccupationType: 'FINALIZADA',
+        },
+        include: {
+          suiteStates: {
+            include: { suite: { include: { suiteCategories: true } } },
           },
-          include: {
-            suiteStates: {
-              include: { suite: { include: { suiteCategories: true } } },
-            },
-            saleLease: true,
-            Booking: true,
-          },
-        });
+          saleLease: true,
+          Booking: true,
+        },
+      });
 
       const stockOutIds = allRentalApartments
         .map((a) => a.saleLease?.stockOutId)
@@ -522,20 +473,19 @@ export class KpiRevenueService {
         },
       });
 
-      const stockOutMap: { [key: string]: Prisma.Decimal } =
-        stockOutData.reduce((map, stockOut) => {
+      const stockOutMap: { [key: string]: Prisma.Decimal } = stockOutData.reduce(
+        (map, stockOut) => {
           const priceSale = stockOut.stockOutItem
             .reduce(
-              (acc, item) =>
-                acc.plus(
-                  new Prisma.Decimal(item.priceSale).times(item.quantity),
-                ),
+              (acc, item) => acc.plus(new Prisma.Decimal(item.priceSale).times(item.quantity)),
               new Prisma.Decimal(0),
             )
             .minus(stockOut.sale?.discount || new Prisma.Decimal(0));
           map[stockOut.id] = priceSale;
           return map;
-        }, {});
+        },
+        {},
+      );
 
       while (currentDate < endDate) {
         let nextDate = new Date(currentDate);
@@ -579,13 +529,12 @@ export class KpiRevenueService {
             : new Prisma.Decimal(0);
 
           const priceSale = rentalApartment.saleLease?.stockOutId
-            ? stockOutMap[rentalApartment.saleLease.stockOutId] ||
-              new Prisma.Decimal(0)
+            ? stockOutMap[rentalApartment.saleLease.stockOutId] || new Prisma.Decimal(0)
             : new Prisma.Decimal(0);
 
-          totalsMap[rentalType].totalValue = totalsMap[
-            rentalType
-          ].totalValue.plus(permanenceValueLiquid.plus(priceSale));
+          totalsMap[rentalType].totalValue = totalsMap[rentalType].totalValue.plus(
+            permanenceValueLiquid.plus(priceSale),
+          );
 
           if (rentalApartment.checkIn < totalsMap[rentalType].createdDate) {
             totalsMap[rentalType].createdDate = currentDate;
@@ -631,11 +580,7 @@ export class KpiRevenueService {
       const totalResult = {
         totalValue: Object.values(results).reduce(
           (acc, dailyData) =>
-            acc +
-            dailyData.reduce(
-              (sum, data) => sum + data.totalValue.toNumber(),
-              0,
-            ),
+            acc + dailyData.reduce((sum, data) => sum + data.totalValue.toNumber(), 0),
           0,
         ),
       };
@@ -649,9 +594,7 @@ export class KpiRevenueService {
       };
     } catch (error) {
       console.error('Erro ao acumular dados por tipo de locação:', error);
-      throw new BadRequestException(
-        `Failed to accumulate data by rental type: ${error.message}`,
-      );
+      throw new BadRequestException(`Failed to accumulate data by rental type: ${error.message}`);
     }
   }
 
@@ -699,19 +642,18 @@ export class KpiRevenueService {
           nextDate.setUTCHours(5, 59, 59, 999); // Fim do mês contábil
         }
 
-        const allRentalApartments =
-          await this.prisma.prismaLocal.rentalApartment.findMany({
-            where: {
-              checkIn: {
-                gte: currentDate,
-                lte: nextDate,
-              },
-              endOccupationType: 'FINALIZADA',
+        const allRentalApartments = await this.prisma.prismaLocal.rentalApartment.findMany({
+          where: {
+            checkIn: {
+              gte: currentDate,
+              lte: nextDate,
             },
-            include: {
-              saleLease: true,
-            },
-          });
+            endOccupationType: 'FINALIZADA',
+          },
+          include: {
+            saleLease: true,
+          },
+        });
 
         let totalValueForCurrentPeriod = new Prisma.Decimal(0);
         const stockOutIds: number[] = [];
@@ -751,9 +693,7 @@ export class KpiRevenueService {
               })
             : [];
 
-        const stockOutMap = new Map(
-          stockOuts.map((stockOut) => [stockOut.id, stockOut]),
-        );
+        const stockOutMap = new Map(stockOuts.map((stockOut) => [stockOut.id, stockOut]));
 
         for (const rentalApartment of allRentalApartments) {
           // Lógica para calcular os valores
@@ -792,9 +732,7 @@ export class KpiRevenueService {
         }
 
         // Formatar o totalValue
-        const formattedTotalValue = this.formatCurrency(
-          totalValueForCurrentPeriod.toNumber(),
-        );
+        const formattedTotalValue = this.formatCurrency(totalValueForCurrentPeriod.toNumber());
 
         // Adicionar o resultado ao objeto de resultados
         const dateKey = currentDate.toISOString().split('T')[0];
@@ -839,9 +777,7 @@ export class KpiRevenueService {
     }
   }
 
-  private async insertKpiRevenueByPeriod(
-    data: KpiRevenueByPeriod,
-  ): Promise<KpiRevenueByPeriod> {
+  private async insertKpiRevenueByPeriod(data: KpiRevenueByPeriod): Promise<KpiRevenueByPeriod> {
     return this.prisma.prismaOnline.kpiRevenueByPeriod.upsert({
       where: {
         period_createdDate: {
@@ -874,20 +810,16 @@ export class KpiRevenueService {
     startDateLast7Days.setHours(6, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast7Days,
-      endDate: parsedEndDateLast7Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast7Days),
-      this.formatDateString(endDateLast7Days),
-    );
+    const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
     previousStartDateLast7Days.setHours(6, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -900,12 +832,8 @@ export class KpiRevenueService {
     );
 
     // Log para verificar as datas
-    const startTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiRevenue - últimos 7 dias: ${startTimeLast7Days}`,
-    );
+    const startTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiRevenue - últimos 7 dias: ${startTimeLast7Days}`);
 
     // Chamar a função para o período atual
     await this.findAllKpiRevenue(
@@ -929,12 +857,8 @@ export class KpiRevenueService {
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
     );
-    const endTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiRevenue - últimos 7 dias: ${endTimeLast7Days}`,
-    );
+    const endTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiRevenue - últimos 7 dias: ${endTimeLast7Days}`);
 
     // Últimos 30 dias
     const endDateLast30Days = currentDate;
@@ -945,22 +869,16 @@ export class KpiRevenueService {
     startDateLast30Days.setHours(6, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast30Days,
-      endDate: parsedEndDateLast30Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast30Days),
-      this.formatDateString(endDateLast30Days),
-    );
+    const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
     previousStartDateLast30Days.setHours(6, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -973,12 +891,8 @@ export class KpiRevenueService {
     );
 
     // Log para verificar as datas
-    const startTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiRevenue - últimos 30 dias: ${startTimeLast30Days}`,
-    );
+    const startTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiRevenue - últimos 30 dias: ${startTimeLast30Days}`);
 
     // Chamar a função para o período atual
     await this.findAllKpiRevenue(
@@ -1002,12 +916,8 @@ export class KpiRevenueService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
-    const endTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiRevenue - últimos 30 dias: ${endTimeLast30Days}`,
-    );
+    const endTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiRevenue - últimos 30 dias: ${endTimeLast30Days}`);
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = currentDate;
@@ -1018,22 +928,16 @@ export class KpiRevenueService {
     startDateLast6Months.setHours(6, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast6Months,
-      endDate: parsedEndDateLast6Months,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast6Months),
-      this.formatDateString(endDateLast6Months),
-    );
+    const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
-    const previousStartDateLast6Months = new Date(
-      previousParsedEndDateLast6Months,
-    );
-    previousStartDateLast6Months.setMonth(
-      previousStartDateLast6Months.getMonth() - 6,
-    );
+    const previousStartDateLast6Months = new Date(previousParsedEndDateLast6Months);
+    previousStartDateLast6Months.setMonth(previousStartDateLast6Months.getMonth() - 6);
     previousStartDateLast6Months.setHours(6, 0, 0, 0); // Configuração de horas
 
     // Parse as datas para o formato desejado
@@ -1046,12 +950,8 @@ export class KpiRevenueService {
     );
 
     // Log para verificar as datas
-    const startTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiRevenue - últimos 6 meses: ${startTimeLast6Months}`,
-    );
+    const startTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiRevenue - últimos 6 meses: ${startTimeLast6Months}`);
 
     // Chamar a função para o período atual
     await this.findAllKpiRevenue(
@@ -1075,12 +975,8 @@ export class KpiRevenueService {
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
-    const endTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiRevenue - últimos 6 meses: ${endTimeLast6Months}`,
-    );
+    const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiRevenue - últimos 6 meses: ${endTimeLast6Months}`);
   }
 
   private formatDateString(date: Date): string {
@@ -1099,9 +995,7 @@ export class KpiRevenueService {
     const [startDay, startMonth, startYear] = startDateString.split('/');
     const [endDay, endMonth, endYear] = endDateString.split('/');
 
-    const parsedStartDate = new Date(
-      Date.UTC(+startYear, +startMonth - 1, +startDay),
-    );
+    const parsedStartDate = new Date(Date.UTC(+startYear, +startMonth - 1, +startDay));
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
     parsedStartDate.setUTCHours(6, 0, 0, 0); // Define início às 06:00
@@ -1110,15 +1004,8 @@ export class KpiRevenueService {
     return { startDate: parsedStartDate, endDate: parsedEndDate };
   }
 
-  private determineRentalPeriod(
-    checkIn: Date,
-    checkOut: Date,
-    Booking: any,
-  ): string {
-    const occupationTimeSeconds = this.calculateOccupationTime(
-      checkIn,
-      checkOut,
-    );
+  private determineRentalPeriod(checkIn: Date, checkOut: Date, Booking: any): string {
+    const occupationTimeSeconds = this.calculateOccupationTime(checkIn, checkOut);
 
     // Convertendo check-in e check-out para objetos Date
     const checkInDate = new Date(checkIn);
@@ -1159,8 +1046,7 @@ export class KpiRevenueService {
       // Verificação para Diária
       if (
         occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
-        (checkInHour <= 15 &&
-          (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
+        (checkInHour <= 15 && (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
       ) {
         return 'DAILY';
       }

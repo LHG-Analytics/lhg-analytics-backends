@@ -3,18 +3,9 @@
   "compilerOptions": {
     "baseUrl": "./",
     "paths": {
-      "@client-online": [
-        "dist/generated/client-online"
-      ],
-      "@client-local": [
-        "dist/generated/client-local"
-      ]
+      "@client-online": ["dist/generated/client-online"],
+      "@client-local": ["dist/generated/client-local"]
     }
   },
-  "exclude": [
-    "node_modules",
-    "test",
-    "dist",
-    "**/*spec.ts"
-  ]
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
 }

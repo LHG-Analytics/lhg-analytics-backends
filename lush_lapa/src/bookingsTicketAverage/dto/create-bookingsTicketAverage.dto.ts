@@ -24,11 +24,7 @@ export class CreateBookingsTicketAverageDto {
   @IsOptional()
   period?: PeriodEnum;
 
-  constructor(
-    totalAllTicketAverage: Prisma.Decimal,
-    createdDate: Date,
-    period?: PeriodEnum,
-  ) {
+  constructor(totalAllTicketAverage: Prisma.Decimal, createdDate: Date, period?: PeriodEnum) {
     this.totalAllTicketAverage = totalAllTicketAverage;
     this.createdDate = createdDate;
     this.period = period;

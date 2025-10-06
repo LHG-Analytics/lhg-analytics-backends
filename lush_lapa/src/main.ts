@@ -27,21 +27,23 @@ async function bootstrap() {
     const app = await NestFactory.create(AppModule);
 
     // Configuração de segurança com Helmet
-    app.use(helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          scriptSrc: ["'self'"],
-          imgSrc: ["'self'", "data:", "https:"],
+    app.use(
+      helmet({
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'"],
+            imgSrc: ["'self'", 'data:', 'https:'],
+          },
         },
-      },
-      hsts: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true,
-      },
-    }));
+        hsts: {
+          maxAge: 31536000,
+          includeSubDomains: true,
+          preload: true,
+        },
+      }),
+    );
 
     const servicePrefix = process.env.SERVICE_PREFIX_LAPA || 'lapa';
     app.setGlobalPrefix(`${servicePrefix}/api`);
@@ -50,9 +52,7 @@ async function bootstrap() {
     // Configuração do Swagger
     const swaggerConfig = new DocumentBuilder()
       .setTitle('LHG Analytics Backend - Lush Lapa')
-      .setDescription(
-        'API para visualização e gerenciamento dos Endpoints no backend',
-      )
+      .setDescription('API para visualização e gerenciamento dos Endpoints no backend')
       .setVersion('1.0')
       //.addBearerAuth()
       .addServer(isProduction ? '/lush_lapa' : '/')
@@ -81,12 +81,7 @@ async function bootstrap() {
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig, {
-      extraModels: [
-        CreateKpiAlosDto,
-        UpdateKpiAlosDto,
-        CreateKpiRevenueDto,
-        UpdateKpiRevenueDto,
-      ],
+      extraModels: [CreateKpiAlosDto, UpdateKpiAlosDto, CreateKpiRevenueDto, UpdateKpiRevenueDto],
     });
     SwaggerModule.setup('lapa/api', app, document);
     console.log('Swagger UI disponível em: /lapa/api');

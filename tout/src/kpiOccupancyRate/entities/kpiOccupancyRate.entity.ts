@@ -1,8 +1,6 @@
 import { PeriodEnum, Prisma } from '@client-online';
 
-export class KpiOccupancyRate
-  implements Prisma.KpiOccupancyRateUncheckedCreateInput
-{
+export class KpiOccupancyRate implements Prisma.KpiOccupancyRateUncheckedCreateInput {
   id?: number;
   suiteCategoryId: number;
   suiteCategoryName: string;
@@ -36,9 +34,7 @@ export class KpiOccupancyRate
   }
 }
 
-export class KpiOccupancyRateByWeek
-  implements Prisma.KpiOccupancyRateByWeekUncheckedCreateInput
-{
+export class KpiOccupancyRateByWeek implements Prisma.KpiOccupancyRateByWeekUncheckedCreateInput {
   id?: number;
   suiteCategoryId: number;
   suiteCategoryName: string;

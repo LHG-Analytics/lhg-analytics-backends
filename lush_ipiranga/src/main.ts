@@ -39,9 +39,7 @@ async function bootstrap() {
     // Configuração do Swagger
     const swaggerConfig = new DocumentBuilder()
       .setTitle('LHG Analytics Backend - Lush Ipiranga')
-      .setDescription(
-        'API para visualização e gerenciamento dos Endpoints no backend',
-      )
+      .setDescription('API para visualização e gerenciamento dos Endpoints no backend')
       .setVersion('1.0')
       /*.addBearerAuth(
         { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
@@ -75,12 +73,7 @@ async function bootstrap() {
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig, {
-      extraModels: [
-        CreateKpiAlosDto,
-        UpdateKpiAlosDto,
-        CreateKpiRevenueDto,
-        UpdateKpiRevenueDto,
-      ],
+      extraModels: [CreateKpiAlosDto, UpdateKpiAlosDto, CreateKpiRevenueDto, UpdateKpiRevenueDto],
     });
     SwaggerModule.setup('ipiranga/api', app, document);
     console.log('Swagger UI disponível em: /ipiranga/api');

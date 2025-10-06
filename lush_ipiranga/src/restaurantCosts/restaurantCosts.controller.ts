@@ -1,17 +1,5 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Query,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiQuery,
-  ApiBadRequestResponse,
-  ApiNotFoundResponse,
-} from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { ApiTags, ApiQuery, ApiBadRequestResponse, ApiNotFoundResponse } from '@nestjs/swagger';
 import { PeriodEnum } from '@client-online';
 import { RestaurantCostsService } from './restaurantCosts.service';
 import { RestaurantCosts } from './entities/restaurantCosts.entity';
@@ -19,9 +7,7 @@ import { RestaurantCosts } from './entities/restaurantCosts.entity';
 @ApiTags('RestaurantCosts')
 @Controller('RestaurantCosts')
 export class RestaurantCostsController {
-  constructor(
-    private readonly restaurantCostsService: RestaurantCostsService,
-  ) {}
+  constructor(private readonly restaurantCostsService: RestaurantCostsService) {}
 
   @Get('calculate-cmv')
   @HttpCode(HttpStatus.OK)
@@ -72,9 +58,7 @@ export class RestaurantCostsController {
     } catch (error) {
       console.error('Erro ao calcular o CMV:', error); // 👈 Aqui imprime o erro real
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
-      throw new BadRequestException(
-        `Failed to calculate CMV: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to calculate CMV: ${errorMessage}`);
     }
   }
 
@@ -87,31 +71,20 @@ export class RestaurantCostsController {
       return await this.restaurantCostsService.handleCron();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException(
-        `Failed to run the cron job: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to run the cron job: ${errorMessage}`);
     }
   }
 
-  private convertToDate(
-    dateStr?: string,
-    isEndDate: boolean = false,
-  ): Date | undefined {
+  private convertToDate(dateStr?: string, isEndDate: boolean = false): Date | undefined {
     if (!dateStr) return undefined;
 
     const [day, month, year] = dateStr.split('/').map(Number);
     if (isNaN(day) || isNaN(month) || isNaN(year)) {
-      throw new BadRequestException(
-        'Invalid date format. Please use DD/MM/YYYY.',
-      );
+      throw new BadRequestException('Invalid date format. Please use DD/MM/YYYY.');
     }
 
     const date = new Date(year, month - 1, day);
-    if (
-      date.getDate() !== day ||
-      date.getMonth() !== month - 1 ||
-      date.getFullYear() !== year
-    ) {
+    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
       throw new BadRequestException(
         'Invalid date. Please ensure it is a valid date in the format DD/MM/YYYY.',
       );

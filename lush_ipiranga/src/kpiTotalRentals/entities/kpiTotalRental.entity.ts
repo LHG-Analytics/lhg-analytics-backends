@@ -1,8 +1,6 @@
 import { PeriodEnum, Prisma } from '@client-online';
 
-export class KpiTotalRentals
-  implements Prisma.KpiTotalRentalsUncheckedCreateInput
-{
+export class KpiTotalRentals implements Prisma.KpiTotalRentalsUncheckedCreateInput {
   id?: number;
   suiteCategoryId: number;
   suiteCategoryName: string;
@@ -39,9 +37,7 @@ export class KpiTotalRentals
   }
 }
 
-export class KpiTotalRentalsByPeriod
-  implements Prisma.KpiTotalRentalsByPeriodUncheckedCreateInput
-{
+export class KpiTotalRentalsByPeriod implements Prisma.KpiTotalRentalsByPeriodUncheckedCreateInput {
   id?: number;
   createdDate: Date;
   totalAllRentalsApartments?: number | null;

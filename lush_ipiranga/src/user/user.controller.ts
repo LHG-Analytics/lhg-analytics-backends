@@ -40,9 +40,7 @@ export class UserController {
       return createdUser; // Este já deve ser um UserResponseDto
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'erro desconhecido';
-      throw new BadRequestException(
-        `Failed to create user: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to create user: ${errorMessage}`);
     }
   }
 
@@ -57,16 +55,11 @@ export class UserController {
   })
   async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     try {
-      const updatedUser = await this.userService.updateUser(
-        Number(id),
-        updateUserDto,
-      );
+      const updatedUser = await this.userService.updateUser(Number(id), updateUserDto);
       return updatedUser; // Este já deve ser um UserResponseDto
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'erro desconhecido';
-      throw new BadRequestException(
-        `Failed to update user: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to update user: ${errorMessage}`);
     }
   }
 
@@ -82,9 +75,7 @@ export class UserController {
       return users; // Este já deve ser um array de UserResponseDto
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'erro desconhecido';
-      throw new BadRequestException(
-        `Failed to fetch users: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to fetch users: ${errorMessage}`);
     }
   }
 

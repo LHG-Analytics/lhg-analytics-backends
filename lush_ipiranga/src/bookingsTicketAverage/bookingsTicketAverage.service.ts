@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as moment from 'moment-timezone';
 import 'moment/locale/pt-br';
@@ -81,9 +77,7 @@ export class BookingsTicketAverageService {
 
       // Calcular a média usando Prisma.Decimal
       const averageTicket =
-        totalBookings > 0
-          ? totalPriceRental.dividedBy(totalBookings).toNumber()
-          : 0;
+        totalBookings > 0 ? totalPriceRental.dividedBy(totalBookings).toNumber() : 0;
 
       // Monta o resultado total
       const totalResult = {
@@ -111,9 +105,7 @@ export class BookingsTicketAverageService {
     }
   }
 
-  async insertBookingsTicketAverage(
-    data: BookingsTicketAverage,
-  ): Promise<BookingsTicketAverage> {
+  async insertBookingsTicketAverage(data: BookingsTicketAverage): Promise<BookingsTicketAverage> {
     return this.prisma.prismaOnline.bookingsTicketAverage.upsert({
       where: {
         period_createdDate: {
@@ -200,9 +192,7 @@ export class BookingsTicketAverageService {
 
       // Função para verificar se a diferença entre duas datas é de até 1 hora
       const isWithinOneHour = (date1: Date, date2: Date) => {
-        const differenceInMilliseconds = Math.abs(
-          date1.getTime() - date2.getTime(),
-        );
+        const differenceInMilliseconds = Math.abs(date1.getTime() - date2.getTime());
         return differenceInMilliseconds <= 3600000; // 1 hora em milissegundos
       };
 
@@ -255,8 +245,7 @@ export class BookingsTicketAverageService {
         const priceRental = booking.priceRental
           ? new Prisma.Decimal(booking.priceRental)
           : new Prisma.Decimal(0);
-        channelTotals[channelType].total =
-          channelTotals[channelType].total.plus(priceRental);
+        channelTotals[channelType].total = channelTotals[channelType].total.plus(priceRental);
         channelTotals[channelType].count++;
       }
     }
@@ -266,13 +255,17 @@ export class BookingsTicketAverageService {
     let totalCount = 0;
     let totalSum = new Prisma.Decimal(0);
 
-    for (const [channel, { total, count }] of Object.entries(channelTotals) as [string, { total: Prisma.Decimal, count: number }][]) {
+    for (const [channel, { total, count }] of Object.entries(channelTotals) as [
+      string,
+      { total: Prisma.Decimal; count: number },
+    ][]) {
       const average = count > 0 ? total.dividedBy(count).toNumber() : 0;
-      (totalResults as Record<string, { total: string; average: string; count: number }>)[channel] = {
-        total: this.formatCurrency(total.toNumber()), // Formata o total em reais
-        average: this.formatCurrency(average), // Formata a média em reais
-        count,
-      };
+      (totalResults as Record<string, { total: string; average: string; count: number }>)[channel] =
+        {
+          total: this.formatCurrency(total.toNumber()), // Formata o total em reais
+          average: this.formatCurrency(average), // Formata a média em reais
+          count,
+        };
 
       // Acumula o total e a contagem para o cálculo da média total
       totalCount += count;
@@ -280,8 +273,7 @@ export class BookingsTicketAverageService {
     }
 
     // Calcular a média total de todos os canais
-    const totalAllTicketAverage =
-      totalCount > 0 ? totalSum.dividedBy(totalCount).toNumber() : 0;
+    const totalAllTicketAverage = totalCount > 0 ? totalSum.dividedBy(totalCount).toNumber() : 0;
 
     // Inserir no banco de dados para cada tipo de canal
     for (const [channel, { total, count }] of Object.entries(channelTotals)) {
@@ -339,20 +331,16 @@ export class BookingsTicketAverageService {
     startDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast7Days,
-      endDate: parsedEndDateLast7Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast7Days),
-      this.formatDateString(endDateLast7Days),
-    );
+    const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
     previousStartDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -365,12 +353,8 @@ export class BookingsTicketAverageService {
     );
 
     // Log para verificar as datas
-    const startTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob BookingsTicketAverage - últimos 7 dias: ${startTimeLast7Days}`,
-    );
+    const startTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob BookingsTicketAverage - últimos 7 dias: ${startTimeLast7Days}`);
 
     // Chamar a função para o período atual
     await this.findAllBookingsTicketAverage(
@@ -395,12 +379,8 @@ export class BookingsTicketAverageService {
       PeriodEnum.LAST_7_D,
     );
 
-    const endTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob BookingsTicketAverage - últimos 7 dias: ${endTimeLast7Days}`,
-    );
+    const endTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob BookingsTicketAverage - últimos 7 dias: ${endTimeLast7Days}`);
 
     // Últimos 30 dias
     const endDateLast30Days = new Date(currentDate);
@@ -411,22 +391,16 @@ export class BookingsTicketAverageService {
     startDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast30Days,
-      endDate: parsedEndDateLast30Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast30Days),
-      this.formatDateString(endDateLast30Days),
-    );
+    const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
     previousStartDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -439,12 +413,8 @@ export class BookingsTicketAverageService {
     );
 
     // Log para verificar as datas
-    const startTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob BookingsTicketAverage - últimos 30 dias: ${startTimeLast30Days}`,
-    );
+    const startTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob BookingsTicketAverage - últimos 30 dias: ${startTimeLast30Days}`);
 
     // Chamar a função para o período atual
     await this.findAllBookingsTicketAverage(
@@ -469,12 +439,8 @@ export class BookingsTicketAverageService {
       PeriodEnum.LAST_30_D,
     );
 
-    const endTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob BookingsTicketAverage - últimos 30 dias: ${endTimeLast30Days}`,
-    );
+    const endTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob BookingsTicketAverage - últimos 30 dias: ${endTimeLast30Days}`);
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = new Date(currentDate);
@@ -485,22 +451,16 @@ export class BookingsTicketAverageService {
     startDateLast6Months.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast6Months,
-      endDate: parsedEndDateLast6Months,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast6Months),
-      this.formatDateString(endDateLast6Months),
-    );
+    const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
-    const previousStartDateLast6Months = new Date(
-      previousParsedEndDateLast6Months,
-    );
-    previousStartDateLast6Months.setMonth(
-      previousStartDateLast6Months.getMonth() - 6,
-    );
+    const previousStartDateLast6Months = new Date(previousParsedEndDateLast6Months);
+    previousStartDateLast6Months.setMonth(previousStartDateLast6Months.getMonth() - 6);
     previousStartDateLast6Months.setHours(0, 0, 0, 0); // Configuração de horas
 
     // Parse as datas para o formato desejado
@@ -513,12 +473,8 @@ export class BookingsTicketAverageService {
     );
 
     // Log para verificar as datas
-    const startTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob BookingsTicketAverage - últimos 6 meses: ${startTimeLast6Months}`,
-    );
+    const startTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob BookingsTicketAverage - últimos 6 meses: ${startTimeLast6Months}`);
 
     // Chamar a função para o período atual
     await this.findAllBookingsTicketAverage(
@@ -543,12 +499,8 @@ export class BookingsTicketAverageService {
       PeriodEnum.LAST_6_M,
     );
 
-    const endTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob BookingsTicketAverage - últimos 6 meses: ${endTimeLast6Months}`,
-    );
+    const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob BookingsTicketAverage - últimos 6 meses: ${endTimeLast6Months}`);
   }
 
   private formatDateString(date: Date): string {
@@ -567,9 +519,7 @@ export class BookingsTicketAverageService {
     const [startDay, startMonth, startYear] = startDateString.split('/');
     const [endDay, endMonth, endYear] = endDateString.split('/');
 
-    const parsedStartDate = new Date(
-      Date.UTC(+startYear, +startMonth - 1, +startDay),
-    );
+    const parsedStartDate = new Date(Date.UTC(+startYear, +startMonth - 1, +startDay));
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
     parsedStartDate.setUTCHours(0, 0, 0, 0); // Define início às 06:00

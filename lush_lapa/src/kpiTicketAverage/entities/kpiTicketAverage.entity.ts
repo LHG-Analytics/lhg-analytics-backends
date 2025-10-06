@@ -1,8 +1,6 @@
 import { PeriodEnum, Prisma } from '@client-online';
 
-export class KpiTicketAverage
-  implements Prisma.KpiTicketAverageUncheckedCreateInput
-{
+export class KpiTicketAverage implements Prisma.KpiTicketAverageUncheckedCreateInput {
   id?: number;
   ticketAverageRental: Prisma.Decimal;
   ticketAverageSale: Prisma.Decimal;

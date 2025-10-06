@@ -28,8 +28,7 @@ export class CreateKpiRevparDto {
   @IsDecimal(
     { decimal_digits: '2' },
     {
-      message:
-        'O totalRevpar deve ser um número decimal com duas casas decimais',
+      message: 'O totalRevpar deve ser um número decimal com duas casas decimais',
     },
   )
   @IsNotEmpty({ message: 'O totalRevpar é obrigatório' })

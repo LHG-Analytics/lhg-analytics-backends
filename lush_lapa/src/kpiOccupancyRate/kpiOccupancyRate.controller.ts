@@ -1,26 +1,12 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Query,
-} from '@nestjs/common';
-import {
-  ApiBadRequestResponse,
-  ApiNotFoundResponse,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PeriodEnum } from '@client-online';
 import { KpiOccupancyRateService } from './kpiOccupancyRate.service';
 
 @ApiTags('KpiOccupancyRate')
 @Controller('KpiOccupancyRate')
 export class KpiOccupancyRateController {
-  constructor(
-    private readonly kpiOccupancyRateService: KpiOccupancyRateService,
-  ) {}
+  constructor(private readonly kpiOccupancyRateService: KpiOccupancyRateService) {}
 
   @Get('create-and-find-all-kpi-ocuppancy-rate')
   @ApiQuery({
@@ -60,11 +46,7 @@ export class KpiOccupancyRateController {
       }
 
       // Chama o serviço com as datas e o período, se fornecidos
-      return await this.kpiOccupancyRateService.findAllKpiOccupancyRate(
-        start,
-        end,
-        period,
-      );
+      return await this.kpiOccupancyRateService.findAllKpiOccupancyRate(start, end, period);
     } catch (error) {
       throw new BadRequestException(
         `Failed to create all KpiOcuppancyRate: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -72,26 +54,17 @@ export class KpiOccupancyRateController {
     }
   }
 
-  private convertToDate(
-    dateStr?: string,
-    isEndDate: boolean = false,
-  ): Date | undefined {
+  private convertToDate(dateStr?: string, isEndDate: boolean = false): Date | undefined {
     if (!dateStr) return undefined;
 
     const [day, month, year] = dateStr.split('/').map(Number);
-    if (isNaN(day)|| isNaN(month) || isNaN(year)) {
-      throw new BadRequestException(
-        'Invalid date format. Please use DD/MM/YYYY.',
-      );
+    if (isNaN(day) || isNaN(month) || isNaN(year)) {
+      throw new BadRequestException('Invalid date format. Please use DD/MM/YYYY.');
     }
 
     // Cria a nova data no formato YYYY-MM-DD
     const date = new Date(year, month - 1, day!);
-    if (
-      date.getDate() !== day ||
-      date.getMonth() !== month - 1 ||
-      date.getFullYear() !== year
-    ) {
+    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
       throw new BadRequestException(
         'Invalid date. Please ensure it is a valid date in the format DD/MM/YYYY.',
       );

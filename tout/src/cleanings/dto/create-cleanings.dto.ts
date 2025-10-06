@@ -1,10 +1,4 @@
-import {
-  IsInt,
-  IsNotEmpty,
-  IsDecimal,
-  IsDate,
-  IsString,
-} from 'class-validator';
+import { IsInt, IsNotEmpty, IsDecimal, IsDate, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Prisma } from '@client-online';
 
@@ -45,8 +39,7 @@ export class CreateCleaningsDto {
   @IsDecimal(
     { decimal_digits: '2' },
     {
-      message:
-        'A média diária de limpeza deve ser um número decimal com duas casas decimais',
+      message: 'A média diária de limpeza deve ser um número decimal com duas casas decimais',
     },
   )
   @IsNotEmpty({ message: 'A média diária de limpeza é obrigatória' })

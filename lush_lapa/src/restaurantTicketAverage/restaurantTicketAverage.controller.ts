@@ -1,27 +1,13 @@
 import { PeriodEnum } from '@client-online';
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Query,
-} from '@nestjs/common';
-import {
-  ApiBadRequestResponse,
-  ApiNotFoundResponse,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { RestaurantTicketAverage } from './entities/restaurantTicketAverage.entity';
 import { RestaurantTicketAverageService } from './restaurantTicketAverage.service';
 
 @ApiTags('RestaurantTicketAverage')
 @Controller('RestaurantTicketAverage')
 export class RestaurantTicketAverageController {
-  constructor(
-    private readonly restaurantTicketAverageService: RestaurantTicketAverageService,
-  ) {}
+  constructor(private readonly restaurantTicketAverageService: RestaurantTicketAverageService) {}
 
   @Get('create-and-find-all-restaurant-ticket-average')
   @HttpCode(HttpStatus.OK)
@@ -43,8 +29,7 @@ export class RestaurantTicketAverageController {
   @ApiQuery({
     name: 'period',
     required: false,
-    description:
-      'Período para qual o ticket médio de restaurante será calculada',
+    description: 'Período para qual o ticket médio de restaurante será calculada',
     example: 'LAST_7_D',
     enum: PeriodEnum,
   })
@@ -79,32 +64,21 @@ export class RestaurantTicketAverageController {
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException(
-        `Failed to create all RestaurantSales: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to create all RestaurantSales: ${errorMessage}`);
     }
   }
 
-  private convertToDate(
-    dateStr?: string,
-    isEndDate: boolean = false,
-  ): Date | undefined {
+  private convertToDate(dateStr?: string, isEndDate: boolean = false): Date | undefined {
     if (!dateStr) return undefined;
 
     const [day, month, year] = dateStr.split('/').map(Number);
-    if (isNaN(day)|| isNaN(month) || isNaN(year)) {
-      throw new BadRequestException(
-        'Invalid date format. Please use DD/MM/YYYY.',
-      );
+    if (isNaN(day) || isNaN(month) || isNaN(year)) {
+      throw new BadRequestException('Invalid date format. Please use DD/MM/YYYY.');
     }
 
     // Cria a nova data no formato YYYY-MM-DD
     const date = new Date(year, month - 1, day!);
-    if (
-      date.getDate() !== day ||
-      date.getMonth() !== month - 1 ||
-      date.getFullYear() !== year
-    ) {
+    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
       throw new BadRequestException(
         'Invalid date. Please ensure it is a valid date in the format DD/MM/YYYY.',
       );
@@ -130,9 +104,7 @@ export class RestaurantTicketAverageController {
       return await this.restaurantTicketAverageService.handleCron();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException(
-        `Failed to run the cron job: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to run the cron job: ${errorMessage}`);
     }
   }
 }

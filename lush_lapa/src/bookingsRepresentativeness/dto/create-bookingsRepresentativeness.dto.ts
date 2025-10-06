@@ -22,11 +22,7 @@ export class CreateBookingsRepresentativenessDto {
   @IsOptional()
   period?: PeriodEnum;
 
-  constructor(
-    totalAllRepresentativeness: Prisma.Decimal,
-    createdDate: Date,
-    period?: PeriodEnum,
-  ) {
+  constructor(totalAllRepresentativeness: Prisma.Decimal, createdDate: Date, period?: PeriodEnum) {
     this.totalAllRepresentativeness = totalAllRepresentativeness;
     this.createdDate = createdDate;
     this.period = period;

@@ -48,8 +48,7 @@ export class CreateKpiTotalRentalsDto {
     required: false,
   })
   @IsInt({
-    message:
-      'O total de todas as locações de apartamentos deve ser um número inteiro',
+    message: 'O total de todas as locações de apartamentos deve ser um número inteiro',
   })
   @IsOptional()
   totalAllRentalsApartments?: number;

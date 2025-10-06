@@ -23,10 +23,7 @@ export class CronJobsController {
       return result;
     } catch (error) {
       if (error.message.includes('já está em execução')) {
-        throw new HttpException(
-          error.message,
-          HttpStatus.CONFLICT,
-        );
+        throw new HttpException(error.message, HttpStatus.CONFLICT);
       }
       throw new HttpException(
         'Erro ao iniciar cron jobs em background: ' + error.message,
@@ -50,15 +47,14 @@ export class CronJobsController {
       const status = await this.cronJobsService.getJobStatus(jobId);
       return status;
     } catch (error) {
-      throw new HttpException(
-        error.message,
-        HttpStatus.NOT_FOUND,
-      );
+      throw new HttpException(error.message, HttpStatus.NOT_FOUND);
     }
   }
 
   @Get('execute-sync')
-  @ApiOperation({ summary: '[DEPRECATED] Executa cron jobs sincronamente - USAR APENAS PARA TESTES' })
+  @ApiOperation({
+    summary: '[DEPRECATED] Executa cron jobs sincronamente - USAR APENAS PARA TESTES',
+  })
   @ApiResponse({
     status: 200,
     description: 'Cron jobs executados sincronamente.',

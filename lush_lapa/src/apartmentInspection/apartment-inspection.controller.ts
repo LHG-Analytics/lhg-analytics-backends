@@ -1,26 +1,12 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Query,
-} from '@nestjs/common';
-import {
-  ApiBadRequestResponse,
-  ApiNotFoundResponse,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PeriodEnum } from '@client-online';
 import { ApartmentInspectionService } from './apartment-inspection.service';
 
 @ApiTags('Inspections')
 @Controller('Inspections')
 export class ApartmentInspectionController {
-  constructor(
-    private readonly ApartmentInspectionService: ApartmentInspectionService,
-  ) {}
+  constructor(private readonly ApartmentInspectionService: ApartmentInspectionService) {}
 
   @Get('find-all-inspections')
   @ApiQuery({
@@ -56,44 +42,27 @@ export class ApartmentInspectionController {
       const end = this.convertToDate(endDate, true); // Data final, ajustando horário
 
       if (!start! || !end) {
-        throw new BadRequestException(
-          'Both startDate and endDate parameters are required.',
-        );
+        throw new BadRequestException('Both startDate and endDate parameters are required.');
       }
 
       // Chama o serviço para buscar os dados com base nos parâmetros fornecidos
-      return await this.ApartmentInspectionService.findAllInspections(
-        start,
-        end,
-        period,
-      );
+      return await this.ApartmentInspectionService.findAllInspections(start, end, period);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException(
-        `Failed to fetch inspections: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to fetch inspections: ${errorMessage}`);
     }
   }
 
-  private convertToDate(
-    dateStr?: string,
-    isEndDate: boolean = false,
-  ): Date | undefined {
+  private convertToDate(dateStr?: string, isEndDate: boolean = false): Date | undefined {
     if (!dateStr) return undefined;
 
     const [day, month, year] = dateStr.split('/').map(Number);
-    if (isNaN(day)|| isNaN(month) || isNaN(year)) {
-      throw new BadRequestException(
-        'Invalid date format. Please use DD/MM/YYYY.',
-      );
+    if (isNaN(day) || isNaN(month) || isNaN(year)) {
+      throw new BadRequestException('Invalid date format. Please use DD/MM/YYYY.');
     }
 
     const date = new Date(year, month - 1, day!);
-    if (
-      date.getDate() !== day ||
-      date.getMonth() !== month - 1 ||
-      date.getFullYear() !== year
-    ) {
+    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
       throw new BadRequestException(
         'Invalid date. Please ensure it is a valid date in the format DD/MM/YYYY.',
       );
@@ -118,9 +87,7 @@ export class ApartmentInspectionController {
       return await this.ApartmentInspectionService.handleCron();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException(
-        `Failed to run the cron job: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to run the cron job: ${errorMessage}`);
     }
   }
 }

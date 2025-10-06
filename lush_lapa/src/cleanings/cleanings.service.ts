@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -19,11 +15,7 @@ import { Cron } from '@nestjs/schedule';
 export class CleaningsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAllCleanings(
-    startDate: Date,
-    endDate: Date,
-    period?: PeriodEnum,
-  ): Promise<any> {
+  async findAllCleanings(startDate: Date, endDate: Date, period?: PeriodEnum): Promise<any> {
     try {
       const companyId = 1; // Defina o ID da empresa conforme necessário
 
@@ -40,37 +32,36 @@ export class CleaningsService {
       currentDate.setUTCHours(4, 0, 0, 0); // Início do dia contábil às 04:00:00
 
       // Obtendo os dados de limpeza dentro do período fornecido
-      const cleanings =
-        await this.prisma.prismaLocal.apartmentCleaning.findMany({
-          where: {
-            startDate: {
-              gte: startDate,
-              lte: endDate,
-            },
-            endDate: {
-              not: null, // Excluir registros onde endDate é null
-            },
-            reasonEnd: {
-              equals: 'COMPLETA',
-            },
+      const cleanings = await this.prisma.prismaLocal.apartmentCleaning.findMany({
+        where: {
+          startDate: {
+            gte: startDate,
+            lte: endDate,
           },
-          include: {
-            employee: {
-              include: {
-                personPaper: {
-                  where: {
-                    idResponsibleDeletion: {
-                      equals: null,
-                    },
+          endDate: {
+            not: null, // Excluir registros onde endDate é null
+          },
+          reasonEnd: {
+            equals: 'COMPLETA',
+          },
+        },
+        include: {
+          employee: {
+            include: {
+              personPaper: {
+                where: {
+                  idResponsibleDeletion: {
+                    equals: null,
                   },
-                  include: {
-                    person: true,
-                  },
+                },
+                include: {
+                  person: true,
                 },
               },
             },
           },
-        });
+        },
+      });
 
       if (!cleanings || cleanings.length === 0) {
         throw new NotFoundException('No cleaning data found.');
@@ -95,7 +86,7 @@ export class CleaningsService {
         const totalSeconds = hour * 3600 + minute * 60;
 
         for (const [shift, { start, end }] of Object.entries(shifts)) {
-          if (totalSeconds >= start&& totalSeconds <= end) {
+          if (totalSeconds >= start && totalSeconds <= end) {
             return shift;
           }
         }
@@ -103,11 +94,7 @@ export class CleaningsService {
       };
 
       // Função auxiliar para verificar se a data está dentro do intervalo
-      const isWithinDateRange = (
-        date: Date,
-        startDate: Date,
-        endDate: Date,
-      ): boolean => {
+      const isWithinDateRange = (date: Date, startDate: Date, endDate: Date): boolean => {
         return date >= startDate && date <= endDate;
       };
 
@@ -128,8 +115,7 @@ export class CleaningsService {
       // Agrupar dados
       for (const cleaning of cleanings) {
         const workDay = cleaning.startDate.toISOString().split('T')[0];
-        const employeeName =
-          cleaning.employee?.personPaper?.person.name || 'Desconhecido';
+        const employeeName = cleaning.employee?.personPaper?.person.name || 'Desconhecido';
         const businessStartTime = cleaning.employee?.businessStartTime; // Supondo que essa propriedade exista
 
         // Verifica se a data de limpeza está dentro do intervalo fornecido
@@ -185,7 +171,7 @@ export class CleaningsService {
 
           // Insere o KPI de limpezas por período
           await this.insertCleanings({
-            employeeName: employeeName || "",
+            employeeName: employeeName || '',
             shift: shift, // Adicionando o turno correspondente
             averageDailyCleaning: new Prisma.Decimal(data['Média por dia']),
             totalDaysWorked: totalDaysWorked,
@@ -221,7 +207,7 @@ export class CleaningsService {
         employeeName_createdDate_period: {
           period: data.period as PeriodEnum as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
-          employeeName: data.employeeName || "",
+          employeeName: data.employeeName || '',
         },
       },
       create: {
@@ -258,21 +244,20 @@ export class CleaningsService {
         }
 
         // Obtendo os dados de limpeza dentro do período fornecido
-        const cleanings =
-          await this.prisma.prismaLocal.apartmentCleaning.findMany({
-            where: {
-              startDate: {
-                gte: currentDate,
-                lte: nextDate,
-              },
-              endDate: {
-                not: null, // Excluir registros onde endDate é null
-              },
-              reasonEnd: {
-                equals: 'COMPLETA',
-              },
+        const cleanings = await this.prisma.prismaLocal.apartmentCleaning.findMany({
+          where: {
+            startDate: {
+              gte: currentDate,
+              lte: nextDate,
             },
-          });
+            endDate: {
+              not: null, // Excluir registros onde endDate é null
+            },
+            reasonEnd: {
+              equals: 'COMPLETA',
+            },
+          },
+        });
 
         // Contar o total de limpezas para o período atual
         const totalCleaningsForCurrentPeriod = cleanings.length;
@@ -280,10 +265,7 @@ export class CleaningsService {
         // Adicionar o resultado ao objeto de resultados
         const dateKey = currentDate.toISOString().split('T')[0];
         results[dateKey] = {
-          totalCleanings:
-            totalCleaningsForCurrentPeriod > 0
-              ? totalCleaningsForCurrentPeriod
-              : 0,
+          totalCleanings: totalCleaningsForCurrentPeriod > 0 ? totalCleaningsForCurrentPeriod : 0,
         };
 
         // Criar data para armazenar no banco de dados
@@ -325,9 +307,7 @@ export class CleaningsService {
     }
   }
 
-  private async insertCleaningsByPeriod(
-    data: cleaningsByPeriod,
-  ): Promise<cleaningsByPeriod> {
+  private async insertCleaningsByPeriod(data: cleaningsByPeriod): Promise<cleaningsByPeriod> {
     return this.prisma.prismaOnline.cleaningsByPeriod.upsert({
       where: {
         period_createdDate: {
@@ -360,29 +340,28 @@ export class CleaningsService {
       const endDateAdjusted = moment.tz(endDate, timezone);
 
       // Obter limpezas
-      const cleanings =
-        await this.prisma.prismaLocal.apartmentCleaning.findMany({
-          where: {
-            startDate: { gte: startDate, lte: endDate },
-            endDate: { not: null }, // Excluir registros onde endDate é null
-          },
-          include: {
-            employee: {
-              include: {
-                personPaper: {
-                  where: {
-                    idResponsibleDeletion: {
-                      equals: null,
-                    },
+      const cleanings = await this.prisma.prismaLocal.apartmentCleaning.findMany({
+        where: {
+          startDate: { gte: startDate, lte: endDate },
+          endDate: { not: null }, // Excluir registros onde endDate é null
+        },
+        include: {
+          employee: {
+            include: {
+              personPaper: {
+                where: {
+                  idResponsibleDeletion: {
+                    equals: null,
                   },
-                  include: {
-                    person: true,
-                  },
+                },
+                include: {
+                  person: true,
                 },
               },
             },
           },
-        });
+        },
+      });
 
       if (!cleanings || cleanings.length === 0) {
         throw new NotFoundException('No cleaning data found.');
@@ -404,8 +383,7 @@ export class CleaningsService {
         const totalSeconds = hour * 3600 + minute * 60;
         return (
           Object.entries(shifts).find(
-            ([_, { start, end }]) =>
-              totalSeconds >= start && totalSeconds <= end,
+            ([_, { start, end }]) => totalSeconds >= start && totalSeconds <= end,
           )?.[0] || null
         );
       };
@@ -426,11 +404,7 @@ export class CleaningsService {
         Noite: new Set<number>(),
       };
 
-      const excludedShifts = new Set([
-        'EXTRA MANHA',
-        'EXTRA TARDE',
-        'EXTRA NOITE',
-      ]);
+      const excludedShifts = new Set(['EXTRA MANHA', 'EXTRA TARDE', 'EXTRA NOITE']);
 
       for (const cleaning of cleanings) {
         const workDay = moment.tz(cleaning.startDate, timezone).format('dddd'); // Dia da semana em português
@@ -438,7 +412,7 @@ export class CleaningsService {
         if (!businessStartTime) continue; // Pula para a próxima iteração se businessStartTime não existir
         const shift = getShiftByBusinessStartTime(businessStartTime);
 
-        if (shift&& !excludedShifts.has(shift)) {
+        if (shift && !excludedShifts.has(shift)) {
           // Verifica se o turno não está na lista de excluídos
           // Inicializa os dados para o turno e dia, se ainda não existirem
           if (!cleaningsByShiftAndDay[shift][workDay]) {
@@ -475,16 +449,12 @@ export class CleaningsService {
 
         for (const day in cleaningsByShiftAndDay[shift]) {
           const dayData = cleaningsByShiftAndDay[shift][day];
-          const averageDailyWeekCleaning = (
-            dayData.totalCleanings / dayCountMap[day]
-          ).toFixed(2);
-          cleaningsByShiftAndDay[shift][day].averageDailyWeekCleaning =
-            +averageDailyWeekCleaning;
+          const averageDailyWeekCleaning = (dayData.totalCleanings / dayCountMap[day]).toFixed(2);
+          cleaningsByShiftAndDay[shift][day].averageDailyWeekCleaning = +averageDailyWeekCleaning;
 
           // Acumula a média diária para cada dia da semana
           totals.totalAverageDailyWeekCleaning[day] =
-            (totals.totalAverageDailyWeekCleaning[day] || 0) +
-            +averageDailyWeekCleaning;
+            (totals.totalAverageDailyWeekCleaning[day] || 0) + +averageDailyWeekCleaning;
 
           // Preparar dados para inserção
           const createdDate = moment
@@ -498,7 +468,7 @@ export class CleaningsService {
             totalSuitesCleanings: dayData.totalCleanings,
             averageDailyWeekCleaning: new Prisma.Decimal(+averageDailyWeekCleaning),
             totalAverageDailyWeekCleaning: new Prisma.Decimal(
-              +totals.totalAverageDailyWeekCleaning[day].toFixed(2)
+              +totals.totalAverageDailyWeekCleaning[day].toFixed(2),
             ), // Use o valor acumulado
             totalAverageShiftCleaning: new Prisma.Decimal(0),
             totalAllAverageShiftCleaning: new Prisma.Decimal(0),
@@ -523,12 +493,10 @@ export class CleaningsService {
           cleaningsByShiftAndDay[shift].totalAverageShiftCleaning / 9,
         );
 
-        totals.totalIdealShiftMaid +=
-          cleaningsByShiftAndDay[shift].idealShiftMaid;
+        totals.totalIdealShiftMaid += cleaningsByShiftAndDay[shift].idealShiftMaid;
         (cleaningsByShiftAndDay as any)[shift].realShiftMaid =
           (uniqueEmployeesByShift as any)[shift]?.size ?? 0;
-        totals.totalRealShiftMaid +=
-          cleaningsByShiftAndDay[shift].realShiftMaid;
+        totals.totalRealShiftMaid += cleaningsByShiftAndDay[shift].realShiftMaid;
         cleaningsByShiftAndDay[shift].difference =
           cleaningsByShiftAndDay[shift].realShiftMaid -
           cleaningsByShiftAndDay[shift].idealShiftMaid;
@@ -547,12 +515,10 @@ export class CleaningsService {
       // Atualiza dados de inserção com os totais calculados
       for (const data of insertData) {
         data.totalAverageShiftCleaning = new Prisma.Decimal(
-          +cleaningsByShiftAndDay[data.shift].totalAverageShiftCleaning.toFixed(
-            2,
-          )
+          +cleaningsByShiftAndDay[data.shift].totalAverageShiftCleaning.toFixed(2),
         );
         data.totalAllAverageShiftCleaning = new Prisma.Decimal(
-          +totals.totalAllAverageShiftCleaning.toFixed(2)
+          +totals.totalAllAverageShiftCleaning.toFixed(2),
         );
         data.totalIdealShiftMaid = totals.totalIdealShiftMaid;
         data.totalRealShiftMaid = totals.totalRealShiftMaid;
@@ -560,11 +526,9 @@ export class CleaningsService {
         data.totalDifference = totals.totalDifference;
 
         // Atribuir o valor correto de totalAverageDailyWeekCleaning com base no dia da semana
-        const createdDayOfWeek = moment
-          .tz(data.createdDate, timezone)
-          .format('dddd');
+        const createdDayOfWeek = moment.tz(data.createdDate, timezone).format('dddd');
         data.totalAverageDailyWeekCleaning = new Prisma.Decimal(
-          totals.totalAverageDailyWeekCleaning[createdDayOfWeek] || 0
+          totals.totalAverageDailyWeekCleaning[createdDayOfWeek] || 0,
         ); // Atribui o valor correto
       }
 
@@ -572,12 +536,10 @@ export class CleaningsService {
       cleaningsByShiftAndDay.Totals = {
         ...totals,
         totalAverageDailyWeekCleaning: Object.fromEntries(
-          Object.entries(totals.totalAverageDailyWeekCleaning).map(
-            ([day, value]) => {
-              const numericValue = typeof value === 'number' ? value : 0;
-              return [day, +numericValue.toFixed(2)];
-            },
-          ),
+          Object.entries(totals.totalAverageDailyWeekCleaning).map(([day, value]) => {
+            const numericValue = typeof value === 'number' ? value : 0;
+            return [day, +numericValue.toFixed(2)];
+          }),
         ),
       };
 
@@ -593,9 +555,7 @@ export class CleaningsService {
     }
   }
 
-  private async insertCleaningsByWeek(
-    data: cleaningsByWeek,
-  ): Promise<cleaningsByWeek> {
+  private async insertCleaningsByWeek(data: cleaningsByWeek): Promise<cleaningsByWeek> {
     return this.prisma.prismaOnline.cleaningsByWeek.upsert({
       where: {
         period_shift_createdDate: {
@@ -638,47 +598,44 @@ export class CleaningsService {
         };
 
         for (const [shift, { start, end }] of Object.entries(shifts)) {
-          if (totalSeconds >= start&& totalSeconds <= end) return shift;
+          if (totalSeconds >= start && totalSeconds <= end) return shift;
         }
 
         return 'Horário Indefinido';
       };
 
-      let currentDate = moment.utc(startDate).startOf('day' ).add(6, 'hours');
+      let currentDate = moment.utc(startDate).startOf('day').add(6, 'hours');
 
       while (currentDate.isBefore(moment.utc(endDate))) {
         const nextDate = currentDate.clone().add(1, 'day').subtract(1, 'ms');
 
-        const cleanings =
-          await this.prisma.prismaLocal.apartmentCleaning.findMany({
-            where: {
-              startDate: { gte: currentDate.toDate(), lte: nextDate.toDate() },
-              endDate: { not: null },
-              reasonEnd: { equals: 'COMPLETA' },
-            },
-            include: {
-              employee: {
-                include: {
-                  personPaper: {
-                    where: {
-                      idResponsibleDeletion: {
-                        equals: null,
-                      },
+        const cleanings = await this.prisma.prismaLocal.apartmentCleaning.findMany({
+          where: {
+            startDate: { gte: currentDate.toDate(), lte: nextDate.toDate() },
+            endDate: { not: null },
+            reasonEnd: { equals: 'COMPLETA' },
+          },
+          include: {
+            employee: {
+              include: {
+                personPaper: {
+                  where: {
+                    idResponsibleDeletion: {
+                      equals: null,
                     },
-                    include: {
-                      person: true,
-                    },
+                  },
+                  include: {
+                    person: true,
                   },
                 },
               },
             },
-          });
+          },
+        });
 
         cleanings.forEach((cleaning: any) => {
-          const employeeName =
-            cleaning.employee?.personPaper?.person?.name || 'Desconhecido';
-          const businessStartTime =
-            cleaning.employee?.businessStartTime || null;
+          const employeeName = cleaning.employee?.personPaper?.person?.name || 'Desconhecido';
+          const businessStartTime = cleaning.employee?.businessStartTime || null;
           const shift = determineShift(businessStartTime);
 
           const dateKey =
@@ -688,8 +645,7 @@ export class CleaningsService {
 
           if (!results[shift]) results[shift] = {};
           if (!results[shift][dateKey]) results[shift][dateKey] = {};
-          if (!results[shift][dateKey][employeeName])
-            results[shift][dateKey][employeeName] = 0;
+          if (!results[shift][dateKey][employeeName]) results[shift][dateKey][employeeName] = 0;
 
           results[shift][dateKey][employeeName]++;
         });
@@ -698,9 +654,7 @@ export class CleaningsService {
       }
 
       if (period === 'LAST_6_M') {
-        const referenceDate = moment
-          .tz('America/Sao_Paulo')
-          .subtract(1, 'days');
+        const referenceDate = moment.tz('America/Sao_Paulo').subtract(1, 'days');
         const monthsToProcess = Array.from(
           { length: 6 },
           (_: any, i: any) =>
@@ -742,12 +696,8 @@ export class CleaningsService {
       } else {
         for (const [shift, groups] of Object.entries(results)) {
           for (const [groupKey, employees] of Object.entries(groups)) {
-            for (const [employeeName, totalCleanings] of Object.entries(
-              employees,
-            )) {
-              const createdDateWithTime = moment
-                .utc(groupKey, 'YYYY-MM-DD')
-                .endOf('day' );
+            for (const [employeeName, totalCleanings] of Object.entries(employees)) {
+              const createdDateWithTime = moment.utc(groupKey, 'YYYY-MM-DD').endOf('day');
 
               const data = {
                 period,
@@ -788,7 +738,7 @@ export class CleaningsService {
         period_createdDate_employeeName: {
           period: data.period as PeriodEnum as PeriodEnum as PeriodEnum,
           createdDate: data.createdDate,
-          employeeName: data.employeeName || "",
+          employeeName: data.employeeName || '',
         },
       },
       create: {
@@ -816,20 +766,16 @@ export class CleaningsService {
     startDateLast7Days.setHours(4, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast7Days,
-      endDate: parsedEndDateLast7Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast7Days),
-      this.formatDateString(endDateLast7Days),
-    );
+    const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
     previousStartDateLast7Days.setHours(4, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -842,12 +788,8 @@ export class CleaningsService {
     );
 
     // Log para verificar as datas
-    const startTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob Cleanings - últimos 7 dias: ${startTimeLast7Days}`,
-    );
+    const startTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob Cleanings - últimos 7 dias: ${startTimeLast7Days}`);
 
     // Chamar a função para o período atual
     await this.findAllCleanings(
@@ -880,12 +822,8 @@ export class CleaningsService {
       PeriodEnum.LAST_7_D,
     );
 
-    const endTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob Cleanings - últimos 7 dias: ${endTimeLast7Days}`,
-    );
+    const endTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob Cleanings - últimos 7 dias: ${endTimeLast7Days}`);
 
     // Últimos 30 dias
     const endDateLast30Days = currentDate;
@@ -896,22 +834,16 @@ export class CleaningsService {
     startDateLast30Days.setHours(4, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast30Days,
-      endDate: parsedEndDateLast30Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast30Days),
-      this.formatDateString(endDateLast30Days),
-    );
+    const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
     previousStartDateLast30Days.setHours(4, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -924,12 +856,8 @@ export class CleaningsService {
     );
 
     // Log para verificar as datas
-    const startTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob Cleanings - últimos 30 dias: ${startTimeLast30Days}`,
-    );
+    const startTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob Cleanings - últimos 30 dias: ${startTimeLast30Days}`);
 
     // Chamar a função para o período atual
     await this.findAllCleanings(
@@ -962,12 +890,8 @@ export class CleaningsService {
       PeriodEnum.LAST_30_D,
     );
 
-    const endTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob Cleanings - últimos 30 dias: ${endTimeLast30Days}`,
-    );
+    const endTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob Cleanings - últimos 30 dias: ${endTimeLast30Days}`);
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = currentDate;
@@ -978,22 +902,16 @@ export class CleaningsService {
     startDateLast6Months.setHours(4, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast6Months,
-      endDate: parsedEndDateLast6Months,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast6Months),
-      this.formatDateString(endDateLast6Months),
-    );
+    const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
-    const previousStartDateLast6Months = new Date(
-      previousParsedEndDateLast6Months,
-    );
-    previousStartDateLast6Months.setMonth(
-      previousStartDateLast6Months.getMonth() - 6,
-    );
+    const previousStartDateLast6Months = new Date(previousParsedEndDateLast6Months);
+    previousStartDateLast6Months.setMonth(previousStartDateLast6Months.getMonth() - 6);
     previousStartDateLast6Months.setHours(4, 0, 0, 0); // Configuração de horas
 
     // Parse as datas para o formato desejado
@@ -1006,12 +924,8 @@ export class CleaningsService {
     );
 
     // Log para verificar as datas
-    const startTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob Cleanings - últimos 6 meses: ${startTimeLast6Months}`,
-    );
+    const startTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob Cleanings - últimos 6 meses: ${startTimeLast6Months}`);
 
     // Chamar a função para o período atual
     await this.findAllCleanings(
@@ -1044,12 +958,8 @@ export class CleaningsService {
       PeriodEnum.LAST_6_M,
     );
 
-    const endTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob Cleanings - últimos 6 meses: ${endTimeLast6Months}`,
-    );
+    const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob Cleanings - últimos 6 meses: ${endTimeLast6Months}`);
   }
 
   private formatDateString(date: Date): string {
@@ -1068,9 +978,7 @@ export class CleaningsService {
     const [startDay, startMonth, startYear] = startDateString.split('/');
     const [endDay, endMonth, endYear] = endDateString.split('/');
 
-    const parsedStartDate = new Date(
-      Date.UTC(+startYear, +startMonth - 1, +startDay),
-    );
+    const parsedStartDate = new Date(Date.UTC(+startYear, +startMonth - 1, +startDay));
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
     parsedStartDate.setUTCHours(4, 0, 0, 0); // Define início às 04:00

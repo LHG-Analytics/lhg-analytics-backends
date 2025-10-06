@@ -1,27 +1,23 @@
 // tsconfig.base.json (RAIZ DO PROJETO)
 {
-    "compilerOptions": {
-        "module": "commonjs",
-        "target": "ES2021",
-        "strict": true,
-        "sourceMap": true,
-        "declaration": false,
-        "removeComments": true,
-        "emitDecoratorMetadata": true,
-        "experimentalDecorators": true,
-        "allowSyntheticDefaultImports": true,
-        "skipLibCheck": true,
-        "useUnknownInCatchVariables": false,
-        "forceConsistentCasingInFileNames": true,
-        "incremental": true,
-        "baseUrl": ".",
-        "paths": {
-            "@auth/*": [
-                "authentication/src/*"
-            ],
-            "@/*": [
-                "./*"
-            ]
-        }
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2021",
+    "strict": true,
+    "sourceMap": true,
+    "declaration": false,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "useUnknownInCatchVariables": false,
+    "forceConsistentCasingInFileNames": true,
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@auth/*": ["authentication/src/*"],
+      "@/*": ["./*"]
     }
+  }
 }

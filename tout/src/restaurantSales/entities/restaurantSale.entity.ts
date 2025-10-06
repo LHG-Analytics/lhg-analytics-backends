@@ -1,8 +1,6 @@
 import { PeriodEnum, Prisma } from '@client-online';
 
-export class RestaurantSales
-  implements Prisma.RestaurantSalesUncheckedCreateInput
-{
+export class RestaurantSales implements Prisma.RestaurantSalesUncheckedCreateInput {
   id?: number;
   period?: PeriodEnum | null;
   companyId: number;
@@ -24,9 +22,7 @@ export class RestaurantSales
   }
 }
 
-export class RestaurantSalesRanking
-  implements Prisma.RestaurantSalesRankingUncheckedCreateInput
-{
+export class RestaurantSalesRanking implements Prisma.RestaurantSalesRankingUncheckedCreateInput {
   id?: number;
   period?: PeriodEnum | null;
   companyId: number;

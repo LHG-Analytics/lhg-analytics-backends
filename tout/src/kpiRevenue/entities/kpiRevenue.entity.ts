@@ -58,9 +58,7 @@ export class KpiRevenue implements Prisma.KpiRevenueUncheckedCreateInput {
   }
 }
 
-export class KpiRevenueByRentalType
-  implements Prisma.KpiRevenueByRentalTypeUncheckedCreateInput
-{
+export class KpiRevenueByRentalType implements Prisma.KpiRevenueByRentalTypeUncheckedCreateInput {
   id?: number;
   period?: PeriodEnum | null;
   rentalType?: RentalTypeEnum;
@@ -85,9 +83,7 @@ export class KpiRevenueByRentalType
   }
 }
 
-export class KpiRevenueByPeriod
-  implements Prisma.KpiRevenueByPeriodUncheckedCreateInput
-{
+export class KpiRevenueByPeriod implements Prisma.KpiRevenueByPeriodUncheckedCreateInput {
   id?: number;
   period?: PeriodEnum | null;
   totalValue: Prisma.Decimal;

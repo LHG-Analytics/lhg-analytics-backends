@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,11 +9,7 @@ import * as moment from 'moment-timezone';
 export class KpiGiroService {
   constructor(private prisma: PrismaService) {}
 
-  async findAllKpiGiro(
-    startDate: Date,
-    endDate: Date,
-    period?: PeriodEnum,
-  ): Promise<any[]> {
+  async findAllKpiGiro(startDate: Date, endDate: Date, period?: PeriodEnum): Promise<any[]> {
     try {
       const companyId = 1; // Defina o ID da empresa conforme necessário
 
@@ -54,14 +46,7 @@ export class KpiGiroService {
         this.prisma.prismaLocal.suiteCategory.findMany({
           where: {
             description: {
-              in: [
-                'ESPUMA LOUNGE',
-                'POP COPAN',
-                'POP',
-                'LOVE',
-                'ESPUMA COPAN',
-                'ESPUMA',
-              ],
+              in: ['ESPUMA LOUNGE', 'POP COPAN', 'POP', 'LOVE', 'ESPUMA COPAN', 'ESPUMA'],
             },
           },
           include: {
@@ -92,10 +77,7 @@ export class KpiGiroService {
         totalSuites += suitesInCategoryCount;
 
         for (const rentalApartment of allRentalApartments) {
-          if (
-            rentalApartment.suiteStates.suite.suiteCategoryId ===
-            suiteCategory.id
-          ) {
+          if (rentalApartment.suiteStates.suite.suiteCategoryId === suiteCategory.id) {
             const categoryData = categoryTotalsMap[suiteCategory.id];
 
             // Incrementa o número de locações para a categoria
@@ -105,16 +87,10 @@ export class KpiGiroService {
         }
 
         // Cálculo do giro para a categoria
-        if (
-          categoryTotalsMap[suiteCategory.id].rentalsCount > 0 &&
-          suitesInCategoryCount > 0
-        ) {
-          const days =
-            (adjustedEndDate.getTime() - startDate.getTime()) / (1000 * 86400); // Número de dias
+        if (categoryTotalsMap[suiteCategory.id].rentalsCount > 0 && suitesInCategoryCount > 0) {
+          const days = (adjustedEndDate.getTime() - startDate.getTime()) / (1000 * 86400); // Número de dias
           const giro =
-            categoryTotalsMap[suiteCategory.id].rentalsCount /
-            suitesInCategoryCount /
-            days;
+            categoryTotalsMap[suiteCategory.id].rentalsCount / suitesInCategoryCount / days;
 
           categoryTotalsMap[suiteCategory.id].giroTotal += giro;
         }
@@ -138,8 +114,7 @@ export class KpiGiroService {
           totalGiro: new Prisma.Decimal(
             allRentals /
               (totalSuites || 1) /
-              ((adjustedEndDate.getTime() - startDate.getTime()) /
-                (1000 * 86400)),
+              ((adjustedEndDate.getTime() - startDate.getTime()) / (1000 * 86400)),
           ), // Cálculo do totalGiro médio
           createdDate: createdDate, // Usar a data ajustada
           period: period || null,
@@ -211,9 +186,7 @@ export class KpiGiroService {
 
       // Configuração do cálculo dos dias da semana por período
       if (period === PeriodEnum.LAST_6_M) {
-        const sixMonthsAgo = moment(currentDate)
-          .subtract(5, 'months')
-          .startOf('month');
+        const sixMonthsAgo = moment(currentDate).subtract(5, 'months').startOf('month');
 
         while (sixMonthsAgo.isBefore(endDateAdjusted)) {
           const dayOfWeek = sixMonthsAgo.format('dddd');
@@ -231,46 +204,38 @@ export class KpiGiroService {
       }
 
       // Obter dados necessários usando $transaction
-      const [suiteCategories, occupiedSuites] =
-        await this.prisma.prismaLocal.$transaction([
-          this.prisma.prismaLocal.suiteCategory.findMany({
-            where: {
-              description: {
-                in: [
-                  'ESPUMA LOUNGE',
-                  'POP COPAN',
-                  'POP',
-                  'LOVE',
-                  'ESPUMA COPAN',
-                  'ESPUMA',
-                ],
-              },
+      const [suiteCategories, occupiedSuites] = await this.prisma.prismaLocal.$transaction([
+        this.prisma.prismaLocal.suiteCategory.findMany({
+          where: {
+            description: {
+              in: ['ESPUMA LOUNGE', 'POP COPAN', 'POP', 'LOVE', 'ESPUMA COPAN', 'ESPUMA'],
             },
-            include: {
-              suites: true,
+          },
+          include: {
+            suites: true,
+          },
+        }),
+        this.prisma.prismaLocal.rentalApartment.findMany({
+          where: {
+            checkIn: {
+              gte: startDate,
+              lte: endDate,
             },
-          }),
-          this.prisma.prismaLocal.rentalApartment.findMany({
-            where: {
-              checkIn: {
-                gte: startDate,
-                lte: endDate,
-              },
-              endOccupationType: 'FINALIZADA',
-            },
-            include: {
-              suiteStates: {
-                include: {
-                  suite: {
-                    include: {
-                      suiteCategories: true,
-                    },
+            endOccupationType: 'FINALIZADA',
+          },
+          include: {
+            suiteStates: {
+              include: {
+                suite: {
+                  include: {
+                    suiteCategories: true,
                   },
                 },
               },
             },
-          }),
-        ]);
+          },
+        }),
+      ]);
 
       if (!Array.isArray(suiteCategories) || suiteCategories.length === 0) {
         throw new Error('Nenhuma categoria de suíte encontrada');
@@ -309,8 +274,7 @@ export class KpiGiroService {
         }
 
         // Incrementa o número de locações para a categoria e dia da semana
-        kpiGiroByCategoryAndDay[suiteCategoryDescription][dayOfWeek]
-          .rentalsCount++;
+        kpiGiroByCategoryAndDay[suiteCategoryDescription][dayOfWeek].rentalsCount++;
         allRentals++;
       }
 
@@ -321,11 +285,8 @@ export class KpiGiroService {
         const suitesInCategoryCount = suiteCategory.suites.length;
         totalSuites += suitesInCategoryCount;
 
-        for (const dayOfWeek in kpiGiroByCategoryAndDay[
-          suiteCategory.description
-        ]) {
-          const categoryData =
-            kpiGiroByCategoryAndDay[suiteCategory.description][dayOfWeek];
+        for (const dayOfWeek in kpiGiroByCategoryAndDay[suiteCategory.description]) {
+          const categoryData = kpiGiroByCategoryAndDay[suiteCategory.description][dayOfWeek];
 
           // Acumular locações por dia da semana
           if (!totalRentalsByDay[dayOfWeek]) {
@@ -336,8 +297,7 @@ export class KpiGiroService {
           // Cálculo do giro para a categoria e dia
           if (categoryData.rentalsCount > 0 && suitesInCategoryCount > 0) {
             const days = dayCountMap[dayOfWeek];
-            const giro =
-              categoryData.rentalsCount / suitesInCategoryCount / days;
+            const giro = categoryData.rentalsCount / suitesInCategoryCount / days;
 
             categoryData.giroTotal = giro;
           } else {
@@ -357,11 +317,8 @@ export class KpiGiroService {
 
       // Agora, após calcular o giro, vamos calcular o totalGiro
       for (const suiteCategory of suiteCategories) {
-        for (const dayOfWeek in kpiGiroByCategoryAndDay[
-          suiteCategory.description
-        ]) {
-          const categoryData =
-            kpiGiroByCategoryAndDay[suiteCategory.description][dayOfWeek];
+        for (const dayOfWeek in kpiGiroByCategoryAndDay[suiteCategory.description]) {
+          const categoryData = kpiGiroByCategoryAndDay[suiteCategory.description][dayOfWeek];
 
           if (!categoryData) continue;
 
@@ -378,11 +335,8 @@ export class KpiGiroService {
 
       // Inserindo dados no banco de dados
       for (const suiteCategory of suiteCategories) {
-        for (const dayOfWeek in kpiGiroByCategoryAndDay[
-          suiteCategory.description
-        ]) {
-          const categoryData =
-            kpiGiroByCategoryAndDay[suiteCategory.description][dayOfWeek];
+        for (const dayOfWeek in kpiGiroByCategoryAndDay[suiteCategory.description]) {
+          const categoryData = kpiGiroByCategoryAndDay[suiteCategory.description][dayOfWeek];
 
           // Sempre insira, mesmo que não haja locações
           await this.insertKpiGiroByWeek({
@@ -436,28 +390,20 @@ export class KpiGiroService {
     const startDateLast7Days = new Date(currentDate); // copiar data atual
     startDateLast7Days.setDate(startDateLast7Days.getDate() - 7); // subtrair 7 dias
 
-    const {
-      startDate: parsedStartDateLast7Days,
-      endDate: parsedEndDateLast7Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast7Days),
-      this.formatDateString(endDateLast7Days),
-    );
+    const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
     previousStartDateLast7Days.setHours(6, 0, 0, 0); // Configuração de horas
 
-    const startTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiGiro - últimos 7 dias: ${startTimeLast7Days}`,
-    );
+    const startTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiGiro - últimos 7 dias: ${startTimeLast7Days}`);
     await this.findAllKpiGiro(
       parsedStartDateLast7Days,
       parsedEndDateLast7Days,
@@ -473,9 +419,7 @@ export class KpiGiroService {
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
     );
-    const endTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
+    const endTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
     console.log(`Final CronJob KpiGiro - últimos 7 dias: ${endTimeLast7Days}`);
 
     // Últimos 30 dias
@@ -483,30 +427,20 @@ export class KpiGiroService {
     const startDateLast30Days = new Date(currentDate); // copiar data atual
     startDateLast30Days.setDate(startDateLast30Days.getDate() - 30); // subtrair 30 dias
 
-    const {
-      startDate: parsedStartDateLast30Days,
-      endDate: parsedEndDateLast30Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast30Days),
-      this.formatDateString(endDateLast30Days),
-    );
+    const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
     previousStartDateLast30Days.setHours(6, 0, 0, 0); // Configuração de horas
 
-    const startTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiGiro - últimos 30 dias: ${startTimeLast30Days}`,
-    );
+    const startTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiGiro - últimos 30 dias: ${startTimeLast30Days}`);
     await this.findAllKpiGiro(
       parsedStartDateLast30Days,
       parsedEndDateLast30Days,
@@ -522,33 +456,25 @@ export class KpiGiroService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
-    const endTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiGiro - últimos 30 dias: ${endTimeLast30Days}`,
-    );
+    const endTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiGiro - últimos 30 dias: ${endTimeLast30Days}`);
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = currentDate; // data atual
     const startDateLast6Months = new Date(currentDate); // copiar data atual
     startDateLast6Months.setDate(startDateLast6Months.getDate() - 180); // subtrair 180 dias
 
-    const {
-      startDate: parsedStartDateLast6Months,
-      endDate: parsedEndDateLast6Months,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast6Months),
-      this.formatDateString(endDateLast6Months),
-    );
+    const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
 
     // Usar moment.js para manipular a data
-    const previousStartDateLast6Months = moment(
-      previousParsedEndDateLast6Months,
-    )
+    const previousStartDateLast6Months = moment(previousParsedEndDateLast6Months)
       .subtract(6, 'months') // Subtrai 6 meses
       .toDate(); // Converte de volta para Date
 
@@ -566,12 +492,8 @@ export class KpiGiroService {
       this.formatDateString(previousParsedEndDateLast6Months),
     );
 
-    const startTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiGiro - últimos 6 meses: ${startTimeLast6Months}`,
-    );
+    const startTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiGiro - últimos 6 meses: ${startTimeLast6Months}`);
     await this.findAllKpiGiro(
       parsedStartDateLast6Months,
       parsedEndDateLast6Months,
@@ -587,12 +509,8 @@ export class KpiGiroService {
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
-    const endTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiGiro - últimos 6 meses: ${endTimeLast6Months}`,
-    );
+    const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiGiro - últimos 6 meses: ${endTimeLast6Months}`);
   }
 
   private formatDateString(date: Date): string {
@@ -610,9 +528,7 @@ export class KpiGiroService {
     const [startDay, startMonth, startYear] = startDateString.split('/');
     const [endDay, endMonth, endYear] = endDateString.split('/');
 
-    const parsedStartDate = new Date(
-      Date.UTC(+startYear, +startMonth - 1, +startDay),
-    );
+    const parsedStartDate = new Date(Date.UTC(+startYear, +startMonth - 1, +startDay));
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
     parsedStartDate.setUTCHours(6, 0, 0, 0);

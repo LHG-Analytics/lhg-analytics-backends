@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as moment from 'moment-timezone';
 import { ChannelTypeEnum, PeriodEnum, Prisma } from '@client-online';
@@ -93,27 +89,20 @@ export class BookingsRevenueService {
     ]);
   }
 
-  async findAllBookingsRevenue(
-    startDate: Date,
-    endDate: Date,
-    period?: PeriodEnum,
-  ): Promise<any> {
+  async findAllBookingsRevenue(startDate: Date, endDate: Date, period?: PeriodEnum): Promise<any> {
     try {
       const companyId = 1;
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       }
 
       // Buscar todas as receitas de reservas no intervalo de datas
-      const [allBookingsRevenue] = await this.fetchKpiData(
-        startDate,
-        adjustedEndDate,
-      );
+      const [allBookingsRevenue] = await this.fetchKpiData(startDate, adjustedEndDate);
 
       if (!allBookingsRevenue || allBookingsRevenue.length === 0) {
         throw new NotFoundException('No booking revenue found.');
@@ -141,15 +130,11 @@ export class BookingsRevenueService {
     } catch (error) {
       console.error('Erro ao buscar Bookings Revenue data:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException(
-        `Failed to fetch Bookings Revenue data: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to fetch Bookings Revenue data: ${errorMessage}`);
     }
   }
 
-  private async insertBookingsRevenue(
-    data: BookingsRevenue,
-  ): Promise<BookingsRevenue> {
+  private async insertBookingsRevenue(data: BookingsRevenue): Promise<BookingsRevenue> {
     return this.prisma.prismaOnline.bookingsRevenue.upsert({
       where: {
         period_createdDate: {
@@ -166,16 +151,12 @@ export class BookingsRevenueService {
     });
   }
 
-  private async calculateRevenueByChannelType(
-    startDate: Date,
-    endDate: Date,
-    period: PeriodEnum,
-  ) {
+  private async calculateRevenueByChannelType(startDate: Date, endDate: Date, period: PeriodEnum) {
     const companyId = 1;
 
     const adjustedEndDate = new Date(endDate);
     if (
-      period === PeriodEnum.LAST_7_D||
+      period === PeriodEnum.LAST_7_D ||
       period === PeriodEnum.LAST_30_D ||
       period === PeriodEnum.LAST_6_M
     ) {
@@ -183,10 +164,7 @@ export class BookingsRevenueService {
     }
 
     // Buscar todas as receitas de reservas e os tipos de origem
-    const [allBookingsRevenue] = await this.fetchKpiData(
-      startDate,
-      adjustedEndDate,
-    );
+    const [allBookingsRevenue] = await this.fetchKpiData(startDate, adjustedEndDate);
 
     if (!allBookingsRevenue || allBookingsRevenue.length === 0) {
       throw new NotFoundException('No booking revenue found.');
@@ -219,9 +197,7 @@ export class BookingsRevenueService {
 
       // Função para verificar se a diferença entre duas datas é de até 1 hora
       const isWithinOneHour = (date1: Date, date2: Date) => {
-        const differenceInMilliseconds = Math.abs(
-          date1.getTime() - date2.getTime(),
-        );
+        const differenceInMilliseconds = Math.abs(date1.getTime() - date2.getTime());
         return differenceInMilliseconds <= 3600000; // 1 hora em milissegundos
       };
 
@@ -361,7 +337,7 @@ export class BookingsRevenueService {
         // Use <= para incluir o último dia
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
@@ -374,29 +350,28 @@ export class BookingsRevenueService {
         }
 
         // Buscar todas as receitas de reservas para o período atual
-        const allBookingsRevenue =
-          await this.prisma.prismaLocal.booking.findMany({
-            where: {
-              dateService: {
-                gte: currentDate,
-                lte: nextDate,
-              },
-              canceled: {
-                equals: null,
-              },
-              priceRental: {
-                not: null,
-              },
+        const allBookingsRevenue = await this.prisma.prismaLocal.booking.findMany({
+          where: {
+            dateService: {
+              gte: currentDate,
+              lte: nextDate,
             },
-            select: {
-              id: true,
-              priceRental: true,
-              idTypeOriginBooking: true,
-              dateService: true,
-              startDate: true,
-              rentalApartmentId: true,
+            canceled: {
+              equals: null,
             },
-          });
+            priceRental: {
+              not: null,
+            },
+          },
+          select: {
+            id: true,
+            priceRental: true,
+            idTypeOriginBooking: true,
+            dateService: true,
+            startDate: true,
+            rentalApartmentId: true,
+          },
+        });
 
         let totalValueForCurrentPeriod = new Prisma.Decimal(0);
 
@@ -409,9 +384,7 @@ export class BookingsRevenueService {
         });
 
         // Formatar o totalValue
-        const formattedTotalValue = this.formatCurrency(
-          totalValueForCurrentPeriod.toNumber() || 0,
-        );
+        const formattedTotalValue = this.formatCurrency(totalValueForCurrentPeriod.toNumber() || 0);
 
         // Adicionar o resultado ao objeto de resultados
         const dateKey = currentDate.toISOString().split('T')[0]; // Usando toISOString para formatar a data
@@ -474,7 +447,7 @@ export class BookingsRevenueService {
 
     // Ajustar a data final para não incluir a data atual
     const adjustedEndDate = new Date(endDate);
-    if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
+    if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
       adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
     }
 
@@ -518,7 +491,7 @@ export class BookingsRevenueService {
           if (currentTotal) {
             revenueByPaymentMethod.set(
               paymentName,
-              currentTotal.plus(new Prisma.Decimal(booking.priceRental|| 0)),
+              currentTotal.plus(new Prisma.Decimal(booking.priceRental || 0)),
             );
           }
         }
@@ -597,7 +570,7 @@ export class BookingsRevenueService {
         // Use <= para incluir o último dia
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
@@ -610,32 +583,31 @@ export class BookingsRevenueService {
         }
 
         // Buscar todas as receitas de reservas para o período atual
-        const allBookingsRevenue =
-          await this.prisma.prismaLocal.booking.findMany({
-            where: {
-              dateService: {
-                gte: currentDate,
-                lte: nextDate,
-              },
-              canceled: {
-                equals: null,
-              },
-              priceRental: {
-                not: null,
-              },
-              idTypeOriginBooking: {
-                equals: 4,
-              },
+        const allBookingsRevenue = await this.prisma.prismaLocal.booking.findMany({
+          where: {
+            dateService: {
+              gte: currentDate,
+              lte: nextDate,
             },
-            select: {
-              id: true,
-              priceRental: true,
-              idTypeOriginBooking: true,
-              dateService: true,
-              startDate: true,
-              rentalApartmentId: true,
+            canceled: {
+              equals: null,
             },
-          });
+            priceRental: {
+              not: null,
+            },
+            idTypeOriginBooking: {
+              equals: 4,
+            },
+          },
+          select: {
+            id: true,
+            priceRental: true,
+            idTypeOriginBooking: true,
+            dateService: true,
+            startDate: true,
+            rentalApartmentId: true,
+          },
+        });
 
         let totalValueForCurrentPeriod = new Prisma.Decimal(0);
 
@@ -648,9 +620,7 @@ export class BookingsRevenueService {
         });
 
         // Formatar o totalValue
-        const formattedTotalValue = this.formatCurrency(
-          totalValueForCurrentPeriod.toNumber() || 0,
-        );
+        const formattedTotalValue = this.formatCurrency(totalValueForCurrentPeriod.toNumber() || 0);
 
         // Adicionar o resultado ao objeto de resultados
         const dateKey = currentDate.toISOString().split('T')[0]; // Usando toISOString para formatar a data
@@ -720,20 +690,16 @@ export class BookingsRevenueService {
     startDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast7Days,
-      endDate: parsedEndDateLast7Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast7Days),
-      this.formatDateString(endDateLast7Days),
-    );
+    const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
     previousStartDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -746,12 +712,8 @@ export class BookingsRevenueService {
     );
 
     // Log para verificar as datas
-    const startTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob BookingRevenue - últimos 7 dias: ${startTimeLast7Days}`,
-    );
+    const startTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob BookingRevenue - últimos 7 dias: ${startTimeLast7Days}`);
 
     // Chamar a função para o período atual
     await this.findAllBookingsRevenue(
@@ -796,12 +758,8 @@ export class BookingsRevenueService {
       PeriodEnum.LAST_7_D,
     );
 
-    const endTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob BookingRevenue - últimos 7 dias: ${endTimeLast7Days}`,
-    );
+    const endTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob BookingRevenue - últimos 7 dias: ${endTimeLast7Days}`);
 
     // Últimos 30 dias
     const endDateLast30Days = new Date(currentDate);
@@ -812,22 +770,16 @@ export class BookingsRevenueService {
     startDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast30Days,
-      endDate: parsedEndDateLast30Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast30Days),
-      this.formatDateString(endDateLast30Days),
-    );
+    const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
     previousStartDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -840,12 +792,8 @@ export class BookingsRevenueService {
     );
 
     // Log para verificar as datas
-    const startTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob BookingRevenue - últimos 30 dias: ${startTimeLast30Days}`,
-    );
+    const startTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob BookingRevenue - últimos 30 dias: ${startTimeLast30Days}`);
 
     // Chamar a função para o período atual
     await this.findAllBookingsRevenue(
@@ -885,12 +833,8 @@ export class BookingsRevenueService {
       PeriodEnum.LAST_30_D,
     );
 
-    const endTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob BookingRevenue - últimos 30 dias: ${endTimeLast30Days}`,
-    );
+    const endTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob BookingRevenue - últimos 30 dias: ${endTimeLast30Days}`);
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = new Date(currentDate);
@@ -901,22 +845,16 @@ export class BookingsRevenueService {
     startDateLast6Months.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast6Months,
-      endDate: parsedEndDateLast6Months,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast6Months),
-      this.formatDateString(endDateLast6Months),
-    );
+    const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
-    const previousStartDateLast6Months = new Date(
-      previousParsedEndDateLast6Months,
-    );
-    previousStartDateLast6Months.setMonth(
-      previousStartDateLast6Months.getMonth() - 6,
-    );
+    const previousStartDateLast6Months = new Date(previousParsedEndDateLast6Months);
+    previousStartDateLast6Months.setMonth(previousStartDateLast6Months.getMonth() - 6);
     previousStartDateLast6Months.setHours(0, 0, 0, 0); // Configuração de horas
 
     // Parse as datas para o formato desejado
@@ -929,12 +867,8 @@ export class BookingsRevenueService {
     );
 
     // Log para verificar as datas
-    const startTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob BookingRevenue - últimos 6 meses: ${startTimeLast6Months}`,
-    );
+    const startTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob BookingRevenue - últimos 6 meses: ${startTimeLast6Months}`);
 
     // Chamar a função para o período atual
     await this.findAllBookingsRevenue(
@@ -974,12 +908,8 @@ export class BookingsRevenueService {
       PeriodEnum.LAST_6_M,
     );
 
-    const endTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob BookingRevenue - últimos 6 meses: ${endTimeLast6Months}`,
-    );
+    const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob BookingRevenue - últimos 6 meses: ${endTimeLast6Months}`);
   }
 
   private formatDateString(date: Date): string {
@@ -998,9 +928,7 @@ export class BookingsRevenueService {
     const [startDay, startMonth, startYear] = startDateString.split('/');
     const [endDay, endMonth, endYear] = endDateString.split('/');
 
-    const parsedStartDate = new Date(
-      Date.UTC(+startYear, +startMonth - 1, +startDay),
-    );
+    const parsedStartDate = new Date(Date.UTC(+startYear, +startMonth - 1, +startDay));
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
     parsedStartDate.setUTCHours(0, 0, 0, 0); // Define início às 06:00

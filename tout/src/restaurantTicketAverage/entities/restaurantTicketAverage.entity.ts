@@ -1,8 +1,6 @@
 import { PeriodEnum, Prisma } from '@client-online';
 
-export class RestaurantTicketAverage
-  implements Prisma.RestaurantTicketAverageUncheckedCreateInput
-{
+export class RestaurantTicketAverage implements Prisma.RestaurantTicketAverageUncheckedCreateInput {
   id?: number;
   period?: PeriodEnum | null;
   companyId: number;

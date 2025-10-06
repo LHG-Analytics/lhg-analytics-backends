@@ -1,18 +1,6 @@
-import {
-  Controller,
-  Get,
-  Query,
-  BadRequestException,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, Query, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
 import { KpiAlosService } from './kpiAlos.service';
-import {
-  ApiTags,
-  ApiQuery,
-  ApiNotFoundResponse,
-  ApiBadRequestResponse,
-} from '@nestjs/swagger';
+import { ApiTags, ApiQuery, ApiNotFoundResponse, ApiBadRequestResponse } from '@nestjs/swagger';
 import { PeriodEnum } from '@client-online';
 
 @ApiTags('KpiAlos')
@@ -60,32 +48,21 @@ export class KpiAlosController {
       // Chama o serviço com as datas e o período, se fornecidos
       return await this.kpiAlosService.findAllKpiAlos(start, end, period);
     } catch (error) {
-      throw new BadRequestException(
-        `Failed to create all KpiAlos: ${error.message}`,
-      );
+      throw new BadRequestException(`Failed to create all KpiAlos: ${error.message}`);
     }
   }
 
-  private convertToDate(
-    dateStr?: string,
-    isEndDate: boolean = false,
-  ): Date | undefined {
+  private convertToDate(dateStr?: string, isEndDate: boolean = false): Date | undefined {
     if (!dateStr) return undefined;
 
     const [day, month, year] = dateStr.split('/').map(Number);
     if (isNaN(day) || isNaN(month) || isNaN(year)) {
-      throw new BadRequestException(
-        'Invalid date format. Please use DD/MM/YYYY.',
-      );
+      throw new BadRequestException('Invalid date format. Please use DD/MM/YYYY.');
     }
 
     // Cria a nova data no formato YYYY-MM-DD
     const date = new Date(year, month - 1, day);
-    if (
-      date.getDate() !== day ||
-      date.getMonth() !== month - 1 ||
-      date.getFullYear() !== year
-    ) {
+    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
       throw new BadRequestException(
         'Invalid date. Please ensure it is a valid date in the format DD/MM/YYYY.',
       );
@@ -110,9 +87,7 @@ export class KpiAlosController {
       // Chama o método do serviço que executa as operações do cron job
       return await this.kpiAlosService.handleCron();
     } catch (error) {
-      throw new BadRequestException(
-        `Failed to run the cron job: ${error.message}`,
-      );
+      throw new BadRequestException(`Failed to run the cron job: ${error.message}`);
     }
   }
 }

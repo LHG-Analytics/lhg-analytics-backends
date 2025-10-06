@@ -22,11 +22,7 @@ export class CreateBookingsTotalRentalDto {
   @IsOptional()
   period?: PeriodEnum;
 
-  constructor(
-    totalAllRentalsApartments: number,
-    createdDate: Date,
-    period?: PeriodEnum,
-  ) {
+  constructor(totalAllRentalsApartments: number, createdDate: Date, period?: PeriodEnum) {
     this.totalAllRentalsApartments = totalAllRentalsApartments;
     this.createdDate = createdDate;
     this.period = period;

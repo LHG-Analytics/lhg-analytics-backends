@@ -1,55 +1,55 @@
 {
-    "name": "lhg-analytics-backends",
-    "version": "1.0.0",
-    "description": "Backend services for LHG Analytics",
-    "private": true,
-    "workspaces": [
-        "lush_ipiranga",
-        "lush_lapa",
-        "tout",
-        "andar_de_cima",
-        "authentication"
-    ],
-    "scripts": {
-        "build": "npm-run-all build:*",
-        "build:ipiranga": "cd lush_ipiranga && npm run build",
-        "build:lapa": "cd lush_lapa && npm run build",
-        "build:tout": "cd tout && npm run build",
-        "build:andar": "cd andar_de_cima && npm run build",
-        "build:auth": "cd authentication && npm run build",
-        "dev:ipiranga": "cd lush_ipiranga && npm run start:dev",
-        "dev:lapa": "cd lush_lapa && npm run start:dev",
-        "dev:tout": "cd tout && npm run start:dev",
-        "dev:adc": "cd andar_de_cima && npm run start:dev",
-        "dev:auth": "cd authentication && npm run start:dev"
-    },
-    "dependencies": {
-        "@nestjs/config": "^4.0.2",
-        "@nestjs/jwt": "^11.0.0",
-        "@nestjs/mapped-types": "^2.0.0",
-        "@nestjs/passport": "^11.0.5",
-        "@nestjs/platform-express": "^11.1.3",
-        "@nestjs/swagger": "^11.2.0",
-        "@prisma/client": "^6.7.0",
-        "@types/bcrypt": "^5.0.2",
-        "bcrypt": "^5.1.1",
-        "class-transformer": "^0.5.1",
-        "class-validator": "^0.14.1",
-        "cron": "^4.3.0",
-        "dotenv": "^16.5.0",
-        "express": "^4.21.2",
-        "http-proxy-middleware": "^3.0.3",
-        "module-alias": "^2.2.3",
-        "npm-run-all": "^4.1.5",
-        "passport": "^0.7.0",
-        "passport-jwt": "^4.0.1",
-        "pm2": "^5.4.3",
-        "swagger-ui-express": "^5.0.1"
-    },
-    "devDependencies": {
-        "@nestjs/cli": "^11.0.7",
-        "@types/passport-jwt": "^4.0.1",
-        "prisma": "^6.7.0",
-        "rimraf": "^6.0.1"
-    }
+  "name": "lhg-analytics-backends",
+  "version": "1.0.0",
+  "description": "Backend services for LHG Analytics",
+  "private": true,
+  "workspaces": [
+    "lush_ipiranga",
+    "lush_lapa",
+    "tout",
+    "andar_de_cima",
+    "authentication"
+  ],
+  "scripts": {
+    "build": "npm-run-all build:*",
+    "build:ipiranga": "cd lush_ipiranga && npm run build",
+    "build:lapa": "cd lush_lapa && npm run build",
+    "build:tout": "cd tout && npm run build",
+    "build:andar": "cd andar_de_cima && npm run build",
+    "build:auth": "cd authentication && npm run build",
+    "dev:ipiranga": "cd lush_ipiranga && npm run start:dev",
+    "dev:lapa": "cd lush_lapa && npm run start:dev",
+    "dev:tout": "cd tout && npm run start:dev",
+    "dev:adc": "cd andar_de_cima && npm run start:dev",
+    "dev:auth": "cd authentication && npm run start:dev"
+  },
+  "dependencies": {
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/mapped-types": "^2.0.0",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11.1.3",
+    "@nestjs/swagger": "^11.2.0",
+    "@prisma/client": "^6.7.0",
+    "@types/bcrypt": "^5.0.2",
+    "bcrypt": "^5.1.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "cron": "^4.3.0",
+    "dotenv": "^16.5.0",
+    "express": "^4.21.2",
+    "http-proxy-middleware": "^3.0.3",
+    "module-alias": "^2.2.3",
+    "npm-run-all": "^4.1.5",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "pm2": "^5.4.3",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.7",
+    "@types/passport-jwt": "^4.0.1",
+    "prisma": "^6.7.0",
+    "rimraf": "^6.0.1"
+  }
 }

@@ -1,8 +1,6 @@
 import { ConsumptionGroup, PeriodEnum, Prisma } from '@client-online';
 
-export class RestaurantRevenue
-  implements Prisma.RestaurantRevenueUncheckedCreateInput
-{
+export class RestaurantRevenue implements Prisma.RestaurantRevenueUncheckedCreateInput {
   id?: number;
   period?: PeriodEnum;
   companyId: number;

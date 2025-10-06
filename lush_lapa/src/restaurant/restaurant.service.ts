@@ -78,14 +78,8 @@ export class RestaurantService {
     // Converte as datas para UTC sem alterar o horário configurado
     startDate = moment.tz(startDate, 'America/Sao_Paulo').utc(true).toDate();
     endDate = moment.tz(endDate, 'America/Sao_Paulo').utc(true).toDate();
-    startDatePrevious = moment
-      .tz(startDatePrevious, 'America/Sao_Paulo')
-      .utc(true)
-      .toDate();
-    endDatePrevious = moment
-      .tz(endDatePrevious, 'America/Sao_Paulo')
-      .utc(true)
-      .toDate();
+    startDatePrevious = moment.tz(startDatePrevious, 'America/Sao_Paulo').utc(true).toDate();
+    endDatePrevious = moment.tz(endDatePrevious, 'America/Sao_Paulo').utc(true).toDate();
 
     // Exibe as datas geradas
     console.log('startDate:', startDate);
@@ -96,9 +90,7 @@ export class RestaurantService {
     // Função de filtro para LAST_6_M
     const filterByDayOfMonth = (data: any, dayOfMonth: any) => {
       return data.filter((item: any) => {
-        const createdDate = moment
-          .utc(item.createdDate)
-          .tz('America/Sao_Paulo');
+        const createdDate = moment.utc(item.createdDate).tz('America/Sao_Paulo');
         return createdDate.date() === dayOfMonth; // Verifica se o dia do mês é o mesmo
       });
     };
@@ -469,31 +461,25 @@ export class RestaurantService {
         totalAllValue: Number(RestaurantRevenue[0]?.totalAllValue ?? 0),
 
         totalAllSales: RestaurantSales[0]?.totalAllSales ?? 0,
-        totalAllTicketAverage: Number(
-          RestaurantTicketAverage[0]?.totalAllTicketAverage ?? 0,
-        ),
+        totalAllTicketAverage: Number(RestaurantTicketAverage[0]?.totalAllTicketAverage ?? 0),
 
         totalAllTicketAverageByTotalRentals: Number(
-          RestaurantTicketAverageByTotalRentals[0]
-            ?.totalAllTicketAverageByTotalRentals ?? 0,
+          RestaurantTicketAverageByTotalRentals[0]?.totalAllTicketAverageByTotalRentals ?? 0,
         ),
       },
 
       PreviousDate: {
-        totalAllValuePreviousData: Number(
-          RestaurantRevenuePrevious[0]?.totalAllValue ?? 0,
-        ),
+        totalAllValuePreviousData: Number(RestaurantRevenuePrevious[0]?.totalAllValue ?? 0),
 
-        totalAllSalesPreviousData:
-          RestaurantSalesPrevious[0]?.totalAllSales ?? 0,
+        totalAllSalesPreviousData: RestaurantSalesPrevious[0]?.totalAllSales ?? 0,
 
         totalAllTicketAveragePreviousData: Number(
           RestaurantTicketAveragePrevious[0]?.totalAllTicketAverage ?? 0,
         ),
 
         totalAllTicketAverageByTotalRentalsPreviousData: Number(
-          RestaurantTicketAverageByTotalRentalsPrevious[0]
-            ?.totalAllTicketAverageByTotalRentals ?? 0,
+          RestaurantTicketAverageByTotalRentalsPrevious[0]?.totalAllTicketAverageByTotalRentals ??
+            0,
         ),
       },
     };
@@ -502,18 +488,12 @@ export class RestaurantService {
     let filteredDataRevenuePeriod = RestaurantRevenueByPeriod;
     if (period === PeriodEnum.LAST_6_M) {
       const dayOfMonth = startDate.getDate('day'); // Obter o dia do mês do startDate
-      filteredDataRevenuePeriod = filterByDayOfMonth(
-        RestaurantRevenueByPeriod,
-        dayOfMonth,
-      );
+      filteredDataRevenuePeriod = filterByDayOfMonth(RestaurantRevenueByPeriod, dayOfMonth);
     }
 
     const revenueAbByPeriod = {
       categories: filteredDataRevenuePeriod.map((item: any) =>
-        moment
-          .utc(item.createdDate)
-          .tz('America/Sao_Paulo')
-          .format('DD/MM/YYYY'),
+        moment.utc(item.createdDate).tz('America/Sao_Paulo').format('DD/MM/YYYY'),
       ),
       series: filteredDataRevenuePeriod.map((item: any) => Number(item.totalValue)),
     };
@@ -530,14 +510,9 @@ export class RestaurantService {
 
     const revenueAbByPeriodPercent = {
       categories: filteredDataRevenuePeriodPercent.map((item: any) =>
-        moment
-          .utc(item.createdDate)
-          .tz('America/Sao_Paulo')
-          .format('DD/MM/YYYY'),
+        moment.utc(item.createdDate).tz('America/Sao_Paulo').format('DD/MM/YYYY'),
       ),
-      series: filteredDataRevenuePeriodPercent.map((item: any) =>
-        Number(item.totalValuePercent),
-      ),
+      series: filteredDataRevenuePeriodPercent.map((item: any) => Number(item.totalValuePercent)),
     };
 
     // Aplicar o filtro se o período for LAST_6_M
@@ -552,14 +527,9 @@ export class RestaurantService {
 
     const ticketAverageByPeriod = {
       categories: filteredDataTicketAveragePeriod.map((item: any) =>
-        moment
-          .utc(item.createdDate)
-          .tz('America/Sao_Paulo')
-          .format('DD/MM/YYYY'),
+        moment.utc(item.createdDate).tz('America/Sao_Paulo').format('DD/MM/YYYY'),
       ),
-      series: filteredDataTicketAveragePeriod.map((item: any) =>
-        Number(item.totalTicketAverage),
-      ),
+      series: filteredDataTicketAveragePeriod.map((item: any) => Number(item.totalTicketAverage)),
     };
 
     const top5Sales = [...RestaurantSalesRanking]
@@ -609,8 +579,7 @@ export class RestaurantService {
     const categoriesSet = new Set(formattedData.map((item: any) => item.date));
     const categories = Array.from(categoriesSet).sort(
       (a: any, b: any) =>
-        moment(a, 'DD/MM/YYYY').toDate().getTime() -
-        moment(b, 'DD/MM/YYYY').toDate().getTime(),
+        moment(a, 'DD/MM/YYYY').toDate().getTime() - moment(b, 'DD/MM/YYYY').toDate().getTime(),
     );
 
     // 2. Pegar todos os grupos únicos
@@ -621,7 +590,7 @@ export class RestaurantService {
     const series = groupNames.map((groupName: any) => {
       const data = categories.map((date: any) => {
         const match = formattedData.find(
-          (item: any) => item.date === date&& item.group === groupName,
+          (item: any) => item.date === date && item.group === groupName,
         );
         return match ? match.value : 0;
       });
@@ -660,13 +629,10 @@ export class RestaurantService {
     });
 
     // 1. Pegar datas únicas (ordenadas)
-    const categoriesSetFood = new Set(
-      formattedDataFood.map((item: any) => item.date),
-    );
+    const categoriesSetFood = new Set(formattedDataFood.map((item: any) => item.date));
     const categoriesFood = Array.from(categoriesSetFood).sort(
       (a: any, b: any) =>
-        moment(a, 'DD/MM/YYYY').toDate().getTime() -
-        moment(b, 'DD/MM/YYYY').toDate().getTime(),
+        moment(a, 'DD/MM/YYYY').toDate().getTime() - moment(b, 'DD/MM/YYYY').toDate().getTime(),
     );
 
     // 2. Pegar todos os grupos únicos
@@ -677,7 +643,7 @@ export class RestaurantService {
     const seriesFood = groupNamesFood.map((groupNameFood: any) => {
       const data = categoriesFood.map((date: any) => {
         const match = formattedDataFood.find(
-          (item: any) => item.date === date&& item.group === groupNameFood,
+          (item: any) => item.date === date && item.group === groupNameFood,
         );
         return match ? match.value : 0;
       });
@@ -716,13 +682,10 @@ export class RestaurantService {
     });
 
     // 1. Pegar datas únicas (ordenadas)
-    const categoriesSetDrink = new Set(
-      formattedDataDrink.map((item: any) => item.date),
-    );
+    const categoriesSetDrink = new Set(formattedDataDrink.map((item: any) => item.date));
     const categoriesDrink = Array.from(categoriesSetDrink).sort(
       (a: any, b: any) =>
-        moment(a, 'DD/MM/YYYY').toDate().getTime() -
-        moment(b, 'DD/MM/YYYY').toDate().getTime(),
+        moment(a, 'DD/MM/YYYY').toDate().getTime() - moment(b, 'DD/MM/YYYY').toDate().getTime(),
     );
 
     // 2. Pegar todos os grupos únicos
@@ -733,7 +696,7 @@ export class RestaurantService {
     const seriesDrink = groupNamesDrink.map((groupNameDrink: any) => {
       const data = categoriesDrink.map((date: any) => {
         const match = formattedDataDrink.find(
-          (item: any) => item.date === date&& item.group === groupNameDrink,
+          (item: any) => item.date === date && item.group === groupNameDrink,
         );
         return match ? match.value : 0;
       });
@@ -776,9 +739,7 @@ export class RestaurantService {
     for (const revenuePercent of RestaurantRevenueByDrinkCategory) {
       const category = revenuePercent.drinkCategory;
       if (reportByDrinksMap[category]) {
-        reportByDrinksMap[category].revenuePercent = Number(
-          revenuePercent.totalValuePercent,
-        );
+        reportByDrinksMap[category].revenuePercent = Number(revenuePercent.totalValuePercent);
       }
     }
 
@@ -787,9 +748,7 @@ export class RestaurantService {
       const category = sales.drinkCategory;
       if (reportByDrinksMap[category]) {
         reportByDrinksMap[category].quantity = Number(sales.totalSale);
-        reportByDrinksMap[category].quantityPercent = Number(
-          sales.totalSalePercent,
-        );
+        reportByDrinksMap[category].quantityPercent = Number(sales.totalSalePercent);
       }
     }
 
@@ -841,9 +800,7 @@ export class RestaurantService {
     for (const revenuePercent of RestaurantRevenueByOthersCategory) {
       const category = revenuePercent.othersCategory;
       if (reportByOthersMap[category]) {
-        reportByOthersMap[category].revenuePercent = Number(
-          revenuePercent.totalValuePercent,
-        );
+        reportByOthersMap[category].revenuePercent = Number(revenuePercent.totalValuePercent);
       }
     }
 
@@ -852,9 +809,7 @@ export class RestaurantService {
       const category = sales.othersCategory;
       if (reportByOthersMap[category]) {
         reportByOthersMap[category].quantity = Number(sales.totalSales);
-        reportByOthersMap[category].quantityPercent = Number(
-          sales.totalSalesPercent,
-        );
+        reportByOthersMap[category].quantityPercent = Number(sales.totalSalesPercent);
       }
     }
 
@@ -902,9 +857,7 @@ export class RestaurantService {
     for (const revenuePercent of RestaurantRevenueByFoodCategory) {
       const category = revenuePercent.foodCategory;
       if (reportByFoodMap[category]) {
-        reportByFoodMap[category].revenuePercent = Number(
-          revenuePercent.totalValuePercent,
-        );
+        reportByFoodMap[category].revenuePercent = Number(revenuePercent.totalValuePercent);
       }
     }
 
@@ -913,9 +866,7 @@ export class RestaurantService {
       const category = sales.foodCategory;
       if (reportByFoodMap[category]) {
         reportByFoodMap[category].quantity = Number(sales.totalSales);
-        reportByFoodMap[category].quantityPercent = Number(
-          sales.totalSalesPercent,
-        );
+        reportByFoodMap[category].quantityPercent = Number(sales.totalSalesPercent);
       }
     }
 
@@ -954,9 +905,7 @@ export class RestaurantService {
   }
 
   async calculateKpisByDateRange(startDate: Date, endDate: Date) {
-    const abProductTypes = [
-      40, 47, 33, 34, 32, 15, 13, 44, 10, 11, 31, 41, 27, 26, 25, 35,
-    ];
+    const abProductTypes = [40, 47, 33, 34, 32, 15, 13, 44, 10, 11, 31, 41, 27, 26, 25, 35];
 
     const aProductTypes = [47, 32, 13, 44, 10, 11, 31, 41, 27];
 
@@ -1280,9 +1229,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([kpisRawSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueAbPeriodSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalRevenueByPeriodSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(
-          Prisma.sql([abTicketCountByPeriodSql]),
-        ),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([abTicketCountByPeriodSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([bestSellingItemsSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([leastSellingItemsSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueGroupByPeriodSql])),
@@ -1325,13 +1272,9 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
       const totalNetRevenue = totalGrossRevenue.minus(totalDiscount);
       const totalRentals = rawResult.length;
       const totalAllTicketAverage =
-        rentalsWithABCount > 0
-          ? totalABNetRevenue.div(rentalsWithABCount)
-          : new Prisma.Decimal(0);
+        rentalsWithABCount > 0 ? totalABNetRevenue.div(rentalsWithABCount) : new Prisma.Decimal(0);
       const totalAllTicketAverageByTotalRentals =
-        totalRentals > 0
-          ? totalABNetRevenue.div(totalRentals)
-          : new Prisma.Decimal(0);
+        totalRentals > 0 ? totalABNetRevenue.div(totalRentals) : new Prisma.Decimal(0);
 
       const isMonthly = moment(endDate).diff(moment(startDate), 'days') > 31;
 
@@ -1368,13 +1311,9 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
 
       const revenueAbByPeriod = {
         categories: dateKeys.map((key: any) =>
-          isMonthly
-            ? moment(key, 'YYYY-MM').format('MM/YYYY')
-            : moment(key).format('DD/MM/YYYY'),
+          isMonthly ? moment(key, 'YYYY-MM').format('MM/YYYY') : moment(key).format('DD/MM/YYYY'),
         ),
-        series: dateKeys.map((key: any) =>
-          Number((abGrouped.get(key) || 0).toFixed(2)),
-        ),
+        series: dateKeys.map((key: any) => Number((abGrouped.get(key) || 0).toFixed(2))),
       };
 
       const revenueAbByPeriodPercent = {
@@ -1442,9 +1381,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
 
       const revenueByGroupPeriod = {
         categories: revenueKeys.map((key: any) =>
-          isMonthly
-            ? moment(key, 'YYYY-MM').format('MM/YYYY')
-            : moment(key).format('DD/MM/YYYY'),
+          isMonthly ? moment(key, 'YYYY-MM').format('MM/YYYY') : moment(key).format('DD/MM/YYYY'),
         ),
         series: [
           { name: 'ALIMENTOS', data: alimentosSeries },
@@ -1476,15 +1413,11 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
 
         const sortedDates = [...dateSet].sort();
         const categories = sortedDates.map((key: any) =>
-          isMonthly
-            ? moment(key, 'YYYY-MM').format('MM/YYYY')
-            : moment(key).format('DD/MM/YYYY'),
+          isMonthly ? moment(key, 'YYYY-MM').format('MM/YYYY') : moment(key).format('DD/MM/YYYY'),
         );
 
         const series = [...categoryMap.entries()].map(([category, dateMap]) => {
-          const data = sortedDates.map((date: any) =>
-            Number((dateMap.get(date) || 0).toFixed(2)),
-          );
+          const data = sortedDates.map((date: any) => Number((dateMap.get(date) || 0).toFixed(2)));
           return { name: category, data };
         });
 
@@ -1492,27 +1425,17 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
       }
 
       const revenueAByPeriod = (() => {
-        const { categories, series } = buildRevenueSeries(
-          rawAPeriodResult,
-          isMonthly,
-        );
+        const { categories, series } = buildRevenueSeries(rawAPeriodResult, isMonthly);
         return { categoriesFood: categories, seriesFood: series };
       })();
 
       const revenueBByPeriod = (() => {
-        const { categories, series } = buildRevenueSeries(
-          rawBPeriodResult,
-          isMonthly,
-        );
+        const { categories, series } = buildRevenueSeries(rawBPeriodResult, isMonthly);
         return { categoriesDrink: categories, seriesDrink: series };
       })();
 
       // --- ReportByFood / Drinks / Others ---
-      function buildReport(
-        data: any[],
-        totalRevenue: number,
-        totalQuantity: number,
-      ) {
+      function buildReport(data: any[], totalRevenue: number, totalQuantity: number) {
         return [
           ...data.map((row: any) => ({
             name: row.category,
@@ -1543,11 +1466,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         (acc: any, row: any) => acc + Number(row.quantity),
         0,
       );
-      const reportByFood = buildReport(
-        resultByFood,
-        totalRevenueFood,
-        totalQuantityFood,
-      );
+      const reportByFood = buildReport(resultByFood, totalRevenueFood, totalQuantityFood);
 
       const totalRevenueDrink = resultByDrink.reduce(
         (acc: any, row: any) => acc + Number(row.revenue),
@@ -1557,11 +1476,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         (acc: any, row: any) => acc + Number(row.quantity),
         0,
       );
-      const reportByDrink = buildReport(
-        resultByDrink,
-        totalRevenueDrink,
-        totalQuantityDrink,
-      );
+      const reportByDrink = buildReport(resultByDrink, totalRevenueDrink, totalQuantityDrink);
 
       const totalRevenueOthers = resultByOthers.reduce(
         (acc: any, row: any) => acc + Number(row.revenue),
@@ -1571,11 +1486,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         (acc: any, row: any) => acc + Number(row.quantity),
         0,
       );
-      const reportByOthers = buildReport(
-        resultByOthers,
-        totalRevenueOthers,
-        totalQuantityOthers,
-      );
+      const reportByOthers = buildReport(resultByOthers, totalRevenueOthers, totalQuantityOthers);
 
       // --- Return final ---
       return {
@@ -1614,9 +1525,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
       }
 
       // fallback genérico se não for Error
-      throw new BadRequestException(
-        'Falha ao calcular os KPIs do restaurante: erro desconhecido',
-      );
+      throw new BadRequestException('Falha ao calcular os KPIs do restaurante: erro desconhecido');
     }
   }
 }

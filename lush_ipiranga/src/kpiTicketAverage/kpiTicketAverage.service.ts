@@ -1,16 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as moment from 'moment-timezone';
 import { PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  KpiTicketAverage,
-  KpiTicketAverageByPeriod,
-} from './entities/kpiTicketAverage.entity';
+import { KpiTicketAverage, KpiTicketAverageByPeriod } from './entities/kpiTicketAverage.entity';
 
 @Injectable()
 export class KpiTicketAverageService {
@@ -23,10 +16,7 @@ export class KpiTicketAverageService {
     });
   }
 
-  private async calculateTotalSaleDirect(
-    startDate: Date,
-    endDate: Date,
-  ): Promise<Prisma.Decimal> {
+  private async calculateTotalSaleDirect(startDate: Date, endDate: Date): Promise<Prisma.Decimal> {
     const stockOutItems = await this.prisma.prismaLocal.stockOutItem.findMany({
       where: {
         stockOuts: {
@@ -59,15 +49,9 @@ export class KpiTicketAverageService {
       const discountSale = stockOut.sale?.discount
         ? new Prisma.Decimal(stockOut.sale.discount)
         : new Prisma.Decimal(0);
-      const itemTotal = new Prisma.Decimal(item.priceSale).times(
-        new Prisma.Decimal(item.quantity),
-      );
+      const itemTotal = new Prisma.Decimal(item.priceSale).times(new Prisma.Decimal(item.quantity));
 
-      if (
-        stockOut &&
-        stockOut.saleDirect &&
-        item.stockOutId === stockOut.saleDirect.stockOutId
-      ) {
+      if (stockOut && stockOut.saleDirect && item.stockOutId === stockOut.saleDirect.stockOutId) {
         return total.plus(itemTotal.minus(discountSale));
       }
       return total;
@@ -82,9 +66,7 @@ export class KpiTicketAverageService {
     const [startDay, startMonth, startYear] = startDateString.split('/');
     const [endDay, endMonth, endYear] = endDateString.split('/');
 
-    const parsedStartDate = new Date(
-      Date.UTC(+startYear, +startMonth - 1, +startDay),
-    );
+    const parsedStartDate = new Date(Date.UTC(+startYear, +startMonth - 1, +startDay));
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
     parsedStartDate.setUTCHours(6, 0, 0, 0); // Define início às 06:00
@@ -93,11 +75,7 @@ export class KpiTicketAverageService {
     return { startDate: parsedStartDate, endDate: parsedEndDate };
   }
 
-  async findAllKpiTicketAverage(
-    startDate: Date,
-    endDate: Date,
-    period?: PeriodEnum,
-  ): Promise<any> {
+  async findAllKpiTicketAverage(startDate: Date, endDate: Date, period?: PeriodEnum): Promise<any> {
     try {
       const companyId = 1; // Defina o ID da empresa conforme necessário
 
@@ -110,60 +88,59 @@ export class KpiTicketAverageService {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
       }
 
-      const [allRentalApartments, suiteCategories, totalSaleDirect] =
-        await Promise.all([
-          this.prisma.prismaLocal.rentalApartment.findMany({
-            where: {
-              checkIn: {
-                gte: startDate,
-                lte: endDate,
-              },
-              endOccupationType: 'FINALIZADA',
+      const [allRentalApartments, suiteCategories, totalSaleDirect] = await Promise.all([
+        this.prisma.prismaLocal.rentalApartment.findMany({
+          where: {
+            checkIn: {
+              gte: startDate,
+              lte: endDate,
             },
-            include: {
-              suiteStates: {
-                include: {
-                  suite: {
-                    include: {
-                      suiteCategories: true,
-                    },
-                  },
-                },
-              },
-              saleLease: {
-                include: {
-                  stockOut: {
-                    include: {
-                      stockOutItem: {
-                        where: { canceled: null },
-                        select: { priceSale: true, quantity: true },
-                      },
-                      sale: { select: { discount: true } },
-                    },
+            endOccupationType: 'FINALIZADA',
+          },
+          include: {
+            suiteStates: {
+              include: {
+                suite: {
+                  include: {
+                    suiteCategories: true,
                   },
                 },
               },
             },
-          }),
-          this.prisma.prismaLocal.suiteCategory.findMany({
-            where: {
-              description: {
-                in: [
-                  'LUSH',
-                  'LUSH POP',
-                  'LUSH HIDRO',
-                  'LUSH LOUNGE',
-                  'LUSH SPA',
-                  'LUSH CINE',
-                  'LUSH SPLASH',
-                  'LUSH SPA SPLASH',
-                  'CASA LUSH',
-                ],
+            saleLease: {
+              include: {
+                stockOut: {
+                  include: {
+                    stockOutItem: {
+                      where: { canceled: null },
+                      select: { priceSale: true, quantity: true },
+                    },
+                    sale: { select: { discount: true } },
+                  },
+                },
               },
             },
-          }),
-          this.calculateTotalSaleDirect(startDate, endDate),
-        ]);
+          },
+        }),
+        this.prisma.prismaLocal.suiteCategory.findMany({
+          where: {
+            description: {
+              in: [
+                'LUSH',
+                'LUSH POP',
+                'LUSH HIDRO',
+                'LUSH LOUNGE',
+                'LUSH SPA',
+                'LUSH CINE',
+                'LUSH SPLASH',
+                'LUSH SPA SPLASH',
+                'CASA LUSH',
+              ],
+            },
+          },
+        }),
+        this.calculateTotalSaleDirect(startDate, endDate),
+      ]);
 
       if (!allRentalApartments || allRentalApartments.length === 0) {
         throw new NotFoundException('No rental apartments found.');
@@ -174,7 +151,7 @@ export class KpiTicketAverageService {
       let totalRental = new Prisma.Decimal(0);
       let totalRentals = 0;
 
-        // Tipos auxiliares
+      // Tipos auxiliares
       type CategoryTotals = {
         categoryTotalSale: Prisma.Decimal;
         categoryTotalRental: Prisma.Decimal;
@@ -191,10 +168,7 @@ export class KpiTicketAverageService {
         };
 
         for (const rentalApartment of allRentalApartments) {
-          if (
-            rentalApartment.suiteStates.suite.suiteCategoryId ===
-            suiteCategory.id
-          ) {
+          if (rentalApartment.suiteStates.suite.suiteCategoryId === suiteCategory.id) {
             const suiteCategoryData = categoryTotalsMap[suiteCategory.id];
 
             const saleLease = rentalApartment.saleLease;
@@ -206,9 +180,7 @@ export class KpiTicketAverageService {
 
               priceSale = stockOutItems.reduce((acc, item) => {
                 return acc.plus(
-                  new Prisma.Decimal(item.priceSale).times(
-                    new Prisma.Decimal(item.quantity),
-                  ),
+                  new Prisma.Decimal(item.priceSale).times(new Prisma.Decimal(item.quantity)),
                 );
               }, new Prisma.Decimal(0));
 
@@ -234,9 +206,7 @@ export class KpiTicketAverageService {
               suiteCategoryData.categoryTotalSale =
                 suiteCategoryData.categoryTotalSale.plus(priceSale);
               suiteCategoryData.categoryTotalRental =
-                suiteCategoryData.categoryTotalRental.plus(
-                  permanenceValueLiquid,
-                );
+                suiteCategoryData.categoryTotalRental.plus(permanenceValueLiquid);
             }
           }
         }
@@ -291,11 +261,7 @@ export class KpiTicketAverageService {
       const totalResult = {
         totalAllTicketAverage: this.formatCurrency(
           totalRentals > 0
-            ? totalRental
-                .plus(totalSale)
-                .plus(totalSaleDirect)
-                .dividedBy(totalRentals)
-                .toNumber()
+            ? totalRental.plus(totalSale).plus(totalSaleDirect).dividedBy(totalRentals).toNumber()
             : 0,
         ),
         ticketAverageAllSale: this.formatCurrency(
@@ -313,16 +279,12 @@ export class KpiTicketAverageService {
         },
       };
 
-      const formattedKpiTicketAverageData = kpiTicketAverageData.map(
-        (category) => ({
-          ...category,
-          ticketAverageSale: this.formatCurrency(category.ticketAverageSale),
-          ticketAverageRental: this.formatCurrency(
-            category.ticketAverageRental,
-          ),
-          totalTicketAverage: this.formatCurrency(category.totalTicketAverage),
-        }),
-      );
+      const formattedKpiTicketAverageData = kpiTicketAverageData.map((category) => ({
+        ...category,
+        ticketAverageSale: this.formatCurrency(category.ticketAverageSale),
+        ticketAverageRental: this.formatCurrency(category.ticketAverageRental),
+        totalTicketAverage: this.formatCurrency(category.totalTicketAverage),
+      }));
 
       return {
         kpiTicketAverage: formattedKpiTicketAverageData,
@@ -337,9 +299,7 @@ export class KpiTicketAverageService {
     }
   }
 
-  async insertKpiTicketAverage(
-    data: KpiTicketAverage,
-  ): Promise<KpiTicketAverage> {
+  async insertKpiTicketAverage(data: KpiTicketAverage): Promise<KpiTicketAverage> {
     return this.prisma.prismaOnline.kpiTicketAverage.upsert({
       where: {
         suiteCategoryId_period_createdDate: {
@@ -382,31 +342,30 @@ export class KpiTicketAverageService {
         }
 
         // Obter os dados de rentalApartment
-        const rentalApartments =
-          await this.prisma.prismaLocal.rentalApartment.findMany({
-            where: {
-              checkIn: {
-                gte: currentDate,
-                lte: nextDate,
-              },
-              endOccupationType: 'FINALIZADA',
+        const rentalApartments = await this.prisma.prismaLocal.rentalApartment.findMany({
+          where: {
+            checkIn: {
+              gte: currentDate,
+              lte: nextDate,
             },
-            include: {
-              saleLease: {
-                include: {
-                  stockOut: {
-                    include: {
-                      stockOutItem: {
-                        where: { canceled: null },
-                        select: { priceSale: true, quantity: true },
-                      },
-                      sale: { select: { discount: true } },
+            endOccupationType: 'FINALIZADA',
+          },
+          include: {
+            saleLease: {
+              include: {
+                stockOut: {
+                  include: {
+                    stockOutItem: {
+                      where: { canceled: null },
+                      select: { priceSale: true, quantity: true },
                     },
+                    sale: { select: { discount: true } },
                   },
                 },
               },
             },
-          });
+          },
+        });
 
         // Inicializar variáveis para calcular o ticket médio
         let totalSale = new Prisma.Decimal(0);
@@ -423,9 +382,7 @@ export class KpiTicketAverageService {
 
             priceSale = stockOutItems.reduce((acc, item) => {
               return acc.plus(
-                new Prisma.Decimal(item.priceSale).times(
-                  new Prisma.Decimal(item.quantity),
-                ),
+                new Prisma.Decimal(item.priceSale).times(new Prisma.Decimal(item.quantity)),
               );
             }, new Prisma.Decimal(0));
 
@@ -486,20 +443,15 @@ export class KpiTicketAverageService {
       }
 
       // Formatar o resultado final
-      const totalTicketAverageForThePeriod = Object.keys(results).map(
-        (date) => ({
-          [date]: results[date],
-        }),
-      );
+      const totalTicketAverageForThePeriod = Object.keys(results).map((date) => ({
+        [date]: results[date],
+      }));
 
       return {
         TotalTicketAverageForThePeriod: totalTicketAverageForThePeriod,
       };
     } catch (error) {
-      console.error(
-        'Erro ao calcular o total de Ticket Average por período:',
-        error,
-      );
+      console.error('Erro ao calcular o total de Ticket Average por período:', error);
       if (error instanceof Error) {
         throw new BadRequestException(
           `Falha ao calcular o total de Ticket Average por período: ${error.message}`,
@@ -547,20 +499,16 @@ export class KpiTicketAverageService {
     startDateLast7Days.setHours(6, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast7Days,
-      endDate: parsedEndDateLast7Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast7Days),
-      this.formatDateString(endDateLast7Days),
-    );
+    const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
     previousStartDateLast7Days.setHours(6, 0, 0, 0); // Configuração de horas
 
     // Parse as datas para o formato desejado
@@ -573,12 +521,8 @@ export class KpiTicketAverageService {
     );
 
     // Log para verificar as datas
-    const startTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiTicketAverage - últimos 7 dias: ${startTimeLast7Days}`,
-    );
+    const startTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiTicketAverage - últimos 7 dias: ${startTimeLast7Days}`);
 
     // Chamar a função para o período atual
     await this.findAllKpiTicketAverage(
@@ -598,12 +542,8 @@ export class KpiTicketAverageService {
       parsedEndDateLast7Days,
       PeriodEnum.LAST_7_D,
     );
-    const endTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiTicketAverage - últimos 7 dias: ${endTimeLast7Days}`,
-    );
+    const endTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiTicketAverage - últimos 7 dias: ${endTimeLast7Days}`);
 
     // Últimos 30 dias
     const endDateLast30Days = currentDate;
@@ -614,22 +554,16 @@ export class KpiTicketAverageService {
     startDateLast30Days.setHours(6, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast30Days,
-      endDate: parsedEndDateLast30Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast30Days),
-      this.formatDateString(endDateLast30Days),
-    );
+    const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
     previousStartDateLast30Days.setHours(6, 0, 0, 0); // Configuração de horas
 
     // Parse as datas para o formato desejado
@@ -642,12 +576,8 @@ export class KpiTicketAverageService {
     );
 
     // Log para verificar as datas
-    const startTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiTicketAverage - últimos 30 dias: ${startTimeLast30Days}`,
-    );
+    const startTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiTicketAverage - últimos 30 dias: ${startTimeLast30Days}`);
 
     // Chamar a função para o período atual
     await this.findAllKpiTicketAverage(
@@ -666,12 +596,8 @@ export class KpiTicketAverageService {
       parsedEndDateLast30Days,
       PeriodEnum.LAST_30_D,
     );
-    const endTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiTicketAverage - últimos 30 dias: ${endTimeLast30Days}`,
-    );
+    const endTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiTicketAverage - últimos 30 dias: ${endTimeLast30Days}`);
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = currentDate;
@@ -682,22 +608,16 @@ export class KpiTicketAverageService {
     startDateLast6Months.setHours(6, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast6Months,
-      endDate: parsedEndDateLast6Months,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast6Months),
-      this.formatDateString(endDateLast6Months),
-    );
+    const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
-    const previousStartDateLast6Months = new Date(
-      previousParsedEndDateLast6Months,
-    );
-    previousStartDateLast6Months.setMonth(
-      previousStartDateLast6Months.getMonth() - 6,
-    );
+    const previousStartDateLast6Months = new Date(previousParsedEndDateLast6Months);
+    previousStartDateLast6Months.setMonth(previousStartDateLast6Months.getMonth() - 6);
     previousStartDateLast6Months.setHours(6, 0, 0, 0); // Configuração de horas
 
     // Parse as datas para o formato desejado
@@ -710,12 +630,8 @@ export class KpiTicketAverageService {
     );
 
     // Log para verificar as datas
-    const startTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob KpiTicketAverage - últimos 6 meses: ${startTimeLast6Months}`,
-    );
+    const startTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiTicketAverage - últimos 6 meses: ${startTimeLast6Months}`);
 
     // Chamar a função para o período atual
     await this.findAllKpiTicketAverage(
@@ -734,12 +650,8 @@ export class KpiTicketAverageService {
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
-    const endTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob KpiTicketAverage - últimos 6 meses: ${endTimeLast6Months}`,
-    );
+    const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiTicketAverage - últimos 6 meses: ${endTimeLast6Months}`);
   }
 
   private formatDateString(date: Date): string {

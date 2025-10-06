@@ -249,12 +249,16 @@ export class CompanyService {
     switch (period) {
       case PeriodEnum.LAST_7_D:
         // Período atual: últimos 7 dias das 05:59 (ex: 22/09 05:59 até 29/09 05:59)
-        startDate = todayInitial.clone().subtract(7, 'days').set({
-          hour: 5,
-          minute: 59,
-          second: 59,
-          millisecond: 999,
-        }).toDate();
+        startDate = todayInitial
+          .clone()
+          .subtract(7, 'days')
+          .set({
+            hour: 5,
+            minute: 59,
+            second: 59,
+            millisecond: 999,
+          })
+          .toDate();
 
         // Período anterior: 7 dias antes do início do período atual
         startDatePrevious = moment(startDate).subtract(7, 'days').toDate();
@@ -263,12 +267,16 @@ export class CompanyService {
 
       case PeriodEnum.LAST_30_D:
         // Período atual: últimos 30 dias
-        startDate = todayInitial.clone().subtract(30, 'days').set({
-          hour: 5,
-          minute: 59,
-          second: 59,
-          millisecond: 999,
-        }).toDate();
+        startDate = todayInitial
+          .clone()
+          .subtract(30, 'days')
+          .set({
+            hour: 5,
+            minute: 59,
+            second: 59,
+            millisecond: 999,
+          })
+          .toDate();
 
         // Período anterior: 30 dias antes do início do período atual
         startDatePrevious = moment(startDate).subtract(30, 'days').toDate();
@@ -277,12 +285,16 @@ export class CompanyService {
 
       case PeriodEnum.LAST_6_M:
         // Período atual: últimos 6 meses
-        startDate = todayInitial.clone().subtract(6, 'months').set({
-          hour: 5,
-          minute: 59,
-          second: 59,
-          millisecond: 999,
-        }).toDate();
+        startDate = todayInitial
+          .clone()
+          .subtract(6, 'months')
+          .set({
+            hour: 5,
+            minute: 59,
+            second: 59,
+            millisecond: 999,
+          })
+          .toDate();
 
         // Período anterior: 6 meses antes do início do período atual
         startDatePrevious = moment(startDate).subtract(6, 'months').toDate();
@@ -761,19 +773,19 @@ export class CompanyService {
     const bigNumbers: BigNumbersDataSQL = {
       currentDate: {
         totalAllValue: Number(KpiRevenue[0]?.totalAllValue ?? 0),
-        totalAllRentalsApartments:
-          KpiTotalRentals[0]?.totalAllRentalsApartments ?? 0,
+        totalAllRentalsApartments: KpiTotalRentals[0]?.totalAllRentalsApartments ?? 0,
         totalAllTicketAverage: Number(KpiTicketAverage[0]?.totalAllTicketAverage ?? 0),
         totalAllTrevpar: Number(KpiRevpar[0]?.totalRevpar ?? 0),
         totalAllGiro: Number(KpiGiro[0]?.totalGiro ?? 0),
-        totalAverageOccupationTime:
-          KpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00',
+        totalAverageOccupationTime: KpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00',
       },
       previousDate: {
         totalAllValuePreviousData: Number(KpiRevenuePreviousData[0]?.totalAllValue ?? 0),
         totalAllRentalsApartmentsPreviousData:
           KpiTotalRentalsPreviousData[0]?.totalAllRentalsApartments ?? 0,
-        totalAllTicketAveragePreviousData: Number(KpiTicketAveragePreviousData[0]?.totalAllTicketAverage ?? 0),
+        totalAllTicketAveragePreviousData: Number(
+          KpiTicketAveragePreviousData[0]?.totalAllTicketAverage ?? 0,
+        ),
         totalAllTrevparPreviousData: Number(KpiRevparPreviousData[0]?.totalRevpar ?? 0),
         totalAllGiroPreviousData: Number(KpiGiroPreviousData[0]?.totalGiro ?? 0),
         totalAverageOccupationTimePreviousData:
@@ -790,7 +802,9 @@ export class CompanyService {
     const yesterday = todayForForecast.clone().subtract(1, 'day');
 
     // Verificar se estamos no mês corrente
-    const isCurrentMonth = nowForForecast.month() === currentMonthStart.month() && nowForForecast.year() === currentMonthStart.year();
+    const isCurrentMonth =
+      nowForForecast.month() === currentMonthStart.month() &&
+      nowForForecast.year() === currentMonthStart.year();
 
     if (isCurrentMonth) {
       // Dias que já passaram no mês (do dia 1 até ontem)
@@ -873,7 +887,8 @@ export class CompanyService {
         const monthlyTotalTrevpar = Number(monthlyKpiTrevpar[0]?.totalTrevpar ?? 0);
         const monthlyTotalGiro = Number(monthlyKpiGiro[0]?.totalGiro ?? 0);
         const monthlyTicketAverage = Number(monthlyKpiTicketAverage[0]?.totalAllTicketAverage ?? 0);
-        const monthlyAverageOccupationTime = monthlyKpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00';
+        const monthlyAverageOccupationTime =
+          monthlyKpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00';
 
         // Média diária baseada nos dados do mês completo
         const dailyAverageValue = monthlyTotalValue / daysElapsed;
@@ -883,11 +898,19 @@ export class CompanyService {
 
         // Projeção: dados atuais do mês + (média diária × dias restantes)
         bigNumbers.monthlyForecast = {
-          totalAllValueForecast: Number((monthlyTotalValue + (dailyAverageValue * remainingDays)).toFixed(2)),
-          totalAllRentalsApartmentsForecast: Math.round(monthlyTotalRentals + (dailyAverageRentals * remainingDays)),
+          totalAllValueForecast: Number(
+            (monthlyTotalValue + dailyAverageValue * remainingDays).toFixed(2),
+          ),
+          totalAllRentalsApartmentsForecast: Math.round(
+            monthlyTotalRentals + dailyAverageRentals * remainingDays,
+          ),
           totalAllTicketAverageForecast: Number(monthlyTicketAverage), // Ticket médio não muda com projeção
-          totalAllTrevparForecast: Number((monthlyTotalTrevpar + (dailyAverageTrevpar * remainingDays)).toFixed(2)),
-          totalAllGiroForecast: Number((monthlyTotalGiro + (dailyAverageGiro * remainingDays)).toFixed(2)),
+          totalAllTrevparForecast: Number(
+            (monthlyTotalTrevpar + dailyAverageTrevpar * remainingDays).toFixed(2),
+          ),
+          totalAllGiroForecast: Number(
+            (monthlyTotalGiro + dailyAverageGiro * remainingDays).toFixed(2),
+          ),
           totalAverageOccupationTimeForecast: monthlyAverageOccupationTime, // Tempo médio não muda com projeção
         };
       }
@@ -898,58 +921,44 @@ export class CompanyService {
       const suiteName = suite.description;
 
       // Filtrar os valores de KPI específicos para a suite atual
-      const kpiRevenueForSuite = KpiRevenue.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
-      );
+      const kpiRevenueForSuite = KpiRevenue.find((kpi) => kpi.suiteCategoryName === suiteName);
       const kpiTotalRentalsForSuite = KpiTotalRentals.find(
         (kpi) => kpi.suiteCategoryName === suiteName,
       );
       const kpiTicketAverageForSuite = KpiTicketAverage.find(
         (kpi) => kpi.suiteCategoryName === suiteName,
       );
-      const kpiRevparForSuite = KpiRevpar.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
-      );
+      const kpiRevparForSuite = KpiRevpar.find((kpi) => kpi.suiteCategoryName === suiteName);
       const kpiOccupancyRateForSuite = KpiOccupancyRate.find(
         (kpi) => kpi.suiteCategoryName === suiteName,
       );
-      const kpiAlosForSuite = KpiAlos.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
-      );
-      const kpiGiroForSuite = KpiGiro.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
-      );
-      const kpiTrevparForSuite = KpiTrevpar.find(
-        (kpi) => kpi.suiteCategoryName === suiteName,
-      );
+      const kpiAlosForSuite = KpiAlos.find((kpi) => kpi.suiteCategoryName === suiteName);
+      const kpiGiroForSuite = KpiGiro.find((kpi) => kpi.suiteCategoryName === suiteName);
+      const kpiTrevparForSuite = KpiTrevpar.find((kpi) => kpi.suiteCategoryName === suiteName);
 
       // Montar o objeto para cada suite
       return {
         [suiteName]: {
-          totalRentalsApartments:
-            kpiTotalRentalsForSuite?.totalRentalsApartments ?? 0,
+          totalRentalsApartments: kpiTotalRentalsForSuite?.totalRentalsApartments ?? 0,
           totalValue: Number(kpiRevenueForSuite?.totalValue ?? 0),
           totalTicketAverage: Number(kpiTicketAverageForSuite?.totalTicketAverage ?? 0),
           giro: Number(kpiGiroForSuite?.giro ?? 0),
           revpar: Number(kpiRevparForSuite?.revpar ?? 0),
           trevpar: Number(kpiTrevparForSuite?.trevpar ?? 0),
-          averageOccupationTime:
-            kpiAlosForSuite?.averageOccupationTime ?? '00:00:00',
+          averageOccupationTime: kpiAlosForSuite?.averageOccupationTime ?? '00:00:00',
           occupancyRate: Number(kpiOccupancyRateForSuite?.occupancyRate ?? 0),
         },
       };
     });
 
     const TotalResult: TotalResultDataSQL = {
-      totalAllRentalsApartments:
-        KpiTotalRentals[0]?.totalAllRentalsApartments || 0,
+      totalAllRentalsApartments: KpiTotalRentals[0]?.totalAllRentalsApartments || 0,
       totalAllValue: Number(KpiRevenue[0]?.totalAllValue ?? 0),
       totalAllTicketAverage: Number(KpiTicketAverage[0]?.totalAllTicketAverage) || 0,
       totalGiro: Number(KpiGiro[0]?.totalGiro ?? 0),
       totalRevpar: Number(KpiRevpar[0]?.totalRevpar) || 0,
       totalTrevpar: Number(KpiTrevpar[0]?.totalTrevpar) || 0,
-      totalAverageOccupationTime:
-        KpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00',
+      totalAverageOccupationTime: KpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00',
       totalOccupancyRate: Number(KpiOccupancyRate[0]?.totalOccupancyRate ?? 0),
     };
 
@@ -1018,13 +1027,13 @@ export class CompanyService {
     // Construindo BillingRentalType para formato ApexCharts
     const billingRentalType: ApexChartsSeriesData = {
       categories: periodsArray,
-      series: expectedRentalTypes.map(rentalType => ({
+      series: expectedRentalTypes.map((rentalType) => ({
         name: rentalType,
-        data: periodsArray.map(date => {
+        data: periodsArray.map((date) => {
           const rentalTypeData = billingRentalTypeMap[date]?.[rentalType];
           return rentalTypeData ? rentalTypeData.totalValue : 0;
-        })
-      }))
+        }),
+      })),
     };
 
     // Obter o dia atual no fuso horário da aplicação
@@ -1054,10 +1063,7 @@ export class CompanyService {
 
       // Agrupar os dados por data
       filteredKpiRevenueByPeriod.forEach((curr) => {
-        const dateKey = moment
-          .utc(curr.createdDate)
-          .tz('America/Sao_Paulo')
-          .format('DD/MM/YYYY');
+        const dateKey = moment.utc(curr.createdDate).tz('America/Sao_Paulo').format('DD/MM/YYYY');
         const totalValue = Number(curr.totalValue);
 
         if (!revenueByDateMap.has(dateKey)) {
@@ -1068,10 +1074,7 @@ export class CompanyService {
     } else {
       // Se o period não for LAST_6_M, não aplica o filtro, apenas agrupa normalmente
       KpiRevenueByPeriod.forEach((curr) => {
-        const dateKey = moment
-          .utc(curr.createdDate)
-          .tz('America/Sao_Paulo')
-          .format('DD/MM/YYYY');
+        const dateKey = moment.utc(curr.createdDate).tz('America/Sao_Paulo').format('DD/MM/YYYY');
         const totalValue = Number(curr.totalValue);
 
         if (!revenueByDateMap.has(dateKey)) {
@@ -1084,20 +1087,22 @@ export class CompanyService {
     // RevenueByDate no formato ApexCharts
     const revenueByDate: ApexChartsData = {
       categories: periodsArray,
-      series: periodsArray.map(date => revenueByDateMap.get(date) || 0)
+      series: periodsArray.map((date) => revenueByDateMap.get(date) || 0),
     };
 
     // RevenueBySuiteCategory no formato ApexCharts
     const suiteRevenueData = suiteCategory
       .map((suite) => ({
         name: suite.description,
-        value: Number(KpiRevenue.find(kpi => kpi.suiteCategoryName === suite.description)?.totalValue ?? 0)
+        value: Number(
+          KpiRevenue.find((kpi) => kpi.suiteCategoryName === suite.description)?.totalValue ?? 0,
+        ),
       }))
       .sort((a, b) => b.value - a.value);
 
     const revenueBySuiteCategory: ApexChartsData = {
-      categories: suiteRevenueData.map(suite => suite.name),
-      series: suiteRevenueData.map(suite => suite.value)
+      categories: suiteRevenueData.map((suite) => suite.name),
+      series: suiteRevenueData.map((suite) => suite.value),
     };
 
     // Criar mapa de dados de rentals por data
@@ -1106,21 +1111,19 @@ export class CompanyService {
     // Verificar se o period é LAST_6_M
     if (period === 'LAST_6_M') {
       // Filtrar os dados do KpiTotalRentalsByPeriod
-      const filteredKpiTotalRentalsByPeriod = KpiTotalRentalsByPeriod.filter(
-        (record) => {
-          const recordDate = moment(new Date(record.createdDate));
-          const recordDay = recordDate.date();
+      const filteredKpiTotalRentalsByPeriod = KpiTotalRentalsByPeriod.filter((record) => {
+        const recordDate = moment(new Date(record.createdDate));
+        const recordDay = recordDate.date();
 
-          return (
-            recordDate.isBetween(
-              nowForCurrentDay.clone().subtract(6, 'months').startOf('month'),
-              nowForCurrentDay.clone().endOf('month'),
-              null,
-              '[]',
-            ) && recordDay === currentDayOfMonth
-          );
-        },
-      );
+        return (
+          recordDate.isBetween(
+            nowForCurrentDay.clone().subtract(6, 'months').startOf('month'),
+            nowForCurrentDay.clone().endOf('month'),
+            null,
+            '[]',
+          ) && recordDay === currentDayOfMonth
+        );
+      });
 
       // Agrupar os dados por data
       filteredKpiTotalRentalsByPeriod.forEach((curr) => {
@@ -1148,7 +1151,7 @@ export class CompanyService {
     // RentalsByDate no formato ApexCharts
     const rentalsByDate: ApexChartsData = {
       categories: periodsArray,
-      series: periodsArray.map(date => rentalsByDateMap.get(date) || 0)
+      series: periodsArray.map((date) => rentalsByDateMap.get(date) || 0),
     };
 
     // Criar mapa de dados de revpar por data
@@ -1181,7 +1184,6 @@ export class CompanyService {
         }
         revparByDateMap.set(dateKey, revparByDateMap.get(dateKey)! + totalRevpar);
       });
-
     } else {
       // Caso contrário, apenas agrupar os dados sem filtro
       KpiRevparByPeriod.forEach((curr) => {
@@ -1198,7 +1200,7 @@ export class CompanyService {
     // RevparByDate no formato ApexCharts
     const revparByDate: ApexChartsData = {
       categories: periodsArray,
-      series: periodsArray.map(date => revparByDateMap.get(date) || 0)
+      series: periodsArray.map((date) => revparByDateMap.get(date) || 0),
     };
 
     // Criar mapa de dados de ticket average por data
@@ -1207,21 +1209,19 @@ export class CompanyService {
     // Verificar se o period é LAST_6_M
     if (period === 'LAST_6_M') {
       // Filtrar os dados do KpiTicketAverageByPeriod
-      const filteredKpiTicketAverageByPeriod = KpiTicketAverageByPeriod.filter(
-        (record) => {
-          const recordDate = moment(new Date(record.createdDate));
-          const recordDay = recordDate.date();
+      const filteredKpiTicketAverageByPeriod = KpiTicketAverageByPeriod.filter((record) => {
+        const recordDate = moment(new Date(record.createdDate));
+        const recordDay = recordDate.date();
 
-          return (
-            recordDate.isBetween(
-              nowForCurrentDay.clone().subtract(6, 'months').startOf('month'),
-              nowForCurrentDay.clone().endOf('month'),
-              null,
-              '[]',
-            ) && recordDay === currentDayOfMonth
-          );
-        },
-      );
+        return (
+          recordDate.isBetween(
+            nowForCurrentDay.clone().subtract(6, 'months').startOf('month'),
+            nowForCurrentDay.clone().endOf('month'),
+            null,
+            '[]',
+          ) && recordDay === currentDayOfMonth
+        );
+      });
 
       // Agrupar os dados por data
       filteredKpiTicketAverageByPeriod.forEach((curr) => {
@@ -1231,7 +1231,10 @@ export class CompanyService {
         if (!ticketAverageByDateMap.has(dateKey)) {
           ticketAverageByDateMap.set(dateKey, 0);
         }
-        ticketAverageByDateMap.set(dateKey, ticketAverageByDateMap.get(dateKey)! + totalAllTicketAverage);
+        ticketAverageByDateMap.set(
+          dateKey,
+          ticketAverageByDateMap.get(dateKey)! + totalAllTicketAverage,
+        );
       });
     } else {
       // Caso contrário, apenas agrupar os dados sem filtro
@@ -1242,14 +1245,17 @@ export class CompanyService {
         if (!ticketAverageByDateMap.has(dateKey)) {
           ticketAverageByDateMap.set(dateKey, 0);
         }
-        ticketAverageByDateMap.set(dateKey, ticketAverageByDateMap.get(dateKey)! + totalAllTicketAverage);
+        ticketAverageByDateMap.set(
+          dateKey,
+          ticketAverageByDateMap.get(dateKey)! + totalAllTicketAverage,
+        );
       });
     }
 
     // TicketAverageByDate no formato ApexCharts
     const ticketAverageByDate: ApexChartsData = {
       categories: periodsArray,
-      series: periodsArray.map(date => ticketAverageByDateMap.get(date) || 0)
+      series: periodsArray.map((date) => ticketAverageByDateMap.get(date) || 0),
     };
 
     // Criar mapa de dados de trevpar por data
@@ -1290,7 +1296,7 @@ export class CompanyService {
     // TrevparByDate no formato ApexCharts
     const trevparByDate: ApexChartsData = {
       categories: periodsArray,
-      series: periodsArray.map(date => trevparByDateMap.get(date) || 0)
+      series: periodsArray.map((date) => trevparByDateMap.get(date) || 0),
     };
 
     // Criar mapa de dados de occupancy rate por data
@@ -1299,7 +1305,62 @@ export class CompanyService {
     // Verificar se o period é LAST_6_M
     if (period === 'LAST_6_M') {
       // Filtrar os dados do KpiOccupancyRateByPeriod
-      const filteredKpiOccupancyRateByPeriod = KpiOccupancyRateByPeriod.filter(
+      const filteredKpiOccupancyRateByPeriod = KpiOccupancyRateByPeriod.filter((record) => {
+        const recordDate = moment(new Date(record.createdDate));
+        const recordDay = recordDate.date();
+
+        return (
+          recordDate.isBetween(
+            nowForCurrentDay.clone().subtract(6, 'months').startOf('month'),
+            nowForCurrentDay.clone().endOf('month'),
+            null,
+            '[]',
+          ) && recordDay === currentDayOfMonth
+        );
+      });
+
+      // Agrupar os dados por data
+      filteredKpiOccupancyRateByPeriod.forEach((curr) => {
+        const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
+        const totalOccupancyRate = Number(curr.totalOccupancyRate);
+
+        if (!occupancyRateByDateMap.has(dateKey)) {
+          occupancyRateByDateMap.set(dateKey, 0);
+        }
+        occupancyRateByDateMap.set(
+          dateKey,
+          occupancyRateByDateMap.get(dateKey)! + totalOccupancyRate,
+        );
+      });
+    } else {
+      // Caso contrário, apenas agrupar os dados sem filtro
+      KpiOccupancyRateByPeriod.forEach((curr) => {
+        const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
+        const totalOccupancyRate = Number(curr.totalOccupancyRate);
+
+        if (!occupancyRateByDateMap.has(dateKey)) {
+          occupancyRateByDateMap.set(dateKey, 0);
+        }
+        occupancyRateByDateMap.set(
+          dateKey,
+          occupancyRateByDateMap.get(dateKey)! + totalOccupancyRate,
+        );
+      });
+    }
+
+    // OccupancyRateByDate no formato ApexCharts
+    const occupancyRateByDate: ApexChartsData = {
+      categories: periodsArray,
+      series: periodsArray.map((date) => occupancyRateByDateMap.get(date) || 0),
+    };
+
+    // Declarar formattedOccupancyRateBySuiteCategory fora do escopo do if
+    let formattedOccupancyRateBySuiteCategory: OccupancyBySuiteCategoryData[];
+
+    // Verificar se o period é LAST_6_M
+    if (period === 'LAST_6_M') {
+      // Filtrar os dados do KpiOccupancyRateBySuiteCategory
+      const filteredKpiOccupancyRateBySuiteCategory = KpiOccupancyRateBySuiteCategory.filter(
         (record) => {
           const recordDate = moment(new Date(record.createdDate));
           const recordDay = recordDate.date();
@@ -1315,59 +1376,12 @@ export class CompanyService {
         },
       );
 
-      // Agrupar os dados por data
-      filteredKpiOccupancyRateByPeriod.forEach((curr) => {
-        const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
-        const totalOccupancyRate = Number(curr.totalOccupancyRate);
-
-        if (!occupancyRateByDateMap.has(dateKey)) {
-          occupancyRateByDateMap.set(dateKey, 0);
-        }
-        occupancyRateByDateMap.set(dateKey, occupancyRateByDateMap.get(dateKey)! + totalOccupancyRate);
-      });
-    } else {
-      // Caso contrário, apenas agrupar os dados sem filtro
-      KpiOccupancyRateByPeriod.forEach((curr) => {
-        const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
-        const totalOccupancyRate = Number(curr.totalOccupancyRate);
-
-        if (!occupancyRateByDateMap.has(dateKey)) {
-          occupancyRateByDateMap.set(dateKey, 0);
-        }
-        occupancyRateByDateMap.set(dateKey, occupancyRateByDateMap.get(dateKey)! + totalOccupancyRate);
-      });
-    }
-
-    // OccupancyRateByDate no formato ApexCharts
-    const occupancyRateByDate: ApexChartsData = {
-      categories: periodsArray,
-      series: periodsArray.map(date => occupancyRateByDateMap.get(date) || 0)
-    };
-
-    // Declarar formattedOccupancyRateBySuiteCategory fora do escopo do if
-    let formattedOccupancyRateBySuiteCategory: OccupancyBySuiteCategoryData[];
-
-    // Verificar se o period é LAST_6_M
-    if (period === 'LAST_6_M') {
-      // Filtrar os dados do KpiOccupancyRateBySuiteCategory
-      const filteredKpiOccupancyRateBySuiteCategory =
-        KpiOccupancyRateBySuiteCategory.filter((record) => {
-          const recordDate = moment(new Date(record.createdDate));
-          const recordDay = recordDate.date();
-
-          return (
-            recordDate.isBetween(
-              nowForCurrentDay.clone().subtract(6, 'months').startOf('month'),
-              nowForCurrentDay.clone().endOf('month'),
-              null,
-              '[]',
-            ) && recordDay === currentDayOfMonth
-          );
-        });
-
       // Agrupar os dados por data e por categoria de suíte
-      const occupancyRateBySuiteCategory: Record<string, Record<string, { occupancyRate: string }>> =
-        filteredKpiOccupancyRateBySuiteCategory.reduce((acc, curr) => {
+      const occupancyRateBySuiteCategory: Record<
+        string,
+        Record<string, { occupancyRate: string }>
+      > = filteredKpiOccupancyRateBySuiteCategory.reduce(
+        (acc, curr) => {
           const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
           const suiteCategoryName = curr.suiteCategoryName;
           const occupancyRate = this.formatPercentage(Number(curr.occupancyRate));
@@ -1379,7 +1393,9 @@ export class CompanyService {
           acc[dateKey][suiteCategoryName] = { occupancyRate };
 
           return acc;
-        }, {} as Record<string, Record<string, { occupancyRate: string }>>);
+        },
+        {} as Record<string, Record<string, { occupancyRate: string }>>,
+      );
 
       // Formatar o resultado no formato desejado
       formattedOccupancyRateBySuiteCategory = Object.keys(occupancyRateBySuiteCategory).map(
@@ -1389,8 +1405,11 @@ export class CompanyService {
       );
     } else {
       // Caso contrário, apenas formatar os dados sem filtro
-      const occupancyRateBySuiteCategory: Record<string, Record<string, { occupancyRate: string }>> =
-        KpiOccupancyRateBySuiteCategory.reduce((acc, curr) => {
+      const occupancyRateBySuiteCategory: Record<
+        string,
+        Record<string, { occupancyRate: string }>
+      > = KpiOccupancyRateBySuiteCategory.reduce(
+        (acc, curr) => {
           const dateKey = moment(new Date(curr.createdDate)).format('DD/MM/YYYY');
           const suiteCategoryName = curr.suiteCategoryName;
           const occupancyRate = this.formatPercentage(Number(curr.occupancyRate));
@@ -1402,7 +1421,9 @@ export class CompanyService {
           acc[dateKey][suiteCategoryName] = { occupancyRate };
 
           return acc;
-        }, {} as Record<string, Record<string, { occupancyRate: string }>>);
+        },
+        {} as Record<string, Record<string, { occupancyRate: string }>>,
+      );
 
       // Formatar o resultado no formato desejado
       formattedOccupancyRateBySuiteCategory = Object.keys(occupancyRateBySuiteCategory).map(
@@ -1413,8 +1434,11 @@ export class CompanyService {
     }
 
     // Agrupar os dados por categoria de suíte e por dia da semana
-    const occupancyRateByWeek: Record<string, Record<string, { occupancyRate: number; totalOccupancyRate: number }>> = 
-      KpiOccupancyRateByWeek.reduce((acc, curr) => {
+    const occupancyRateByWeek: Record<
+      string,
+      Record<string, { occupancyRate: number; totalOccupancyRate: number }>
+    > = KpiOccupancyRateByWeek.reduce(
+      (acc, curr) => {
         const createdDate = new Date(curr.createdDate);
         const dayOfWeek = createdDate.toLocaleDateString('pt-BR', {
           weekday: 'long',
@@ -1435,7 +1459,9 @@ export class CompanyService {
         acc[suiteCategoryName][dayOfWeek].occupancyRate = Number(curr.occupancyRate);
 
         return acc;
-      }, {} as Record<string, Record<string, { occupancyRate: number; totalOccupancyRate: number }>>);
+      },
+      {} as Record<string, Record<string, { occupancyRate: number; totalOccupancyRate: number }>>,
+    );
 
     // Converte o objeto em um array de objetos
     const occupancyRateByWeekArray: WeeklyOccupancyData[] = Object.entries(occupancyRateByWeek).map(
@@ -1445,8 +1471,11 @@ export class CompanyService {
     );
 
     // Agrupar os dados por categoria de suíte e por dia da semana
-    const giroByWeek: Record<string, Record<string, { giro: Prisma.Decimal; totalGiro: Prisma.Decimal }>> = 
-      KpiGiroByWeek.reduce((acc, curr) => {
+    const giroByWeek: Record<
+      string,
+      Record<string, { giro: Prisma.Decimal; totalGiro: Prisma.Decimal }>
+    > = KpiGiroByWeek.reduce(
+      (acc, curr) => {
         const createdDate = new Date(curr.createdDate);
         const dayOfWeek = createdDate.toLocaleDateString('pt-BR', {
           weekday: 'long',
@@ -1467,7 +1496,9 @@ export class CompanyService {
         acc[suiteCategoryName][dayOfWeek].giro = curr.giro;
 
         return acc;
-      }, {} as Record<string, Record<string, { giro: Prisma.Decimal; totalGiro: Prisma.Decimal }>>);
+      },
+      {} as Record<string, Record<string, { giro: Prisma.Decimal; totalGiro: Prisma.Decimal }>>,
+    );
 
     // Converte o objeto em um array de objetos
     const giroByWeekArray: WeeklyGiroData[] = Object.entries(giroByWeek).map(([key, value]) => ({
@@ -1487,7 +1518,7 @@ export class CompanyService {
     const allSuiteCategories = new Set<string>();
 
     // Processar dados do KpiOccupancyRateBySuiteCategory
-    KpiOccupancyRateBySuiteCategory.forEach(item => {
+    KpiOccupancyRateBySuiteCategory.forEach((item) => {
       const dateKey = moment(item.createdDate).format('DD/MM/YYYY');
       const suiteCategoryName = item.suiteCategoryName;
       const occupancyRate = Number(item.occupancyRate) || 0;
@@ -1503,12 +1534,12 @@ export class CompanyService {
     // Criar series para cada categoria de suíte usando periodsArray como base (mesma lógica do OccupancyRateByDate)
     const occupancyRateBySuiteCategory: ApexChartsSeriesData = {
       categories: periodsArray,
-      series: Array.from(allSuiteCategories).map(suiteCategoryName => ({
+      series: Array.from(allSuiteCategories).map((suiteCategoryName) => ({
         name: suiteCategoryName,
-        data: periodsArray.map(date =>
-          occupancyBySuiteCategoryMap.get(date)?.get(suiteCategoryName) || 0
-        )
-      }))
+        data: periodsArray.map(
+          (date) => occupancyBySuiteCategoryMap.get(date)?.get(suiteCategoryName) || 0,
+        ),
+      })),
     };
 
     return {
@@ -1546,7 +1577,10 @@ export class CompanyService {
     return `${percentageValue.toFixed(2)}%`;
   }
 
-  private async fetchKpiData(startDate: Date, endDate: Date): Promise<[any[], any[], any[], any[], any[]]> {
+  private async fetchKpiData(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<[any[], any[], any[], any[], any[]]> {
     return await Promise.all([
       this.prisma.prismaLocal.rentalApartment.findMany({
         where: {
@@ -1662,7 +1696,6 @@ export class CompanyService {
   }
 
   async calculateKpisByDateRange(startDate: Date, endDate: Date): Promise<CompanyKpiResponse> {
-
     const [
       allRentalApartments,
       suiteCategories,
@@ -1671,10 +1704,13 @@ export class CompanyService {
       stockOutItems,
     ] = await this.fetchKpiData(startDate, endDate);
 
-    const groupedByStockOut = new Map<number, {
-      items: typeof stockOutItems;
-      discount: Prisma.Decimal;
-    }>();
+    const groupedByStockOut = new Map<
+      number,
+      {
+        items: typeof stockOutItems;
+        discount: Prisma.Decimal;
+      }
+    >();
 
     for (const stockOutItem of stockOutItems) {
       const stockOut = stockOutItem.stockOuts;
@@ -1721,7 +1757,7 @@ export class CompanyService {
 
     const kpisData: SuiteCategoryData[] = [];
     const daysTimeInSeconds = (endDate.getTime() - startDate.getTime()) / 1000;
-    
+
     const categoryTotalsMap: CategoryTotalsMap = suiteCategories.reduce((acc, suiteCategory) => {
       acc[suiteCategory.id] = {
         giroTotal: 0,
@@ -1767,8 +1803,7 @@ export class CompanyService {
       (map, stockOut) => {
         const priceSale = stockOut.stockOutItem
           .reduce(
-            (acc, item) =>
-              acc.plus(new Prisma.Decimal(item.priceSale).times(item.quantity)),
+            (acc, item) => acc.plus(new Prisma.Decimal(item.priceSale).times(item.quantity)),
             new Prisma.Decimal(0),
           )
           .minus(stockOut.sale?.discount || new Prisma.Decimal(0));
@@ -1843,13 +1878,12 @@ export class CompanyService {
           : new Prisma.Decimal(0);
 
         const priceSale = rentalApartment.saleLease?.stockOutId
-          ? stockOutMap[rentalApartment.saleLease.stockOutId] ||
-            new Prisma.Decimal(0)
+          ? stockOutMap[rentalApartment.saleLease.stockOutId] || new Prisma.Decimal(0)
           : new Prisma.Decimal(0);
 
-        totalsMap[rentalType].totalValue = totalsMap[
-          rentalType
-        ].totalValue.plus(permanenceValueLiquid.plus(priceSale));
+        totalsMap[rentalType].totalValue = totalsMap[rentalType].totalValue.plus(
+          permanenceValueLiquid.plus(priceSale),
+        );
       }
 
       // Cálculo do tempo indisponível por manutenção e limpeza
@@ -1867,14 +1901,8 @@ export class CompanyService {
             const cleaningEnd = new Date(cleaning.endDate);
 
             if (cleaningEnd > currentDate && cleaningStart < nextDate) {
-              const overlapStart = Math.max(
-                cleaningStart.getTime(),
-                currentDate.getTime(),
-              );
-              const overlapEnd = Math.min(
-                cleaningEnd.getTime(),
-                nextDate.getTime(),
-              );
+              const overlapStart = Math.max(cleaningStart.getTime(), currentDate.getTime());
+              const overlapEnd = Math.min(cleaningEnd.getTime(), nextDate.getTime());
 
               const cleaningTimeInSeconds = (overlapEnd - overlapStart) / 1000;
               const cleaningKey = `${suite.id}-${overlapStart}-${overlapEnd}`;
@@ -1893,20 +1921,12 @@ export class CompanyService {
           );
 
           suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect: any) => {
-            const defectStart = new Date(
-              blockedMaintenanceDefect.defect.startDate,
-            );
+            const defectStart = new Date(blockedMaintenanceDefect.defect.startDate);
             const defectEnd = new Date(blockedMaintenanceDefect.defect.endDate);
 
             if (defectEnd > currentDate && defectStart < nextDate) {
-              const overlapStart = Math.max(
-                defectStart.getTime(),
-                currentDate.getTime(),
-              );
-              const overlapEnd = Math.min(
-                defectEnd.getTime(),
-                nextDate.getTime(),
-              );
+              const overlapStart = Math.max(defectStart.getTime(), currentDate.getTime());
+              const overlapEnd = Math.min(defectEnd.getTime(), nextDate.getTime());
 
               const defectTimeInSeconds = (overlapEnd - overlapStart) / 1000;
 
@@ -1924,10 +1944,8 @@ export class CompanyService {
         (acc: number, category: any) => acc + category.suites.length,
         0,
       );
-      const daysTimeInSeconds =
-        (nextDate.getTime() - currentDate.getTime()) / 1000;
-      let availableTimeInSeconds =
-        daysTimeInSeconds * totalSuitesCounts - totalUnavailableTime;
+      const daysTimeInSeconds = (nextDate.getTime() - currentDate.getTime()) / 1000;
+      let availableTimeInSeconds = daysTimeInSeconds * totalSuitesCounts - totalUnavailableTime;
 
       if (availableTimeInSeconds < 0) {
         availableTimeInSeconds = 0;
@@ -1935,9 +1953,7 @@ export class CompanyService {
 
       // Calcular a taxa de ocupação
       const occupancyRateDecimal =
-        availableTimeInSeconds > 0
-          ? totalOccupiedTime / availableTimeInSeconds
-          : 0;
+        availableTimeInSeconds > 0 ? totalOccupiedTime / availableTimeInSeconds : 0;
 
       // Formatar a data para YYYY-MM-DD
       const dateKey = new Intl.DateTimeFormat('pt-BR').format(currentDate);
@@ -1980,14 +1996,8 @@ export class CompanyService {
             const cleaningEnd = new Date(cleaning.endDate);
 
             if (cleaningEnd > currentDate && cleaningStart < nextDate) {
-              const overlapStart = Math.max(
-                cleaningStart.getTime(),
-                currentDate.getTime(),
-              );
-              const overlapEnd = Math.min(
-                cleaningEnd.getTime(),
-                nextDate.getTime(),
-              );
+              const overlapStart = Math.max(cleaningStart.getTime(), currentDate.getTime());
+              const overlapEnd = Math.min(cleaningEnd.getTime(), nextDate.getTime());
 
               const cleaningTimeInSeconds = (overlapEnd - overlapStart) / 1000;
 
@@ -2006,20 +2016,12 @@ export class CompanyService {
           );
 
           suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect: any) => {
-            const defectStart = new Date(
-              blockedMaintenanceDefect.defect.startDate,
-            );
+            const defectStart = new Date(blockedMaintenanceDefect.defect.startDate);
             const defectEnd = new Date(blockedMaintenanceDefect.defect.endDate);
 
             if (defectEnd > currentDate && defectStart < nextDate) {
-              const overlapStart = Math.max(
-                defectStart.getTime(),
-                currentDate.getTime(),
-              );
-              const overlapEnd = Math.min(
-                defectEnd.getTime(),
-                nextDate.getTime(),
-              );
+              const overlapStart = Math.max(defectStart.getTime(), currentDate.getTime());
+              const overlapEnd = Math.min(defectEnd.getTime(), nextDate.getTime());
 
               const defectTimeInSeconds = (overlapEnd - overlapStart) / 1000;
 
@@ -2032,14 +2034,14 @@ export class CompanyService {
         });
 
         // Calcular o tempo indisponível total para a categoria
-        const categoryUnavailableTime = Array.from(
-          unavailableTimeMap.values(),
-        ).reduce((acc, time) => acc + time, 0);
+        const categoryUnavailableTime = Array.from(unavailableTimeMap.values()).reduce(
+          (acc, time) => acc + time,
+          0,
+        );
 
         const totalCategorySuitesCounts = suiteCategory.suites.length;
         let categoryAvailableTimeInSeconds =
-          daysTimeInSeconds * totalCategorySuitesCounts -
-          categoryUnavailableTime;
+          daysTimeInSeconds * totalCategorySuitesCounts - categoryUnavailableTime;
 
         if (categoryAvailableTimeInSeconds < 0) {
           categoryAvailableTimeInSeconds = 0;
@@ -2056,9 +2058,7 @@ export class CompanyService {
           dateToOccupancyRates[dateKey] = {};
         }
         dateToOccupancyRates[dateKey][suiteCategory.description] = {
-          occupancyRate: this.formatPercentageUpdate(
-            categoryOccupancyRateDecimal,
-          ),
+          occupancyRate: this.formatPercentageUpdate(categoryOccupancyRateDecimal),
         };
       });
 
@@ -2079,9 +2079,7 @@ export class CompanyService {
       const periodDays = 1;
       const giro = totalRentalsForDate / (totalSuites * periodDays);
       const ticketAverage =
-        totalRentalsForDate > 0
-          ? totalRevenueForDate.dividedBy(totalRentalsForDate).toNumber()
-          : 0;
+        totalRentalsForDate > 0 ? totalRevenueForDate.dividedBy(totalRentalsForDate).toNumber() : 0;
 
       // Cálculo do TrevPAR
       const totalTrevpar = giro * ticketAverage;
@@ -2110,8 +2108,7 @@ export class CompanyService {
 
         const rentalApartmentsInCategory = currentRentalApartments.filter(
           (rentalApartment: any) =>
-            rentalApartment.suiteStates.suite.suiteCategoryId ===
-            suiteCategory.id,
+            rentalApartment.suiteStates.suite.suiteCategoryId === suiteCategory.id,
         );
 
         rentalApartmentsInCategory.forEach((rentalApartment: any) => {
@@ -2124,10 +2121,7 @@ export class CompanyService {
       });
 
       // Calcular o RevPAR
-      const revpar =
-        totalSuitesCount > 0
-          ? totalRevenue.dividedBy(totalSuitesCount).toNumber()
-          : 0;
+      const revpar = totalSuitesCount > 0 ? totalRevenue.dividedBy(totalSuitesCount).toNumber() : 0;
 
       // Adiciona o RevPAR ao array
       revparByDate.push({
@@ -2138,9 +2132,7 @@ export class CompanyService {
 
       // Formata os resultados para o dia atual
       results[dateKey] = Object.keys(rentalTypeMap).map((rentalType) => {
-        const totalValue = totalsMap[rentalType]
-          ? totalsMap[rentalType].totalValue.toNumber()
-          : 0;
+        const totalValue = totalsMap[rentalType] ? totalsMap[rentalType].totalValue.toNumber() : 0;
 
         return {
           [rentalType]: {
@@ -2196,11 +2188,9 @@ export class CompanyService {
         occupancyByCategoryAndDay[suiteCategoryDescription] &&
         occupancyByCategoryAndDay[suiteCategoryDescription][dayOfWeek]
       ) {
-        const occupiedTime =
-          occupiedSuite.checkOut.getTime() - occupiedSuite.checkIn.getTime();
-        occupancyByCategoryAndDay[suiteCategoryDescription][
-          dayOfWeek
-        ].totalOccupiedTime += occupiedTime;
+        const occupiedTime = occupiedSuite.checkOut.getTime() - occupiedSuite.checkIn.getTime();
+        occupancyByCategoryAndDay[suiteCategoryDescription][dayOfWeek].totalOccupiedTime +=
+          occupiedTime;
       }
     });
 
@@ -2209,16 +2199,12 @@ export class CompanyService {
       const suitesInCategory = suiteCategory.suites;
       const suitesInCategoryCount = suitesInCategory.length;
 
-      for (const dayOfWeek in occupancyByCategoryAndDay[
-        suiteCategory.description
-      ]) {
+      for (const dayOfWeek in occupancyByCategoryAndDay[suiteCategory.description]) {
         let unavailableTimeCleaning = 0;
 
         // Calcular o tempo indisponível por limpeza
         const suiteCleanings = cleanings.filter((cleaning: any) => {
-          const cleaningDayOfWeek = moment
-            .tz(cleaning.startDate, timezone)
-            .format('dddd');
+          const cleaningDayOfWeek = moment.tz(cleaning.startDate, timezone).format('dddd');
           return (
             cleaning.suiteState.suiteId === suitesInCategory[0].id &&
             cleaningDayOfWeek === dayOfWeek
@@ -2227,9 +2213,7 @@ export class CompanyService {
 
         suiteCleanings.forEach((cleaning: any) => {
           const cleaningTimeInSeconds =
-            (new Date(cleaning.endDate).getTime() -
-              new Date(cleaning.startDate).getTime()) /
-            1000;
+            (new Date(cleaning.endDate).getTime() - new Date(cleaning.startDate).getTime()) / 1000;
           unavailableTimeCleaning += cleaningTimeInSeconds;
         });
 
@@ -2240,19 +2224,16 @@ export class CompanyService {
               .tz(blockedMaintenanceDefect.defect.startDate, timezone)
               .format('dddd');
             return (
-              blockedMaintenanceDefect.defect.suite.id ===
-                suitesInCategory[0].id && defectDayOfWeek === dayOfWeek
+              blockedMaintenanceDefect.defect.suite.id === suitesInCategory[0].id &&
+              defectDayOfWeek === dayOfWeek
             );
           },
         );
 
         suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect: any) => {
-          const startDefect = new Date(
-            blockedMaintenanceDefect.defect.startDate,
-          );
+          const startDefect = new Date(blockedMaintenanceDefect.defect.startDate);
           const endDefect = new Date(blockedMaintenanceDefect.defect.endDate);
-          const defectTimeInSeconds =
-            (endDefect.getTime() - startDefect.getTime()) / 1000;
+          const defectTimeInSeconds = (endDefect.getTime() - startDefect.getTime()) / 1000;
           unavailableTimeCleaning += defectTimeInSeconds;
         });
 
@@ -2264,25 +2245,19 @@ export class CompanyService {
           availableTimeInSeconds = 0;
         }
 
-        occupancyByCategoryAndDay[suiteCategory.description][
-          dayOfWeek
-        ].unavailableTime += unavailableTimeCleaning;
-        occupancyByCategoryAndDay[suiteCategory.description][
-          dayOfWeek
-        ].availableTime += availableTimeInSeconds * 1000;
+        occupancyByCategoryAndDay[suiteCategory.description][dayOfWeek].unavailableTime +=
+          unavailableTimeCleaning;
+        occupancyByCategoryAndDay[suiteCategory.description][dayOfWeek].availableTime +=
+          availableTimeInSeconds * 1000;
 
         // Calcular a taxa de ocupação
         const totalOccupiedTime =
-          occupancyByCategoryAndDay[suiteCategory.description][dayOfWeek]
-            .totalOccupiedTime;
+          occupancyByCategoryAndDay[suiteCategory.description][dayOfWeek].totalOccupiedTime;
         const occupancyRate =
-          availableTimeInSeconds > 0
-            ? (totalOccupiedTime / availableTimeInSeconds) * 100
-            : 0;
+          availableTimeInSeconds > 0 ? (totalOccupiedTime / availableTimeInSeconds) * 100 : 0;
 
-        occupancyByCategoryAndDay[suiteCategory.description][
-          dayOfWeek
-        ].occupancyRate = occupancyRate / 1000;
+        occupancyByCategoryAndDay[suiteCategory.description][dayOfWeek].occupancyRate =
+          occupancyRate / 1000;
       }
     }
 
@@ -2302,8 +2277,7 @@ export class CompanyService {
 
       const totalOccupancyRate =
         totalAvailableTimeAllCategories > 0
-          ? (totalOccupiedTimeAllCategories / totalAvailableTimeAllCategories) *
-            100
+          ? (totalOccupiedTimeAllCategories / totalAvailableTimeAllCategories) * 100
           : 0;
 
       totalOccupancyRateByDay[dayOfWeek] = totalOccupancyRate;
@@ -2355,8 +2329,7 @@ export class CompanyService {
 
       // Contar o número de locações por categoria
       rentalsForCurrentDay.forEach((rental: any) => {
-        const suiteCategoryDescription =
-          rental.suiteStates?.suite?.suiteCategories?.description;
+        const suiteCategoryDescription = rental.suiteStates?.suite?.suiteCategories?.description;
 
         if (!suiteCategoryDescription) {
           return;
@@ -2364,8 +2337,7 @@ export class CompanyService {
 
         // Incrementa o número de locações para a categoria e dia da semana
         if (giroByCategoryAndDay[suiteCategoryDescription]) {
-          giroByCategoryAndDay[suiteCategoryDescription][dayOfWeek]
-            .rentalsCount++;
+          giroByCategoryAndDay[suiteCategoryDescription][dayOfWeek].rentalsCount++;
         }
       });
 
@@ -2381,8 +2353,7 @@ export class CompanyService {
       allSuites += suitesInCategoryCount;
 
       for (const dayOfWeek in giroByCategoryAndDay[suiteCategory.description]) {
-        const categoryData =
-          giroByCategoryAndDay[suiteCategory.description][dayOfWeek];
+        const categoryData = giroByCategoryAndDay[suiteCategory.description][dayOfWeek];
 
         // Acumular locações por dia da semana
         if (!totalRentalsByDay[dayOfWeek]) {
@@ -2406,8 +2377,7 @@ export class CompanyService {
     // Calcular o totalGiro
     for (const suiteCategory of suiteCategories) {
       for (const dayOfWeek in giroByCategoryAndDay[suiteCategory.description]) {
-        const categoryData =
-          giroByCategoryAndDay[suiteCategory.description][dayOfWeek];
+        const categoryData = giroByCategoryAndDay[suiteCategory.description][dayOfWeek];
 
         if (!categoryData) continue;
 
@@ -2437,11 +2407,9 @@ export class CompanyService {
       giroByWeekArray.push(categoryData);
     }
 
-    const dataTableBillingRentalType = Object.entries(results).map(
-      ([date, rentals]) => ({
-        [date]: rentals,
-      }),
-    );
+    const dataTableBillingRentalType = Object.entries(results).map(([date, rentals]) => ({
+      [date]: rentals,
+    }));
 
     // Cálculo do RevenueByDate
     const revenueByDate: DateValueData[] = [];
@@ -2451,8 +2419,7 @@ export class CompanyService {
       const dateKey = new Intl.DateTimeFormat('pt-BR').format(currentDate);
       const allRentalApartmentsForDate = allRentalApartments.filter(
         (ra: any) =>
-          ra.checkIn >= currentDate &&
-          ra.checkIn < new Date(currentDate.getTime() + 86400000),
+          ra.checkIn >= currentDate && ra.checkIn < new Date(currentDate.getTime() + 86400000),
       );
 
       let totalValueForCurrentDate = new Prisma.Decimal(0);
@@ -2461,8 +2428,7 @@ export class CompanyService {
           ? new Prisma.Decimal(rentalApartment.permanenceValueLiquid)
           : new Prisma.Decimal(0);
         const priceSale = rentalApartment.saleLease?.stockOutId
-          ? stockOutMap[rentalApartment.saleLease.stockOutId] ||
-            new Prisma.Decimal(0)
+          ? stockOutMap[rentalApartment.saleLease.stockOutId] || new Prisma.Decimal(0)
           : new Prisma.Decimal(0);
 
         totalValueForCurrentDate = totalValueForCurrentDate.plus(
@@ -2487,9 +2453,7 @@ export class CompanyService {
 
       allRentalApartments.forEach((rentalApartment) => {
         if (
-          suitesInCategory.some(
-            (suite: any) => suite.id === rentalApartment.suiteStates?.suite?.id,
-          )
+          suitesInCategory.some((suite: any) => suite.id === rentalApartment.suiteStates?.suite?.id)
         ) {
           const permanenceValueLiquid = rentalApartment.permanenceValueLiquid
             ? new Prisma.Decimal(rentalApartment.permanenceValueLiquid)
@@ -2497,14 +2461,10 @@ export class CompanyService {
           let priceSale = new Prisma.Decimal(0);
 
           if (rentalApartment.saleLease?.stockOutId) {
-            priceSale =
-              stockOutMap[rentalApartment.saleLease.stockOutId] ||
-              new Prisma.Decimal(0);
+            priceSale = stockOutMap[rentalApartment.saleLease.stockOutId] || new Prisma.Decimal(0);
           }
 
-          totalValueForCategory = totalValueForCategory.plus(
-            permanenceValueLiquid.plus(priceSale),
-          );
+          totalValueForCategory = totalValueForCategory.plus(permanenceValueLiquid.plus(priceSale));
         }
       });
 
@@ -2519,8 +2479,7 @@ export class CompanyService {
       const suitesInCategoryCount = suiteCategory.suites.length;
       const occupiedSuitesInCategory = allRentalApartments.filter(
         (rentalApartment) =>
-          rentalApartment.suiteStates?.suite?.suiteCategoryId ===
-          suiteCategory.id,
+          rentalApartment.suiteStates?.suite?.suiteCategoryId === suiteCategory.id,
       );
 
       let totalOccupiedTime = 0;
@@ -2543,12 +2502,11 @@ export class CompanyService {
         const saleLease = occupiedSuite.saleLease;
         if (saleLease && saleLease.stockOut?.stockOutItem) {
           priceSale = saleLease.stockOut.stockOutItem.reduce(
-            (acc: { plus: (arg0: Prisma.Decimal) => any; }, item: { priceSale: Prisma.Decimal.Value; quantity: Prisma.Decimal.Value; }) =>
-              acc.plus(
-                new Prisma.Decimal(item.priceSale).times(
-                  new Prisma.Decimal(item.quantity),
-                ),
-              ),
+            (
+              acc: { plus: (arg0: Prisma.Decimal) => any },
+              item: { priceSale: Prisma.Decimal.Value; quantity: Prisma.Decimal.Value },
+            ) =>
+              acc.plus(new Prisma.Decimal(item.priceSale).times(new Prisma.Decimal(item.quantity))),
             new Prisma.Decimal(0),
           );
 
@@ -2571,13 +2529,9 @@ export class CompanyService {
           totalSale = totalSale.plus(priceSale);
 
           categoryTotalsMap[suiteCategory.id].categoryTotalSale =
-            categoryTotalsMap[suiteCategory.id].categoryTotalSale.plus(
-              priceSale,
-            );
+            categoryTotalsMap[suiteCategory.id].categoryTotalSale.plus(priceSale);
           categoryTotalsMap[suiteCategory.id].categoryTotalRental =
-            categoryTotalsMap[suiteCategory.id].categoryTotalRental.plus(
-              permanenceValueLiquid,
-            );
+            categoryTotalsMap[suiteCategory.id].categoryTotalRental.plus(permanenceValueLiquid);
         }
       });
 
@@ -2585,44 +2539,32 @@ export class CompanyService {
         const suiteDefectsAndMaintenances = blockedMaintenanceDefects.filter(
           (blockedMaintenanceDefect) =>
             blockedMaintenanceDefect.defect.suite.id === suite.id &&
-            blockedMaintenanceDefect.suiteState.suite.id === suite.id
+            blockedMaintenanceDefect.suiteState.suite.id === suite.id,
         );
 
         suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect) => {
-          const startDefect = new Date(
-            blockedMaintenanceDefect.defect.startDate,
-          );
+          const startDefect = new Date(blockedMaintenanceDefect.defect.startDate);
           const endDefect = new Date(blockedMaintenanceDefect.defect.endDate);
-          const startMaintenance = new Date(
-            blockedMaintenanceDefect.suiteState.startDate,
-          );
-          const endMaintenance = new Date(
-            blockedMaintenanceDefect.suiteState.endDate,
-          );
+          const startMaintenance = new Date(blockedMaintenanceDefect.suiteState.startDate);
+          const endMaintenance = new Date(blockedMaintenanceDefect.suiteState.endDate);
 
-          const defectTimeInSeconds =
-            (endDefect.getTime() - startDefect.getTime()) / 1000;
+          const defectTimeInSeconds = (endDefect.getTime() - startDefect.getTime()) / 1000;
           const maintenanceTimeInSeconds =
             (endMaintenance.getTime() - startMaintenance.getTime()) / 1000;
-          maxUnavailableTime += Math.max(
-            defectTimeInSeconds,
-            maintenanceTimeInSeconds,
-          );
+          maxUnavailableTime += Math.max(defectTimeInSeconds, maintenanceTimeInSeconds);
         });
 
         cleanings
           .filter((cleaning) => cleaning.suiteState.suiteId === suite.id)
           .forEach((cleaning) => {
             unavailableTimeCleaning +=
-              (new Date(cleaning.endDate).getTime() -
-                new Date(cleaning.startDate).getTime()) /
+              (new Date(cleaning.endDate).getTime() - new Date(cleaning.startDate).getTime()) /
               1000;
           });
       });
 
       const unavailableTime = maxUnavailableTime + unavailableTimeCleaning;
-      const availableTimeInSeconds =
-        daysTimeInSeconds * suitesInCategoryCount - unavailableTime;
+      const availableTimeInSeconds = daysTimeInSeconds * suitesInCategoryCount - unavailableTime;
 
       totalOccupiedTimeAllCategories += totalOccupiedTime;
       totalAvailableTimeAllCategories += availableTimeInSeconds;
@@ -2643,17 +2585,11 @@ export class CompanyService {
 
     const totalResult = {
       totalAllRentalsApartments: allRentals,
-      totalAllValue: this.formatCurrency(
-        Number(totalAllValue.plus(totalSaleDirect)),
-      ),
+      totalAllValue: this.formatCurrency(Number(totalAllValue.plus(totalSaleDirect))),
       totalAllTicketAverage:
         totalRentals > 0
           ? this.formatCurrency(
-              totalSale
-                .plus(totalRental)
-                .plus(totalSaleDirect)
-                .dividedBy(totalRentals)
-                .toNumber(),
+              totalSale.plus(totalRental).plus(totalSaleDirect).dividedBy(totalRentals).toNumber(),
             )
           : 'R$ 0,00',
       totalGiro: Number(
@@ -2699,9 +2635,7 @@ export class CompanyService {
 
         const ticketAverageSale =
           categoryData.categoryTotalRentals > 0
-            ? categoryData.categoryTotalSale
-                .dividedBy(categoryData.categoryTotalRentals)
-                .toNumber()
+            ? categoryData.categoryTotalSale.dividedBy(categoryData.categoryTotalRentals).toNumber()
             : 0;
 
         const ticketAverageRental =
@@ -2732,9 +2666,7 @@ export class CompanyService {
 
     const bigNumbers = {
       currentDate: {
-        totalAllValue: this.formatCurrency(
-          Number(totalAllValue.plus(totalSaleDirect)),
-        ),
+        totalAllValue: this.formatCurrency(Number(totalAllValue.plus(totalSaleDirect))),
         totalAllRentalsApartments: allRentals,
         totalAllTicketAverage: totalResult.totalAllTicketAverage,
         totalAllRevpar: totalResult.totalRevpar,
@@ -2775,16 +2707,15 @@ export class CompanyService {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
-  async calculateKpisByDateRangeSQL(startDate: Date, endDate: Date): Promise<CompanyKpiApexChartsResponse> {
+  async calculateKpisByDateRangeSQL(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<CompanyKpiApexChartsResponse> {
     // Controller já adiciona D+1, não precisa fazer novamente aqui
     // Formatação das datas para SQL (seguindo padrão do bookings.service)
-    const formattedStart = moment
-      .utc(startDate)
-      .format('YYYY-MM-DD HH:mm:ss');
+    const formattedStart = moment.utc(startDate).format('YYYY-MM-DD HH:mm:ss');
 
-    const formattedEnd = moment
-      .utc(endDate)
-      .format('YYYY-MM-DD HH:mm:ss');
+    const formattedEnd = moment.utc(endDate).format('YYYY-MM-DD HH:mm:ss');
 
     // Gera array completo de datas APENAS no período solicitado pelo usuário (exibição)
     const periodsArray: string[] = [];
@@ -3093,7 +3024,7 @@ export class CompanyService {
       ticketAverageByDateResult,
       trevparByDateResult,
       occupancyRateBySuiteCategoryResult,
-      suitesByCategoryResult
+      suitesByCategoryResult,
     ] = await Promise.all([
       this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([bigNumbersSQL])),
       this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalSaleDirectSQL])),
@@ -3109,7 +3040,8 @@ export class CompanyService {
     ]);
 
     // Processa BigNumbers
-    const totalSuitesCount = totalSuitesResult.length > 0 ? Number(totalSuitesResult[0].total_suites) || 1 : 1;
+    const totalSuitesCount =
+      totalSuitesResult.length > 0 ? Number(totalSuitesResult[0].total_suites) || 1 : 1;
     const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
 
     const bigNumbers: BigNumbersDataSQL = {
@@ -3130,13 +3062,12 @@ export class CompanyService {
       const totalOccupiedTime = Number(result.total_occupied_time) || 0;
 
       // Vendas diretas com correção para 100% precisão
-      const totalSaleDirect = totalSaleDirectResult && totalSaleDirectResult.length > 0
-        ? Number(totalSaleDirectResult[0].total_sale_direct) || 0
-        : 0;
+      const totalSaleDirect =
+        totalSaleDirectResult && totalSaleDirectResult.length > 0
+          ? Number(totalSaleDirectResult[0].total_sale_direct) || 0
+          : 0;
 
       // 🔍 INVESTIGAÇÃO REAL DAS VENDAS DIRETAS:
-
-
 
       // Executar a query investigativa
       try {
@@ -3162,7 +3093,6 @@ export class CompanyService {
           ORDER BY se.id, sei.id
         `;
 
-
         // Agrupar por venda para análise
         const vendasDetalhadas: any = {};
         let totalReceitaManual = 0;
@@ -3176,7 +3106,7 @@ export class CompanyService {
               venda_id: vendaId,
               desconto: Number(item.desconto_venda) || 0,
               itens: [],
-              receita_bruta: 0
+              receita_bruta: 0,
             };
           }
 
@@ -3185,7 +3115,7 @@ export class CompanyService {
             item_id: item.item_id,
             precovenda: Number(item.precovenda),
             quantidade: Number(item.quantidade),
-            valor_item: valorItem
+            valor_item: valorItem,
           });
 
           vendasDetalhadas[vendaId].receita_bruta += valorItem;
@@ -3195,26 +3125,27 @@ export class CompanyService {
         Object.values(vendasDetalhadas).forEach((venda: any) => {
           totalReceitaManual += venda.receita_bruta;
           totalDescontoManual += venda.desconto;
-
         });
-
-
-
       } catch (error) {
         // Erro na investigação ignorado para não quebrar o fluxo
       }
-
-
-
 
       // totalAllValue = locação + vendas diretas
       const finalTotalAllValue = totalAllValue + totalSaleDirect;
 
       // Cálculos baseados na função original
-      const avgTicket = totalRentals > 0 ? Number((finalTotalAllValue / totalRentals).toFixed(2)) : 0;
-      const giro = totalSuitesCount > 0 && daysDiff > 0 ? Number((totalRentals / totalSuitesCount / daysDiff).toFixed(2)) : 0;
-      const trevpar = totalSuitesCount > 0 && daysDiff > 0 ? Number((finalTotalAllValue / totalSuitesCount / daysDiff).toFixed(2)) : 0;
-      const avgOccupationTime = totalRentals > 0 ? this.formatTime(totalOccupiedTime / totalRentals) : '00:00:00';
+      const avgTicket =
+        totalRentals > 0 ? Number((finalTotalAllValue / totalRentals).toFixed(2)) : 0;
+      const giro =
+        totalSuitesCount > 0 && daysDiff > 0
+          ? Number((totalRentals / totalSuitesCount / daysDiff).toFixed(2))
+          : 0;
+      const trevpar =
+        totalSuitesCount > 0 && daysDiff > 0
+          ? Number((finalTotalAllValue / totalSuitesCount / daysDiff).toFixed(2))
+          : 0;
+      const avgOccupationTime =
+        totalRentals > 0 ? this.formatTime(totalOccupiedTime / totalRentals) : '00:00:00';
 
       bigNumbers.currentDate = {
         totalAllValue: Number(finalTotalAllValue.toFixed(2)),
@@ -3237,7 +3168,6 @@ export class CompanyService {
       revenueDataMap.set(dateKey, item);
     });
 
-
     const revenueByDate: ApexChartsData = {
       categories: [...periodsArray],
       series: [...periodsArray].map((dateKey: string) => {
@@ -3246,10 +3176,9 @@ export class CompanyService {
       }),
     };
 
-
     const revenueBySuiteCategory: ApexChartsData = {
-      categories: revenueBySuiteCategoryResult.map(item => item.suite_category),
-      series: revenueBySuiteCategoryResult.map(item => Number(item.category_revenue) || 0)
+      categories: revenueBySuiteCategoryResult.map((item) => item.suite_category),
+      series: revenueBySuiteCategoryResult.map((item) => Number(item.category_revenue) || 0),
     };
 
     // Mapeamento de dados do BillingRentalType
@@ -3264,19 +3193,25 @@ export class CompanyService {
     });
 
     // BillingRentalType seguindo padrão do bookings.service
-    const allRentalTypes = ['THREE_HOURS', 'SIX_HOURS', 'TWELVE_HOURS', 'DAY_USE', 'DAILY', 'OVERNIGHT'];
+    const allRentalTypes = [
+      'THREE_HOURS',
+      'SIX_HOURS',
+      'TWELVE_HOURS',
+      'DAY_USE',
+      'DAILY',
+      'OVERNIGHT',
+    ];
 
     const billingRentalType: ApexChartsSeriesData = {
       categories: [...periodsArray],
-      series: allRentalTypes.map(rentalType => ({
+      series: allRentalTypes.map((rentalType) => ({
         name: rentalType,
         data: [...periodsArray].map((dateKey: string) => {
           const item = billingDataMap.get(dateKey);
           return item && item[rentalType] ? item[rentalType] : 0;
-        })
-      }))
+        }),
+      })),
     };
-
 
     // Criar mapeamento de dados para RentalsByDate (seguindo padrão do bookings.service)
     const rentalsDataMap = new Map();
@@ -3295,14 +3230,14 @@ export class CompanyService {
     };
 
     // Obter total de suítes (já consultado no Promise.all)
-    const totalSuites = totalSuitesResult.length > 0 ? Number(totalSuitesResult[0].total_suites) || 1 : 1;
+    const totalSuites =
+      totalSuitesResult.length > 0 ? Number(totalSuitesResult[0].total_suites) || 1 : 1;
 
     // Calcular REVPAR usando a receita já calculada e o número de suítes
     const revparByDate: ApexChartsData = {
       categories: revenueByDate.categories,
-      series: revenueByDate.series.map(revenue => Number((revenue / totalSuites).toFixed(2)))
+      series: revenueByDate.series.map((revenue) => Number((revenue / totalSuites).toFixed(2))),
     };
-
 
     // Criar mapeamento de dados para TicketAverageByDate (seguindo padrão do bookings.service)
     const ticketDataMap = new Map();
@@ -3319,7 +3254,6 @@ export class CompanyService {
         return item ? Number((Number(item.avg_ticket) || 0).toFixed(2)) : 0;
       }),
     };
-
 
     // Criar mapeamento de dados para TrevparByDate (seguindo padrão do bookings.service)
     const trevparDataMap = new Map();
@@ -3340,12 +3274,11 @@ export class CompanyService {
     // Calcular OccupancyRateByDate - Taxa de ocupação por data (usando dados já coletados)
     const occupancyRateByDate: ApexChartsData = {
       categories: rentalsByDate.categories,
-      series: rentalsByDate.series.map(rentals => {
-        const occupancyRate = (rentals / totalSuites);
+      series: rentalsByDate.series.map((rentals) => {
+        const occupancyRate = rentals / totalSuites;
         return Number(occupancyRate.toFixed(2));
-      })
+      }),
     };
-
 
     // Calcular taxa de ocupação por categoria (formato ApexCharts com dates em categories e suites em series)
     const occupancyBySuiteCategoryMap = new Map<string, Map<string, number>>();
@@ -3353,14 +3286,18 @@ export class CompanyService {
     const allDatesSet = new Set<string>();
 
     // Processar dados do occupancyRateBySuiteCategoryResult
-    occupancyRateBySuiteCategoryResult.forEach(item => {
+    occupancyRateBySuiteCategoryResult.forEach((item) => {
       const dateKey = moment(item.rental_date).format('DD/MM/YYYY');
       const suiteCategoryName = item.suite_category;
       const totalRentals = Number(item.total_rentals) || 0;
 
       // Calcular taxa de ocupação baseada no número de suítes da categoria
-      const categoryInfo = suitesByCategoryResult.find(s => s.suite_category === suiteCategoryName);
-      const totalSuitesInCategory = categoryInfo ? Number(categoryInfo.total_suites_in_category) : 1;
+      const categoryInfo = suitesByCategoryResult.find(
+        (s) => s.suite_category === suiteCategoryName,
+      );
+      const totalSuitesInCategory = categoryInfo
+        ? Number(categoryInfo.total_suites_in_category)
+        : 1;
       const occupancyRate = Number((totalRentals / totalSuitesInCategory).toFixed(2));
 
       allDatesSet.add(dateKey);
@@ -3382,12 +3319,12 @@ export class CompanyService {
     // Criar series para cada categoria de suíte
     const occupancyRateBySuiteCategory: ApexChartsSeriesData = {
       categories: sortedDates,
-      series: Array.from(allSuiteCategoriesSet).map(suiteCategoryName => ({
+      series: Array.from(allSuiteCategoriesSet).map((suiteCategoryName) => ({
         name: suiteCategoryName,
-        data: sortedDates.map(date =>
-          occupancyBySuiteCategoryMap.get(date)?.get(suiteCategoryName) || 0
-        )
-      }))
+        data: sortedDates.map(
+          (date) => occupancyBySuiteCategoryMap.get(date)?.get(suiteCategoryName) || 0,
+        ),
+      })),
     };
 
     // === IMPLEMENTAÇÃO DO DATATABLESUITEACATEGORY ===
@@ -3455,10 +3392,10 @@ export class CompanyService {
     `;
 
     // Calcular período em dias (igual ao BigNumbers)
-    const periodDays = (moment(endDate).diff(moment(startDate), 'days')) + 1;
+    const periodDays = moment(endDate).diff(moment(startDate), 'days') + 1;
 
     // Transformar os resultados no formato esperado com cálculos corretos
-    const dataTableSuiteCategory: any[] = suiteCategoryKpisResult.map(item => {
+    const dataTableSuiteCategory: any[] = suiteCategoryKpisResult.map((item) => {
       const totalRentals = Number(item.total_rentals) || 0;
       const totalValue = Number(item.total_value) || 0;
       const rentalRevenue = Number(item.rental_revenue) || 0;
@@ -3467,9 +3404,18 @@ export class CompanyService {
 
       // Aplicar as mesmas fórmulas do BigNumbers
       const ticketAverage = totalRentals > 0 ? totalValue / totalRentals : 0;
-      const giro = totalSuitesInCategory > 0 && periodDays > 0 ? totalRentals / totalSuitesInCategory / periodDays : 0;
-      const revpar = totalSuitesInCategory > 0 && periodDays > 0 ? rentalRevenue / totalSuitesInCategory / periodDays : 0;
-      const trevpar = totalSuitesInCategory > 0 && periodDays > 0 ? totalValue / totalSuitesInCategory / periodDays : 0;
+      const giro =
+        totalSuitesInCategory > 0 && periodDays > 0
+          ? totalRentals / totalSuitesInCategory / periodDays
+          : 0;
+      const revpar =
+        totalSuitesInCategory > 0 && periodDays > 0
+          ? rentalRevenue / totalSuitesInCategory / periodDays
+          : 0;
+      const trevpar =
+        totalSuitesInCategory > 0 && periodDays > 0
+          ? totalValue / totalSuitesInCategory / periodDays
+          : 0;
       const avgOccupationTime = totalRentals > 0 ? totalOccupiedTime / totalRentals : 0;
       const occupancyRate = totalSuitesInCategory > 0 ? totalRentals / totalSuitesInCategory : 0;
 
@@ -3483,7 +3429,7 @@ export class CompanyService {
           trevpar: Number(trevpar.toFixed(2)),
           averageOccupationTime: this.formatTime(avgOccupationTime),
           occupancyRate: Number(occupancyRate.toFixed(2)),
-        }
+        },
       };
     });
 
@@ -3566,9 +3512,9 @@ export class CompanyService {
 
     // Calcular taxa de ocupação total por dia da semana
     const totalOccupancyByDay: { [key: string]: number } = {};
-    const dayTotals: { [key: string]: { rentals: number, totalSuites: number, days: number } } = {};
+    const dayTotals: { [key: string]: { rentals: number; totalSuites: number; days: number } } = {};
 
-    occupancyRateByWeekResult.forEach(item => {
+    occupancyRateByWeekResult.forEach((item) => {
       const dayKey = item.day_of_week;
       if (!dayTotals[dayKey]) {
         dayTotals[dayKey] = { rentals: 0, totalSuites: 0, days: Number(item.days_count) };
@@ -3578,15 +3524,16 @@ export class CompanyService {
     });
 
     Object.entries(dayTotals).forEach(([day, totals]) => {
-      totalOccupancyByDay[day] = totals.totalSuites > 0 && totals.days > 0
-        ? totals.rentals / (totals.totalSuites * totals.days)
-        : 0;
+      totalOccupancyByDay[day] =
+        totals.totalSuites > 0 && totals.days > 0
+          ? totals.rentals / (totals.totalSuites * totals.days)
+          : 0;
     });
 
     // Transformar os resultados no formato esperado (WeeklyOccupancyData[])
     const occupancyByCategory: { [category: string]: { [day: string]: any } } = {};
 
-    occupancyRateByWeekResult.forEach(item => {
+    occupancyRateByWeekResult.forEach((item) => {
       const categoryName = item.suite_category_name;
       const dayName = item.day_of_week;
 
@@ -3603,7 +3550,7 @@ export class CompanyService {
     const dataTableOccupancyRateByWeek: any[] = Object.entries(occupancyByCategory).map(
       ([categoryName, dayData]) => ({
         [categoryName]: dayData,
-      })
+      }),
     );
 
     // === IMPLEMENTAÇÃO DO DATATABLEGIROBYWEEK ===
@@ -3710,7 +3657,7 @@ export class CompanyService {
     // Transformar os resultados no formato esperado (WeeklyGiroData[])
     const giroByCategory: { [category: string]: { [day: string]: any } } = {};
 
-    giroByWeekResult.forEach(item => {
+    giroByWeekResult.forEach((item) => {
       const categoryName = item.suite_category_name;
       const dayName = item.day_of_week;
 
@@ -3727,7 +3674,7 @@ export class CompanyService {
     const dataTableGiroByWeek: any[] = Object.entries(giroByCategory).map(
       ([categoryName, dayData]) => ({
         [categoryName]: dayData,
-      })
+      }),
     );
 
     // Retornos temporários (serão implementados um por vez)
@@ -3749,25 +3696,25 @@ export class CompanyService {
         totalAllValue: Number(bigNumbers.currentDate.totalAllValue.toFixed(2)),
         totalAllTicketAverage: Number(bigNumbers.currentDate.totalAllTicketAverage.toFixed(2)),
         totalGiro: Number(bigNumbers.currentDate.totalAllGiro.toFixed(2)),
-        totalRevpar: Number((bigNumbers.currentDate.totalAllRentalsApartments > 0 ? (revenueByDate.series.reduce((sum, val) => sum + val, 0) / totalSuites / daysDiff) : 0).toFixed(2)),
+        totalRevpar: Number(
+          (bigNumbers.currentDate.totalAllRentalsApartments > 0
+            ? revenueByDate.series.reduce((sum, val) => sum + val, 0) / totalSuites / daysDiff
+            : 0
+          ).toFixed(2),
+        ),
         totalTrevpar: Number(bigNumbers.currentDate.totalAllTrevpar.toFixed(2)),
         totalAverageOccupationTime: bigNumbers.currentDate.totalAverageOccupationTime,
-        totalOccupancyRate: Number((bigNumbers.currentDate.totalAllRentalsApartments / totalSuites).toFixed(2)),
+        totalOccupancyRate: Number(
+          (bigNumbers.currentDate.totalAllRentalsApartments / totalSuites).toFixed(2),
+        ),
       },
       DataTableOccupancyRateByWeek: dataTableOccupancyRateByWeek,
       DataTableGiroByWeek: dataTableGiroByWeek,
     };
   }
 
-  private determineRentalPeriod(
-    checkIn: Date,
-    checkOut: Date,
-    Booking: any,
-  ): string {
-    const occupationTimeSeconds = this.calculateOccupationTime(
-      checkIn,
-      checkOut,
-    );
+  private determineRentalPeriod(checkIn: Date, checkOut: Date, Booking: any): string {
+    const occupationTimeSeconds = this.calculateOccupationTime(checkIn, checkOut);
 
     // Convertendo check-in e check-out para objetos Date
     const checkInDate = new Date(checkIn);
@@ -3808,8 +3755,7 @@ export class CompanyService {
       // Verificacao para Diaria
       if (
         occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
-        (checkInHour <= 15 &&
-          (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
+        (checkInHour <= 15 && (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
       ) {
         return 'DAILY';
       }

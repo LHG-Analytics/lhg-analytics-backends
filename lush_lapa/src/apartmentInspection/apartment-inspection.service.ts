@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PeriodEnum } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,11 +12,7 @@ export class ApartmentInspectionService {
 
   constructor(private prisma: PrismaService) {}
 
-  async findAllInspections(
-    startDate: Date,
-    endDate: Date,
-    period?: PeriodEnum,
-  ): Promise<any> {
+  async findAllInspections(startDate: Date, endDate: Date, period?: PeriodEnum): Promise<any> {
     try {
       const companyId = 1; // Defina o ID da empresa conforme necessário
 
@@ -34,42 +25,40 @@ export class ApartmentInspectionService {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       }
 
-
       // Obtendo os dados de inspeção dentro do período fornecido
-      const inspections =
-        await this.prisma.prismaLocal.apartmentInspection.findMany({
-          where: {
-            startDate: {
-              gte: startDate,
-              lte: endDate,
-            },
-            reasonEnd: 'APROVADA', // Filtrar apenas as inspeções aprovadas
-            user: {
-              employee: {
-                role: {
-                  id: {
-                    equals: 24,
-                  },
+      const inspections = await this.prisma.prismaLocal.apartmentInspection.findMany({
+        where: {
+          startDate: {
+            gte: startDate,
+            lte: endDate,
+          },
+          reasonEnd: 'APROVADA', // Filtrar apenas as inspeções aprovadas
+          user: {
+            employee: {
+              role: {
+                id: {
+                  equals: 24,
                 },
               },
             },
           },
-          include: {
-            user: {
-              include: {
-                employee: {
-                  include: {
-                    personPaper: {
-                      include: {
-                        person: true,
-                      },
+        },
+        include: {
+          user: {
+            include: {
+              employee: {
+                include: {
+                  personPaper: {
+                    include: {
+                      person: true,
                     },
                   },
                 },
               },
             },
           },
-        });
+        },
+      });
 
       if (!inspections || inspections.length === 0) {
         // Return empty structure instead of throwing error
@@ -78,13 +67,12 @@ export class ApartmentInspectionService {
           inspectionsBySupervisor: { categories: [], series: [] },
           totalInspections: 0,
           averageInspectionTime: 0,
-          completionRate: 0
+          completionRate: 0,
         };
       }
 
       // Estrutura para armazenar os dados agrupados por supervisor
-      const groupedBySupervisors: Record<string, { totalInspections: number }> =
-        {};
+      const groupedBySupervisors: Record<string, { totalInspections: number }> = {};
 
       // Variável para acumular o total de inspeções
       let totalAllInspections = 0;
@@ -109,8 +97,7 @@ export class ApartmentInspectionService {
       // Inserir os dados no banco de dados
       await Promise.all(
         Object.keys(groupedBySupervisors).map(async (supervisorName) => {
-          const totalInspections =
-            groupedBySupervisors[supervisorName].totalInspections;
+          const totalInspections = groupedBySupervisors[supervisorName].totalInspections;
 
           // Formatar os dados para inserção
           const dataToInsert = {
@@ -131,15 +118,11 @@ export class ApartmentInspectionService {
     } catch (error) {
       this.logger.error('Error in findAllInspections:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException(
-        `Failed to fetch Inspections: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to fetch Inspections: ${errorMessage}`);
     }
   }
 
-  private async insertInspections(
-    data: ApartmentInspection,
-  ): Promise<ApartmentInspection> {
+  private async insertInspections(data: ApartmentInspection): Promise<ApartmentInspection> {
     return this.prisma.prismaOnline.inspections.upsert({
       where: {
         employeeName_period_createdDate: {
@@ -173,20 +156,16 @@ export class ApartmentInspectionService {
     startDateLast7Days.setHours(4, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast7Days,
-      endDate: parsedEndDateLast7Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast7Days),
-      this.formatDateString(endDateLast7Days),
-    );
+    const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
     previousStartDateLast7Days.setHours(4, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -199,12 +178,8 @@ export class ApartmentInspectionService {
     );
 
     // Log para verificar as datas
-    const startTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob Inspections - últimos 7 dias: ${startTimeLast7Days}`,
-    );
+    const startTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob Inspections - últimos 7 dias: ${startTimeLast7Days}`);
 
     // Chamar a função para o período atual
     await this.findAllInspections(
@@ -219,12 +194,8 @@ export class ApartmentInspectionService {
       PeriodEnum.LAST_7_D,
     );
 
-    const endTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob Inspections - últimos 7 dias: ${endTimeLast7Days}`,
-    );
+    const endTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob Inspections - últimos 7 dias: ${endTimeLast7Days}`);
 
     // Últimos 30 dias
     const endDateLast30Days = currentDate;
@@ -235,22 +206,16 @@ export class ApartmentInspectionService {
     startDateLast30Days.setHours(4, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast30Days,
-      endDate: parsedEndDateLast30Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast30Days),
-      this.formatDateString(endDateLast30Days),
-    );
+    const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
     previousStartDateLast30Days.setHours(4, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -263,12 +228,8 @@ export class ApartmentInspectionService {
     );
 
     // Log para verificar as datas
-    const startTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob Inspections - últimos 30 dias: ${startTimeLast30Days}`,
-    );
+    const startTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob Inspections - últimos 30 dias: ${startTimeLast30Days}`);
 
     // Chamar a função para o período atual
     await this.findAllInspections(
@@ -283,12 +244,8 @@ export class ApartmentInspectionService {
       PeriodEnum.LAST_30_D,
     );
 
-    const endTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob Inspections - últimos 30 dias: ${endTimeLast30Days}`,
-    );
+    const endTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob Inspections - últimos 30 dias: ${endTimeLast30Days}`);
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = currentDate;
@@ -299,22 +256,16 @@ export class ApartmentInspectionService {
     startDateLast6Months.setHours(4, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast6Months,
-      endDate: parsedEndDateLast6Months,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast6Months),
-      this.formatDateString(endDateLast6Months),
-    );
+    const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
-    const previousStartDateLast6Months = new Date(
-      previousParsedEndDateLast6Months,
-    );
-    previousStartDateLast6Months.setMonth(
-      previousStartDateLast6Months.getMonth() - 6,
-    );
+    const previousStartDateLast6Months = new Date(previousParsedEndDateLast6Months);
+    previousStartDateLast6Months.setMonth(previousStartDateLast6Months.getMonth() - 6);
     previousStartDateLast6Months.setHours(4, 0, 0, 0); // Configuração de horas
 
     // Parse as datas para o formato desejado
@@ -327,12 +278,8 @@ export class ApartmentInspectionService {
     );
 
     // Log para verificar as datas
-    const startTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob Inspections - últimos 6 meses: ${startTimeLast6Months}`,
-    );
+    const startTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob Inspections - últimos 6 meses: ${startTimeLast6Months}`);
 
     // Chamar a função para o período atual
     await this.findAllInspections(
@@ -347,12 +294,8 @@ export class ApartmentInspectionService {
       PeriodEnum.LAST_6_M,
     );
 
-    const endTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob Inspections - últimos 6 meses: ${endTimeLast6Months}`,
-    );
+    const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob Inspections - últimos 6 meses: ${endTimeLast6Months}`);
   }
 
   private formatDateString(date: Date): string {
@@ -371,9 +314,7 @@ export class ApartmentInspectionService {
     const [startDay, startMonth, startYear] = startDateString.split('/');
     const [endDay, endMonth, endYear] = endDateString.split('/');
 
-    const parsedStartDate = new Date(
-      Date.UTC(+startYear, +startMonth - 1, +startDay),
-    );
+    const parsedStartDate = new Date(Date.UTC(+startYear, +startMonth - 1, +startDay));
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
     parsedStartDate.setUTCHours(4, 0, 0, 0); // Define início às 04:00

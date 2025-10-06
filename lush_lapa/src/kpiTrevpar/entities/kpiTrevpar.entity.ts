@@ -6,7 +6,7 @@ export class KpiTrevpar implements Prisma.KpiTrevparUncheckedCreateInput {
   suiteCategoryName: string;
   trevpar!: Prisma.Decimal;
   totalTrevpar!: Prisma.Decimal;
-  period?: PeriodEnum | null;  // <-- ajuste aqui
+  period?: PeriodEnum | null; // <-- ajuste aqui
   createdDate: Date;
   companyId: number;
 
@@ -31,9 +31,7 @@ export class KpiTrevpar implements Prisma.KpiTrevparUncheckedCreateInput {
   }
 }
 
-export class KpiTrevparByPeriod
-  implements Prisma.KpiTrevparByPeriodUncheckedCreateInput
-{
+export class KpiTrevparByPeriod implements Prisma.KpiTrevparByPeriodUncheckedCreateInput {
   id?: number;
   totalTrevpar!: Prisma.Decimal;
   period?: PeriodEnum | null; // <-- ajuste aqui

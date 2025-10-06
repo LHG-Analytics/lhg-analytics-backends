@@ -25,13 +25,7 @@ export class UserResponseDto {
   @IsString({ message: 'O nome da empresa deve ser uma string' })
   company: string;
 
-  constructor(
-    email: string,
-    name: string,
-    cpf: string,
-    company: string,
-    role?: Role,
-  ) {
+  constructor(email: string, name: string, cpf: string, company: string, role?: Role) {
     this.email = email;
     this.name = name;
     this.cpf = cpf;

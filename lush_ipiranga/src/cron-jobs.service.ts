@@ -63,12 +63,8 @@ export class CronJobsService {
     }
 
     this.isJobRunning = true; // Define a flag como true
-    const startTime = moment()
-      .tz('America/Sao_Paulo')
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início da execução dos CronJobs do Lush Ipiranga: ${startTime}`,
-    );
+    const startTime = moment().tz('America/Sao_Paulo').format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início da execução dos CronJobs do Lush Ipiranga: ${startTime}`);
 
     try {
       await this.kpiAlosService.handleCron();
@@ -94,9 +90,7 @@ export class CronJobsService {
       this.isJobRunning = false; // Define a flag como false no final
     }
 
-    const endTime = moment()
-      .tz('America/Sao_Paulo')
-      .format('DD-MM-YYYY HH:mm:ss');
+    const endTime = moment().tz('America/Sao_Paulo').format('DD-MM-YYYY HH:mm:ss');
     console.log(`Fim da execução dos CronJobs do Lush Ipiranga: ${endTime}`);
   }
 
@@ -106,7 +100,9 @@ export class CronJobsService {
 
   async startBackgroundExecution(): Promise<any> {
     if (this.isJobRunning) {
-      throw new Error('Cron jobs já estão em execução. Use GET /status/{jobId} para acompanhar o progresso.');
+      throw new Error(
+        'Cron jobs já estão em execução. Use GET /status/{jobId} para acompanhar o progresso.',
+      );
     }
 
     const jobId = this.generateJobId();
@@ -115,7 +111,7 @@ export class CronJobsService {
       status: 'running',
       startTime: new Date(),
       progress: 0,
-      currentTask: 'Iniciando execução dos cron jobs...'
+      currentTask: 'Iniciando execução dos cron jobs...',
     };
 
     this.jobs.set(jobId, jobStatus);
@@ -139,14 +135,14 @@ export class CronJobsService {
         { name: 'BookingsRepresentativeness', service: this.bookingsRepresentativeness },
         { name: 'RestaurantRevenue', service: this.restaurantRevenue },
         { name: 'RestaurantSales', service: this.restaurantSales },
-        { name: 'RestaurantTicketAverage', service: this.restaurantTicketAverage }
+        { name: 'RestaurantTicketAverage', service: this.restaurantTicketAverage },
       ]);
     });
 
     return {
       jobId,
       message: 'Cron jobs iniciados em background',
-      statusUrl: `/CronJobs/status/${jobId}`
+      statusUrl: `/CronJobs/status/${jobId}`,
     };
   }
 
@@ -180,7 +176,7 @@ export class CronJobsService {
       job.results = {
         totalServices: services.length,
         completedServices: completedSteps,
-        executionTime: job.endTime.getTime() - job.startTime.getTime()
+        executionTime: job.endTime.getTime() - job.startTime.getTime(),
       };
     } catch (error) {
       job.status = 'error';
@@ -190,7 +186,7 @@ export class CronJobsService {
     } finally {
       this.isJobRunning = false;
       this.jobs.set(jobId, job);
-      
+
       setTimeout(() => {
         this.jobs.delete(jobId);
       }, 300000);
@@ -200,7 +196,9 @@ export class CronJobsService {
   async getJobStatus(jobId: string): Promise<JobStatus> {
     const job = this.jobs.get(jobId);
     if (!job) {
-      throw new Error(`Job com ID ${jobId} não encontrado ou já foi finalizado há mais de 5 minutos.`);
+      throw new Error(
+        `Job com ID ${jobId} não encontrado ou já foi finalizado há mais de 5 minutos.`,
+      );
     }
     return job;
   }

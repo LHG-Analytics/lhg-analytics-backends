@@ -1,8 +1,6 @@
 import { PeriodEnum, Prisma } from '@client-online';
 
-export class RestaurantCosts
-  implements Prisma.RestaurantCMVUncheckedCreateInput
-{
+export class RestaurantCosts implements Prisma.RestaurantCMVUncheckedCreateInput {
   id?: number;
   period?: PeriodEnum | null;
   totalAllCMV: Prisma.Decimal;

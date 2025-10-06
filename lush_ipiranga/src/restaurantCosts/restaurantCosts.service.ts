@@ -26,33 +26,22 @@ export class RestaurantCostsService {
     this.unitId = Number(this.config.get<string>('DESBRAVADOR_IPIRANGA_ID')!);
   }
 
-  async calculateCMV(
-    startDate: Date,
-    endDate: Date,
-    period?: PeriodEnum,
-  ): Promise<any> {
+  async calculateCMV(startDate: Date, endDate: Date, period?: PeriodEnum): Promise<any> {
     const companyId = 1;
 
     const token = await this.getToken();
 
     const movimentos = await this.getMovimentos(token, startDate, endDate);
 
-    const saidas = movimentos.filter((m: any) =>
-      [2].includes(m.codigoTipoMovimento),
-    );
+    const saidas = movimentos.filter((m: any) => [2].includes(m.codigoTipoMovimento));
 
-    const totalCost = saidas.reduce(
-      (acc: number, item: any) => acc + Number(item.custo || 0),
-      0,
-    );
+    const totalCost = saidas.reduce((acc: number, item: any) => acc + Number(item.custo || 0), 0);
 
     // Receita A&B via SQL
     const formattedStart = startDate.toISOString().split('T')[0];
     const formattedEnd = endDate.toISOString().split('T')[0];
 
-    const abProductTypes = [
-      78, 64, 77, 57, 56, 79, 54, 55, 80, 53, 62, 59, 61, 58, 63,
-    ];
+    const abProductTypes = [78, 64, 77, 57, 56, 79, 54, 55, 80, 53, 62, 59, 61, 58, 63];
 
     const abProductTypesSqlList = abProductTypes.join(', ');
 
@@ -88,10 +77,9 @@ export class RestaurantCostsService {
         AND ra."fimocupacaotipo" = 'FINALIZADA'
     `;
 
-    const revenueResult =
-      await this.prisma.prismaLocal.$queryRaw<{ totalValue: number }[]>(
-        Prisma.sql([revenueAbPeriodSql]),
-      );
+    const revenueResult = await this.prisma.prismaLocal.$queryRaw<{ totalValue: number }[]>(
+      Prisma.sql([revenueAbPeriodSql]),
+    );
 
     const totalRevenue = revenueResult?.[0]?.totalValue ?? 0;
 
@@ -159,9 +147,7 @@ export class RestaurantCostsService {
     return [];
   }
 
-  private async insertRestaurantCMV(
-    data: RestaurantCosts,
-  ): Promise<RestaurantCosts> {
+  private async insertRestaurantCMV(data: RestaurantCosts): Promise<RestaurantCosts> {
     return this.prisma.prismaOnline.restaurantCMV.upsert({
       where: {
         period_createdDate: {
@@ -194,20 +180,16 @@ export class RestaurantCostsService {
     startDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast7Days,
-      endDate: parsedEndDateLast7Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast7Days),
-      this.formatDateString(endDateLast7Days),
-    );
+    const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
     previousStartDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -220,19 +202,11 @@ export class RestaurantCostsService {
     );
 
     // Log para verificar as datas
-    const startTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    this.logger.log(
-      `Starting CronJob RestaurantCosts - last 7 days: ${startTimeLast7Days}`,
-    );
+    const startTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    this.logger.log(`Starting CronJob RestaurantCosts - last 7 days: ${startTimeLast7Days}`);
 
     // Chamar a função para o período atual
-    await this.calculateCMV(
-      parsedStartDateLast7Days,
-      parsedEndDateLast7Days,
-      PeriodEnum.LAST_7_D,
-    );
+    await this.calculateCMV(parsedStartDateLast7Days, parsedEndDateLast7Days, PeriodEnum.LAST_7_D);
     // Chamar a função para o período anterior
     await this.calculateCMV(
       previousParsedStartDateLast7Days,
@@ -240,12 +214,8 @@ export class RestaurantCostsService {
       PeriodEnum.LAST_7_D,
     );
 
-    const endTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    this.logger.log(
-      `Finished CronJob RestaurantCosts - last 7 days: ${endTimeLast7Days}`,
-    );
+    const endTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    this.logger.log(`Finished CronJob RestaurantCosts - last 7 days: ${endTimeLast7Days}`);
 
     // Últimos 30 dias
     const endDateLast30Days = new Date(currentDate);
@@ -256,22 +226,16 @@ export class RestaurantCostsService {
     startDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast30Days,
-      endDate: parsedEndDateLast30Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast30Days),
-      this.formatDateString(endDateLast30Days),
-    );
+    const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
     previousStartDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -284,12 +248,8 @@ export class RestaurantCostsService {
     );
 
     // Log para verificar as datas
-    const startTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    this.logger.log(
-      `Starting CronJob RestaurantCosts - last 30 days: ${startTimeLast30Days}`,
-    );
+    const startTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    this.logger.log(`Starting CronJob RestaurantCosts - last 30 days: ${startTimeLast30Days}`);
 
     // Chamar a função para o período atual
     await this.calculateCMV(
@@ -304,12 +264,8 @@ export class RestaurantCostsService {
       PeriodEnum.LAST_30_D,
     );
 
-    const endTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    this.logger.log(
-      `Finished CronJob RestaurantCosts - last 30 days: ${endTimeLast30Days}`,
-    );
+    const endTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    this.logger.log(`Finished CronJob RestaurantCosts - last 30 days: ${endTimeLast30Days}`);
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = new Date(currentDate);
@@ -320,22 +276,16 @@ export class RestaurantCostsService {
     startDateLast6Months.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast6Months,
-      endDate: parsedEndDateLast6Months,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast6Months),
-      this.formatDateString(endDateLast6Months),
-    );
+    const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
-    const previousStartDateLast6Months = new Date(
-      previousParsedEndDateLast6Months,
-    );
-    previousStartDateLast6Months.setMonth(
-      previousStartDateLast6Months.getMonth() - 6,
-    );
+    const previousStartDateLast6Months = new Date(previousParsedEndDateLast6Months);
+    previousStartDateLast6Months.setMonth(previousStartDateLast6Months.getMonth() - 6);
     previousStartDateLast6Months.setHours(0, 0, 0, 0); // Configuração de horas
 
     // Parse as datas para o formato desejado
@@ -348,12 +298,8 @@ export class RestaurantCostsService {
     );
 
     // Log para verificar as datas
-    const startTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    this.logger.log(
-      `Starting CronJob RestaurantCosts - last 6 months: ${startTimeLast6Months}`,
-    );
+    const startTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    this.logger.log(`Starting CronJob RestaurantCosts - last 6 months: ${startTimeLast6Months}`);
 
     // Chamar a função para o período atual
     await this.calculateCMV(
@@ -368,12 +314,8 @@ export class RestaurantCostsService {
       PeriodEnum.LAST_6_M,
     );
 
-    const endTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    this.logger.log(
-      `Finished CronJob RestaurantCosts - last 6 months: ${endTimeLast6Months}`,
-    );
+    const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    this.logger.log(`Finished CronJob RestaurantCosts - last 6 months: ${endTimeLast6Months}`);
   }
 
   private formatDateString(date: Date): string {
@@ -392,9 +334,7 @@ export class RestaurantCostsService {
     const [startDay, startMonth, startYear] = startDateString.split('/');
     const [endDay, endMonth, endYear] = endDateString.split('/');
 
-    const parsedStartDate = new Date(
-      Date.UTC(+startYear, +startMonth - 1, +startDay),
-    );
+    const parsedStartDate = new Date(Date.UTC(+startYear, +startMonth - 1, +startDay));
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
     parsedStartDate.setUTCHours(0, 0, 0, 0); // Define início às 06:00

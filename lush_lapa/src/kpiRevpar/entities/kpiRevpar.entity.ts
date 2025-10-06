@@ -31,9 +31,7 @@ export class KpiRevpar implements Prisma.KpiRevparUncheckedCreateInput {
   }
 }
 
-export class KpiRevparByPeriod
-  implements Prisma.KpiRevparByPeriodUncheckedCreateInput
-{
+export class KpiRevparByPeriod implements Prisma.KpiRevparByPeriodUncheckedCreateInput {
   id?: number;
   period?: PeriodEnum | null;
   createdDate: Date;

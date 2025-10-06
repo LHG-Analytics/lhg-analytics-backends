@@ -9,10 +9,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   constructor() {
     this.prismaLocal = new PrismaClientLocal({
-      log: ['error']
+      log: ['error'],
     });
     this.prismaOnline = new PrismaClientOnline({
-      log: ['error']
+      log: ['error'],
     });
   }
 
@@ -31,7 +31,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       await this.prismaOnline.$connect();
       console.log('✅ Conexão ONLINE estabelecida com sucesso');
     } catch (error) {
-      console.error('⚠️ Erro ao conectar ao banco ONLINE (servidor continuará apenas com LOCAL):', error.message);
+      console.error(
+        '⚠️ Erro ao conectar ao banco ONLINE (servidor continuará apenas com LOCAL):',
+        error.message,
+      );
     }
   }
 

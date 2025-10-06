@@ -1,17 +1,5 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Query,
-} from '@nestjs/common';
-import {
-  ApiBadRequestResponse,
-  ApiNotFoundResponse,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PeriodEnum } from '@client-online';
 import { BookingsService } from './bookings.service';
 
@@ -65,7 +53,9 @@ export class BookingsController {
       const end = this.convertToDate(endDate, true); // Fim, com ajuste de horário
 
       if (!start || !end) {
-        throw new BadRequestException('Both startDate and endDate are required and must be valid dates.');
+        throw new BadRequestException(
+          'Both startDate and endDate are required and must be valid dates.',
+        );
       }
 
       // Chama o serviço com as datas e o período, se fornecidos
@@ -76,26 +66,17 @@ export class BookingsController {
     }
   }
 
-  private convertToDate(
-    dateStr?: string,
-    isEndDate: boolean = false,
-  ): Date | undefined {
+  private convertToDate(dateStr?: string, isEndDate: boolean = false): Date | undefined {
     if (!dateStr) return undefined;
 
     const [day, month, year] = dateStr.split('/').map(Number);
     if (isNaN(day) || isNaN(month) || isNaN(year)) {
-      throw new BadRequestException(
-        'Invalid date format. Please use DD/MM/YYYY.',
-      );
+      throw new BadRequestException('Invalid date format. Please use DD/MM/YYYY.');
     }
 
     // Cria a nova data no formato YYYY-MM-DD
     const date = new Date(year, month - 1, day);
-    if (
-      date.getDate() !== day ||
-      date.getMonth() !== month - 1 ||
-      date.getFullYear() !== year
-    ) {
+    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
       throw new BadRequestException(
         'Invalid date. Please ensure it is a valid date in the format DD/MM/YYYY.',
       );
@@ -103,9 +84,9 @@ export class BookingsController {
 
     // Ajusta as horas conforme necessário
     if (isEndDate) {
-      date.setUTCHours(5,59, 59, 999); // Define o final às 05:59:59.999
+      date.setUTCHours(5, 59, 59, 999); // Define o final às 05:59:59.999
     } else {
-      date.setUTCHours(6,0, 0, 0); // Define o início às 06:00
+      date.setUTCHours(6, 0, 0, 0); // Define o início às 06:00
     }
 
     return date;

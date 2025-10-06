@@ -9,10 +9,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   constructor() {
     this.prismaLocal = new PrismaClientLocal({
-      log: ['error']
+      log: ['error'],
     });
     this.prismaOnline = new PrismaClientOnline({
-      log: ['error']
+      log: ['error'],
     });
   }
 

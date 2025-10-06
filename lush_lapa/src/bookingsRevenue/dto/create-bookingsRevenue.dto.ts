@@ -22,11 +22,7 @@ export class CreateBookingsRevenueDto {
   @IsOptional()
   period?: PeriodEnum;
 
-  constructor(
-    totalAllValue: Prisma.Decimal,
-    createdDate: Date,
-    period?: PeriodEnum,
-  ) {
+  constructor(totalAllValue: Prisma.Decimal, createdDate: Date, period?: PeriodEnum) {
     this.totalAllValue = totalAllValue;
     this.createdDate = createdDate;
     this.period = period;

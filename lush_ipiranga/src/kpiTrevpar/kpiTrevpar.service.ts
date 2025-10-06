@@ -109,8 +109,9 @@ export class KpiTrevparService {
         },
       });
 
-      const stockOutSalesMap: Record<number, (typeof stockOutSales)[number]> =
-        Object.fromEntries(stockOutSales.map((s) => [s.id, s]));
+      const stockOutSalesMap: Record<number, (typeof stockOutSales)[number]> = Object.fromEntries(
+        stockOutSales.map((s) => [s.id, s]),
+      );
 
       // Mapa para armazenar os totais por categoria
       const categoryTotalsMap: Record<number, CategoryTotals> = {};
@@ -178,9 +179,10 @@ export class KpiTrevparService {
       }> = [];
 
       const daysAll = (endDate.getTime() - startDate.getTime()) / 86400000;
-      const totalTrevparGlobal = totalSuites > 0 && daysAll > 0
-        ? totalRevenue.dividedBy(totalSuites).dividedBy(new Prisma.Decimal(daysAll))
-        : new Prisma.Decimal(0);
+      const totalTrevparGlobal =
+        totalSuites > 0 && daysAll > 0
+          ? totalRevenue.dividedBy(totalSuites).dividedBy(new Prisma.Decimal(daysAll))
+          : new Prisma.Decimal(0);
 
       for (const suiteCategory of suiteCategories) {
         const data = categoryTotalsMap[suiteCategory.id];
@@ -312,8 +314,9 @@ export class KpiTrevparService {
           },
         });
 
-        const stockOutSalesMap: Record<number, (typeof stockOutSales)[number]> =
-          Object.fromEntries(stockOutSales.map((s) => [s.id, s]));
+        const stockOutSalesMap: Record<number, (typeof stockOutSales)[number]> = Object.fromEntries(
+          stockOutSales.map((s) => [s.id, s]),
+        );
 
         let totalRevenue = new Prisma.Decimal(0);
         let totalSuites = 0;
@@ -348,7 +351,8 @@ export class KpiTrevparService {
         }
 
         const periodDays = (nextDate.getTime() - currentDate.getTime()) / 86400000;
-        const giro = totalSuites > 0 && periodDays > 0 ? totalRentalsCount / (totalSuites * periodDays) : 0;
+        const giro =
+          totalSuites > 0 && periodDays > 0 ? totalRentalsCount / (totalSuites * periodDays) : 0;
         const ticketAverage =
           totalRentalsCount > 0 ? totalRevenue.dividedBy(totalRentalsCount).toNumber() : 0;
 
@@ -389,9 +393,7 @@ export class KpiTrevparService {
     }
   }
 
-  async insertKpiTrevparByPeriod(
-    data: KpiTrevparByPeriodCreateInput,
-  ): Promise<KpiTrevparByPeriod> {
+  async insertKpiTrevparByPeriod(data: KpiTrevparByPeriodCreateInput): Promise<KpiTrevparByPeriod> {
     return this.prisma.prismaOnline.kpiTrevparByPeriod.upsert({
       where: {
         period_createdDate: {
@@ -417,10 +419,21 @@ export class KpiTrevparService {
     startDateLast7Days.setHours(6, 0, 0, 0);
 
     const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
-      this.parseDateString(this.formatDateString(startDateLast7Days), this.formatDateString(endDateLast7Days));
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
-    await this.findAllKpiTrevpar(parsedStartDateLast7Days, parsedEndDateLast7Days, PeriodEnum.LAST_7_D);
-    await this.calculateTotalTrevparByPeriod(parsedStartDateLast7Days, parsedEndDateLast7Days, PeriodEnum.LAST_7_D);
+    await this.findAllKpiTrevpar(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
+    await this.calculateTotalTrevparByPeriod(
+      parsedStartDateLast7Days,
+      parsedEndDateLast7Days,
+      PeriodEnum.LAST_7_D,
+    );
 
     // Últimos 30 dias
     const endDateLast30Days = new Date(currentDate);
@@ -430,10 +443,21 @@ export class KpiTrevparService {
     startDateLast30Days.setHours(6, 0, 0, 0);
 
     const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
-      this.parseDateString(this.formatDateString(startDateLast30Days), this.formatDateString(endDateLast30Days));
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
-    await this.findAllKpiTrevpar(parsedStartDateLast30Days, parsedEndDateLast30Days, PeriodEnum.LAST_30_D);
-    await this.calculateTotalTrevparByPeriod(parsedStartDateLast30Days, parsedEndDateLast30Days, PeriodEnum.LAST_30_D);
+    await this.findAllKpiTrevpar(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
+    await this.calculateTotalTrevparByPeriod(
+      parsedStartDateLast30Days,
+      parsedEndDateLast30Days,
+      PeriodEnum.LAST_30_D,
+    );
 
     // Últimos 6 meses
     const endDateLast6Months = new Date(currentDate);
@@ -443,10 +467,21 @@ export class KpiTrevparService {
     startDateLast6Months.setHours(6, 0, 0, 0);
 
     const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
-      this.parseDateString(this.formatDateString(startDateLast6Months), this.formatDateString(endDateLast6Months));
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
-    await this.findAllKpiTrevpar(parsedStartDateLast6Months, parsedEndDateLast6Months, PeriodEnum.LAST_6_M);
-    await this.calculateTotalTrevparByPeriod(parsedStartDateLast6Months, parsedEndDateLast6Months, PeriodEnum.LAST_6_M);
+    await this.findAllKpiTrevpar(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
+    await this.calculateTotalTrevparByPeriod(
+      parsedStartDateLast6Months,
+      parsedEndDateLast6Months,
+      PeriodEnum.LAST_6_M,
+    );
   }
 
   private formatDateString(date: Date): string {

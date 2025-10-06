@@ -19,8 +19,7 @@ export class CreateKpiRevenueDto {
   @IsDecimal(
     { decimal_digits: '2' },
     {
-      message:
-        'A receita de locação total deve ser um número decimal com duas casas decimais',
+      message: 'A receita de locação total deve ser um número decimal com duas casas decimais',
     },
   )
   @IsNotEmpty({ message: 'A receita de locação total é obrigatória' })
@@ -30,8 +29,7 @@ export class CreateKpiRevenueDto {
   @IsDecimal(
     { decimal_digits: '2' },
     {
-      message:
-        'A receita de locação líquida deve ser um número decimal com duas casas decimais',
+      message: 'A receita de locação líquida deve ser um número decimal com duas casas decimais',
     },
   )
   @IsNotEmpty({ message: 'A receita de locação líquida é obrigatória' })
@@ -45,8 +43,7 @@ export class CreateKpiRevenueDto {
   @IsDecimal(
     { decimal_digits: '2' },
     {
-      message:
-        'A receita de consumo deve ser um número decimal com duas casas decimais',
+      message: 'A receita de consumo deve ser um número decimal com duas casas decimais',
     },
   )
   @IsOptional()
@@ -70,8 +67,7 @@ export class CreateKpiRevenueDto {
   @IsDecimal(
     { decimal_digits: '2' },
     {
-      message:
-        'A receita total deve ser um número decimal com duas casas decimais',
+      message: 'A receita total deve ser um número decimal com duas casas decimais',
     },
   )
   @IsNotEmpty({ message: 'A receita total é obrigatória' })

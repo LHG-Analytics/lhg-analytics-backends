@@ -1,9 +1,5 @@
 import { PeriodEnum, Prisma } from '@client-online';
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as moment from 'moment-timezone';
 import { PrismaService } from '../prisma/prisma.service';
@@ -35,11 +31,7 @@ export class RestaurantSalesService {
     ]);
   }
 
-  async findAllRestaurantSales(
-    startDate: Date,
-    endDate: Date,
-    period?: PeriodEnum,
-  ): Promise<any> {
+  async findAllRestaurantSales(startDate: Date, endDate: Date, period?: PeriodEnum): Promise<any> {
     try {
       const companyId = 1;
 
@@ -52,10 +44,7 @@ export class RestaurantSalesService {
       }
 
       // Buscar todas as locações no intervalo de datas
-      const [allRentalApartments] = await this.fetchKpiData(
-        startDate,
-        adjustedEndDate,
-      );
+      const [allRentalApartments] = await this.fetchKpiData(startDate, adjustedEndDate);
 
       if (!allRentalApartments || allRentalApartments.length === 0) {
         throw new NotFoundException('No rental apartments found.');
@@ -66,26 +55,25 @@ export class RestaurantSalesService {
         .map((rentalApartment) => rentalApartment.saleLease?.stockOutId)
         .filter((id) => id !== undefined);
 
-      const stockOutSaleLeases =
-        await this.prisma.prismaLocal.stockOut.findMany({
-          where: { id: { in: stockOutIds } },
-          include: {
-            stockOutItem: {
-              where: { canceled: null },
-              select: {
-                id: true,
-                priceSale: true,
-                quantity: true,
-                stockOutId: true,
-              },
-            },
-            sale: {
-              select: {
-                discount: true,
-              },
+      const stockOutSaleLeases = await this.prisma.prismaLocal.stockOut.findMany({
+        where: { id: { in: stockOutIds } },
+        include: {
+          stockOutItem: {
+            where: { canceled: null },
+            select: {
+              id: true,
+              priceSale: true,
+              quantity: true,
+              stockOutId: true,
             },
           },
-        });
+          sale: {
+            select: {
+              discount: true,
+            },
+          },
+        },
+      });
 
       let totalAllSales = 0;
 
@@ -110,20 +98,14 @@ export class RestaurantSalesService {
     } catch (error) {
       console.error('Erro ao buscar Restaurant Revenue data:', error);
       if (error instanceof Error) {
-        throw new BadRequestException(
-          `Failed to fetch Restaurant Revenue data: ${error.message}`,
-        );
+        throw new BadRequestException(`Failed to fetch Restaurant Revenue data: ${error.message}`);
       } else {
-        throw new BadRequestException(
-          'Failed to fetch Restaurant Revenue data: erro desconhecido',
-        );
+        throw new BadRequestException('Failed to fetch Restaurant Revenue data: erro desconhecido');
       }
     }
   }
 
-  private async insertRestaurantSales(
-    data: RestaurantSales,
-  ): Promise<RestaurantSales> {
+  private async insertRestaurantSales(data: RestaurantSales): Promise<RestaurantSales> {
     return this.prisma.prismaOnline.restaurantSales.upsert({
       where: {
         period_createdDate: {
@@ -188,10 +170,7 @@ export class RestaurantSalesService {
       ];
 
       // Buscar todas as locações no intervalo de datas
-      const [allRentalApartments] = await this.fetchKpiData(
-        startDate,
-        adjustedEndDate,
-      );
+      const [allRentalApartments] = await this.fetchKpiData(startDate, adjustedEndDate);
 
       if (!allRentalApartments || allRentalApartments.length === 0) {
         throw new NotFoundException('No rental apartments found.');
@@ -203,27 +182,26 @@ export class RestaurantSalesService {
         .filter((id) => id !== undefined);
 
       // Buscar os stockOutSaleLeases
-      const stockOutSaleLeases =
-        await this.prisma.prismaLocal.stockOut.findMany({
-          where: { id: { in: stockOutIds } },
-          include: {
-            stockOutItem: {
-              where: { canceled: null },
-              select: {
-                quantity: true,
-                productStock: {
-                  select: {
-                    product: {
-                      select: {
-                        description: true,
-                      },
+      const stockOutSaleLeases = await this.prisma.prismaLocal.stockOut.findMany({
+        where: { id: { in: stockOutIds } },
+        include: {
+          stockOutItem: {
+            where: { canceled: null },
+            select: {
+              quantity: true,
+              productStock: {
+                select: {
+                  product: {
+                    select: {
+                      description: true,
                     },
                   },
                 },
               },
             },
           },
-        });
+        },
+      });
 
       // Mapa para acumular a contagem por produto
       const productSalesMap = new Map<string, number>();
@@ -231,8 +209,7 @@ export class RestaurantSalesService {
       // Agregando as quantidades somente dos produtos permitidos
       for (const stockOut of stockOutSaleLeases) {
         for (const item of stockOut.stockOutItem) {
-          const description =
-            item.productStock?.product?.description ?? 'Produto sem nome';
+          const description = item.productStock?.product?.description ?? 'Produto sem nome';
           if (!allowedProducts.includes(description.toUpperCase())) continue;
 
           const currentCount = productSalesMap.get(description) ?? 0;
@@ -254,10 +231,7 @@ export class RestaurantSalesService {
 
       return { message: 'Restaurant sales ranking calculated successfully.' };
     } catch (error) {
-      console.error(
-        'Erro ao calcular ranking de vendas do restaurante:',
-        error,
-      );
+      console.error('Erro ao calcular ranking de vendas do restaurante:', error);
       if (error instanceof Error) {
         throw new BadRequestException(
           `Failed to calculate restaurant sales ranking: ${error.message}`,
@@ -269,7 +243,7 @@ export class RestaurantSalesService {
       }
     }
   }
-       
+
   private async insertRestaurantSalesRanking(
     data: RestaurantSalesRanking,
   ): Promise<RestaurantSalesRanking> {
@@ -317,19 +291,18 @@ export class RestaurantSalesService {
     const createdDate = new Date(adjustedEndDate);
     createdDate.setUTCHours(5, 59, 59, 999);
 
-    const allRentalApartments =
-      await this.prisma.prismaLocal.rentalApartment.findMany({
-        where: {
-          checkIn: {
-            gte: startDate.toISOString(),
-            lte: adjustedEndDate.toISOString(),
-          },
-          endOccupationType: 'FINALIZADA',
+    const allRentalApartments = await this.prisma.prismaLocal.rentalApartment.findMany({
+      where: {
+        checkIn: {
+          gte: startDate.toISOString(),
+          lte: adjustedEndDate.toISOString(),
         },
-        include: {
-          saleLease: true,
-        },
-      });
+        endOccupationType: 'FINALIZADA',
+      },
+      include: {
+        saleLease: true,
+      },
+    });
 
     const stockOutIds = allRentalApartments
       .map((r) => r.saleLease?.stockOutId)
@@ -367,10 +340,7 @@ export class RestaurantSalesService {
       }
     }
 
-    const totalAllSales = Object.values(totalByCategory).reduce(
-      (sum, qty) => sum + qty,
-      0,
-    );
+    const totalAllSales = Object.values(totalByCategory).reduce((sum, qty) => sum + qty, 0);
 
     for (const category of categories) {
       const totalSales = totalByCategory[category];
@@ -384,9 +354,7 @@ export class RestaurantSalesService {
         foodCategory: category,
         totalSales,
         totalAllSales,
-        totalSalesPercent: new Prisma.Decimal(
-          totalSalesPercent.times(100).toFixed(2),
-        ),
+        totalSalesPercent: new Prisma.Decimal(totalSalesPercent.times(100).toFixed(2)),
       });
     }
   }
@@ -435,19 +403,18 @@ export class RestaurantSalesService {
     const createdDate = new Date(adjustedEndDate);
     createdDate.setUTCHours(5, 59, 59, 999);
 
-    const allRentalApartments =
-      await this.prisma.prismaLocal.rentalApartment.findMany({
-        where: {
-          checkIn: {
-            gte: startDate.toISOString(),
-            lte: adjustedEndDate.toISOString(),
-          },
-          endOccupationType: 'FINALIZADA',
+    const allRentalApartments = await this.prisma.prismaLocal.rentalApartment.findMany({
+      where: {
+        checkIn: {
+          gte: startDate.toISOString(),
+          lte: adjustedEndDate.toISOString(),
         },
-        include: {
-          saleLease: true,
-        },
-      });
+        endOccupationType: 'FINALIZADA',
+      },
+      include: {
+        saleLease: true,
+      },
+    });
 
     const stockOutIds = allRentalApartments
       .map((r) => r.saleLease?.stockOutId)
@@ -485,10 +452,7 @@ export class RestaurantSalesService {
       }
     }
 
-    const totalAllSales = Object.values(totalByCategory).reduce(
-      (sum, qty) => sum + qty,
-      0,
-    );
+    const totalAllSales = Object.values(totalByCategory).reduce((sum, qty) => sum + qty, 0);
 
     for (const category of categories) {
       const totalSale = totalByCategory[category];
@@ -502,9 +466,7 @@ export class RestaurantSalesService {
         drinkCategory: category,
         totalSale,
         totalAllSales,
-        totalSalePercent: new Prisma.Decimal(
-          totalSalePercent.times(100).toFixed(2),
-        ),
+        totalSalePercent: new Prisma.Decimal(totalSalePercent.times(100).toFixed(2)),
       });
     }
   }
@@ -552,19 +514,18 @@ export class RestaurantSalesService {
     const createdDate = new Date(adjustedEndDate);
     createdDate.setUTCHours(5, 59, 59, 999);
 
-    const allRentalApartments =
-      await this.prisma.prismaLocal.rentalApartment.findMany({
-        where: {
-          checkIn: {
-            gte: startDate.toISOString(),
-            lte: adjustedEndDate.toISOString(),
-          },
-          endOccupationType: 'FINALIZADA',
+    const allRentalApartments = await this.prisma.prismaLocal.rentalApartment.findMany({
+      where: {
+        checkIn: {
+          gte: startDate.toISOString(),
+          lte: adjustedEndDate.toISOString(),
         },
-        include: {
-          saleLease: true,
-        },
-      });
+        endOccupationType: 'FINALIZADA',
+      },
+      include: {
+        saleLease: true,
+      },
+    });
 
     const stockOutIds = allRentalApartments
       .map((r) => r.saleLease?.stockOutId)
@@ -602,10 +563,7 @@ export class RestaurantSalesService {
       }
     }
 
-    const totalAllSales = Object.values(totalByCategory).reduce(
-      (sum, qty) => sum + qty,
-      0,
-    );
+    const totalAllSales = Object.values(totalByCategory).reduce((sum, qty) => sum + qty, 0);
 
     for (const category of categories) {
       const totalSales = totalByCategory[category];
@@ -619,9 +577,7 @@ export class RestaurantSalesService {
         othersCategory: category,
         totalSales,
         totalAllSales,
-        totalSalesPercent: new Prisma.Decimal(
-          totalSalesPercent.times(100).toFixed(2),
-        ),
+        totalSalesPercent: new Prisma.Decimal(totalSalesPercent.times(100).toFixed(2)),
       });
     }
   }
@@ -662,20 +618,16 @@ export class RestaurantSalesService {
     startDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast7Days,
-      endDate: parsedEndDateLast7Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast7Days),
-      this.formatDateString(endDateLast7Days),
-    );
+    const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
     previousStartDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -688,12 +640,8 @@ export class RestaurantSalesService {
     );
 
     // Log para verificar as datas
-    const startTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob RestaurantSales - últimos 7 dias: ${startTimeLast7Days}`,
-    );
+    const startTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob RestaurantSales - últimos 7 dias: ${startTimeLast7Days}`);
 
     // Chamar a função para o período atual
     await this.findAllRestaurantSales(
@@ -728,12 +676,8 @@ export class RestaurantSalesService {
       PeriodEnum.LAST_7_D,
     );
 
-    const endTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob RestaurantSales - últimos 7 dias: ${endTimeLast7Days}`,
-    );
+    const endTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob RestaurantSales - últimos 7 dias: ${endTimeLast7Days}`);
 
     // Últimos 30 dias
     const endDateLast30Days = new Date(currentDate);
@@ -744,22 +688,16 @@ export class RestaurantSalesService {
     startDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast30Days,
-      endDate: parsedEndDateLast30Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast30Days),
-      this.formatDateString(endDateLast30Days),
-    );
+    const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
     previousStartDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -772,12 +710,8 @@ export class RestaurantSalesService {
     );
 
     // Log para verificar as datas
-    const startTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob RestaurantSales - últimos 30 dias: ${startTimeLast30Days}`,
-    );
+    const startTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob RestaurantSales - últimos 30 dias: ${startTimeLast30Days}`);
 
     // Chamar a função para o período atual
     await this.findAllRestaurantSales(
@@ -812,12 +746,8 @@ export class RestaurantSalesService {
       PeriodEnum.LAST_30_D,
     );
 
-    const endTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob RestaurantSales - últimos 30 dias: ${endTimeLast30Days}`,
-    );
+    const endTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob RestaurantSales - últimos 30 dias: ${endTimeLast30Days}`);
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = new Date(currentDate);
@@ -828,22 +758,16 @@ export class RestaurantSalesService {
     startDateLast6Months.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast6Months,
-      endDate: parsedEndDateLast6Months,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast6Months),
-      this.formatDateString(endDateLast6Months),
-    );
+    const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
-    const previousStartDateLast6Months = new Date(
-      previousParsedEndDateLast6Months,
-    );
-    previousStartDateLast6Months.setMonth(
-      previousStartDateLast6Months.getMonth() - 6,
-    );
+    const previousStartDateLast6Months = new Date(previousParsedEndDateLast6Months);
+    previousStartDateLast6Months.setMonth(previousStartDateLast6Months.getMonth() - 6);
     previousStartDateLast6Months.setHours(0, 0, 0, 0); // Configuração de horas
 
     // Parse as datas para o formato desejado
@@ -856,12 +780,8 @@ export class RestaurantSalesService {
     );
 
     // Log para verificar as datas
-    const startTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob RestaurantSales - últimos 6 meses: ${startTimeLast6Months}`,
-    );
+    const startTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob RestaurantSales - últimos 6 meses: ${startTimeLast6Months}`);
 
     // Chamar a função para o período atual
     await this.findAllRestaurantSales(
@@ -896,12 +816,8 @@ export class RestaurantSalesService {
       PeriodEnum.LAST_6_M,
     );
 
-    const endTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob RestaurantSales - últimos 6 meses: ${endTimeLast6Months}`,
-    );
+    const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob RestaurantSales - últimos 6 meses: ${endTimeLast6Months}`);
   }
 
   private formatDateString(date: Date): string {
@@ -920,9 +836,7 @@ export class RestaurantSalesService {
     const [startDay, startMonth, startYear] = startDateString.split('/');
     const [endDay, endMonth, endYear] = endDateString.split('/');
 
-    const parsedStartDate = new Date(
-      Date.UTC(+startYear, +startMonth - 1, +startDay),
-    );
+    const parsedStartDate = new Date(Date.UTC(+startYear, +startMonth - 1, +startDay));
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
     parsedStartDate.setUTCHours(0, 0, 0, 0); // Define início às 06:00

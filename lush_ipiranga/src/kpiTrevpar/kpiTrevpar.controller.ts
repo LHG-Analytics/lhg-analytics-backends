@@ -1,17 +1,5 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Query,
-} from '@nestjs/common';
-import {
-  ApiBadRequestResponse,
-  ApiNotFoundResponse,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PeriodEnum } from '@client-online';
 import { KpiTrevparService } from './kpiTrevpar.service';
 
@@ -65,32 +53,21 @@ export class KpiTrevparController {
       return await this.kpiTrevparService.findAllKpiTrevpar(start, end, period);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException(
-        `Failed to create all KpiTrevpar: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to create all KpiTrevpar: ${errorMessage}`);
     }
   }
 
-  private convertToDate(
-    dateStr?: string,
-    isEndDate: boolean = false,
-  ): Date | undefined {
+  private convertToDate(dateStr?: string, isEndDate: boolean = false): Date | undefined {
     if (!dateStr) return undefined;
 
     const [day, month, year] = dateStr.split('/').map(Number);
     if (isNaN(day) || isNaN(month) || isNaN(year)) {
-      throw new BadRequestException(
-        'Invalid date format. Please use DD/MM/YYYY.',
-      );
+      throw new BadRequestException('Invalid date format. Please use DD/MM/YYYY.');
     }
 
     // Cria a nova data no formato YYYY-MM-DD
     const date = new Date(year, month - 1, day);
-    if (
-      date.getDate() !== day ||
-      date.getMonth() !== month - 1 ||
-      date.getFullYear() !== year
-    ) {
+    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
       throw new BadRequestException(
         'Invalid date. Please ensure it is a valid date in the format DD/MM/YYYY.',
       );
@@ -116,9 +93,7 @@ export class KpiTrevparController {
       return await this.kpiTrevparService.handleCron();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException(
-        `Failed to run the cron job: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to run the cron job: ${errorMessage}`);
     }
   }
 }

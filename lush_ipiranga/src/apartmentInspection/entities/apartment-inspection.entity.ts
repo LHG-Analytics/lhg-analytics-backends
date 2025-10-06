@@ -1,8 +1,6 @@
 import { PeriodEnum, Prisma } from '@client-online';
 
-export class ApartmentInspection
-  implements Prisma.InspectionsUncheckedCreateInput
-{
+export class ApartmentInspection implements Prisma.InspectionsUncheckedCreateInput {
   id?: number;
   companyId: number;
   createdDate: Date;

@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PeriodEnum, RentalTypeEnum, ChannelTypeEnum } from '@client-online';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
@@ -29,7 +25,7 @@ export class BookingsTotalRentalsService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
@@ -72,15 +68,11 @@ export class BookingsTotalRentalsService {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException(
-        `Failed to fetch KpiTotalRentals: ${errorMessage}`,
-      );
+      throw new BadRequestException(`Failed to fetch KpiTotalRentals: ${errorMessage}`);
     }
   }
 
-  async insertBookingsTotalRentals(
-    data: BookingsTotalRental,
-  ): Promise<BookingsTotalRental> {
+  async insertBookingsTotalRentals(data: BookingsTotalRental): Promise<BookingsTotalRental> {
     return this.prisma.prismaOnline.bookingsTotalRentals.upsert({
       where: {
         period_createdDate: {
@@ -107,7 +99,7 @@ export class BookingsTotalRentalsService {
 
       // Ajustar a data final para não incluir a data atual
       const adjustedEndDate = new Date(endDate);
-      if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
+      if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
@@ -147,7 +139,6 @@ export class BookingsTotalRentalsService {
 
       // Processa cada reserva para contar o tipo de locação
       for (const booking of allBookings) {
-        
         const checkIn = booking.rentalApartment?.checkIn; // Acessa checkIn do apartamento
         const checkOut = booking.rentalApartment?.checkOut; // Acessa checkOut do apartamento
 
@@ -155,11 +146,7 @@ export class BookingsTotalRentalsService {
         if (!checkIn || !checkOut) {
           continue; // Pula esta reserva se checkIn ou checkOut estiverem indefinidos
         }
-        const rentalType = this.determineRentalPeriod(
-          checkIn,
-          checkOut,
-          allBookings,
-        );
+        const rentalType = this.determineRentalPeriod(checkIn, checkOut, allBookings);
 
         // Incrementa o contador para o tipo de locação correspondente
         if (rentalCounts[rentalType as keyof typeof rentalCounts] !== undefined) {
@@ -240,7 +227,7 @@ export class BookingsTotalRentalsService {
         // Use <= para incluir o último dia
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
@@ -332,7 +319,7 @@ export class BookingsTotalRentalsService {
       const adjustedEndDate = new Date(endDate);
 
       if (
-        period === PeriodEnum.LAST_7_D||
+        period === PeriodEnum.LAST_7_D ||
         period === PeriodEnum.LAST_30_D ||
         period === PeriodEnum.LAST_6_M
       ) {
@@ -387,9 +374,7 @@ export class BookingsTotalRentalsService {
 
         // Função para verificar se a diferença entre duas datas é de até 1 hora
         const isWithinOneHour = (date1: Date, date2: Date) => {
-          const differenceInMilliseconds = Math.abs(
-            date1.getTime() - date2.getTime(),
-          );
+          const differenceInMilliseconds = Math.abs(date1.getTime() - date2.getTime());
           return differenceInMilliseconds <= 3600000; // 1 hora em milissegundos
         };
 
@@ -439,7 +424,7 @@ export class BookingsTotalRentalsService {
         );
 
         // Incrementa o contador para o tipo de canal correspondente
-        if (channelType&& channelCounts[channelType] !== undefined) {
+        if (channelType && channelCounts[channelType] !== undefined) {
           channelCounts[channelType]++;
         }
       }
@@ -522,7 +507,7 @@ export class BookingsTotalRentalsService {
         // Use <= para incluir o último dia
         let nextDate = new Date(currentDate);
 
-        if (period === PeriodEnum.LAST_7_D|| period === PeriodEnum.LAST_30_D) {
+        if (period === PeriodEnum.LAST_7_D || period === PeriodEnum.LAST_30_D) {
           // Para LAST_7_D e LAST_30_D, iteração diária
           nextDate.setDate(nextDate.getDate() + 1);
           nextDate.setUTCHours(0, 0, 0, 0); // Início do próximo dia
@@ -588,22 +573,20 @@ export class BookingsTotalRentalsService {
   async insertBookingsTotalRentalsByPeriodEcommerce(
     data: BookingsTotalRentalsByPeriodEcommerce,
   ): Promise<BookingsTotalRentalsByPeriodEcommerce> {
-    return this.prisma.prismaOnline.bookingsTotalRentalsByPeriodEcommerce.upsert(
-      {
-        where: {
-          period_createdDate: {
-            period: data.period as PeriodEnum as PeriodEnum,
-            createdDate: data.createdDate,
-          },
-        },
-        create: {
-          ...data,
-        },
-        update: {
-          ...data,
+    return this.prisma.prismaOnline.bookingsTotalRentalsByPeriodEcommerce.upsert({
+      where: {
+        period_createdDate: {
+          period: data.period as PeriodEnum as PeriodEnum,
+          createdDate: data.createdDate,
         },
       },
-    );
+      create: {
+        ...data,
+      },
+      update: {
+        ...data,
+      },
+    });
   }
 
   @Cron('0 0 * * *', { disabled: true })
@@ -622,20 +605,16 @@ export class BookingsTotalRentalsService {
     startDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast7Days,
-      endDate: parsedEndDateLast7Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast7Days),
-      this.formatDateString(endDateLast7Days),
-    );
+    const { startDate: parsedStartDateLast7Days, endDate: parsedEndDateLast7Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast7Days),
+        this.formatDateString(endDateLast7Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast7Days = parsedStartDateLast7Days;
     const previousStartDateLast7Days = new Date(previousParsedEndDateLast7Days);
-    previousStartDateLast7Days.setDate(
-      previousStartDateLast7Days.getDate() - 7,
-    );
+    previousStartDateLast7Days.setDate(previousStartDateLast7Days.getDate() - 7);
     previousStartDateLast7Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -648,12 +627,8 @@ export class BookingsTotalRentalsService {
     );
 
     // Log para verificar as datas
-    const startTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob BookingsTotalRentals - últimos 7 dias: ${startTimeLast7Days}`,
-    );
+    const startTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob BookingsTotalRentals - últimos 7 dias: ${startTimeLast7Days}`);
 
     // Chamar a função para o período atual
     await this.findAllBookingsTotalRentals(
@@ -693,12 +668,8 @@ export class BookingsTotalRentalsService {
       PeriodEnum.LAST_7_D,
     );
 
-    const endTimeLast7Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob BookingsTotalRentals - últimos 7 dias: ${endTimeLast7Days}`,
-    );
+    const endTimeLast7Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob BookingsTotalRentals - últimos 7 dias: ${endTimeLast7Days}`);
 
     // Últimos 30 dias
     const endDateLast30Days = new Date(currentDate);
@@ -709,22 +680,16 @@ export class BookingsTotalRentalsService {
     startDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast30Days,
-      endDate: parsedEndDateLast30Days,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast30Days),
-      this.formatDateString(endDateLast30Days),
-    );
+    const { startDate: parsedStartDateLast30Days, endDate: parsedEndDateLast30Days } =
+      this.parseDateString(
+        this.formatDateString(startDateLast30Days),
+        this.formatDateString(endDateLast30Days),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast30Days = parsedStartDateLast30Days;
-    const previousStartDateLast30Days = new Date(
-      previousParsedEndDateLast30Days,
-    );
-    previousStartDateLast30Days.setDate(
-      previousStartDateLast30Days.getDate() - 30,
-    );
+    const previousStartDateLast30Days = new Date(previousParsedEndDateLast30Days);
+    previousStartDateLast30Days.setDate(previousStartDateLast30Days.getDate() - 30);
     previousStartDateLast30Days.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
@@ -737,12 +702,8 @@ export class BookingsTotalRentalsService {
     );
 
     // Log para verificar as datas
-    const startTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob BookingsTotalRentals - últimos 30 dias: ${startTimeLast30Days}`,
-    );
+    const startTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob BookingsTotalRentals - últimos 30 dias: ${startTimeLast30Days}`);
 
     // Chamar a função para o período atual
     await this.findAllBookingsTotalRentals(
@@ -782,12 +743,8 @@ export class BookingsTotalRentalsService {
       PeriodEnum.LAST_30_D,
     );
 
-    const endTimeLast30Days = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob BookingsTotalRentals - últimos 30 dias: ${endTimeLast30Days}`,
-    );
+    const endTimeLast30Days = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob BookingsTotalRentals - últimos 30 dias: ${endTimeLast30Days}`);
 
     // Últimos 6 meses (180 dias)
     const endDateLast6Months = new Date(currentDate);
@@ -798,22 +755,16 @@ export class BookingsTotalRentalsService {
     startDateLast6Months.setHours(0, 0, 0, 0);
 
     // Parse as datas para o formato desejado
-    const {
-      startDate: parsedStartDateLast6Months,
-      endDate: parsedEndDateLast6Months,
-    } = this.parseDateString(
-      this.formatDateString(startDateLast6Months),
-      this.formatDateString(endDateLast6Months),
-    );
+    const { startDate: parsedStartDateLast6Months, endDate: parsedEndDateLast6Months } =
+      this.parseDateString(
+        this.formatDateString(startDateLast6Months),
+        this.formatDateString(endDateLast6Months),
+      );
 
     // Calcular as datas para o período anterior
     const previousParsedEndDateLast6Months = parsedStartDateLast6Months;
-    const previousStartDateLast6Months = new Date(
-      previousParsedEndDateLast6Months,
-    );
-    previousStartDateLast6Months.setMonth(
-      previousStartDateLast6Months.getMonth() - 6,
-    );
+    const previousStartDateLast6Months = new Date(previousParsedEndDateLast6Months);
+    previousStartDateLast6Months.setMonth(previousStartDateLast6Months.getMonth() - 6);
     previousStartDateLast6Months.setHours(0, 0, 0, 0); // Configuração de horas
 
     // Parse as datas para o formato desejado
@@ -826,12 +777,8 @@ export class BookingsTotalRentalsService {
     );
 
     // Log para verificar as datas
-    const startTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Início CronJob BookingsTotalRentals - últimos 6 meses: ${startTimeLast6Months}`,
-    );
+    const startTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob BookingsTotalRentals - últimos 6 meses: ${startTimeLast6Months}`);
 
     // Chamar a função para o período atual
     await this.findAllBookingsTotalRentals(
@@ -871,12 +818,8 @@ export class BookingsTotalRentalsService {
       PeriodEnum.LAST_6_M,
     );
 
-    const endTimeLast6Months = moment()
-      .tz(timezone)
-      .format('DD-MM-YYYY HH:mm:ss');
-    console.log(
-      `Final CronJob BookingsTotalRentals - últimos 6 meses: ${endTimeLast6Months}`,
-    );
+    const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob BookingsTotalRentals - últimos 6 meses: ${endTimeLast6Months}`);
   }
 
   private formatDateString(date: Date): string {
@@ -895,9 +838,7 @@ export class BookingsTotalRentalsService {
     const [startDay, startMonth, startYear] = startDateString.split('/');
     const [endDay, endMonth, endYear] = endDateString.split('/');
 
-    const parsedStartDate = new Date(
-      Date.UTC(+startYear, +startMonth - 1, +startDay),
-    );
+    const parsedStartDate = new Date(Date.UTC(+startYear, +startMonth - 1, +startDay));
     const parsedEndDate = new Date(Date.UTC(+endYear, +endMonth - 1, +endDay));
 
     parsedStartDate.setUTCHours(0, 0, 0, 0); // Define início às 06:00
@@ -906,15 +847,8 @@ export class BookingsTotalRentalsService {
     return { startDate: parsedStartDate, endDate: parsedEndDate };
   }
 
-  private determineRentalPeriod(
-    checkIn: Date,
-    checkOut: Date,
-    Booking: any,
-  ): string {
-    const occupationTimeSeconds = this.calculateOccupationTime(
-      checkIn,
-      checkOut,
-    );
+  private determineRentalPeriod(checkIn: Date, checkOut: Date, Booking: any): string {
+    const occupationTimeSeconds = this.calculateOccupationTime(checkIn, checkOut);
 
     // Convertendo check-in e check-out para objetos Date
     const checkInDate = new Date(checkIn);
@@ -934,16 +868,16 @@ export class BookingsTotalRentalsService {
     }
 
     // Se houver reservas, calcular os tipos adicionais
-    if (Booking&& Array.isArray(Booking) && Booking.length > 0) {
+    if (Booking && Array.isArray(Booking) && Booking.length > 0) {
       // Regra para Day Use
-      if (checkInHour >= 13&& checkOutHour <= 19 && checkOutMinutes <= 15) {
+      if (checkInHour >= 13 && checkOutHour <= 19 && checkOutMinutes <= 15) {
         return 'DAY_USE';
       }
 
       // Regra para Overnight
       const overnightMinimumStaySeconds = 12 * 3600 + 15 * 60;
       if (
-        checkInHour >= 20&&
+        checkInHour >= 20 &&
         checkInHour <= 23 &&
         checkOutHour >= 8 &&
         (checkOutHour < 12 || (checkOutHour === 12 && checkOutMinutes <= 15)) &&
@@ -954,9 +888,8 @@ export class BookingsTotalRentalsService {
 
       // Verificação para Diária
       if (
-        occupationTimeSeconds > 16 * 3600 + 15 * 60||
-        (checkInHour <= 15 &&
-          (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
+        occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
+        (checkInHour <= 15 && (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
       ) {
         return 'DAILY';
       }

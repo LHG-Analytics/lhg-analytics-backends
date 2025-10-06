@@ -32,7 +32,8 @@ export class UsersController {
       const users = await this.usersService.findAll();
       return users;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       console.error('Erro ao buscar usuários:', error);
       throw new Error(`Failed to fetch users: ${errorMessage}`);
     }

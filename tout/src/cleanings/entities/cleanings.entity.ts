@@ -40,9 +40,7 @@ export class cleanings implements Prisma.CleaningsUncheckedCreateInput {
   }
 }
 
-export class cleaningsByPeriod
-  implements Prisma.CleaningsByPeriodUncheckedCreateInput
-{
+export class cleaningsByPeriod implements Prisma.CleaningsByPeriodUncheckedCreateInput {
   id?: number;
   totalSuitesCleanings: number;
   createdDate: Date;
@@ -64,9 +62,7 @@ export class cleaningsByPeriod
   }
 }
 
-export class cleaningsByWeek
-  implements Prisma.CleaningsByWeekUncheckedCreateInput
-{
+export class cleaningsByWeek implements Prisma.CleaningsByWeekUncheckedCreateInput {
   id?: number;
   totalAverageDailyWeekCleaning: Prisma.Decimal;
   averageDailyWeekCleaning: Prisma.Decimal;
@@ -121,9 +117,7 @@ export class cleaningsByWeek
   }
 }
 
-export class cleaningsByPeriodShift
-  implements Prisma.CleaningsByPeriodShiftUncheckedCreateInput
-{
+export class cleaningsByPeriodShift implements Prisma.CleaningsByPeriodShiftUncheckedCreateInput {
   id?: number;
   totalSuitesCleanings: number;
   employeeName: string;

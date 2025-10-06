@@ -1,8 +1,6 @@
 import { ChannelTypeEnum, PeriodEnum, Prisma } from '@client-online';
 
-export class BookingsRevenue
-  implements Prisma.BookingsRevenueUncheckedCreateInput
-{
+export class BookingsRevenue implements Prisma.BookingsRevenueUncheckedCreateInput {
   id?: number;
   period?: PeriodEnum;
   totalAllValue: Prisma.Decimal;
@@ -22,9 +20,7 @@ export class BookingsRevenueByChannelType
   channelType?: ChannelTypeEnum;
 }
 
-export class BookingsRevenueByPeriod
-  implements Prisma.BookingsRevenueByPeriodUncheckedCreateInput
-{
+export class BookingsRevenueByPeriod implements Prisma.BookingsRevenueByPeriodUncheckedCreateInput {
   id?: number;
   period?: PeriodEnum;
   totalValue: Prisma.Decimal;

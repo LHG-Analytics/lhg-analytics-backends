@@ -38,8 +38,7 @@ export class CreateKpiTrevparDto {
   @IsDecimal(
     { decimal_digits: '2' },
     {
-      message:
-        'O totalTrevpar deve ser um número decimal com duas casas decimais',
+      message: 'O totalTrevpar deve ser um número decimal com duas casas decimais',
     },
   )
   @IsNotEmpty({ message: 'O totalTrevpar é obrigatório' })

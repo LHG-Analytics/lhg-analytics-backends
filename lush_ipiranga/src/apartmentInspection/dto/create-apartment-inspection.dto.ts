@@ -1,10 +1,4 @@
-import {
-  IsInt,
-  IsNotEmpty,
-  IsString,
-  IsDate,
-  IsOptional,
-} from 'class-validator';
+import { IsInt, IsNotEmpty, IsString, IsDate, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { PeriodEnum } from '@client-online';
 
