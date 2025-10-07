@@ -2825,6 +2825,7 @@ export class CompanyService {
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
       WHERE ca.id IN (6,7,8,9,10,12)
+      AND a.dataexclusao IS NULL
     `;
 
     const revenueByDateSQL = `

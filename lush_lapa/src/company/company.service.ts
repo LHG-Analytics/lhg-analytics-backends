@@ -2824,7 +2824,8 @@ export class CompanyService {
       SELECT COUNT(*) as total_suites
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE ca.descricao IN ('LUSH', 'LUSH HIDRO', 'LUSH LOUNGE HIDRO', 'LUSH SPA', 'LUSH SPLASH', 'LUSH SPA SPLASH')
+      WHERE ca.id IN (7, 8, 9, 10, 11, 12)
+        AND a.dataexclusao IS NULL
     `;
 
     const revenueByDateSQL = `
@@ -3040,6 +3041,7 @@ export class CompanyService {
     // Processa BigNumbers
     const totalSuitesCount =
       totalSuitesResult.length > 0 ? Number(totalSuitesResult[0].total_suites) || 1 : 1;
+
     const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
 
     const bigNumbers: BigNumbersDataSQL = {
