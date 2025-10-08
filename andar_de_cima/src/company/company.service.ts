@@ -2751,7 +2751,7 @@ export class CompanyService {
     const bigNumbersSQL = `
       WITH receita_consumo AS (
         -- Calcula receita de consumo usando saidaestoque com relação para locações
-        -- Filtrando apenas locações de apartamentos das categorias corretas (10,11,12,15,16,17,18,19,24)
+        -- Filtrando apenas locações de apartamentos das categorias corretas (2,3,4,5,6,7,12)
         -- Mas incluindo TODOS os produtos consumidos nessas locações
         SELECT
           la.id_apartamentostate as id_locacao,
@@ -2773,7 +2773,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND sei.cancelado IS NULL
-          AND ca_apt.id IN (2,3,4,5,6,7)
+          AND ca_apt.id IN (2,3,4,5,6,7,12)
         GROUP BY la.id_apartamentostate, vl.id_locacaoapartamento
       )
       SELECT
@@ -2797,7 +2797,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
     `;
 
@@ -2825,7 +2825,7 @@ export class CompanyService {
       SELECT COUNT(*) as total_suites
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE ca.id IN (2,3,4,5,6,7)
+      WHERE ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
       AND a.dataexclusao IS NULL
     `;
@@ -2850,7 +2850,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
@@ -2887,7 +2887,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
       GROUP BY
         CASE
@@ -2923,7 +2923,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
       GROUP BY ca.descricao
       ORDER BY category_revenue DESC
@@ -2943,7 +2943,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
@@ -2966,7 +2966,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
@@ -2995,7 +2995,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
@@ -3015,7 +3015,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
       GROUP BY ca.descricao
       ORDER BY total_rentals DESC
@@ -3027,7 +3027,7 @@ export class CompanyService {
         COUNT(a.id) as total_suites_in_category
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE ca.id IN (2,3,4,5,6,7)
+      WHERE ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
       GROUP BY ca.descricao
     `;
@@ -3360,7 +3360,7 @@ export class CompanyService {
         WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
           AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
           GROUP BY ca.id, ca.descricao
       ),
@@ -3370,7 +3370,7 @@ export class CompanyService {
           COUNT(DISTINCT a.id) as total_suites_in_category
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
-        WHERE ca.id IN (2,3,4,5,6,7)
+        WHERE ca.id IN (2,3,4,5,6,7,12)
           AND a.dataexclusao IS NULL
         AND a.dataexclusao IS NULL
         GROUP BY ca.id, ca.descricao
@@ -3458,7 +3458,7 @@ export class CompanyService {
         WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
           AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
           GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM la.datainicialdaocupacao)
       ),
@@ -3468,7 +3468,7 @@ export class CompanyService {
           COUNT(DISTINCT a.id) as total_suites_in_category
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
-        WHERE ca.id IN (2,3,4,5,6,7)
+        WHERE ca.id IN (2,3,4,5,6,7,12)
           AND a.dataexclusao IS NULL
         AND a.dataexclusao IS NULL
         GROUP BY ca.id, ca.descricao
@@ -3576,7 +3576,7 @@ export class CompanyService {
         WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
           AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
           GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM la.datainicialdaocupacao)
       ),
@@ -3586,7 +3586,7 @@ export class CompanyService {
           COUNT(DISTINCT a.id) as total_suites_in_category
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
-        WHERE ca.id IN (2,3,4,5,6,7)
+        WHERE ca.id IN (2,3,4,5,6,7,12)
           AND a.dataexclusao IS NULL
         AND a.dataexclusao IS NULL
         GROUP BY ca.id, ca.descricao
@@ -3627,7 +3627,7 @@ export class CompanyService {
         WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
           AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
         AND a.dataexclusao IS NULL
           GROUP BY EXTRACT(DOW FROM la.datainicialdaocupacao)
       )
