@@ -3441,125 +3441,205 @@ export class CompanyService {
     });
 
     // === IMPLEMENTAÇÃO DO DATATABLEOCCUPANCYRATEBYWEEK ===
-    // Consulta SQL para taxa de ocupação semanal por categoria
-    const occupancyRateByWeekResult: any[] = await this.prisma.prismaLocal.$queryRaw`
-      WITH weekly_occupancy AS (
-        SELECT
-          ca.descricao as suite_category_name,
-          EXTRACT(DOW FROM la.datainicialdaocupacao) as day_of_week_num,
-          CASE EXTRACT(DOW FROM la.datainicialdaocupacao)
-            WHEN 0 THEN 'domingo'
-            WHEN 1 THEN 'segunda-feira'
-            WHEN 2 THEN 'terça-feira'
-            WHEN 3 THEN 'quarta-feira'
-            WHEN 4 THEN 'quinta-feira'
-            WHEN 5 THEN 'sexta-feira'
-            WHEN 6 THEN 'sábado'
-          END as day_of_week,
-          COUNT(*) as day_rentals,
-          COUNT(DISTINCT a.id) as suites_used,
-          -- Tempo total ocupado no dia da semana (em segundos)
-          COALESCE(SUM(
-            EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao)
-          ), 0) as total_occupied_time
-        FROM locacaoapartamento la
-        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-        INNER JOIN apartamento a ON aps.id_apartamento = a.id
-        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
-          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
-          AND la.fimocupacaotipo = 'FINALIZADA'
-          AND ca.id IN (10,11,12,15,16,17,18,19,24)
-          AND a.dataexclusao IS NULL
-        GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM la.datainicialdaocupacao)
-      ),
-      suite_counts_by_category AS (
-        SELECT
-          ca.descricao as suite_category_name,
-          COUNT(DISTINCT a.id) as total_suites_in_category
+    // Solução otimizada com 3 queries simples + processamento TypeScript
+
+    // Query 1: Buscar todas as ocupações
+    const rentalsData: any[] = await this.prisma.prismaLocal.$queryRaw`
+      SELECT
+        ca.descricao as category_name,
+        la.datainicialdaocupacao as check_in,
+        la.datafinaldaocupacao as check_out
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      INNER JOIN apartamento a ON aps.id_apartamento = a.id
+      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+      WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
+        AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+        AND la.fimocupacaotipo = 'FINALIZADA'
+        AND ca.id IN (10,11,12,15,16,17,18,19,24)
+        AND a.dataexclusao IS NULL
+    `;
+
+    // Query 2: Buscar tempos indisponíveis (COM suite_id para filtrar depois)
+    const unavailableTimesData: any[] = await this.prisma.prismaLocal.$queryRaw`
+      SELECT
+        ca.descricao as category_name,
+        a.id as suite_id,
+        la.datainicio as start_date,
+        la.datafim as end_date
+      FROM limpezaapartamento la
+      INNER JOIN apartamentostate aps ON la.id_sujoapartamento = aps.id
+      INNER JOIN apartamento a ON aps.id_apartamento = a.id
+      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+      WHERE la.datainicio >= ${formattedStart}::timestamp
+        AND la.datainicio <= ${formattedEnd}::timestamp
+        AND la.datafim IS NOT NULL
+        AND ca.id IN (10,11,12,15,16,17,18,19,24)
+        AND a.dataexclusao IS NULL
+
+      UNION ALL
+
+      SELECT
+        ca.descricao as category_name,
+        a.id as suite_id,
+        d.datainicio as start_date,
+        GREATEST(d.datafim, COALESCE(aps_manut.datafim, d.datafim)) as end_date
+      FROM defeito d
+      INNER JOIN apartamento a ON d.id_apartamento = a.id
+      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+      LEFT JOIN col_bloqueadomanutencao_defeito bmd ON bmd.id_defeito = d.id
+      LEFT JOIN apartamentostate aps_manut ON bmd.id_bloqueadomanutencao = aps_manut.id
+      WHERE d.datainicio >= ${formattedStart}::timestamp
+        AND d.datainicio <= ${formattedEnd}::timestamp
+        AND d.datafim IS NOT NULL
+        AND ca.id IN (10,11,12,15,16,17,18,19,24)
+        AND a.dataexclusao IS NULL
+    `;
+
+    // Query 3: Metadados (suítes por categoria + primeira suíte de cada categoria)
+    const metadataResult: any[] = await this.prisma.prismaLocal.$queryRaw`
+      WITH first_suite_per_category AS (
+        SELECT DISTINCT ON (ca.id)
+          ca.descricao as category_name,
+          a.id as first_suite_id
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
         WHERE ca.id IN (10,11,12,15,16,17,18,19,24)
-        GROUP BY ca.id, ca.descricao
-      ),
-      days_in_period AS (
-        SELECT
-          EXTRACT(DOW FROM d::date) as day_of_week_num,
-          CASE EXTRACT(DOW FROM d::date)
-            WHEN 0 THEN 'domingo'
-            WHEN 1 THEN 'segunda-feira'
-            WHEN 2 THEN 'terça-feira'
-            WHEN 3 THEN 'quarta-feira'
-            WHEN 4 THEN 'quinta-feira'
-            WHEN 5 THEN 'sexta-feira'
-            WHEN 6 THEN 'sábado'
-          END as day_of_week,
-          COUNT(*) as days_count
-        FROM generate_series(${formattedStart}::timestamp, ${formattedEnd}::timestamp, '1 day'::interval) d
-        GROUP BY EXTRACT(DOW FROM d::date)
+          AND a.dataexclusao IS NULL
+        ORDER BY ca.id, a.id
       )
       SELECT
-        wo.suite_category_name,
-        wo.day_of_week,
-        wo.day_rentals,
-        sc.total_suites_in_category,
-        dp.days_count,
-        -- Taxa de ocupação específica por categoria e dia da semana
-        CASE
-          WHEN sc.total_suites_in_category > 0 AND dp.days_count > 0 THEN
-            wo.day_rentals::DECIMAL / (sc.total_suites_in_category * dp.days_count)
-          ELSE 0
-        END as category_occupancy_rate,
-        -- Total geral de ocupação para o dia da semana (será calculado posteriormente)
-        0 as total_occupancy_rate
-      FROM weekly_occupancy wo
-      INNER JOIN suite_counts_by_category sc ON wo.suite_category_name = sc.suite_category_name
-      INNER JOIN days_in_period dp ON wo.day_of_week_num = dp.day_of_week_num
-      ORDER BY wo.suite_category_name, wo.day_of_week_num
+        ca.descricao as category_name,
+        COUNT(DISTINCT a.id) as total_suites,
+        fs.first_suite_id
+      FROM categoriaapartamento ca
+      INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
+      INNER JOIN first_suite_per_category fs ON ca.descricao = fs.category_name
+      WHERE ca.id IN (10,11,12,15,16,17,18,19,24)
+        AND a.dataexclusao IS NULL
+      GROUP BY ca.descricao, fs.first_suite_id
     `;
 
-    // Calcular taxa de ocupação total por dia da semana
-    const totalOccupancyByDay: { [key: string]: number } = {};
-    const dayTotals: { [key: string]: { rentals: number; totalSuites: number; days: number } } = {};
+    // Processar dados no TypeScript
+    const timezone = 'America/Sao_Paulo';
+    const dayNames = [
+      'domingo',
+      'segunda-feira',
+      'terça-feira',
+      'quarta-feira',
+      'quinta-feira',
+      'sexta-feira',
+      'sábado',
+    ];
 
-    occupancyRateByWeekResult.forEach((item) => {
-      const dayKey = item.day_of_week;
-      if (!dayTotals[dayKey]) {
-        dayTotals[dayKey] = { rentals: 0, totalSuites: 0, days: Number(item.days_count) };
+    // Contar quantos dias de cada dia da semana existem no período
+    const dayCountMap: { [key: string]: number } = {};
+    const currentMoment = moment.tz(startDate, timezone).clone();
+    const endMoment = moment.tz(endDate, timezone);
+    while (currentMoment.isSameOrBefore(endMoment, 'day')) {
+      const dayOfWeek = dayNames[currentMoment.day()];
+      dayCountMap[dayOfWeek] = (dayCountMap[dayOfWeek] || 0) + 1;
+      currentMoment.add(1, 'day');
+    }
+
+    // Criar estrutura de dados
+    const occupancyByCategory: {
+      [category: string]: { [day: string]: { occupiedTime: number; unavailableTime: number } };
+    } = {};
+
+    metadataResult.forEach((meta) => {
+      occupancyByCategory[meta.category_name] = {};
+      dayNames.forEach((day) => {
+        occupancyByCategory[meta.category_name][day] = {
+          occupiedTime: 0,
+          unavailableTime: 0,
+        };
+      });
+    });
+
+    // Distribuir tempo ocupado pelos dias da semana corretos (SIMPLIFICADO - igual ao kpiOccupancyRate)
+    rentalsData.forEach((rental) => {
+      const checkIn = new Date(rental.check_in);
+      const category = rental.category_name;
+
+      // Pegar apenas o dia da semana do checkIn (como no código de referência)
+      const dayOfWeek = dayNames[checkIn.getDay()];
+      const occupiedTime = new Date(rental.check_out).getTime() - checkIn.getTime();
+
+      if (occupancyByCategory[category] && occupancyByCategory[category][dayOfWeek]) {
+        occupancyByCategory[category][dayOfWeek].occupiedTime += occupiedTime / 1000; // converter para segundos
       }
-      dayTotals[dayKey].rentals += Number(item.day_rentals);
-      dayTotals[dayKey].totalSuites = totalSuites; // usar o totalSuites global
     });
 
-    Object.entries(dayTotals).forEach(([day, totals]) => {
-      totalOccupancyByDay[day] =
-        totals.totalSuites > 0 && totals.days > 0
-          ? totals.rentals / (totals.totalSuites * totals.days)
-          : 0;
+    // Distribuir tempo indisponível pelos dias da semana corretos (APENAS PRIMEIRA SUÍTE de cada categoria)
+    // Criar map de primeira suíte por categoria
+    const firstSuiteByCategory: { [category: string]: number } = {};
+    metadataResult.forEach((meta) => {
+      firstSuiteByCategory[meta.category_name] = Number(meta.first_suite_id);
     });
 
-    // Transformar os resultados no formato esperado (WeeklyOccupancyData[])
-    const occupancyByCategory: { [category: string]: { [day: string]: any } } = {};
+    unavailableTimesData.forEach((unavailable) => {
+      const startDate = new Date(unavailable.start_date);
+      const category = unavailable.category_name;
+      const suiteId = Number(unavailable.suite_id);
 
-    occupancyRateByWeekResult.forEach((item) => {
-      const categoryName = item.suite_category_name;
-      const dayName = item.day_of_week;
-
-      if (!occupancyByCategory[categoryName]) {
-        occupancyByCategory[categoryName] = {};
+      // FILTRAR: apenas considerar se for a primeira suíte da categoria
+      if (suiteId !== firstSuiteByCategory[category]) {
+        return; // Pular esta entrada
       }
 
-      occupancyByCategory[categoryName][dayName] = {
-        occupancyRate: Number(Number(item.category_occupancy_rate).toFixed(2)),
-        totalOccupancyRate: Number((totalOccupancyByDay[dayName] || 0).toFixed(2)),
-      };
+      // Pegar apenas o dia da semana do startDate (como no código de referência)
+      const dayOfWeek = dayNames[startDate.getDay()];
+      const unavailableTime = new Date(unavailable.end_date).getTime() - startDate.getTime();
+
+      if (occupancyByCategory[category] && occupancyByCategory[category][dayOfWeek]) {
+        occupancyByCategory[category][dayOfWeek].unavailableTime += unavailableTime / 1000;
+      }
     });
 
-    const dataTableOccupancyRateByWeek: any[] = Object.entries(occupancyByCategory).map(
-      ([categoryName, dayData]) => ({
-        [categoryName]: dayData,
-      }),
-    );
+    // Calcular taxa de ocupação
+    const totalOccupancyByDay: { [key: string]: { occupied: number; available: number } } = {};
+    dayNames.forEach((day) => {
+      totalOccupancyByDay[day] = { occupied: 0, available: 0 };
+    });
+
+    const dataTableOccupancyRateByWeek: any[] = metadataResult.map((meta) => {
+      const category = meta.category_name;
+      const totalSuites = Number(meta.total_suites);
+      const dayData: any = {};
+
+      dayNames.forEach((day) => {
+        const daysCount = dayCountMap[day] || 0;
+        const occupiedTime = occupancyByCategory[category][day].occupiedTime;
+        const unavailableTime = occupancyByCategory[category][day].unavailableTime;
+        const availableTime = daysCount * totalSuites * 86400 - unavailableTime;
+
+        const occupancyRate = availableTime > 0 ? (occupiedTime / availableTime) * 100 : 0;
+
+        dayData[day] = {
+          occupancyRate: Number(occupancyRate.toFixed(2)),
+          totalOccupancyRate: 0, // será calculado depois
+        };
+
+        // Acumular para total geral
+        totalOccupancyByDay[day].occupied += occupiedTime;
+        totalOccupancyByDay[day].available += availableTime;
+      });
+
+      return { [category]: dayData };
+    });
+
+    // Calcular e preencher totalOccupancyRate
+    dataTableOccupancyRateByWeek.forEach((item) => {
+      const category = Object.keys(item)[0];
+      dayNames.forEach((day) => {
+        const totalRate =
+          totalOccupancyByDay[day].available > 0
+            ? (totalOccupancyByDay[day].occupied / totalOccupancyByDay[day].available) * 100
+            : 0;
+        item[category][day].totalOccupancyRate = Number(totalRate.toFixed(2));
+      });
+    });
 
     // === IMPLEMENTAÇÃO DO DATATABLEGIROBYWEEK ===
     // Consulta SQL para giro semanal por categoria
