@@ -902,6 +902,7 @@ enum PeriodEnum {
   LAST_30_D
   LAST_6_M
   CUSTOM
+  ESTE_MES
 }
 
 enum RentalTypeEnum {

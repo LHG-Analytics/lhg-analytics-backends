@@ -28,6 +28,9 @@ export class KpiRevparService {
       } else if (period === PeriodEnum.LAST_6_M) {
         // Para LAST_6_M, subtrair um dia para não incluir a data atual
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      } else if (period === PeriodEnum.ESTE_MES) {
+        // Para ESTE_MES, a data final já vem como hoje do handleCron
+        // Não precisa ajustar, usa como está
       }
 
       // Obter os dados de rentalApartment, suiteCategory e Company
@@ -473,6 +476,27 @@ export class KpiRevparService {
     );
     const endTimeLast6Months = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
     console.log(`Final CronJob KpiRevpar - últimos 6 meses: ${endTimeLast6Months}`);
+
+    // ESTE_MES - Do dia 1º do mês atual (às 06:00) até ontem (às 05:59)
+    const endDateEsteMes = new Date(currentDate);
+    endDateEsteMes.setHours(5, 59, 59, 999);
+
+    const startDateEsteMes = moment().tz(timezone).startOf('month').toDate();
+    startDateEsteMes.setHours(6, 0, 0, 0);
+
+    const { startDate: parsedStartDateEsteMes, endDate: parsedEndDateEsteMes } =
+      this.parseDateString(
+        this.formatDateString(startDateEsteMes),
+        this.formatDateString(endDateEsteMes),
+      );
+
+    const startTimeEsteMes = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiRevpar - este mês: ${startTimeEsteMes}`);
+
+    await this.findAllKpiRevpar(parsedStartDateEsteMes, parsedEndDateEsteMes, PeriodEnum.ESTE_MES);
+
+    const endTimeEsteMes = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiRevpar - este mês: ${endTimeEsteMes}`);
   }
 
   private formatDateString(date: Date): string {

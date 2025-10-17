@@ -301,6 +301,44 @@ export class CompanyService {
         endDatePrevious = new Date(startDate);
         break;
 
+      case PeriodEnum.ESTE_MES:
+        // Período atual: desde o início do mês até hoje
+        startDate = moment
+          .tz('America/Sao_Paulo')
+          .startOf('month')
+          .set({
+            hour: 6,
+            minute: 0,
+            second: 0,
+            millisecond: 0,
+          })
+          .toDate();
+
+        // EndDate já está definido como hoje às 05:59:59
+
+        // Período anterior: o mês anterior completo
+        const lastMonthStart = moment.tz('America/Sao_Paulo').subtract(1, 'month').startOf('month');
+        const lastMonthEnd = moment.tz('America/Sao_Paulo').subtract(1, 'month').endOf('month');
+
+        startDatePrevious = lastMonthStart
+          .set({
+            hour: 6,
+            minute: 0,
+            second: 0,
+            millisecond: 0,
+          })
+          .toDate();
+
+        endDatePrevious = lastMonthEnd
+          .set({
+            hour: 5,
+            minute: 59,
+            second: 59,
+            millisecond: 999,
+          })
+          .toDate();
+        break;
+
       default:
         throw new Error('Invalid period specified');
     }
@@ -807,22 +845,32 @@ export class CompanyService {
       nowForForecast.year() === currentMonthStart.year();
 
     if (isCurrentMonth) {
-      // Dias que já passaram no mês (do dia 1 até ontem)
-      const daysElapsed = yesterday.date(); // dia de ontem = quantos dias passaram
       // Total de dias no mês
       const totalDaysInMonth = currentMonthEnd.date();
+
+      // Dias que já passaram no mês (do dia 1 até ontem, dados completos)
+      // Como o dia contábil fecha às 05:59 do dia seguinte, "ontem fechado" = hoje às 05:59
+      const daysElapsed = todayForForecast.date(); // dia atual = quantos dias passaram (até ontem completo)
+
       // Dias restantes (de hoje até o fim do mês)
       const remainingDays = totalDaysInMonth - daysElapsed;
 
       // Se temos dados suficientes e ainda restam dias no mês
       if (daysElapsed > 0 && remainingDays > 0) {
-        // Buscar dados do mês completo (desde dia 1) para calcular previsão
-        const monthStartDate = currentMonthStart.toDate();
-        const monthCurrentDate = nowForForecast.clone().endOf('day').toDate();
+        // Buscar dados do período ESTE_MES que contém o acumulado desde o dia 1º até hoje
+        // Os dados são salvos com createdDate às 05:59:59 de cada dia
+        const monthStartDate = currentMonthStart
+          .set({ hour: 5, minute: 59, second: 59, millisecond: 999 })
+          .toDate();
+        const monthCurrentDate = todayForForecast
+          .clone()
+          .set({ hour: 5, minute: 59, second: 59, millisecond: 999 })
+          .toDate();
 
-        // Query para buscar dados do mês completo
+        // Query para buscar dados do período ESTE_MES
         const monthlyKpiRevenue = await this.prisma.prismaOnline.kpiRevenue.findMany({
           where: {
+            period: 'ESTE_MES',
             createdDate: {
               gte: monthStartDate,
               lte: monthCurrentDate,
@@ -833,6 +881,7 @@ export class CompanyService {
 
         const monthlyKpiTotalRentals = await this.prisma.prismaOnline.kpiTotalRentals.findMany({
           where: {
+            period: 'ESTE_MES',
             createdDate: {
               gte: monthStartDate,
               lte: monthCurrentDate,
@@ -843,6 +892,7 @@ export class CompanyService {
 
         const monthlyKpiTrevpar = await this.prisma.prismaOnline.kpiTrevpar.findMany({
           where: {
+            period: 'ESTE_MES',
             createdDate: {
               gte: monthStartDate,
               lte: monthCurrentDate,
@@ -853,6 +903,7 @@ export class CompanyService {
 
         const monthlyKpiGiro = await this.prisma.prismaOnline.kpiGiro.findMany({
           where: {
+            period: 'ESTE_MES',
             createdDate: {
               gte: monthStartDate,
               lte: monthCurrentDate,
@@ -863,6 +914,7 @@ export class CompanyService {
 
         const monthlyKpiTicketAverage = await this.prisma.prismaOnline.kpiTicketAverage.findMany({
           where: {
+            period: 'ESTE_MES',
             createdDate: {
               gte: monthStartDate,
               lte: monthCurrentDate,
@@ -873,6 +925,7 @@ export class CompanyService {
 
         const monthlyKpiAlos = await this.prisma.prismaOnline.kpiAlos.findMany({
           where: {
+            period: 'ESTE_MES',
             createdDate: {
               gte: monthStartDate,
               lte: monthCurrentDate,
@@ -881,7 +934,7 @@ export class CompanyService {
           orderBy: { createdDate: 'desc' },
         });
 
-        // Calcular totais do mês
+        // Pegar o registro mais recente que contém o acumulado do mês
         const monthlyTotalValue = Number(monthlyKpiRevenue[0]?.totalAllValue ?? 0);
         const monthlyTotalRentals = monthlyKpiTotalRentals[0]?.totalAllRentalsApartments || 0;
         const monthlyTotalTrevpar = Number(monthlyKpiTrevpar[0]?.totalTrevpar ?? 0);
@@ -890,11 +943,11 @@ export class CompanyService {
         const monthlyAverageOccupationTime =
           monthlyKpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00';
 
-        // Média diária baseada nos dados do mês completo
-        const dailyAverageValue = monthlyTotalValue / daysElapsed;
-        const dailyAverageRentals = monthlyTotalRentals / daysElapsed;
-        const dailyAverageTrevpar = monthlyTotalTrevpar / daysElapsed;
-        const dailyAverageGiro = monthlyTotalGiro / daysElapsed;
+        // Média diária baseada no acumulado até hoje dividido pelos dias que já passaram
+        const dailyAverageValue = daysElapsed > 0 ? monthlyTotalValue / daysElapsed : 0;
+        const dailyAverageRentals = daysElapsed > 0 ? monthlyTotalRentals / daysElapsed : 0;
+        const dailyAverageTrevpar = daysElapsed > 0 ? monthlyTotalTrevpar / daysElapsed : 0;
+        const dailyAverageGiro = daysElapsed > 0 ? monthlyTotalGiro / daysElapsed : 0;
 
         // Projeção: dados atuais do mês + (média diária × dias restantes)
         bigNumbers.monthlyForecast = {

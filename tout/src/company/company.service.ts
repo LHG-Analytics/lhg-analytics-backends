@@ -301,6 +301,44 @@ export class CompanyService {
         endDatePrevious = new Date(startDate);
         break;
 
+      case PeriodEnum.ESTE_MES:
+        // Período atual: desde o início do mês até hoje
+        startDate = moment
+          .tz('America/Sao_Paulo')
+          .startOf('month')
+          .set({
+            hour: 6,
+            minute: 0,
+            second: 0,
+            millisecond: 0,
+          })
+          .toDate();
+
+        // EndDate já está definido como hoje às 05:59:59
+
+        // Período anterior: o mês anterior completo
+        const lastMonthStart = moment.tz('America/Sao_Paulo').subtract(1, 'month').startOf('month');
+        const lastMonthEnd = moment.tz('America/Sao_Paulo').subtract(1, 'month').endOf('month');
+
+        startDatePrevious = lastMonthStart
+          .set({
+            hour: 6,
+            minute: 0,
+            second: 0,
+            millisecond: 0,
+          })
+          .toDate();
+
+        endDatePrevious = lastMonthEnd
+          .set({
+            hour: 5,
+            minute: 59,
+            second: 59,
+            millisecond: 999,
+          })
+          .toDate();
+        break;
+
       default:
         throw new Error('Invalid period specified');
     }
@@ -801,10 +839,11 @@ export class CompanyService {
     const todayForForecast = nowForForecast.clone().startOf('day');
     const yesterday = todayForForecast.clone().subtract(1, 'day');
 
-    // Verificar se estamos no mês corrente
+    // Verificar se estamos no mês corrente OU se o período é ESTE_MES
     const isCurrentMonth =
-      nowForForecast.month() === currentMonthStart.month() &&
-      nowForForecast.year() === currentMonthStart.year();
+      (nowForForecast.month() === currentMonthStart.month() &&
+        nowForForecast.year() === currentMonthStart.year()) ||
+      period === PeriodEnum.ESTE_MES;
 
     if (isCurrentMonth) {
       // Dias que já passaram no mês (do dia 1 até ontem)

@@ -301,6 +301,55 @@ export class CompanyService {
         endDatePrevious = new Date(startDate);
         break;
 
+      case PeriodEnum.ESTE_MES:
+        // Período atual: do dia 1 do mês às 06:00 até hoje às 05:59
+        startDate = moment
+          .tz(timezone)
+          .startOf('month')
+          .set({
+            hour: 6,
+            minute: 0,
+            second: 0,
+            millisecond: 0,
+          })
+          .toDate();
+
+        endDate = moment
+          .tz(timezone)
+          .set({
+            hour: 5,
+            minute: 59,
+            second: 59,
+            millisecond: 999,
+          })
+          .toDate();
+
+        // Período anterior: mês anterior completo
+        startDatePrevious = moment
+          .tz(timezone)
+          .subtract(1, 'month')
+          .startOf('month')
+          .set({
+            hour: 6,
+            minute: 0,
+            second: 0,
+            millisecond: 0,
+          })
+          .toDate();
+
+        endDatePrevious = moment
+          .tz(timezone)
+          .subtract(1, 'month')
+          .endOf('month')
+          .set({
+            hour: 5,
+            minute: 59,
+            second: 59,
+            millisecond: 999,
+          })
+          .toDate();
+        break;
+
       default:
         throw new Error('Invalid period specified');
     }
@@ -806,7 +855,8 @@ export class CompanyService {
       nowForForecast.month() === currentMonthStart.month() &&
       nowForForecast.year() === currentMonthStart.year();
 
-    if (isCurrentMonth) {
+    // Incluir previsão para ESTE_MES
+    if (isCurrentMonth || period === PeriodEnum.ESTE_MES) {
       // Dias que já passaram no mês (do dia 1 até ontem)
       const daysElapsed = yesterday.date(); // dia de ontem = quantos dias passaram
       // Total de dias no mês
