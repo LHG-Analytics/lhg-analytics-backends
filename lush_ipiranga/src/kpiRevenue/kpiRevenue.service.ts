@@ -1039,11 +1039,7 @@ export class KpiRevenueService {
     console.log(`Início CronJob KpiRevenue - este mês: ${startTimeEsteMes}`);
 
     // Chamar apenas a função findAllKpiRevenue para o período ESTE_MES
-    await this.findAllKpiRevenue(
-      parsedStartDateEsteMes,
-      parsedEndDateEsteMes,
-      PeriodEnum.ESTE_MES,
-    );
+    await this.findAllKpiRevenue(parsedStartDateEsteMes, parsedEndDateEsteMes, PeriodEnum.ESTE_MES);
     const endTimeEsteMes = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
     console.log(`Final CronJob KpiRevenue - este mês: ${endTimeEsteMes}`);
   }

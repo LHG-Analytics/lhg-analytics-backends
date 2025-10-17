@@ -303,16 +303,18 @@ export class CompanyService {
 
       case PeriodEnum.ESTE_MES:
         // Período atual: desde o início do mês até hoje
-        startDate = moment
-          .tz('America/Sao_Paulo')
+        startDate = todayInitial
+          .clone()
           .startOf('month')
           .set({
-            hour: 6,
-            minute: 0,
-            second: 0,
-            millisecond: 0,
+            hour: 5,
+            minute: 59,
+            second: 59,
+            millisecond: 999,
           })
           .toDate();
+
+        console.log('startDate:', startDate);
 
         // EndDate já está definido como hoje às 05:59:59
 
@@ -349,6 +351,7 @@ export class CompanyService {
     const [
       KpiRevenue,
       KpiRevenuePreviousData,
+      KpiRevenueNextData,
       KpiRevenueByRentalType,
       KpiRevenueByPeriod,
       KpiTotalRentals,
@@ -398,6 +401,24 @@ export class CompanyService {
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
+          },
+        },
+        select: {
+          totalValue: true,
+          suiteCategoryName: true,
+          totalAllValue: true,
+          createdDate: true,
+          suiteCategoryId: true,
+        },
+        orderBy: {
+          createdDate: 'desc',
+        },
+      }),
+      this.prisma.prismaOnline.kpiRevenue.findMany({
+        where: {
+          period: period,
+          createdDate: {
+            gte: startDate,
           },
         },
         select: {
