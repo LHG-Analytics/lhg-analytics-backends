@@ -307,10 +307,10 @@ export class CompanyService {
           .clone()
           .startOf('month')
           .set({
-            hour: 2,
-            minute: 59,
-            second: 59,
-            millisecond: 999,
+            hour: 3,
+            minute: 0,
+            second: 0,
+            millisecond: 0,
           })
           .toDate();
 
