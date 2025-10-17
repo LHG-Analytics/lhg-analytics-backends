@@ -799,7 +799,6 @@ export class CompanyService {
     const currentMonthStart = nowForForecast.clone().startOf('month');
     const currentMonthEnd = nowForForecast.clone().endOf('month');
     const todayForForecast = nowForForecast.clone().startOf('day');
-    const yesterday = todayForForecast.clone().subtract(1, 'day');
 
     // Verificar se estamos no mês corrente
     const isCurrentMonth =
@@ -807,22 +806,25 @@ export class CompanyService {
       nowForForecast.year() === currentMonthStart.year();
 
     if (isCurrentMonth) {
-      // Dias que já passaram no mês (do dia 1 até ontem)
-      const daysElapsed = yesterday.date(); // dia de ontem = quantos dias passaram
       // Total de dias no mês
       const totalDaysInMonth = currentMonthEnd.date();
-      // Dias restantes (de hoje até o fim do mês)
+
+      // Dias que já passaram no mês (do dia 1 até hoje, incluindo hoje)
+      const daysElapsed = todayForForecast.date(); // dia atual = quantos dias passaram
+
+      // Dias restantes (de amanhã até o fim do mês)
       const remainingDays = totalDaysInMonth - daysElapsed;
 
       // Se temos dados suficientes e ainda restam dias no mês
       if (daysElapsed > 0 && remainingDays > 0) {
-        // Buscar dados do mês completo (desde dia 1) para calcular previsão
+        // Buscar dados do período ESTE_MES que contém o acumulado desde o dia 1º até hoje
         const monthStartDate = currentMonthStart.toDate();
-        const monthCurrentDate = nowForForecast.clone().endOf('day').toDate();
+        const monthCurrentDate = todayForForecast.clone().endOf('day').toDate();
 
-        // Query para buscar dados do mês completo
+        // Query para buscar dados do período ESTE_MES
         const monthlyKpiRevenue = await this.prisma.prismaOnline.kpiRevenue.findMany({
           where: {
+            period: 'ESTE_MES',
             createdDate: {
               gte: monthStartDate,
               lte: monthCurrentDate,
@@ -833,6 +835,7 @@ export class CompanyService {
 
         const monthlyKpiTotalRentals = await this.prisma.prismaOnline.kpiTotalRentals.findMany({
           where: {
+            period: 'ESTE_MES',
             createdDate: {
               gte: monthStartDate,
               lte: monthCurrentDate,
@@ -843,6 +846,7 @@ export class CompanyService {
 
         const monthlyKpiTrevpar = await this.prisma.prismaOnline.kpiTrevpar.findMany({
           where: {
+            period: 'ESTE_MES',
             createdDate: {
               gte: monthStartDate,
               lte: monthCurrentDate,
@@ -853,6 +857,7 @@ export class CompanyService {
 
         const monthlyKpiGiro = await this.prisma.prismaOnline.kpiGiro.findMany({
           where: {
+            period: 'ESTE_MES',
             createdDate: {
               gte: monthStartDate,
               lte: monthCurrentDate,
@@ -863,6 +868,7 @@ export class CompanyService {
 
         const monthlyKpiTicketAverage = await this.prisma.prismaOnline.kpiTicketAverage.findMany({
           where: {
+            period: 'ESTE_MES',
             createdDate: {
               gte: monthStartDate,
               lte: monthCurrentDate,
@@ -873,6 +879,7 @@ export class CompanyService {
 
         const monthlyKpiAlos = await this.prisma.prismaOnline.kpiAlos.findMany({
           where: {
+            period: 'ESTE_MES',
             createdDate: {
               gte: monthStartDate,
               lte: monthCurrentDate,
@@ -881,7 +888,7 @@ export class CompanyService {
           orderBy: { createdDate: 'desc' },
         });
 
-        // Calcular totais do mês
+        // Pegar o registro mais recente que contém o acumulado do mês
         const monthlyTotalValue = Number(monthlyKpiRevenue[0]?.totalAllValue ?? 0);
         const monthlyTotalRentals = monthlyKpiTotalRentals[0]?.totalAllRentalsApartments || 0;
         const monthlyTotalTrevpar = Number(monthlyKpiTrevpar[0]?.totalTrevpar ?? 0);
@@ -890,11 +897,11 @@ export class CompanyService {
         const monthlyAverageOccupationTime =
           monthlyKpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00';
 
-        // Média diária baseada nos dados do mês completo
-        const dailyAverageValue = monthlyTotalValue / daysElapsed;
-        const dailyAverageRentals = monthlyTotalRentals / daysElapsed;
-        const dailyAverageTrevpar = monthlyTotalTrevpar / daysElapsed;
-        const dailyAverageGiro = monthlyTotalGiro / daysElapsed;
+        // Média diária baseada no acumulado até hoje dividido pelos dias que já passaram
+        const dailyAverageValue = daysElapsed > 0 ? monthlyTotalValue / daysElapsed : 0;
+        const dailyAverageRentals = daysElapsed > 0 ? monthlyTotalRentals / daysElapsed : 0;
+        const dailyAverageTrevpar = daysElapsed > 0 ? monthlyTotalTrevpar / daysElapsed : 0;
+        const dailyAverageGiro = daysElapsed > 0 ? monthlyTotalGiro / daysElapsed : 0;
 
         // Projeção: dados atuais do mês + (média diária × dias restantes)
         bigNumbers.monthlyForecast = {

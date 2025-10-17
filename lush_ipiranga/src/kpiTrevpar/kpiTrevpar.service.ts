@@ -56,6 +56,9 @@ export class KpiTrevparService {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
       } else if (period === PeriodEnum.LAST_6_M) {
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      } else if (period === PeriodEnum.ESTE_MES) {
+        // Para ESTE_MES, não ajustar - já vem correto do handleCron
+        // A data final já é D+1 às 05:59:59
       }
 
       // Obter dados de locações e categorias de suíte
@@ -482,6 +485,34 @@ export class KpiTrevparService {
       parsedEndDateLast6Months,
       PeriodEnum.LAST_6_M,
     );
+
+    // ESTE_MES - Do dia 1º do mês atual (às 06:00) até hoje (às 05:59 do D+1)
+    const endDateEsteMes = new Date(currentDate);
+    endDateEsteMes.setDate(endDateEsteMes.getDate() + 1); // D+1
+    endDateEsteMes.setHours(5, 59, 59, 999); // 05:59:59 do D+1
+
+    const startDateEsteMes = moment().tz(timezone).startOf('month').toDate();
+    startDateEsteMes.setHours(6, 0, 0, 0); // 06:00 do dia 1º
+
+    // Parse as datas para o formato desejado
+    const { startDate: parsedStartDateEsteMes, endDate: parsedEndDateEsteMes } =
+      this.parseDateString(
+        this.formatDateString(startDateEsteMes),
+        this.formatDateString(endDateEsteMes),
+      );
+
+    // Log para verificar as datas
+    const startTimeEsteMes = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Início CronJob KpiTrevpar - este mês: ${startTimeEsteMes}`);
+
+    // Chamar apenas a função findAllKpiTrevpar para o período ESTE_MES
+    await this.findAllKpiTrevpar(
+      parsedStartDateEsteMes,
+      parsedEndDateEsteMes,
+      PeriodEnum.ESTE_MES,
+    );
+    const endTimeEsteMes = moment().tz(timezone).format('DD-MM-YYYY HH:mm:ss');
+    console.log(`Final CronJob KpiTrevpar - este mês: ${endTimeEsteMes}`);
   }
 
   private formatDateString(date: Date): string {
