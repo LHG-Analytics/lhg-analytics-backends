@@ -148,8 +148,9 @@ export class KpiRevenueService {
         adjustedEndDate.setMonth(adjustedEndDate.getMonth() - 1); // Para LAST_6_M, subtrair um mês
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Não incluir hoje
       } else if (period === PeriodEnum.ESTE_MES) {
-        // Para ESTE_MES, não ajustar - já vem correto do handleCron
-        // A data final já é D+1 às 05:59:59
+        // Para ESTE_MES, a data final vem como D+1 do handleCron para filtrar até hoje
+        // Mas para salvar no banco, precisamos usar a data de HOJE às 05:59:59
+        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Remove 1 dia para voltar para hoje
       }
 
       const [totalSaleDirect, allRentalApartments, suiteCategories] = await this.fetchKpiData(

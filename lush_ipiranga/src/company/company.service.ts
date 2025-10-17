@@ -303,18 +303,16 @@ export class CompanyService {
 
       case PeriodEnum.ESTE_MES:
         // Período atual: desde o início do mês até hoje
-        startDate = todayInitial
-          .clone()
+        startDate = moment
+          .tz('America/Sao_Paulo')
           .startOf('month')
           .set({
-            hour: 3,
+            hour: 6,
             minute: 0,
             second: 0,
             millisecond: 0,
           })
           .toDate();
-
-        console.log('startDate:', startDate);
 
         // EndDate já está definido como hoje às 05:59:59
 
@@ -351,7 +349,6 @@ export class CompanyService {
     const [
       KpiRevenue,
       KpiRevenuePreviousData,
-      KpiRevenueNextData,
       KpiRevenueByRentalType,
       KpiRevenueByPeriod,
       KpiTotalRentals,
@@ -401,24 +398,6 @@ export class CompanyService {
           createdDate: {
             gte: startDatePrevious,
             lte: endDatePrevious,
-          },
-        },
-        select: {
-          totalValue: true,
-          suiteCategoryName: true,
-          totalAllValue: true,
-          createdDate: true,
-          suiteCategoryId: true,
-        },
-        orderBy: {
-          createdDate: 'desc',
-        },
-      }),
-      this.prisma.prismaOnline.kpiRevenue.findMany({
-        where: {
-          period: period,
-          createdDate: {
-            gte: startDate,
           },
         },
         select: {
@@ -877,8 +856,14 @@ export class CompanyService {
       // Se temos dados suficientes e ainda restam dias no mês
       if (daysElapsed > 0 && remainingDays > 0) {
         // Buscar dados do período ESTE_MES que contém o acumulado desde o dia 1º até hoje
-        const monthStartDate = currentMonthStart.toDate();
-        const monthCurrentDate = todayForForecast.clone().endOf('day').toDate();
+        // Os dados são salvos com createdDate às 05:59:59 de cada dia
+        const monthStartDate = currentMonthStart
+          .set({ hour: 5, minute: 59, second: 59, millisecond: 999 })
+          .toDate();
+        const monthCurrentDate = todayForForecast
+          .clone()
+          .set({ hour: 5, minute: 59, second: 59, millisecond: 999 })
+          .toDate();
 
         // Query para buscar dados do período ESTE_MES
         const monthlyKpiRevenue = await this.prisma.prismaOnline.kpiRevenue.findMany({
