@@ -87,8 +87,9 @@ export class KpiTicketAverageService {
         // Para LAST_6_M, subtrair um dia para não incluir a data atual
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
       } else if (period === PeriodEnum.ESTE_MES) {
-        // Para ESTE_MES, não ajustar - já vem correto do handleCron
-        // A data final já é D+1 às 05:59:59
+        // Para ESTE_MES, a data final vem como D+1 do handleCron para filtrar até hoje
+        // Mas para salvar no banco, precisamos usar a data de HOJE às 05:59:59
+        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Remove 1 dia para voltar para hoje
       }
 
       const [allRentalApartments, suiteCategories, totalSaleDirect] = await Promise.all([
