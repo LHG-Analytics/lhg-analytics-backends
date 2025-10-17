@@ -847,10 +847,11 @@ export class CompanyService {
       // Total de dias no mês
       const totalDaysInMonth = currentMonthEnd.date();
 
-      // Dias que já passaram no mês (do dia 1 até hoje, incluindo hoje)
-      const daysElapsed = todayForForecast.date(); // dia atual = quantos dias passaram
+      // Dias que já passaram no mês (do dia 1 até ontem, dados completos)
+      // Como o dia contábil fecha às 05:59 do dia seguinte, "ontem fechado" = hoje às 05:59
+      const daysElapsed = todayForForecast.date(); // dia atual = quantos dias passaram (até ontem completo)
 
-      // Dias restantes (de amanhã até o fim do mês)
+      // Dias restantes (de hoje até o fim do mês)
       const remainingDays = totalDaysInMonth - daysElapsed;
 
       // Se temos dados suficientes e ainda restam dias no mês

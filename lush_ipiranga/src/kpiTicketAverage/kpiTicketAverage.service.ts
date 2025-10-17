@@ -87,9 +87,8 @@ export class KpiTicketAverageService {
         // Para LAST_6_M, subtrair um dia para não incluir a data atual
         adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
       } else if (period === PeriodEnum.ESTE_MES) {
-        // Para ESTE_MES, a data final vem como D+1 do handleCron para filtrar até hoje
-        // Mas para salvar no banco, precisamos usar a data de HOJE às 05:59:59
-        adjustedEndDate.setDate(adjustedEndDate.getDate() - 1); // Remove 1 dia para voltar para hoje
+        // Para ESTE_MES, a data final já vem como hoje do handleCron
+        // Não precisa ajustar, usa como está
       }
 
       const [allRentalApartments, suiteCategories, totalSaleDirect] = await Promise.all([
@@ -659,8 +658,8 @@ export class KpiTicketAverageService {
 
     // ESTE_MES - Do dia 1º do mês atual (às 06:00) até hoje (às 05:59 do D+1)
     const endDateEsteMes = new Date(currentDate);
-    endDateEsteMes.setDate(endDateEsteMes.getDate() + 1); // D+1
-    endDateEsteMes.setHours(5, 59, 59, 999); // 05:59:59 do D+1
+    // Não adiciona +1, usa o currentDate que já é a data atual
+    endDateEsteMes.setHours(5, 59, 59, 999); // 05:59:59 de hoje (que é tecnicamente ontem para dados completos)
 
     const startDateEsteMes = moment().tz(timezone).startOf('month').toDate();
     startDateEsteMes.setHours(6, 0, 0, 0); // 06:00 do dia 1º
