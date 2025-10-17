@@ -302,9 +302,9 @@ export class CompanyService {
         break;
 
       case PeriodEnum.ESTE_MES:
-        // Período atual: do dia 1 do mês às 06:00 até hoje às 05:59
+        // Período atual: desde o início do mês até hoje
         startDate = moment
-          .tz(timezone)
+          .tz('America/Sao_Paulo')
           .startOf('month')
           .set({
             hour: 6,
@@ -314,21 +314,13 @@ export class CompanyService {
           })
           .toDate();
 
-        endDate = moment
-          .tz(timezone)
-          .set({
-            hour: 5,
-            minute: 59,
-            second: 59,
-            millisecond: 999,
-          })
-          .toDate();
+        // EndDate já está definido como hoje às 05:59:59
 
-        // Período anterior: mês anterior completo
-        startDatePrevious = moment
-          .tz(timezone)
-          .subtract(1, 'month')
-          .startOf('month')
+        // Período anterior: o mês anterior completo
+        const lastMonthStart = moment.tz('America/Sao_Paulo').subtract(1, 'month').startOf('month');
+        const lastMonthEnd = moment.tz('America/Sao_Paulo').subtract(1, 'month').endOf('month');
+
+        startDatePrevious = lastMonthStart
           .set({
             hour: 6,
             minute: 0,
@@ -337,10 +329,7 @@ export class CompanyService {
           })
           .toDate();
 
-        endDatePrevious = moment
-          .tz(timezone)
-          .subtract(1, 'month')
-          .endOf('month')
+        endDatePrevious = lastMonthEnd
           .set({
             hour: 5,
             minute: 59,
