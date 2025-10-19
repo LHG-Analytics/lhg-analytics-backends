@@ -961,43 +961,65 @@ export class CompanyService {
         console.log('  Registros encontrados (Revenue):', monthlyKpiRevenue.length);
         console.log('  Data do registro mais recente:', monthlyKpiRevenue[0]?.createdDate ? moment(monthlyKpiRevenue[0].createdDate).format('DD/MM/YYYY HH:mm:ss') : 'N/A');
         console.log('  monthlyTotalValue (receita acumulada):', monthlyTotalValue.toFixed(2));
-        console.log('  monthlyTotalRentals:', monthlyTotalRentals);
-        console.log('  monthlyTotalTrevpar:', monthlyTotalTrevpar.toFixed(2));
-        console.log('  monthlyTotalGiro:', monthlyTotalGiro.toFixed(2));
+        console.log('  monthlyTotalRentals (total de locações):', monthlyTotalRentals);
+        console.log('  monthlyTotalTrevpar (TRevPAR do período):', monthlyTotalTrevpar.toFixed(2));
+        console.log('  monthlyTotalGiro (Giro do período):', monthlyTotalGiro.toFixed(2));
+        console.log('  monthlyTicketAverage (Ticket médio):', monthlyTicketAverage.toFixed(2));
+
+        // Buscar total de suítes para cálculos
+        const totalSuitesCount = suiteCategory.reduce(
+          (acc, category) => acc + category.suites.length,
+          0,
+        );
+
+        console.log('  Total de suítes:', totalSuitesCount);
 
         // Média diária baseada no acumulado até hoje dividido pelos dias que já passaram
         const dailyAverageValue = daysElapsed > 0 ? monthlyTotalValue / daysElapsed : 0;
         const dailyAverageRentals = daysElapsed > 0 ? monthlyTotalRentals / daysElapsed : 0;
-        const dailyAverageTrevpar = daysElapsed > 0 ? monthlyTotalTrevpar / daysElapsed : 0;
-        const dailyAverageGiro = daysElapsed > 0 ? monthlyTotalGiro / daysElapsed : 0;
 
         console.log('\nMédias diárias:');
         console.log('  dailyAverageValue (receita diária média):', dailyAverageValue.toFixed(2));
-        console.log('  dailyAverageRentals:', dailyAverageRentals.toFixed(2));
-        console.log('  dailyAverageTrevpar:', dailyAverageTrevpar.toFixed(2));
-        console.log('  dailyAverageGiro:', dailyAverageGiro.toFixed(2));
+        console.log('  dailyAverageRentals (locações diárias médias):', dailyAverageRentals.toFixed(2));
 
-        // Projeção: dados atuais do mês + (média diária × dias restantes)
+        // Projeção dos valores acumulados
         const forecastValue = monthlyTotalValue + dailyAverageValue * remainingDays;
         const forecastRentals = monthlyTotalRentals + dailyAverageRentals * remainingDays;
-        const forecastTrevpar = monthlyTotalTrevpar + dailyAverageTrevpar * remainingDays;
-        const forecastGiro = monthlyTotalGiro + dailyAverageGiro * remainingDays;
+
+        // Recalcular métricas com base nos valores projetados
+        // Ticket Médio = receita total / número de locações
+        const forecastTicketAverage = forecastRentals > 0
+          ? Number((forecastValue / forecastRentals).toFixed(2))
+          : 0;
+
+        // Giro = locações / suítes / dias no mês completo
+        const forecastGiro = totalSuitesCount > 0 && totalDaysInMonth > 0
+          ? Number((forecastRentals / totalSuitesCount / totalDaysInMonth).toFixed(2))
+          : 0;
+
+        // TRevPAR = receita total / suítes / dias no mês completo
+        const forecastTrevpar = totalSuitesCount > 0 && totalDaysInMonth > 0
+          ? Number((forecastValue / totalSuitesCount / totalDaysInMonth).toFixed(2))
+          : 0;
 
         console.log('\nCálculo da projeção:');
-        console.log('  Fórmula: acumulado + (média diária × dias restantes)');
+        console.log('  === VALORES ACUMULADOS ===');
         console.log('  totalAllValueForecast: ', monthlyTotalValue.toFixed(2), ' + (', dailyAverageValue.toFixed(2), ' × ', remainingDays, ') = ', forecastValue.toFixed(2));
         console.log('  totalAllRentalsApartmentsForecast: ', monthlyTotalRentals, ' + (', dailyAverageRentals.toFixed(2), ' × ', remainingDays, ') = ', Math.round(forecastRentals));
-        console.log('  totalAllTrevparForecast: ', monthlyTotalTrevpar.toFixed(2), ' + (', dailyAverageTrevpar.toFixed(2), ' × ', remainingDays, ') = ', forecastTrevpar.toFixed(2));
-        console.log('  totalAllGiroForecast: ', monthlyTotalGiro.toFixed(2), ' + (', dailyAverageGiro.toFixed(2), ' × ', remainingDays, ') = ', forecastGiro.toFixed(2));
+        console.log('  === MÉTRICAS RECALCULADAS ===');
+        console.log('  totalAllTicketAverageForecast: ', forecastValue.toFixed(2), ' / ', Math.round(forecastRentals), ' = ', forecastTicketAverage.toFixed(2));
+        console.log('  totalAllGiroForecast: ', Math.round(forecastRentals), ' / ', totalSuitesCount, ' / ', totalDaysInMonth, ' = ', forecastGiro.toFixed(2));
+        console.log('  totalAllTrevparForecast: ', forecastValue.toFixed(2), ' / ', totalSuitesCount, ' / ', totalDaysInMonth, ' = ', forecastTrevpar.toFixed(2));
+        console.log('  totalAverageOccupationTimeForecast: ', monthlyAverageOccupationTime, ' (mantém, falta dados de tempo ocupado)');
         console.log('====== DEBUG FORECAST - FIM ======\n');
 
         bigNumbers.monthlyForecast = {
           totalAllValueForecast: Number(forecastValue.toFixed(2)),
           totalAllRentalsApartmentsForecast: Math.round(forecastRentals),
-          totalAllTicketAverageForecast: Number(monthlyTicketAverage), // Ticket médio não muda com projeção
-          totalAllTrevparForecast: Number(forecastTrevpar.toFixed(2)),
-          totalAllGiroForecast: Number(forecastGiro.toFixed(2)),
-          totalAverageOccupationTimeForecast: monthlyAverageOccupationTime, // Tempo médio não muda com projeção
+          totalAllTicketAverageForecast: forecastTicketAverage,
+          totalAllTrevparForecast: forecastTrevpar,
+          totalAllGiroForecast: forecastGiro,
+          totalAverageOccupationTimeForecast: monthlyAverageOccupationTime, // Mantém (faltam dados de tempo ocupado para projetar)
         };
       }
     }
