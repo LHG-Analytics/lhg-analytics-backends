@@ -234,13 +234,10 @@ export class CompanyService {
 
     let startDate: Date, endDate: Date, startDatePrevious: Date, endDatePrevious: Date;
 
-    // Obtém o horário atual em "America/Sao_Paulo"
-    const todayInitial = moment.tz('America/Sao_Paulo').set({
-      hour: 5,
-      minute: 59,
-      second: 59,
-      millisecond: 999,
-    });
+    // Obtém a data atual em São Paulo e cria um momento UTC com hora 05:59:59
+    // Isso garante que a data/hora no banco (UTC) será exatamente como queremos
+    const todayInSaoPaulo = moment.tz('America/Sao_Paulo').format('YYYY-MM-DD');
+    const todayInitial = moment.utc(`${todayInSaoPaulo} 05:59:59.999`, 'YYYY-MM-DD HH:mm:ss.SSS');
 
     // Define endDate como hoje às 05:59 para todos os períodos (exceto ESTE_MES que redefine depois)
     endDate = todayInitial.clone().toDate();
