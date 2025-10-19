@@ -245,7 +245,7 @@ export class CompanyService {
       case PeriodEnum.LAST_7_D:
         startDate = todayInitial
           .clone()
-          .subtract(7, 'days')
+          .subtract(6, 'days')
           .toDate();
 
         // Período anterior: 7 dias antes do início do período atual
@@ -256,7 +256,7 @@ export class CompanyService {
       case PeriodEnum.LAST_30_D:
         startDate = todayInitial
           .clone()
-          .subtract(30, 'days')
+          .subtract(29, 'days')
           .toDate();
 
         // Período anterior: 30 dias antes do início do período atual
