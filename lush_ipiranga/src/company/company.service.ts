@@ -847,12 +847,14 @@ export class CompanyService {
       // Total de dias no mês
       const totalDaysInMonth = currentMonthEnd.date();
 
-      // Dias que já passaram no mês (do dia 1 até ontem, dados completos)
+      // Dias com dados completos (do dia 1 até ontem)
       // Como o dia contábil fecha às 05:59 do dia seguinte, "ontem fechado" = hoje às 05:59
-      const daysElapsed = todayForForecast.date(); // dia atual = quantos dias passaram (até ontem completo)
+      // Se hoje é dia 18, temos dados completos de 17 dias (dia 1 até dia 17)
+      const daysElapsed = todayForForecast.date() - 1; // dia atual - 1 = dias completos
 
       // Dias restantes (de hoje até o fim do mês)
-      const remainingDays = totalDaysInMonth - daysElapsed;
+      // Se hoje é dia 18 e o mês tem 31 dias, restam 14 dias (18 ao 31)
+      const remainingDays = totalDaysInMonth - (todayForForecast.date() - 1);
 
       console.log('====== DEBUG FORECAST - INÍCIO ======');
       console.log('Data/Hora atual (nowForForecast):', nowForForecast.format('DD/MM/YYYY HH:mm:ss'));
