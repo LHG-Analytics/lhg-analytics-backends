@@ -242,24 +242,16 @@ export class CompanyService {
       millisecond: 999,
     });
 
-    // Define o `endDate` como hoje às 05:59:59 no fuso horário local
-    endDate = todayInitial.clone().toDate();
-
-    // Calcula o `startDate` e os períodos anteriores com base no `period`
+    // Calcula o `startDate`, `endDate` e os períodos anteriores com base no `period`
     switch (period) {
       case PeriodEnum.LAST_7_D:
-        // Período atual: últimos 7 dias das 05:59
-        // Para pegar dados de 7 dias completos (ex: 12 a 18), precisamos dos registros de 13/10 até 19/10
-        // porque o registro de 13/10 05:59 contém dados do dia 12/10 (de 06:00 de 12/10 até 05:59 de 13/10)
+        // EndDate = hoje às 05:59 (contém dados de ontem)
+        endDate = todayInitial.clone().toDate();
+
+        // StartDate = 7 dias atrás (para pegar 7 dias completos de dados)
         startDate = todayInitial
           .clone()
           .subtract(6, 'days')
-          .set({
-            hour: 5,
-            minute: 59,
-            second: 59,
-            millisecond: 999,
-          })
           .toDate();
 
         // Período anterior: 7 dias antes do início do período atual
@@ -268,17 +260,13 @@ export class CompanyService {
         break;
 
       case PeriodEnum.LAST_30_D:
-        // Período atual: últimos 30 dias
-        // Mesma lógica: subtract(29) para pegar 30 dias completos
+        // EndDate = hoje às 05:59 (contém dados de ontem)
+        endDate = todayInitial.clone().toDate();
+
+        // StartDate = 30 dias atrás (para pegar 30 dias completos de dados)
         startDate = todayInitial
           .clone()
           .subtract(29, 'days')
-          .set({
-            hour: 5,
-            minute: 59,
-            second: 59,
-            millisecond: 999,
-          })
           .toDate();
 
         // Período anterior: 30 dias antes do início do período atual
@@ -287,18 +275,14 @@ export class CompanyService {
         break;
 
       case PeriodEnum.LAST_6_M:
-        // Período atual: últimos 6 meses
-        // Para meses, adiciona 1 dia após subtrair 6 meses
+        // EndDate = hoje às 05:59 (contém dados de ontem)
+        endDate = todayInitial.clone().toDate();
+
+        // StartDate = 6 meses atrás + 1 dia
         startDate = todayInitial
           .clone()
           .subtract(6, 'months')
           .add(1, 'day')
-          .set({
-            hour: 5,
-            minute: 59,
-            second: 59,
-            millisecond: 999,
-          })
           .toDate();
 
         // Período anterior: 6 meses antes do início do período atual
