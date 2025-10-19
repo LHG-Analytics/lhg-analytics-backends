@@ -234,19 +234,19 @@ export class CompanyService {
 
     let startDate: Date, endDate: Date, startDatePrevious: Date, endDatePrevious: Date;
 
-    // Obtém a data atual em São Paulo e cria um momento UTC com hora 05:59:59
-    // Isso garante que a data/hora no banco (UTC) será exatamente como queremos
-    const todayInSaoPaulo = moment.tz('America/Sao_Paulo').format('YYYY-MM-DD');
-    const todayInitial = moment.utc(`${todayInSaoPaulo} 05:59:59.999`, 'YYYY-MM-DD HH:mm:ss.SSS');
+    // Obtém a data de ONTEM em São Paulo e cria um momento UTC com hora 05:59:59
+    // Usamos ontem porque queremos apenas dados completos (até ontem)
+    const yesterdayInSaoPaulo = moment.tz('America/Sao_Paulo').subtract(1, 'day').format('YYYY-MM-DD');
+    const yesterdayInitial = moment.utc(`${yesterdayInSaoPaulo} 05:59:59.999`, 'YYYY-MM-DD HH:mm:ss.SSS');
 
-    // Define endDate como hoje às 05:59 para todos os períodos (exceto ESTE_MES que redefine depois)
-    endDate = todayInitial.clone().toDate();
+    // Define endDate como ontem às 05:59 para todos os períodos (exceto ESTE_MES que usa hoje)
+    endDate = yesterdayInitial.clone().toDate();
 
     // Calcula o `startDate` e os períodos anteriores com base no `period`
     switch (period) {
       case PeriodEnum.LAST_7_D:
-        // StartDate = 7 dias atrás (para pegar 7 dias completos de dados)
-        startDate = todayInitial
+        // StartDate = 7 dias atrás de ontem (para pegar 7 dias completos de dados)
+        startDate = yesterdayInitial
           .clone()
           .subtract(6, 'days')
           .toDate();
@@ -257,8 +257,8 @@ export class CompanyService {
         break;
 
       case PeriodEnum.LAST_30_D:
-        // StartDate = 30 dias atrás (para pegar 30 dias completos de dados)
-        startDate = todayInitial
+        // StartDate = 30 dias atrás de ontem (para pegar 30 dias completos de dados)
+        startDate = yesterdayInitial
           .clone()
           .subtract(29, 'days')
           .toDate();
@@ -269,8 +269,8 @@ export class CompanyService {
         break;
 
       case PeriodEnum.LAST_6_M:
-        // StartDate = 6 meses atrás + 1 dia
-        startDate = todayInitial
+        // StartDate = 6 meses atrás de ontem + 1 dia
+        startDate = yesterdayInitial
           .clone()
           .subtract(6, 'months')
           .add(1, 'day')
