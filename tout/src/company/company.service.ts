@@ -949,19 +949,48 @@ export class CompanyService {
         const monthlyAverageOccupationTime =
           monthlyKpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00';
 
+        console.log('====== DEBUG FORECAST TOUT - INÍCIO ======');
+        console.log('Registros encontrados:');
+        console.log('  Revenue:', monthlyKpiRevenue.length);
+        console.log('  TotalRentals:', monthlyKpiTotalRentals.length);
+        console.log('  Trevpar:', monthlyKpiTrevpar.length);
+        console.log('  Giro:', monthlyKpiGiro.length);
+        console.log('  TicketAverage:', monthlyKpiTicketAverage.length);
+        console.log('  Alos:', monthlyKpiAlos.length);
+        console.log('Valores extraídos:');
+        console.log('  monthlyTotalValue:', monthlyTotalValue);
+        console.log('  monthlyTotalRentals:', monthlyTotalRentals);
+        console.log('  monthlyTotalTrevpar:', monthlyTotalTrevpar);
+        console.log('  monthlyTotalGiro:', monthlyTotalGiro);
+        console.log('  monthlyTicketAverage:', monthlyTicketAverage);
+        console.log('Dias:');
+        console.log('  daysElapsed:', daysElapsed);
+        console.log('  totalDaysInMonth:', totalDaysInMonth);
+        console.log('  remainingDays:', remainingDays);
+
         // Buscar total de suítes para cálculos
         const totalSuitesCount = suiteCategory.reduce(
           (acc, category) => acc + category.suites.length,
           0,
         );
 
+        console.log('  totalSuitesCount:', totalSuitesCount);
+
         // Média diária baseada no acumulado até hoje dividido pelos dias que já passaram
         const dailyAverageValue = daysElapsed > 0 ? monthlyTotalValue / daysElapsed : 0;
         const dailyAverageRentals = daysElapsed > 0 ? monthlyTotalRentals / daysElapsed : 0;
 
+        console.log('Médias diárias:');
+        console.log('  dailyAverageValue:', dailyAverageValue);
+        console.log('  dailyAverageRentals:', dailyAverageRentals);
+
         // Projeção dos valores acumulados
         const forecastValue = monthlyTotalValue + dailyAverageValue * remainingDays;
         const forecastRentals = monthlyTotalRentals + dailyAverageRentals * remainingDays;
+
+        console.log('Projeções:');
+        console.log('  forecastValue:', forecastValue);
+        console.log('  forecastRentals:', forecastRentals);
 
         // Recalcular métricas com base nos valores projetados
         // Ticket Médio = receita total / número de locações
@@ -978,6 +1007,12 @@ export class CompanyService {
         const forecastTrevpar = totalSuitesCount > 0 && totalDaysInMonth > 0
           ? Number((forecastValue / totalSuitesCount / totalDaysInMonth).toFixed(2))
           : 0;
+
+        console.log('Métricas recalculadas:');
+        console.log('  forecastTicketAverage:', forecastTicketAverage);
+        console.log('  forecastGiro:', forecastGiro);
+        console.log('  forecastTrevpar:', forecastTrevpar);
+        console.log('====== DEBUG FORECAST TOUT - FIM ======\n');
 
         bigNumbers.monthlyForecast = {
           totalAllValueForecast: Number(forecastValue.toFixed(2)),
