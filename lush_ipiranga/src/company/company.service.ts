@@ -854,6 +854,15 @@ export class CompanyService {
       // Dias restantes (de hoje até o fim do mês)
       const remainingDays = totalDaysInMonth - daysElapsed;
 
+      console.log('====== DEBUG FORECAST - INÍCIO ======');
+      console.log('Data/Hora atual (nowForForecast):', nowForForecast.format('DD/MM/YYYY HH:mm:ss'));
+      console.log('Início do mês (currentMonthStart):', currentMonthStart.format('DD/MM/YYYY HH:mm:ss'));
+      console.log('Fim do mês (currentMonthEnd):', currentMonthEnd.format('DD/MM/YYYY HH:mm:ss'));
+      console.log('Hoje para forecast (todayForForecast):', todayForForecast.format('DD/MM/YYYY HH:mm:ss'));
+      console.log('Total de dias no mês:', totalDaysInMonth);
+      console.log('Dias já passados (daysElapsed):', daysElapsed);
+      console.log('Dias restantes (remainingDays):', remainingDays);
+
       // Se temos dados suficientes e ainda restam dias no mês
       if (daysElapsed > 0 && remainingDays > 0) {
         // Buscar dados do período ESTE_MES que contém o acumulado desde o dia 1º até hoje
@@ -865,6 +874,10 @@ export class CompanyService {
           .clone()
           .set({ hour: 5, minute: 59, second: 59, millisecond: 999 })
           .toDate();
+
+        console.log('Range de busca no banco:');
+        console.log('  monthStartDate:', moment(monthStartDate).format('DD/MM/YYYY HH:mm:ss'));
+        console.log('  monthCurrentDate:', moment(monthCurrentDate).format('DD/MM/YYYY HH:mm:ss'));
 
         // Query para buscar dados do período ESTE_MES
         const monthlyKpiRevenue = await this.prisma.prismaOnline.kpiRevenue.findMany({
@@ -942,27 +955,46 @@ export class CompanyService {
         const monthlyAverageOccupationTime =
           monthlyKpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00';
 
+        console.log('\nDados do período ESTE_MES (registro mais recente):');
+        console.log('  Registros encontrados (Revenue):', monthlyKpiRevenue.length);
+        console.log('  Data do registro mais recente:', monthlyKpiRevenue[0]?.createdDate ? moment(monthlyKpiRevenue[0].createdDate).format('DD/MM/YYYY HH:mm:ss') : 'N/A');
+        console.log('  monthlyTotalValue (receita acumulada):', monthlyTotalValue.toFixed(2));
+        console.log('  monthlyTotalRentals:', monthlyTotalRentals);
+        console.log('  monthlyTotalTrevpar:', monthlyTotalTrevpar.toFixed(2));
+        console.log('  monthlyTotalGiro:', monthlyTotalGiro.toFixed(2));
+
         // Média diária baseada no acumulado até hoje dividido pelos dias que já passaram
         const dailyAverageValue = daysElapsed > 0 ? monthlyTotalValue / daysElapsed : 0;
         const dailyAverageRentals = daysElapsed > 0 ? monthlyTotalRentals / daysElapsed : 0;
         const dailyAverageTrevpar = daysElapsed > 0 ? monthlyTotalTrevpar / daysElapsed : 0;
         const dailyAverageGiro = daysElapsed > 0 ? monthlyTotalGiro / daysElapsed : 0;
 
+        console.log('\nMédias diárias:');
+        console.log('  dailyAverageValue (receita diária média):', dailyAverageValue.toFixed(2));
+        console.log('  dailyAverageRentals:', dailyAverageRentals.toFixed(2));
+        console.log('  dailyAverageTrevpar:', dailyAverageTrevpar.toFixed(2));
+        console.log('  dailyAverageGiro:', dailyAverageGiro.toFixed(2));
+
         // Projeção: dados atuais do mês + (média diária × dias restantes)
+        const forecastValue = monthlyTotalValue + dailyAverageValue * remainingDays;
+        const forecastRentals = monthlyTotalRentals + dailyAverageRentals * remainingDays;
+        const forecastTrevpar = monthlyTotalTrevpar + dailyAverageTrevpar * remainingDays;
+        const forecastGiro = monthlyTotalGiro + dailyAverageGiro * remainingDays;
+
+        console.log('\nCálculo da projeção:');
+        console.log('  Fórmula: acumulado + (média diária × dias restantes)');
+        console.log('  totalAllValueForecast: ', monthlyTotalValue.toFixed(2), ' + (', dailyAverageValue.toFixed(2), ' × ', remainingDays, ') = ', forecastValue.toFixed(2));
+        console.log('  totalAllRentalsApartmentsForecast: ', monthlyTotalRentals, ' + (', dailyAverageRentals.toFixed(2), ' × ', remainingDays, ') = ', Math.round(forecastRentals));
+        console.log('  totalAllTrevparForecast: ', monthlyTotalTrevpar.toFixed(2), ' + (', dailyAverageTrevpar.toFixed(2), ' × ', remainingDays, ') = ', forecastTrevpar.toFixed(2));
+        console.log('  totalAllGiroForecast: ', monthlyTotalGiro.toFixed(2), ' + (', dailyAverageGiro.toFixed(2), ' × ', remainingDays, ') = ', forecastGiro.toFixed(2));
+        console.log('====== DEBUG FORECAST - FIM ======\n');
+
         bigNumbers.monthlyForecast = {
-          totalAllValueForecast: Number(
-            (monthlyTotalValue + dailyAverageValue * remainingDays).toFixed(2),
-          ),
-          totalAllRentalsApartmentsForecast: Math.round(
-            monthlyTotalRentals + dailyAverageRentals * remainingDays,
-          ),
+          totalAllValueForecast: Number(forecastValue.toFixed(2)),
+          totalAllRentalsApartmentsForecast: Math.round(forecastRentals),
           totalAllTicketAverageForecast: Number(monthlyTicketAverage), // Ticket médio não muda com projeção
-          totalAllTrevparForecast: Number(
-            (monthlyTotalTrevpar + dailyAverageTrevpar * remainingDays).toFixed(2),
-          ),
-          totalAllGiroForecast: Number(
-            (monthlyTotalGiro + dailyAverageGiro * remainingDays).toFixed(2),
-          ),
+          totalAllTrevparForecast: Number(forecastTrevpar.toFixed(2)),
+          totalAllGiroForecast: Number(forecastGiro.toFixed(2)),
           totalAverageOccupationTimeForecast: monthlyAverageOccupationTime, // Tempo médio não muda com projeção
         };
       }
