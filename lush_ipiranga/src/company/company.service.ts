@@ -248,10 +248,12 @@ export class CompanyService {
     // Calcula o `startDate` e os períodos anteriores com base no `period`
     switch (period) {
       case PeriodEnum.LAST_7_D:
-        // Período atual: últimos 7 dias das 05:59 (ex: 22/09 05:59 até 29/09 05:59)
+        // Período atual: últimos 7 dias das 05:59
+        // Para pegar dados de 7 dias completos (ex: 12 a 18), precisamos dos registros de 13/10 até 19/10
+        // porque o registro de 13/10 05:59 contém dados do dia 12/10 (de 06:00 de 12/10 até 05:59 de 13/10)
         startDate = todayInitial
           .clone()
-          .subtract(7, 'days')
+          .subtract(6, 'days')
           .set({
             hour: 5,
             minute: 59,
@@ -267,9 +269,10 @@ export class CompanyService {
 
       case PeriodEnum.LAST_30_D:
         // Período atual: últimos 30 dias
+        // Mesma lógica: subtract(29) para pegar 30 dias completos
         startDate = todayInitial
           .clone()
-          .subtract(30, 'days')
+          .subtract(29, 'days')
           .set({
             hour: 5,
             minute: 59,
@@ -285,9 +288,11 @@ export class CompanyService {
 
       case PeriodEnum.LAST_6_M:
         // Período atual: últimos 6 meses
+        // Para meses, adiciona 1 dia após subtrair 6 meses
         startDate = todayInitial
           .clone()
           .subtract(6, 'months')
+          .add(1, 'day')
           .set({
             hour: 5,
             minute: 59,
@@ -868,14 +873,6 @@ export class CompanyService {
       // Se hoje é dia 18 e o mês tem 31 dias, restam 14 dias (18 ao 31)
       const remainingDays = totalDaysInMonth - (todayForForecast.date() - 1);
 
-      console.log('====== DEBUG FORECAST - INÍCIO ======');
-      console.log('Data/Hora atual (nowForForecast):', nowForForecast.format('DD/MM/YYYY HH:mm:ss'));
-      console.log('Início do mês (currentMonthStart):', currentMonthStart.format('DD/MM/YYYY HH:mm:ss'));
-      console.log('Fim do mês (currentMonthEnd):', currentMonthEnd.format('DD/MM/YYYY HH:mm:ss'));
-      console.log('Hoje para forecast (todayForForecast):', todayForForecast.format('DD/MM/YYYY HH:mm:ss'));
-      console.log('Total de dias no mês:', totalDaysInMonth);
-      console.log('Dias já passados (daysElapsed):', daysElapsed);
-      console.log('Dias restantes (remainingDays):', remainingDays);
 
       // Se temos dados suficientes e ainda restam dias no mês
       if (daysElapsed > 0 && remainingDays > 0) {
@@ -889,9 +886,6 @@ export class CompanyService {
           .set({ hour: 5, minute: 59, second: 59, millisecond: 999 })
           .toDate();
 
-        console.log('Range de busca no banco:');
-        console.log('  monthStartDate:', moment(monthStartDate).format('DD/MM/YYYY HH:mm:ss'));
-        console.log('  monthCurrentDate:', moment(monthCurrentDate).format('DD/MM/YYYY HH:mm:ss'));
 
         // Query para buscar dados do período ESTE_MES
         const monthlyKpiRevenue = await this.prisma.prismaOnline.kpiRevenue.findMany({
@@ -969,14 +963,6 @@ export class CompanyService {
         const monthlyAverageOccupationTime =
           monthlyKpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00';
 
-        console.log('\nDados do período ESTE_MES (registro mais recente):');
-        console.log('  Registros encontrados (Revenue):', monthlyKpiRevenue.length);
-        console.log('  Data do registro mais recente:', monthlyKpiRevenue[0]?.createdDate ? moment(monthlyKpiRevenue[0].createdDate).format('DD/MM/YYYY HH:mm:ss') : 'N/A');
-        console.log('  monthlyTotalValue (receita acumulada):', monthlyTotalValue.toFixed(2));
-        console.log('  monthlyTotalRentals (total de locações):', monthlyTotalRentals);
-        console.log('  monthlyTotalTrevpar (TRevPAR do período):', monthlyTotalTrevpar.toFixed(2));
-        console.log('  monthlyTotalGiro (Giro do período):', monthlyTotalGiro.toFixed(2));
-        console.log('  monthlyTicketAverage (Ticket médio):', monthlyTicketAverage.toFixed(2));
 
         // Buscar total de suítes para cálculos
         const totalSuitesCount = suiteCategory.reduce(
@@ -984,15 +970,11 @@ export class CompanyService {
           0,
         );
 
-        console.log('  Total de suítes:', totalSuitesCount);
 
         // Média diária baseada no acumulado até hoje dividido pelos dias que já passaram
         const dailyAverageValue = daysElapsed > 0 ? monthlyTotalValue / daysElapsed : 0;
         const dailyAverageRentals = daysElapsed > 0 ? monthlyTotalRentals / daysElapsed : 0;
 
-        console.log('\nMédias diárias:');
-        console.log('  dailyAverageValue (receita diária média):', dailyAverageValue.toFixed(2));
-        console.log('  dailyAverageRentals (locações diárias médias):', dailyAverageRentals.toFixed(2));
 
         // Projeção dos valores acumulados
         const forecastValue = monthlyTotalValue + dailyAverageValue * remainingDays;
@@ -1014,16 +996,6 @@ export class CompanyService {
           ? Number((forecastValue / totalSuitesCount / totalDaysInMonth).toFixed(2))
           : 0;
 
-        console.log('\nCálculo da projeção:');
-        console.log('  === VALORES ACUMULADOS ===');
-        console.log('  totalAllValueForecast: ', monthlyTotalValue.toFixed(2), ' + (', dailyAverageValue.toFixed(2), ' × ', remainingDays, ') = ', forecastValue.toFixed(2));
-        console.log('  totalAllRentalsApartmentsForecast: ', monthlyTotalRentals, ' + (', dailyAverageRentals.toFixed(2), ' × ', remainingDays, ') = ', Math.round(forecastRentals));
-        console.log('  === MÉTRICAS RECALCULADAS ===');
-        console.log('  totalAllTicketAverageForecast: ', forecastValue.toFixed(2), ' / ', Math.round(forecastRentals), ' = ', forecastTicketAverage.toFixed(2));
-        console.log('  totalAllGiroForecast: ', Math.round(forecastRentals), ' / ', totalSuitesCount, ' / ', totalDaysInMonth, ' = ', forecastGiro.toFixed(2));
-        console.log('  totalAllTrevparForecast: ', forecastValue.toFixed(2), ' / ', totalSuitesCount, ' / ', totalDaysInMonth, ' = ', forecastTrevpar.toFixed(2));
-        console.log('  totalAverageOccupationTimeForecast: ', monthlyAverageOccupationTime, ' (mantém, falta dados de tempo ocupado)');
-        console.log('====== DEBUG FORECAST - FIM ======\n');
 
         bigNumbers.monthlyForecast = {
           totalAllValueForecast: Number(forecastValue.toFixed(2)),
@@ -1133,11 +1105,11 @@ export class CompanyService {
     );
 
     // Gerar array completo de datas para o período
-    // As datas no array correspondem às createdDate dos registros no banco
-    // Para LAST_7_D: se queremos dados dos dias 12-18, precisamos dos registros 13/10 05:59 até 19/10 05:59
+    // O periodsArray representa as DATAS DOS DADOS (não as createdDate dos registros)
+    // Se startDate = 13/10 05:59 (registro que contém dados do dia 12), então o array começa do dia 12
     const periodsArray: string[] = [];
-    let currentDate = moment(startDate).add(1, 'day'); // Começa 1 dia depois do startDate
-    const endDateMoment = moment(endDate);
+    let currentDate = moment(startDate).subtract(1, 'day');
+    const endDateMoment = moment(endDate).subtract(1, 'day');
 
     while (currentDate.isSameOrBefore(endDateMoment, 'day')) {
       periodsArray.push(currentDate.format('DD/MM/YYYY'));
