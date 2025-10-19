@@ -236,17 +236,20 @@ export class CompanyService {
 
     // Obtém a data de ONTEM em São Paulo e cria momento UTC às 05:59:59
     // Usamos ontem porque queremos apenas dados completos (até ontem)
-    const yesterdayInSaoPaulo = moment.tz('America/Sao_Paulo').subtract(1, 'day').format('YYYY-MM-DD');
-    const todayInitial = moment.utc(`${yesterdayInSaoPaulo} 05:59:59.999`, 'YYYY-MM-DD HH:mm:ss.SSS');
+    const yesterdayInSaoPaulo = moment
+      .tz('America/Sao_Paulo')
+      .subtract(1, 'day')
+      .format('YYYY-MM-DD');
+    const todayInitial = moment.utc(
+      `${yesterdayInSaoPaulo} 05:59:59.999`,
+      'YYYY-MM-DD HH:mm:ss.SSS',
+    );
     endDate = todayInitial.clone().toDate();
 
     // Calcula o `startDate` e os períodos anteriores com base no `period`
     switch (period) {
       case PeriodEnum.LAST_7_D:
-        startDate = todayInitial
-          .clone()
-          .subtract(6, 'days')
-          .toDate();
+        startDate = todayInitial.clone().subtract(6, 'days').toDate();
 
         // Período anterior: 7 dias antes do início do período atual
         startDatePrevious = moment(startDate).subtract(7, 'days').toDate();
@@ -254,10 +257,7 @@ export class CompanyService {
         break;
 
       case PeriodEnum.LAST_30_D:
-        startDate = todayInitial
-          .clone()
-          .subtract(29, 'days')
-          .toDate();
+        startDate = todayInitial.clone().subtract(29, 'days').toDate();
 
         // Período anterior: 30 dias antes do início do período atual
         startDatePrevious = moment(startDate).subtract(30, 'days').toDate();
@@ -265,10 +265,7 @@ export class CompanyService {
         break;
 
       case PeriodEnum.LAST_6_M:
-        startDate = todayInitial
-          .clone()
-          .subtract(6, 'months')
-          .toDate();
+        startDate = todayInitial.clone().subtract(6, 'months').toDate();
 
         // Período anterior: 6 meses antes do início do período atual
         startDatePrevious = moment(startDate).subtract(6, 'months').toDate();
@@ -322,8 +319,14 @@ export class CompanyService {
     console.log('Period:', period);
     console.log('StartDate:', startDate);
     console.log('EndDate:', endDate);
-    console.log('StartDate formatted:', moment(startDate).tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss'));
-    console.log('EndDate formatted:', moment(endDate).tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss'));
+    console.log(
+      'StartDate formatted:',
+      moment(startDate).tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss'),
+    );
+    console.log(
+      'EndDate formatted:',
+      moment(endDate).tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss'),
+    );
     console.log('StartDate UTC:', moment.utc(startDate).format('DD/MM/YYYY HH:mm:ss'));
     console.log('EndDate UTC:', moment.utc(endDate).format('DD/MM/YYYY HH:mm:ss'));
     console.log('============================');
@@ -844,7 +847,6 @@ export class CompanyService {
       // Se hoje é dia 18 e o mês tem 31 dias, restam 14 dias (18 ao 31)
       const remainingDays = totalDaysInMonth - (todayForForecast.date() - 1);
 
-
       // Se temos dados suficientes e ainda restam dias no mês
       if (daysElapsed > 0 && remainingDays > 0) {
         // Buscar dados do período ESTE_MES que contém o acumulado desde o dia 1º até hoje
@@ -856,7 +858,6 @@ export class CompanyService {
           .clone()
           .set({ hour: 5, minute: 59, second: 59, millisecond: 999 })
           .toDate();
-
 
         // Query para buscar dados do período ESTE_MES
         const monthlyKpiRevenue = await this.prisma.prismaOnline.kpiRevenue.findMany({
@@ -934,18 +935,15 @@ export class CompanyService {
         const monthlyAverageOccupationTime =
           monthlyKpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00';
 
-
         // Buscar total de suítes para cálculos
         const totalSuitesCount = suiteCategory.reduce(
           (acc, category) => acc + category.suites.length,
           0,
         );
 
-
         // Média diária baseada no acumulado até hoje dividido pelos dias que já passaram
         const dailyAverageValue = daysElapsed > 0 ? monthlyTotalValue / daysElapsed : 0;
         const dailyAverageRentals = daysElapsed > 0 ? monthlyTotalRentals / daysElapsed : 0;
-
 
         // Projeção dos valores acumulados
         const forecastValue = monthlyTotalValue + dailyAverageValue * remainingDays;
@@ -953,20 +951,20 @@ export class CompanyService {
 
         // Recalcular métricas com base nos valores projetados
         // Ticket Médio = receita total / número de locações
-        const forecastTicketAverage = forecastRentals > 0
-          ? Number((forecastValue / forecastRentals).toFixed(2))
-          : 0;
+        const forecastTicketAverage =
+          forecastRentals > 0 ? Number((forecastValue / forecastRentals).toFixed(2)) : 0;
 
         // Giro = locações / suítes / dias no mês completo
-        const forecastGiro = totalSuitesCount > 0 && totalDaysInMonth > 0
-          ? Number((forecastRentals / totalSuitesCount / totalDaysInMonth).toFixed(2))
-          : 0;
+        const forecastGiro =
+          totalSuitesCount > 0 && totalDaysInMonth > 0
+            ? Number((forecastRentals / totalSuitesCount / totalDaysInMonth).toFixed(2))
+            : 0;
 
         // TRevPAR = receita total / suítes / dias no mês completo
-        const forecastTrevpar = totalSuitesCount > 0 && totalDaysInMonth > 0
-          ? Number((forecastValue / totalSuitesCount / totalDaysInMonth).toFixed(2))
-          : 0;
-
+        const forecastTrevpar =
+          totalSuitesCount > 0 && totalDaysInMonth > 0
+            ? Number((forecastValue / totalSuitesCount / totalDaysInMonth).toFixed(2))
+            : 0;
 
         bigNumbers.monthlyForecast = {
           totalAllValueForecast: Number(forecastValue.toFixed(2)),
