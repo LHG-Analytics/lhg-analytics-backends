@@ -239,6 +239,10 @@ export class CompanyService {
     const yesterdayInSaoPaulo = moment.tz('America/Sao_Paulo').subtract(1, 'day').format('YYYY-MM-DD');
     const yesterdayInitial = moment.utc(`${yesterdayInSaoPaulo} 05:59:59.999`, 'YYYY-MM-DD HH:mm:ss.SSS');
 
+    console.log('DEBUG YESTERDAY:');
+    console.log('yesterdayInSaoPaulo:', yesterdayInSaoPaulo);
+    console.log('yesterdayInitial UTC:', yesterdayInitial.format('DD/MM/YYYY HH:mm:ss'));
+
     // Define endDate como ontem às 05:59 para todos os períodos (exceto ESTE_MES que usa hoje)
     endDate = yesterdayInitial.clone().toDate();
 
@@ -330,6 +334,8 @@ export class CompanyService {
     console.log('EndDate:', endDate);
     console.log('StartDate formatted:', moment(startDate).tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss'));
     console.log('EndDate formatted:', moment(endDate).tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss'));
+    console.log('StartDate UTC:', moment.utc(startDate).format('DD/MM/YYYY HH:mm:ss'));
+    console.log('EndDate UTC:', moment.utc(endDate).format('DD/MM/YYYY HH:mm:ss'));
     console.log('============================');
 
     // Datas geradas para as consultas
