@@ -242,12 +242,12 @@ export class CompanyService {
       millisecond: 999,
     });
 
-    // Calcula o `startDate`, `endDate` e os períodos anteriores com base no `period`
+    // Define endDate como hoje às 05:59 para todos os períodos (exceto ESTE_MES que redefine depois)
+    endDate = todayInitial.clone().toDate();
+
+    // Calcula o `startDate` e os períodos anteriores com base no `period`
     switch (period) {
       case PeriodEnum.LAST_7_D:
-        // EndDate = hoje às 05:59 (contém dados de ontem)
-        endDate = todayInitial.clone().toDate();
-
         // StartDate = 7 dias atrás (para pegar 7 dias completos de dados)
         startDate = todayInitial
           .clone()
@@ -260,9 +260,6 @@ export class CompanyService {
         break;
 
       case PeriodEnum.LAST_30_D:
-        // EndDate = hoje às 05:59 (contém dados de ontem)
-        endDate = todayInitial.clone().toDate();
-
         // StartDate = 30 dias atrás (para pegar 30 dias completos de dados)
         startDate = todayInitial
           .clone()
@@ -275,9 +272,6 @@ export class CompanyService {
         break;
 
       case PeriodEnum.LAST_6_M:
-        // EndDate = hoje às 05:59 (contém dados de ontem)
-        endDate = todayInitial.clone().toDate();
-
         // StartDate = 6 meses atrás + 1 dia
         startDate = todayInitial
           .clone()
