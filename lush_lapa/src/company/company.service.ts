@@ -804,6 +804,9 @@ export class CompanyService {
             in: [7, 8, 9, 10, 11, 12],
           },
         },
+        include: {
+          suites: true,
+        },
       }),
     ]);
 
@@ -848,12 +851,14 @@ export class CompanyService {
       // Total de dias no mês
       const totalDaysInMonth = currentMonthEnd.date();
 
-      // Dias que já passaram no mês (do dia 1 até ontem, dados completos)
+      // Dias com dados completos (do dia 1 até ontem)
       // Como o dia contábil fecha às 05:59 do dia seguinte, "ontem fechado" = hoje às 05:59
-      const daysElapsed = todayForForecast.date(); // dia atual = quantos dias passaram (até ontem completo)
+      // Se hoje é dia 18, temos dados completos de 17 dias (dia 1 até dia 17)
+      const daysElapsed = todayForForecast.date() - 1; // dia atual - 1 = dias completos
 
       // Dias restantes (de hoje até o fim do mês)
-      const remainingDays = totalDaysInMonth - daysElapsed;
+      // Se hoje é dia 18 e o mês tem 31 dias, restam 14 dias (18 ao 31)
+      const remainingDays = totalDaysInMonth - (todayForForecast.date() - 1);
 
       // Se temos dados suficientes e ainda restam dias no mês
       if (daysElapsed > 0 && remainingDays > 0) {
@@ -943,28 +948,43 @@ export class CompanyService {
         const monthlyAverageOccupationTime =
           monthlyKpiAlos[0]?.totalAverageOccupationTime ?? '00:00:00';
 
+        // Buscar total de suítes para cálculos
+        const totalSuitesCount = suiteCategory.reduce(
+          (acc, category) => acc + category.suites.length,
+          0,
+        );
+
         // Média diária baseada no acumulado até hoje dividido pelos dias que já passaram
         const dailyAverageValue = daysElapsed > 0 ? monthlyTotalValue / daysElapsed : 0;
         const dailyAverageRentals = daysElapsed > 0 ? monthlyTotalRentals / daysElapsed : 0;
-        const dailyAverageTrevpar = daysElapsed > 0 ? monthlyTotalTrevpar / daysElapsed : 0;
-        const dailyAverageGiro = daysElapsed > 0 ? monthlyTotalGiro / daysElapsed : 0;
 
-        // Projeção: dados atuais do mês + (média diária × dias restantes)
+        // Projeção dos valores acumulados
+        const forecastValue = monthlyTotalValue + dailyAverageValue * remainingDays;
+        const forecastRentals = monthlyTotalRentals + dailyAverageRentals * remainingDays;
+
+        // Recalcular métricas com base nos valores projetados
+        // Ticket Médio = receita total / número de locações
+        const forecastTicketAverage = forecastRentals > 0
+          ? Number((forecastValue / forecastRentals).toFixed(2))
+          : 0;
+
+        // Giro = locações / suítes / dias no mês completo
+        const forecastGiro = totalSuitesCount > 0 && totalDaysInMonth > 0
+          ? Number((forecastRentals / totalSuitesCount / totalDaysInMonth).toFixed(2))
+          : 0;
+
+        // TRevPAR = receita total / suítes / dias no mês completo
+        const forecastTrevpar = totalSuitesCount > 0 && totalDaysInMonth > 0
+          ? Number((forecastValue / totalSuitesCount / totalDaysInMonth).toFixed(2))
+          : 0;
+
         bigNumbers.monthlyForecast = {
-          totalAllValueForecast: Number(
-            (monthlyTotalValue + dailyAverageValue * remainingDays).toFixed(2),
-          ),
-          totalAllRentalsApartmentsForecast: Math.round(
-            monthlyTotalRentals + dailyAverageRentals * remainingDays,
-          ),
-          totalAllTicketAverageForecast: Number(monthlyTicketAverage), // Ticket médio não muda com projeção
-          totalAllTrevparForecast: Number(
-            (monthlyTotalTrevpar + dailyAverageTrevpar * remainingDays).toFixed(2),
-          ),
-          totalAllGiroForecast: Number(
-            (monthlyTotalGiro + dailyAverageGiro * remainingDays).toFixed(2),
-          ),
-          totalAverageOccupationTimeForecast: monthlyAverageOccupationTime, // Tempo médio não muda com projeção
+          totalAllValueForecast: Number(forecastValue.toFixed(2)),
+          totalAllRentalsApartmentsForecast: Math.round(forecastRentals),
+          totalAllTicketAverageForecast: forecastTicketAverage,
+          totalAllTrevparForecast: forecastTrevpar,
+          totalAllGiroForecast: forecastGiro,
+          totalAverageOccupationTimeForecast: monthlyAverageOccupationTime,
         };
       }
     }
