@@ -804,6 +804,9 @@ export class CompanyService {
             in: [10, 11, 12, 15, 16, 17, 18, 19, 24],
           },
         },
+        include: {
+          suites: true,
+        },
       }),
     ]);
 
