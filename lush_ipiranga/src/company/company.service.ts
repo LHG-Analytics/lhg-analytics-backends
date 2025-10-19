@@ -343,6 +343,15 @@ export class CompanyService {
         throw new Error('Invalid period specified');
     }
 
+    // LOG: Verificar datas de início e fim
+    console.log('=== FINDALLCOMPANY DEBUG ===');
+    console.log('Period:', period);
+    console.log('StartDate:', startDate);
+    console.log('EndDate:', endDate);
+    console.log('StartDate formatted:', moment(startDate).tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss'));
+    console.log('EndDate formatted:', moment(endDate).tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss'));
+    console.log('============================');
+
     // Datas geradas para as consultas
 
     // Consultas para buscar os dados de KPIs com base nas datas selecionadas
@@ -1124,13 +1133,13 @@ export class CompanyService {
     );
 
     // Gerar array completo de datas para o período
+    // As datas no array correspondem às createdDate dos registros no banco
+    // Para LAST_7_D: se queremos dados dos dias 12-18, precisamos dos registros 13/10 05:59 até 19/10 05:59
     const periodsArray: string[] = [];
-    let currentDate = moment(startDate);
+    let currentDate = moment(startDate).add(1, 'day'); // Começa 1 dia depois do startDate
+    const endDateMoment = moment(endDate);
 
-    // CORRIGINDO: Para incluir corretamente todos os dias operacionais
-    // O endDate vem como próximo dia 05:59, então subtraímos 1 dia para pegar o último dia válido
-    const userEndDate = moment(endDate).subtract(1, 'day').startOf('day');
-    while (currentDate.isSameOrBefore(userEndDate, 'day')) {
+    while (currentDate.isSameOrBefore(endDateMoment, 'day')) {
       periodsArray.push(currentDate.format('DD/MM/YYYY'));
       currentDate.add(1, 'day');
     }
