@@ -234,25 +234,17 @@ export class CompanyService {
 
     let startDate: Date, endDate: Date, startDatePrevious: Date, endDatePrevious: Date;
 
-    // Obtém a data de ONTEM em São Paulo e cria um momento UTC com hora 05:59:59
-    // Usamos ontem porque queremos apenas dados completos (até ontem)
-    const yesterdayInSaoPaulo = moment.tz('America/Sao_Paulo').subtract(1, 'day').format('YYYY-MM-DD');
-    const yesterdayInitial = moment.utc(`${yesterdayInSaoPaulo} 05:59:59.999`, 'YYYY-MM-DD HH:mm:ss.SSS');
-
-    console.log('DEBUG YESTERDAY:');
-    console.log('yesterdayInSaoPaulo:', yesterdayInSaoPaulo);
-    console.log('yesterdayInitial UTC:', yesterdayInitial.format('DD/MM/YYYY HH:mm:ss'));
-
-    // Define endDate como ontem às 05:59 para todos os períodos (exceto ESTE_MES que usa hoje)
-    endDate = yesterdayInitial.clone().toDate();
+    // Obtém a data de hoje em São Paulo e cria momento UTC às 05:59:59
+    const todayInSaoPaulo = moment.tz('America/Sao_Paulo').format('YYYY-MM-DD');
+    const todayInitial = moment.utc(`${todayInSaoPaulo} 05:59:59.999`, 'YYYY-MM-DD HH:mm:ss.SSS');
+    endDate = todayInitial.clone().toDate();
 
     // Calcula o `startDate` e os períodos anteriores com base no `period`
     switch (period) {
       case PeriodEnum.LAST_7_D:
-        // StartDate = 7 dias atrás de ontem (para pegar 7 dias completos de dados)
-        startDate = yesterdayInitial
+        startDate = todayInitial
           .clone()
-          .subtract(6, 'days')
+          .subtract(7, 'days')
           .toDate();
 
         // Período anterior: 7 dias antes do início do período atual
@@ -261,10 +253,9 @@ export class CompanyService {
         break;
 
       case PeriodEnum.LAST_30_D:
-        // StartDate = 30 dias atrás de ontem (para pegar 30 dias completos de dados)
-        startDate = yesterdayInitial
+        startDate = todayInitial
           .clone()
-          .subtract(29, 'days')
+          .subtract(30, 'days')
           .toDate();
 
         // Período anterior: 30 dias antes do início do período atual
@@ -273,11 +264,9 @@ export class CompanyService {
         break;
 
       case PeriodEnum.LAST_6_M:
-        // StartDate = 6 meses atrás de ontem + 1 dia
-        startDate = yesterdayInitial
+        startDate = todayInitial
           .clone()
           .subtract(6, 'months')
-          .add(1, 'day')
           .toDate();
 
         // Período anterior: 6 meses antes do início do período atual
@@ -1085,27 +1074,22 @@ export class CompanyService {
       {},
     );
 
-    // Gerar arrays de datas para o período
-    // periodsArrayCreatedDate: para buscar nos mapas (usa createdDate dos registros)
-    // periodsArrayDataDate: para mostrar ao usuário (data dos dados, que é createdDate - 1 dia)
-    const periodsArrayCreatedDate: string[] = [];
-    const periodsArrayDataDate: string[] = [];
+    // Gerar array de datas para o período
+    const periodsArray: string[] = [];
     let currentDate = moment(startDate);
     const endDateMoment = moment(endDate);
 
     while (currentDate.isSameOrBefore(endDateMoment, 'day')) {
-      periodsArrayCreatedDate.push(currentDate.format('DD/MM/YYYY'));
-      // A data dos dados é 1 dia antes da createdDate (registro de 13/10 = dados de 12/10)
-      periodsArrayDataDate.push(currentDate.clone().subtract(1, 'day').format('DD/MM/YYYY'));
+      periodsArray.push(currentDate.format('DD/MM/YYYY'));
       currentDate.add(1, 'day');
     }
 
     // Construindo BillingRentalType para formato ApexCharts
     const billingRentalType: ApexChartsSeriesData = {
-      categories: periodsArrayDataDate, // Mostrar datas dos dados ao usuário
+      categories: periodsArray,
       series: expectedRentalTypes.map((rentalType) => ({
         name: rentalType,
-        data: periodsArrayCreatedDate.map((date) => { // Buscar usando createdDate
+        data: periodsArray.map((date) => {
           const rentalTypeData = billingRentalTypeMap[date]?.[rentalType];
           return rentalTypeData ? rentalTypeData.totalValue : 0;
         }),
@@ -1162,8 +1146,8 @@ export class CompanyService {
 
     // RevenueByDate no formato ApexCharts
     const revenueByDate: ApexChartsData = {
-      categories: periodsArrayDataDate, // Mostrar datas dos dados ao usuário
-      series: periodsArrayCreatedDate.map((date) => revenueByDateMap.get(date) || 0), // Buscar usando createdDate
+      categories: periodsArray, // Mostrar datas dos dados ao usuário
+      series: periodsArray.map((date) => revenueByDateMap.get(date) || 0), // Buscar usando createdDate
     };
 
     // RevenueBySuiteCategory no formato ApexCharts
@@ -1226,8 +1210,8 @@ export class CompanyService {
 
     // RentalsByDate no formato ApexCharts
     const rentalsByDate: ApexChartsData = {
-      categories: periodsArrayDataDate,
-      series: periodsArrayCreatedDate.map((date) => rentalsByDateMap.get(date) || 0),
+      categories: periodsArray,
+      series: periodsArray.map((date) => rentalsByDateMap.get(date) || 0),
     };
 
     // Criar mapa de dados de revpar por data
@@ -1275,8 +1259,8 @@ export class CompanyService {
 
     // RevparByDate no formato ApexCharts
     const revparByDate: ApexChartsData = {
-      categories: periodsArrayDataDate,
-      series: periodsArrayCreatedDate.map((date) => revparByDateMap.get(date) || 0),
+      categories: periodsArray,
+      series: periodsArray.map((date) => revparByDateMap.get(date) || 0),
     };
 
     // Criar mapa de dados de ticket average por data
@@ -1330,8 +1314,8 @@ export class CompanyService {
 
     // TicketAverageByDate no formato ApexCharts
     const ticketAverageByDate: ApexChartsData = {
-      categories: periodsArrayDataDate,
-      series: periodsArrayCreatedDate.map((date) => ticketAverageByDateMap.get(date) || 0),
+      categories: periodsArray,
+      series: periodsArray.map((date) => ticketAverageByDateMap.get(date) || 0),
     };
 
     // Criar mapa de dados de trevpar por data
@@ -1371,8 +1355,8 @@ export class CompanyService {
 
     // TrevparByDate no formato ApexCharts
     const trevparByDate: ApexChartsData = {
-      categories: periodsArrayDataDate,
-      series: periodsArrayCreatedDate.map((date) => trevparByDateMap.get(date) || 0),
+      categories: periodsArray,
+      series: periodsArray.map((date) => trevparByDateMap.get(date) || 0),
     };
 
     // Criar mapa de dados de occupancy rate por data
@@ -1426,8 +1410,8 @@ export class CompanyService {
 
     // OccupancyRateByDate no formato ApexCharts
     const occupancyRateByDate: ApexChartsData = {
-      categories: periodsArrayDataDate,
-      series: periodsArrayCreatedDate.map((date) => occupancyRateByDateMap.get(date) || 0),
+      categories: periodsArray,
+      series: periodsArray.map((date) => occupancyRateByDateMap.get(date) || 0),
     };
 
     // Declarar formattedOccupancyRateBySuiteCategory fora do escopo do if
@@ -1609,10 +1593,10 @@ export class CompanyService {
 
     // Criar series para cada categoria de suíte usando periodsArray como base (mesma lógica do OccupancyRateByDate)
     const occupancyRateBySuiteCategory: ApexChartsSeriesData = {
-      categories: periodsArrayDataDate,
+      categories: periodsArray,
       series: Array.from(allSuiteCategories).map((suiteCategoryName) => ({
         name: suiteCategoryName,
-        data: periodsArrayCreatedDate.map(
+        data: periodsArray.map(
           (date) => occupancyBySuiteCategoryMap.get(date)?.get(suiteCategoryName) || 0,
         ),
       })),
