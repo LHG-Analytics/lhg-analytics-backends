@@ -234,9 +234,10 @@ export class CompanyService {
 
     let startDate: Date, endDate: Date, startDatePrevious: Date, endDatePrevious: Date;
 
-    // Obtém a data de hoje em São Paulo e cria momento UTC às 05:59:59
-    const todayInSaoPaulo = moment.tz('America/Sao_Paulo').format('YYYY-MM-DD');
-    const todayInitial = moment.utc(`${todayInSaoPaulo} 05:59:59.999`, 'YYYY-MM-DD HH:mm:ss.SSS');
+    // Obtém a data de ONTEM em São Paulo e cria momento UTC às 05:59:59
+    // Usamos ontem porque queremos apenas dados completos (até ontem)
+    const yesterdayInSaoPaulo = moment.tz('America/Sao_Paulo').subtract(1, 'day').format('YYYY-MM-DD');
+    const todayInitial = moment.utc(`${yesterdayInSaoPaulo} 05:59:59.999`, 'YYYY-MM-DD HH:mm:ss.SSS');
     endDate = todayInitial.clone().toDate();
 
     // Calcula o `startDate` e os períodos anteriores com base no `period`
