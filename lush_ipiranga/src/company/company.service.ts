@@ -2886,8 +2886,6 @@ export class CompanyService {
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
       WHERE ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
-        AND a.dataexclusao IS NULL
-      AND a.dataexclusao IS NULL
     `;
 
     const revenueByDateSQL = `
@@ -2976,7 +2974,6 @@ export class CompanyService {
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
-        AND a.dataexclusao IS NULL
       GROUP BY ca.descricao
       ORDER BY category_revenue DESC
     `;
@@ -2996,7 +2993,6 @@ export class CompanyService {
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
-        AND a.dataexclusao IS NULL
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -3061,7 +3057,6 @@ export class CompanyService {
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
-        AND a.dataexclusao IS NULL
       GROUP BY ca.descricao, DATE(la.datainicialdaocupacao)
       ORDER BY rental_date, ca.descricao
     `;
@@ -3073,7 +3068,6 @@ export class CompanyService {
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
       WHERE ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
-        AND a.dataexclusao IS NULL
       GROUP BY ca.descricao
     `;
 
@@ -3433,8 +3427,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND ca.id IN (10,11,12,15,16,17,18,19,24)
-          AND a.dataexclusao IS NULL
-        GROUP BY ca.id, ca.descricao
+          GROUP BY ca.id, ca.descricao
       ),
       suite_counts AS (
         SELECT
@@ -3516,7 +3509,6 @@ export class CompanyService {
         AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
         AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.id IN (10,11,12,15,16,17,18,19,24)
-        AND a.dataexclusao IS NULL
     `;
 
     // Query 2: Buscar tempos indisponíveis (COM suite_id para filtrar depois)
@@ -3534,7 +3526,6 @@ export class CompanyService {
         AND la.datainicio <= ${formattedEnd}::timestamp
         AND la.datafim IS NOT NULL
         AND ca.id IN (10,11,12,15,16,17,18,19,24)
-        AND a.dataexclusao IS NULL
 
       UNION ALL
 
@@ -3552,7 +3543,6 @@ export class CompanyService {
         AND d.datainicio <= ${formattedEnd}::timestamp
         AND d.datafim IS NOT NULL
         AND ca.id IN (10,11,12,15,16,17,18,19,24)
-        AND a.dataexclusao IS NULL
     `;
 
     // Query 3: Metadados (suítes por categoria + primeira suíte de cada categoria)
@@ -3564,8 +3554,7 @@ export class CompanyService {
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
         WHERE ca.id IN (10,11,12,15,16,17,18,19,24)
-          AND a.dataexclusao IS NULL
-        ORDER BY ca.id, a.id
+          ORDER BY ca.id, a.id
       )
       SELECT
         ca.descricao as category_name,
@@ -3575,7 +3564,6 @@ export class CompanyService {
       INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
       INNER JOIN first_suite_per_category fs ON ca.descricao = fs.category_name
       WHERE ca.id IN (10,11,12,15,16,17,18,19,24)
-        AND a.dataexclusao IS NULL
       GROUP BY ca.descricao, fs.first_suite_id
     `;
 
@@ -3725,8 +3713,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND ca.id IN (10,11,12,15,16,17,18,19,24)
-          AND a.dataexclusao IS NULL
-        GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM la.datainicialdaocupacao)
+          GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM la.datainicialdaocupacao)
       ),
       suite_counts_by_category AS (
         SELECT
@@ -3774,8 +3761,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND ca.id IN (10,11,12,15,16,17,18,19,24)
-          AND a.dataexclusao IS NULL
-        GROUP BY EXTRACT(DOW FROM la.datainicialdaocupacao)
+          GROUP BY EXTRACT(DOW FROM la.datainicialdaocupacao)
       )
       SELECT
         wg.suite_category_name,
