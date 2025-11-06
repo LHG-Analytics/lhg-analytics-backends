@@ -2859,17 +2859,14 @@ export class CompanyService {
     // SQL BigNumbers - CORRIGIDO para não duplicar desconto
     const bigNumbersSQL = `
       WITH receita_consumo AS (
-        -- Calcula receita de consumo usando saidaestoque com relação para locações
+        -- Calcula receita de consumo BRUTA (sem aplicar desconto aqui)
+        -- O desconto de consumo já está incluído em locacaoapartamento.desconto
         -- Filtrando apenas locações de apartamentos das categorias corretas (6,7,8,9,10,12)
-        -- Mas incluindo TODOS os produtos consumidos nessas locações
         SELECT
           la.id_apartamentostate as id_locacao,
           COALESCE(SUM(
-            (CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))) -
-            COALESCE((CAST(v.desconto AS DECIMAL(15,4)) /
-              NULLIF((SELECT COUNT(*) FROM saidaestoqueitem sei2 WHERE sei2.id_saidaestoque = se.id AND sei2.cancelado IS NULL), 0)
-            ), 0)
-          ), 0) as valor_consumo
+            CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
+          ), 0) as valor_consumo_bruto
         FROM locacaoapartamento la
         INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
         INNER JOIN apartamento a ON aps.id_apartamento = a.id
@@ -2877,7 +2874,6 @@ export class CompanyService {
         INNER JOIN vendalocacao vl ON la.id_apartamentostate = vl.id_locacaoapartamento
         INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
         INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
-        LEFT JOIN venda v ON se.id = v.id_saidaestoque
         WHERE la.datainicialdaocupacao >= '${formattedStart}'
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
@@ -2887,16 +2883,19 @@ export class CompanyService {
       )
       SELECT
         COUNT(*) as total_rentals,
-        -- totalAllValue: permanenceValueTotal + ocupadicionalValueTotal + priceSale das locações
+        -- totalAllValue: (permanencia + ocupadicional + consumo_bruto) - desconto
+        -- Importante: la.desconto já contém desconto de locação + desconto de consumo
         COALESCE(SUM(
           COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
           COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
-          COALESCE(rc.valor_consumo, 0)
+          COALESCE(rc.valor_consumo_bruto, 0) -
+          COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
         ), 0) as total_all_value,
-        -- Receita apenas de locação (permanenceValueTotal + ocupadicionalValueTotal)
+        -- Receita apenas de locação (permanenceValueTotal + ocupadicionalValueTotal - desconto_locação)
         COALESCE(SUM(
           COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-          COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0)
+          COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
+          COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
         ), 0) as total_rental_revenue,
         -- Tempo total de ocupação em segundos
         COALESCE(SUM(
