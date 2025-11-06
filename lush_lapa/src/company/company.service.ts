@@ -2902,6 +2902,7 @@ export class CompanyService {
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
       WHERE ca.id IN (7, 8, 9, 10, 11, 12)
+        AND a.dataexclusao IS NULL
     `;
 
     const revenueByDateSQL = `
@@ -3084,6 +3085,7 @@ export class CompanyService {
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
       WHERE ca.descricao IN ('LUSH', 'LUSH HIDRO', 'LUSH LOUNGE HIDRO', 'LUSH SPA', 'LUSH SPLASH', 'LUSH SPA SPLASH')
+        AND a.dataexclusao IS NULL
       GROUP BY ca.descricao
     `;
 
