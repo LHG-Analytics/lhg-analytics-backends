@@ -2877,24 +2877,32 @@ export class CompanyService {
         -- Removido filtro a.dataexclusao IS NULL para incluir locações históricas de apartamentos excluídos
     `;
 
-    // SQL para vendas diretas - removendo filtro de categoria de produtos
-    // As vendas diretas devem incluir TODOS os produtos vendidos diretamente no período
+    // SQL para vendas diretas - CORRIGIDO para dividir desconto proporcionalmente entre itens
+    // O desconto em venda.desconto deve ser dividido pelo número de itens da venda
     const totalSaleDirectSQL = `
       SELECT
-        COALESCE(SUM(CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))), 0) AS receita_bruta,
-        COALESCE(SUM(DISTINCT COALESCE(CAST(v.desconto AS DECIMAL(15,4)), 0)), 0) AS total_descontos,
-        COALESCE(SUM(CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))), 0) -
-        COALESCE(SUM(DISTINCT COALESCE(CAST(v.desconto AS DECIMAL(15,4)), 0)), 0) AS total_sale_direct,
-        COUNT(DISTINCT sei.id) AS total_itens,
-        COUNT(DISTINCT se.id) AS total_vendas_diretas
-      FROM saidaestoque se
-      INNER JOIN vendadireta vd ON se.id = vd.id_saidaestoque
-      INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
-      LEFT JOIN venda v ON se.id = v.id_saidaestoque
-      WHERE vd.venda_completa = true
-        AND sei.cancelado IS NULL
-        AND sei.datasaidaitem >= '${formattedStart}'
-        AND sei.datasaidaitem <= '${formattedEnd}'
+        COALESCE(SUM(receita_item), 0) AS receita_bruta,
+        COALESCE(SUM(desconto_proporcional), 0) AS total_descontos,
+        COALESCE(SUM(receita_item - desconto_proporcional), 0) AS total_sale_direct,
+        COUNT(*) AS total_itens,
+        COUNT(DISTINCT venda_id) AS total_vendas_diretas
+      FROM (
+        SELECT
+          se.id as venda_id,
+          CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4)) as receita_item,
+          COALESCE(CAST(v.desconto AS DECIMAL(15,4)), 0) /
+            NULLIF((SELECT COUNT(*) FROM saidaestoqueitem sei2
+                    WHERE sei2.id_saidaestoque = se.id
+                    AND sei2.cancelado IS NULL), 0) as desconto_proporcional
+        FROM saidaestoque se
+        INNER JOIN vendadireta vd ON se.id = vd.id_saidaestoque
+        INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+        LEFT JOIN venda v ON se.id = v.id_saidaestoque
+        WHERE vd.venda_completa = true
+          AND sei.cancelado IS NULL
+          AND sei.datasaidaitem >= '${formattedStart}'
+          AND sei.datasaidaitem <= '${formattedEnd}'
+      ) vendas_diretas_detalhadas
     `;
 
     const totalSuitesSQL = `
