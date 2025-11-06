@@ -2887,13 +2887,17 @@ export class CompanyService {
       )
       SELECT
         COUNT(*) as total_rentals,
-        -- totalAllValue: permanenceValueLiquid + priceSale das locações
+        -- totalAllValue: permanenceValueTotal + ocupadicionalValueTotal + priceSale das locações
         COALESCE(SUM(
-          COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0) +
+          COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+          COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
           COALESCE(rc.valor_consumo, 0)
         ), 0) as total_all_value,
-        -- Receita apenas de locação (permanenceValueLiquid)
-        COALESCE(SUM(COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)), 0) as total_rental_revenue,
+        -- Receita apenas de locação (permanenceValueTotal + ocupadicionalValueTotal)
+        COALESCE(SUM(
+          COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+          COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0)
+        ), 0) as total_rental_revenue,
         -- Tempo total de ocupação em segundos
         COALESCE(SUM(
           EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao)
