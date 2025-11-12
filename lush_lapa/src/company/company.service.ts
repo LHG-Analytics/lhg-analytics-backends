@@ -3462,6 +3462,7 @@ export class CompanyService {
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
         WHERE ca.id IN (7,8,9,10,11,12)
+          AND a.dataexclusao IS NULL
           GROUP BY ca.id, ca.descricao
       )
       SELECT
