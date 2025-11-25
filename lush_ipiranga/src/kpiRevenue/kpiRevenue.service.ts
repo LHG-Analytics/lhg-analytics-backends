@@ -118,17 +118,17 @@ export class KpiRevenueService {
       }),
       this.prisma.prismaLocal.suiteCategory.findMany({
         where: {
-          description: {
+          id: {
             in: [
-              'LUSH',
-              'LUSH POP',
-              'LUSH HIDRO',
-              'LUSH LOUNGE',
-              'LUSH SPA',
-              'LUSH CINE',
-              'LUSH SPLASH',
-              'LUSH SPA SPLASH',
-              'CASA LUSH',
+              10,
+              11,
+              12,
+              15,
+              16,
+              17,
+              18,
+              19,
+              24,
             ],
           },
         },

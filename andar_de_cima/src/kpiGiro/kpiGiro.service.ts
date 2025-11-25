@@ -48,8 +48,8 @@ export class KpiGiroService {
         }),
         this.prisma.prismaLocal.suiteCategory.findMany({
           where: {
-            description: {
-              in: ['ESPUMA LOUNGE', 'POP COPAN', 'POP', 'LOVE', 'ESPUMA COPAN', 'ESPUMA'],
+            id: {
+              in: [2, 3, 4, 5, 6, 7, 12],
             },
           },
           include: {
@@ -210,8 +210,8 @@ export class KpiGiroService {
       const [suiteCategories, occupiedSuites] = await this.prisma.prismaLocal.$transaction([
         this.prisma.prismaLocal.suiteCategory.findMany({
           where: {
-            description: {
-              in: ['ESPUMA LOUNGE', 'POP COPAN', 'POP', 'LOVE', 'ESPUMA COPAN', 'ESPUMA'],
+            id: {
+              in: [2, 3, 4, 5, 6, 7, 12],
             },
           },
           include: {

@@ -57,14 +57,14 @@ export class KpiTrevparService {
         }),
         this.prisma.prismaLocal.suiteCategory.findMany({
           where: {
-            description: {
+            id: {
               in: [
-                'LUSH',
-                'LUSH HIDRO',
-                'LUSH LOUNGE HIDRO',
-                'LUSH SPA',
-                'LUSH SPLASH',
-                'LUSH SPA SPLASH',
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
               ],
             },
           },
@@ -294,14 +294,14 @@ export class KpiTrevparService {
           }),
           this.prisma.prismaLocal.suiteCategory.findMany({
             where: {
-              description: {
+              id: {
                 in: [
-                  'LUSH',
-                  'LUSH HIDRO',
-                  'LUSH LOUNGE HIDRO',
-                  'LUSH SPA',
-                  'LUSH SPLASH',
-                  'LUSH SPA SPLASH',
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
                 ],
               },
             },

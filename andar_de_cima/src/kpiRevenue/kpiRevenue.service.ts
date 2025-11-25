@@ -118,8 +118,8 @@ export class KpiRevenueService {
       }),
       this.prisma.prismaLocal.suiteCategory.findMany({
         where: {
-          description: {
-            in: ['ESPUMA LOUNGE', 'POP COPAN', 'POP', 'LOVE', 'ESPUMA COPAN', 'ESPUMA'],
+          id: {
+            in: [2, 3, 4, 5, 6, 7, 12],
           },
         },
       }),
