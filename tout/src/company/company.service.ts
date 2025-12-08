@@ -2513,37 +2513,43 @@ export class CompanyService {
           GROUP BY ca.id, ca.descricao
       ),
       unavailable_times AS (
-        -- Tempo indisponível por limpeza
+        -- Tempo indisponível por limpeza (apenas o tempo dentro do período)
         SELECT
           ca.descricao as suite_category_name,
           COALESCE(SUM(
-            EXTRACT(EPOCH FROM la.datafim - la.datainicio)
+            EXTRACT(EPOCH FROM
+              LEAST(la.datafim, ${formattedEnd}::timestamp) -
+              GREATEST(la.datainicio, ${formattedStart}::timestamp)
+            )
           ), 0) as unavailable_time_seconds
         FROM limpezaapartamento la
         INNER JOIN apartamentostate aps ON la.id_sujoapartamento = aps.id
         INNER JOIN apartamento a ON aps.id_apartamento = a.id
         INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-        WHERE la.datainicio >= ${formattedStart}::timestamp
-          AND la.datainicio <= ${formattedEnd}::timestamp
+        WHERE la.datainicio < ${formattedEnd}::timestamp
+          AND la.datafim > ${formattedStart}::timestamp
           AND la.datafim IS NOT NULL
           AND ca.id IN (6,7,8,9,10,12)
         GROUP BY ca.id, ca.descricao
 
         UNION ALL
 
-        -- Tempo indisponível por defeitos/manutenção
+        -- Tempo indisponível por defeitos/manutenção (apenas o tempo dentro do período)
         SELECT
           ca.descricao as suite_category_name,
           COALESCE(SUM(
-            EXTRACT(EPOCH FROM GREATEST(d.datafim, COALESCE(aps_manut.datafim, d.datafim)) - d.datainicio)
+            EXTRACT(EPOCH FROM
+              LEAST(GREATEST(d.datafim, COALESCE(aps_manut.datafim, d.datafim)), ${formattedEnd}::timestamp) -
+              GREATEST(d.datainicio, ${formattedStart}::timestamp)
+            )
           ), 0) as unavailable_time_seconds
         FROM defeito d
         INNER JOIN apartamento a ON d.id_apartamento = a.id
         INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
         LEFT JOIN col_bloqueadomanutencao_defeito bmd ON bmd.id_defeito = d.id
         LEFT JOIN apartamentostate aps_manut ON bmd.id_bloqueadomanutencao = aps_manut.id
-        WHERE d.datainicio >= ${formattedStart}::timestamp
-          AND d.datainicio <= ${formattedEnd}::timestamp
+        WHERE d.datainicio < ${formattedEnd}::timestamp
+          AND GREATEST(d.datafim, COALESCE(aps_manut.datafim, d.datafim)) > ${formattedStart}::timestamp
           AND d.datafim IS NOT NULL
           AND ca.id IN (6,7,8,9,10,12)
         GROUP BY ca.id, ca.descricao
