@@ -2783,8 +2783,18 @@ export class CompanyService {
       WITH weekly_giro AS (
         SELECT
           ca.descricao as suite_category_name,
-          EXTRACT(DOW FROM la.datainicialdaocupacao) as day_of_week_num,
-          CASE EXTRACT(DOW FROM la.datainicialdaocupacao)
+          EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          ) as day_of_week_num,
+          CASE EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          )
             WHEN 0 THEN 'domingo'
             WHEN 1 THEN 'segunda-feira'
             WHEN 2 THEN 'terça-feira'
@@ -2802,7 +2812,12 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.id IN (2,3,4,5,6,7,12)
-          GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM la.datainicialdaocupacao)
+          GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          )
       ),
       suite_counts_by_category AS (
         SELECT
@@ -2811,6 +2826,7 @@ export class CompanyService {
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
         WHERE ca.id IN (2,3,4,5,6,7,12)
+          AND a.dataexclusao IS NULL
           GROUP BY ca.id, ca.descricao
       ),
       days_in_period AS (
@@ -2831,8 +2847,18 @@ export class CompanyService {
       ),
       total_rentals_by_day AS (
         SELECT
-          EXTRACT(DOW FROM la.datainicialdaocupacao) as day_of_week_num,
-          CASE EXTRACT(DOW FROM la.datainicialdaocupacao)
+          EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          ) as day_of_week_num,
+          CASE EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          )
             WHEN 0 THEN 'domingo'
             WHEN 1 THEN 'segunda-feira'
             WHEN 2 THEN 'terça-feira'
@@ -2850,7 +2876,12 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.id IN (2,3,4,5,6,7,12)
-          GROUP BY EXTRACT(DOW FROM la.datainicialdaocupacao)
+          GROUP BY EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          )
       )
       SELECT
         wg.suite_category_name,
