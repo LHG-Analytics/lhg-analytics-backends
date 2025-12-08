@@ -3431,28 +3431,31 @@ export class CompanyService {
         SELECT
           ca.descricao as suite_category_name,
           COUNT(*) as total_rentals,
-          -- Receita total (locação + consumo)
+          -- Receita total: (permanencia + ocupadicional + consumo) - desconto
+          -- Importante: la.desconto já contém desconto de locação + desconto de consumo
           COALESCE(SUM(
-            COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0) +
+            COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
             COALESCE(
               (
                 SELECT COALESCE(SUM(
-                  (CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))) -
-                  COALESCE((CAST(v.desconto AS DECIMAL(15,4)) /
-                    NULLIF((SELECT COUNT(*) FROM saidaestoqueitem sei2 WHERE sei2.id_saidaestoque = sei.id_saidaestoque AND sei2.cancelado IS NULL), 0)
-                  ), 0)
+                  CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
                 ), 0)
                 FROM vendalocacao vl
                 INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
                 INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
-                LEFT JOIN venda v ON se.id = v.id_saidaestoque
                 WHERE vl.id_locacaoapartamento = la.id_apartamentostate
                   AND sei.cancelado IS NULL
               ), 0
-            )
+            ) -
+            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
           ), 0) as total_value,
-          -- Receita apenas de locação
-          COALESCE(SUM(COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)), 0) as rental_revenue,
+          -- Receita apenas de locação: (permanencia + ocupadicional) - desconto
+          COALESCE(SUM(
+            COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
+            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+          ), 0) as rental_revenue,
           -- Tempo total de ocupação em segundos
           COALESCE(SUM(
             EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao)
@@ -3476,6 +3479,49 @@ export class CompanyService {
         WHERE ca.id IN (2,3,4,5,6,7,12)
           AND a.dataexclusao IS NULL
           GROUP BY ca.id, ca.descricao
+      ),
+      unavailable_times AS (
+        -- Tempo indisponível por limpeza
+        SELECT
+          ca.descricao as suite_category_name,
+          COALESCE(SUM(
+            EXTRACT(EPOCH FROM la.datafim - la.datainicio)
+          ), 0) as unavailable_time_seconds
+        FROM limpezaapartamento la
+        INNER JOIN apartamentostate aps ON la.id_sujoapartamento = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicio >= ${formattedStart}::timestamp
+          AND la.datainicio <= ${formattedEnd}::timestamp
+          AND la.datafim IS NOT NULL
+          AND ca.id IN (2,3,4,5,6,7,12)
+        GROUP BY ca.id, ca.descricao
+
+        UNION ALL
+
+        -- Tempo indisponível por defeitos/manutenção
+        SELECT
+          ca.descricao as suite_category_name,
+          COALESCE(SUM(
+            EXTRACT(EPOCH FROM GREATEST(d.datafim, COALESCE(aps_manut.datafim, d.datafim)) - d.datainicio)
+          ), 0) as unavailable_time_seconds
+        FROM defeito d
+        INNER JOIN apartamento a ON d.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        LEFT JOIN col_bloqueadomanutencao_defeito bmd ON bmd.id_defeito = d.id
+        LEFT JOIN apartamentostate aps_manut ON bmd.id_bloqueadomanutencao = aps_manut.id
+        WHERE d.datainicio >= ${formattedStart}::timestamp
+          AND d.datainicio <= ${formattedEnd}::timestamp
+          AND d.datafim IS NOT NULL
+          AND ca.id IN (2,3,4,5,6,7,12)
+        GROUP BY ca.id, ca.descricao
+      ),
+      total_unavailable AS (
+        SELECT
+          suite_category_name,
+          SUM(unavailable_time_seconds) as total_unavailable_time
+        FROM unavailable_times
+        GROUP BY suite_category_name
       )
       SELECT
         scd.suite_category_name,
@@ -3483,9 +3529,11 @@ export class CompanyService {
         scd.total_value,
         scd.rental_revenue,
         scd.total_occupied_time,
-        sc.total_suites_in_category
+        sc.total_suites_in_category,
+        COALESCE(tu.total_unavailable_time, 0) as unavailable_time
       FROM suite_category_data scd
       INNER JOIN suite_counts sc ON scd.suite_category_name = sc.suite_category_name
+      LEFT JOIN total_unavailable tu ON scd.suite_category_name = tu.suite_category_name
       ORDER BY scd.suite_category_name
     `;
 
@@ -3499,6 +3547,7 @@ export class CompanyService {
       const rentalRevenue = Number(item.rental_revenue) || 0;
       const totalOccupiedTime = Number(item.total_occupied_time) || 0;
       const totalSuitesInCategory = Number(item.total_suites_in_category) || 1;
+      const unavailableTime = Number(item.unavailable_time) || 0;
 
       // Aplicar as mesmas fórmulas do BigNumbers
       const ticketAverage = totalRentals > 0 ? totalValue / totalRentals : 0;
@@ -3515,7 +3564,11 @@ export class CompanyService {
           ? totalValue / totalSuitesInCategory / periodDays
           : 0;
       const avgOccupationTime = totalRentals > 0 ? totalOccupiedTime / totalRentals : 0;
-      const occupancyRate = totalSuitesInCategory > 0 ? totalRentals / totalSuitesInCategory : 0;
+
+      // Taxa de ocupação CORRETA: (tempo ocupado / tempo disponível) × 100
+      // Tempo disponível = (suítes × dias × 86400 segundos) - tempo indisponível
+      const totalAvailableTime = (totalSuitesInCategory * periodDays * 86400) - unavailableTime;
+      const occupancyRate = totalAvailableTime > 0 ? (totalOccupiedTime / totalAvailableTime) * 100 : 0;
 
       return {
         [item.suite_category_name]: {
@@ -3654,17 +3707,11 @@ export class CompanyService {
       firstSuiteByCategory[meta.category_name] = Number(meta.first_suite_id);
     });
 
+    // Processar tempos indisponíveis: considerar TODAS as suítes
     unavailableTimesData.forEach((unavailable) => {
       const startDate = new Date(unavailable.start_date);
       const category = unavailable.category_name;
-      const suiteId = Number(unavailable.suite_id);
 
-      // FILTRAR: apenas considerar se for a primeira suíte da categoria
-      if (suiteId !== firstSuiteByCategory[category]) {
-        return; // Pular esta entrada
-      }
-
-      // Pegar apenas o dia da semana do startDate (como no código de referência)
       const dayOfWeek = dayNames[startDate.getDay()];
       const unavailableTime = new Date(unavailable.end_date).getTime() - startDate.getTime();
 
@@ -3840,6 +3887,52 @@ export class CompanyService {
       }),
     );
 
+    // Calcular TotalResult somando todos os valores do DataTableSuiteCategory
+    // Isso garante que os totais sejam a soma exata das categorias (SEM vendas diretas)
+    const totalResultFromCategories = suiteCategoryKpisResult.reduce(
+      (acc, item) => {
+        acc.totalRentals += Number(item.total_rentals) || 0;
+        acc.totalValue += Number(item.total_value) || 0;
+        acc.rentalRevenue += Number(item.rental_revenue) || 0;
+        acc.totalOccupiedTime += Number(item.total_occupied_time) || 0;
+        acc.totalUnavailableTime += Number(item.unavailable_time) || 0;
+        return acc;
+      },
+      { totalRentals: 0, totalValue: 0, rentalRevenue: 0, totalOccupiedTime: 0, totalUnavailableTime: 0 }
+    );
+
+    const totalResultTicketAverage =
+      totalResultFromCategories.totalRentals > 0
+        ? totalResultFromCategories.totalValue / totalResultFromCategories.totalRentals
+        : 0;
+
+    const totalResultGiro =
+      totalSuitesCount > 0 && daysDiff > 0
+        ? totalResultFromCategories.totalRentals / totalSuitesCount / daysDiff
+        : 0;
+
+    const totalResultRevpar =
+      totalSuitesCount > 0 && daysDiff > 0
+        ? totalResultFromCategories.rentalRevenue / totalSuitesCount / daysDiff
+        : 0;
+
+    const totalResultTrevpar =
+      totalSuitesCount > 0 && daysDiff > 0
+        ? totalResultFromCategories.totalValue / totalSuitesCount / daysDiff
+        : 0;
+
+    const totalResultAvgOccupationTime =
+      totalResultFromCategories.totalRentals > 0
+        ? totalResultFromCategories.totalOccupiedTime / totalResultFromCategories.totalRentals
+        : 0;
+
+    // Taxa de ocupação total CORRETA: (tempo ocupado / tempo disponível) × 100
+    const totalResultAvailableTime = (totalSuitesCount * daysDiff * 86400) - totalResultFromCategories.totalUnavailableTime;
+    const totalResultOccupancyRate =
+      totalResultAvailableTime > 0
+        ? (totalResultFromCategories.totalOccupiedTime / totalResultAvailableTime) * 100
+        : 0;
+
     // Retornos temporários (serão implementados um por vez)
     return {
       Company: 'Andar de Cima',
@@ -3855,21 +3948,14 @@ export class CompanyService {
       OccupancyRateBySuiteCategory: occupancyRateBySuiteCategory,
       DataTableSuiteCategory: dataTableSuiteCategory,
       TotalResult: {
-        totalAllRentalsApartments: bigNumbers.currentDate.totalAllRentalsApartments,
-        totalAllValue: Number(bigNumbers.currentDate.totalAllValue.toFixed(2)),
-        totalAllTicketAverage: Number(bigNumbers.currentDate.totalAllTicketAverage.toFixed(2)),
-        totalGiro: Number(bigNumbers.currentDate.totalAllGiro.toFixed(2)),
-        totalRevpar: Number(
-          (bigNumbers.currentDate.totalAllRentalsApartments > 0
-            ? revenueByDate.series.reduce((sum, val) => sum + val, 0) / totalSuites / daysDiff
-            : 0
-          ).toFixed(2),
-        ),
-        totalTrevpar: Number(bigNumbers.currentDate.totalAllTrevpar.toFixed(2)),
-        totalAverageOccupationTime: bigNumbers.currentDate.totalAverageOccupationTime,
-        totalOccupancyRate: Number(
-          (bigNumbers.currentDate.totalAllRentalsApartments / totalSuites).toFixed(2),
-        ),
+        totalAllRentalsApartments: totalResultFromCategories.totalRentals,
+        totalAllValue: Number(totalResultFromCategories.totalValue.toFixed(2)),
+        totalAllTicketAverage: Number(totalResultTicketAverage.toFixed(2)),
+        totalGiro: Number(totalResultGiro.toFixed(2)),
+        totalRevpar: Number(totalResultRevpar.toFixed(2)),
+        totalTrevpar: Number(totalResultTrevpar.toFixed(2)),
+        totalAverageOccupationTime: this.formatTime(totalResultAvgOccupationTime),
+        totalOccupancyRate: Number(totalResultOccupancyRate.toFixed(2)),
       },
       DataTableOccupancyRateByWeek: dataTableOccupancyRateByWeek,
       DataTableGiroByWeek: dataTableGiroByWeek,
