@@ -994,19 +994,20 @@ export class CompanyService {
 
         // Recalcular métricas com base nos valores projetados
         // Ticket Médio = receita total / número de locações
-        const forecastTicketAverage = forecastRentals > 0
-          ? Number((forecastValue / forecastRentals).toFixed(2))
-          : 0;
+        const forecastTicketAverage =
+          forecastRentals > 0 ? Number((forecastValue / forecastRentals).toFixed(2)) : 0;
 
         // Giro = locações / suítes / dias no mês completo
-        const forecastGiro = totalSuitesCount > 0 && totalDaysInMonth > 0
-          ? Number((forecastRentals / totalSuitesCount / totalDaysInMonth).toFixed(2))
-          : 0;
+        const forecastGiro =
+          totalSuitesCount > 0 && totalDaysInMonth > 0
+            ? Number((forecastRentals / totalSuitesCount / totalDaysInMonth).toFixed(2))
+            : 0;
 
         // TRevPAR = receita total / suítes / dias no mês completo
-        const forecastTrevpar = totalSuitesCount > 0 && totalDaysInMonth > 0
-          ? Number((forecastValue / totalSuitesCount / totalDaysInMonth).toFixed(2))
-          : 0;
+        const forecastTrevpar =
+          totalSuitesCount > 0 && totalDaysInMonth > 0
+            ? Number((forecastValue / totalSuitesCount / totalDaysInMonth).toFixed(2))
+            : 0;
 
         console.log('Métricas recalculadas:');
         console.log('  forecastTicketAverage:', forecastTicketAverage);
@@ -1800,1005 +1801,6 @@ export class CompanyService {
         },
       }),
     ]);
-  }
-
-  async calculateKpisByDateRange(startDate: Date, endDate: Date): Promise<CompanyKpiResponse> {
-    const [
-      allRentalApartments,
-      suiteCategories,
-      cleanings,
-      blockedMaintenanceDefects,
-      stockOutItems,
-    ] = await this.fetchKpiData(startDate, endDate);
-
-    const groupedByStockOut = new Map<
-      number,
-      {
-        items: typeof stockOutItems;
-        discount: Prisma.Decimal;
-      }
-    >();
-
-    for (const stockOutItem of stockOutItems) {
-      const stockOut = stockOutItem.stockOuts;
-
-      if (!stockOut?.saleDirect) continue;
-
-      const stockOutId = stockOutItem.stockOutId;
-
-      if (!groupedByStockOut.has(stockOutId)) {
-        const discount = stockOut.sale?.discount
-          ? new Prisma.Decimal(stockOut.sale.discount.toString())
-          : new Prisma.Decimal(0);
-
-        groupedByStockOut.set(stockOutId, {
-          items: [],
-          discount,
-        });
-      }
-
-      groupedByStockOut.get(stockOutId)!.items.push(stockOutItem);
-    }
-
-    const totalSaleDirect = Array.from(groupedByStockOut.values()).reduce(
-      (total, { items, discount }) => {
-        const subtotal = items.reduce((sum, item) => {
-          const price = new Prisma.Decimal(item.priceSale);
-          const quantity = new Prisma.Decimal(item.quantity);
-          return sum.plus(price.times(quantity));
-        }, new Prisma.Decimal(0));
-
-        return total.plus(subtotal.minus(discount));
-      },
-      new Prisma.Decimal(0),
-    );
-
-    let totalSuites = 0;
-    let allRentals = 0;
-    let totalOccupiedTimeAllCategories = 0;
-    let totalAvailableTimeAllCategories = 0;
-    let totalAllValue = new Prisma.Decimal(0);
-    let totalSale = new Prisma.Decimal(0);
-    let totalRental = new Prisma.Decimal(0);
-    let totalRentals = 0;
-
-    const kpisData: SuiteCategoryData[] = [];
-    const daysTimeInSeconds = (endDate.getTime() - startDate.getTime()) / 1000;
-
-    const categoryTotalsMap: CategoryTotalsMap = suiteCategories.reduce((acc, suiteCategory) => {
-      acc[suiteCategory.id] = {
-        giroTotal: 0,
-        rentalsCount: 0,
-        totalOccupiedTime: 0,
-        unavailableTime: 0,
-        availableTime: 0,
-        totalValue: new Prisma.Decimal(0),
-        categoryTotalSale: new Prisma.Decimal(0),
-        categoryTotalRental: new Prisma.Decimal(0),
-        categoryTotalRentals: 0,
-      };
-      totalSuites += suiteCategory.suites.length;
-      return acc;
-    }, {} as CategoryTotalsMap);
-
-    // Cálculo do stockOutMap
-    const stockOutIds = allRentalApartments
-      .map((a: any) => a.saleLease?.stockOutId)
-      .filter((id): id is number => Boolean(id));
-
-    const stockOutData = await this.prisma.prismaLocal.stockOut.findMany({
-      where: { id: { in: stockOutIds } },
-      include: {
-        stockOutItem: {
-          where: { canceled: null },
-          select: {
-            id: true,
-            priceSale: true,
-            quantity: true,
-            stockOutId: true,
-          },
-        },
-        sale: {
-          select: {
-            discount: true,
-          },
-        },
-      },
-    });
-
-    const stockOutMap: Record<string, Prisma.Decimal> = stockOutData.reduce(
-      (map, stockOut) => {
-        const priceSale = stockOut.stockOutItem
-          .reduce(
-            (acc, item) => acc.plus(new Prisma.Decimal(item.priceSale).times(item.quantity)),
-            new Prisma.Decimal(0),
-          )
-          .minus(stockOut.sale?.discount || new Prisma.Decimal(0));
-        map[String(stockOut.id)] = priceSale;
-        return map;
-      },
-      {} as Record<string, Prisma.Decimal>,
-    );
-
-    const rentalTypeMap: Record<string, RentalTypeEnum> = {
-      THREE_HOURS: RentalTypeEnum.THREE_HOURS,
-      SIX_HOURS: RentalTypeEnum.SIX_HOURS,
-      TWELVE_HOURS: RentalTypeEnum.TWELVE_HOURS,
-      DAY_USE: RentalTypeEnum.DAY_USE,
-      OVERNIGHT: RentalTypeEnum.OVERNIGHT,
-      DAILY: RentalTypeEnum.DAILY,
-    };
-
-    const results: Record<string, any> = {};
-    const trevparByDate: DateTrevparData[] = [];
-    const rentalsByDate: DateRentalsData[] = [];
-    const revparByDate: DateRevparData[] = [];
-    const ticketAverageByDate: DateTicketData[] = [];
-    const occupancyRateByDate: DateOccupancyData[] = [];
-    const occupancyRateBySuiteCategory: OccupancyBySuiteCategoryData[] = [];
-    const occupancyRateByWeekArray: WeeklyOccupancyData[] = [];
-    const dayCountMap: Record<string, number> = {};
-    const giroByWeekArray: WeeklyGiroData[] = [];
-    const timezone = 'America/Sao_Paulo';
-
-    let currentDate = new Date(startDate);
-    currentDate.setUTCHours(6, 0, 0, 0);
-
-    // Iterar sobre cada dia entre startDate e endDate
-    while (currentDate <= endDate) {
-      let nextDate = new Date(currentDate);
-      nextDate.setDate(nextDate.getDate() + 1);
-      nextDate.setUTCHours(5, 59, 59, 999);
-
-      const currentRentalApartments = allRentalApartments.filter(
-        (ra: any) => ra.checkIn >= currentDate && ra.checkIn < nextDate,
-      );
-
-      const totalsMap: Record<string, { totalValue: Prisma.Decimal }> = {};
-
-      let totalOccupiedTime = 0;
-      let totalUnavailableTime = 0;
-
-      // Calcular o tempo ocupado
-      for (const rentalApartment of currentRentalApartments) {
-        const occupiedTimeInSeconds =
-          (new Date(rentalApartment.checkOut).getTime() -
-            new Date(rentalApartment.checkIn).getTime()) /
-          1000;
-        totalOccupiedTime += occupiedTimeInSeconds;
-
-        const rentalTypeString = this.determineRentalPeriod(
-          rentalApartment.checkIn,
-          rentalApartment.checkOut,
-          rentalApartment.Booking?.length ? rentalApartment.Booking : null,
-        );
-        const rentalType = rentalTypeMap[rentalTypeString];
-
-        if (!totalsMap[rentalType]) {
-          totalsMap[rentalType] = {
-            totalValue: new Prisma.Decimal(0),
-          };
-        }
-
-        const permanenceValueLiquid = rentalApartment.permanenceValueLiquid
-          ? new Prisma.Decimal(rentalApartment.permanenceValueLiquid)
-          : new Prisma.Decimal(0);
-
-        const priceSale = rentalApartment.saleLease?.stockOutId
-          ? stockOutMap[rentalApartment.saleLease.stockOutId] || new Prisma.Decimal(0)
-          : new Prisma.Decimal(0);
-
-        totalsMap[rentalType].totalValue = totalsMap[rentalType].totalValue.plus(
-          permanenceValueLiquid.plus(priceSale),
-        );
-      }
-
-      // Cálculo do tempo indisponível por manutenção e limpeza
-      const unavailableTimeMap = new Map<string, number>();
-
-      suiteCategories.forEach((suiteCategory: any) => {
-        suiteCategory.suites.forEach((suite: any) => {
-          // Lógica para calcular o tempo de limpeza
-          const suiteCleanings = cleanings.filter(
-            (cleaning: any) => cleaning.suiteState.suiteId === suite.id,
-          );
-
-          suiteCleanings.forEach((cleaning: any) => {
-            const cleaningStart = new Date(cleaning.startDate);
-            const cleaningEnd = new Date(cleaning.endDate);
-
-            if (cleaningEnd > currentDate && cleaningStart < nextDate) {
-              const overlapStart = Math.max(cleaningStart.getTime(), currentDate.getTime());
-              const overlapEnd = Math.min(cleaningEnd.getTime(), nextDate.getTime());
-
-              const cleaningTimeInSeconds = (overlapEnd - overlapStart) / 1000;
-              const cleaningKey = `${suite.id}-${overlapStart}-${overlapEnd}`;
-              if (!unavailableTimeMap.has(cleaningKey)) {
-                totalUnavailableTime += cleaningTimeInSeconds;
-                unavailableTimeMap.set(cleaningKey, cleaningTimeInSeconds);
-              }
-            }
-          });
-
-          // Lógica para calcular o tempo de manutenção e defeitos
-          const suiteDefectsAndMaintenances = blockedMaintenanceDefects.filter(
-            (blockedMaintenanceDefect: any) =>
-              blockedMaintenanceDefect.defect.suite.id === suite.id &&
-              blockedMaintenanceDefect.suiteState.suite.id === suite.id,
-          );
-
-          suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect: any) => {
-            const defectStart = new Date(blockedMaintenanceDefect.defect.startDate);
-            const defectEnd = new Date(blockedMaintenanceDefect.defect.endDate);
-
-            if (defectEnd > currentDate && defectStart < nextDate) {
-              const overlapStart = Math.max(defectStart.getTime(), currentDate.getTime());
-              const overlapEnd = Math.min(defectEnd.getTime(), nextDate.getTime());
-
-              const defectTimeInSeconds = (overlapEnd - overlapStart) / 1000;
-
-              const defectKey = `${suite.id}-${overlapStart}-${overlapEnd}`;
-              if (!unavailableTimeMap.has(defectKey)) {
-                totalUnavailableTime += defectTimeInSeconds;
-                unavailableTimeMap.set(defectKey, defectTimeInSeconds);
-              }
-            }
-          });
-        });
-      });
-
-      const totalSuitesCounts = suiteCategories.reduce(
-        (acc: number, category: any) => acc + category.suites.length,
-        0,
-      );
-      const daysTimeInSeconds = (nextDate.getTime() - currentDate.getTime()) / 1000;
-      let availableTimeInSeconds = daysTimeInSeconds * totalSuitesCounts - totalUnavailableTime;
-
-      if (availableTimeInSeconds < 0) {
-        availableTimeInSeconds = 0;
-      }
-
-      // Calcular a taxa de ocupação
-      const occupancyRateDecimal =
-        availableTimeInSeconds > 0 ? totalOccupiedTime / availableTimeInSeconds : 0;
-
-      // Formatar a data para YYYY-MM-DD
-      const dateKey = new Intl.DateTimeFormat('pt-BR').format(currentDate);
-
-      // Adicionar a taxa de ocupação ao array
-      occupancyRateByDate.push({
-        [dateKey]: {
-          totalOccupancyRate: this.formatPercentageUpdate(occupancyRateDecimal),
-        },
-      });
-
-      const dateToOccupancyRates: Record<string, any> = {};
-
-      // Cálculo da taxa de ocupação por categoria de suíte
-      suiteCategories.forEach((suiteCategory: any) => {
-        let categoryOccupiedTime = 0;
-        const unavailableTimeMap = new Map<string, number>();
-
-        suiteCategory.suites.forEach((suite: any) => {
-          const suiteRentals = currentRentalApartments.filter(
-            (ra: any) => ra.suiteStates.suite.id === suite.id,
-          );
-
-          // Calcular o tempo ocupado para a categoria
-          suiteRentals.forEach((rentalApartment: any) => {
-            const occupiedTimeInSeconds =
-              (new Date(rentalApartment.checkOut).getTime() -
-                new Date(rentalApartment.checkIn).getTime()) /
-              1000;
-            categoryOccupiedTime += occupiedTimeInSeconds;
-          });
-
-          // Cálculo do tempo indisponível por manutenção e limpeza para a categoria
-          const suiteCleanings = cleanings.filter(
-            (cleaning: any) => cleaning.suiteState.suiteId === suite.id,
-          );
-
-          suiteCleanings.forEach((cleaning: any) => {
-            const cleaningStart = new Date(cleaning.startDate);
-            const cleaningEnd = new Date(cleaning.endDate);
-
-            if (cleaningEnd > currentDate && cleaningStart < nextDate) {
-              const overlapStart = Math.max(cleaningStart.getTime(), currentDate.getTime());
-              const overlapEnd = Math.min(cleaningEnd.getTime(), nextDate.getTime());
-
-              const cleaningTimeInSeconds = (overlapEnd - overlapStart) / 1000;
-
-              const cleaningKey = `${suite.id}-${overlapStart}-${overlapEnd}`;
-              if (!unavailableTimeMap.has(cleaningKey)) {
-                unavailableTimeMap.set(cleaningKey, cleaningTimeInSeconds);
-              }
-            }
-          });
-
-          // Lógica para calcular o tempo de manutenção e defeitos para a categoria
-          const suiteDefectsAndMaintenances = blockedMaintenanceDefects.filter(
-            (blockedMaintenanceDefect: any) =>
-              blockedMaintenanceDefect.defect.suite.id === suite.id &&
-              blockedMaintenanceDefect.suiteState.suite.id === suite.id,
-          );
-
-          suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect: any) => {
-            const defectStart = new Date(blockedMaintenanceDefect.defect.startDate);
-            const defectEnd = new Date(blockedMaintenanceDefect.defect.endDate);
-
-            if (defectEnd > currentDate && defectStart < nextDate) {
-              const overlapStart = Math.max(defectStart.getTime(), currentDate.getTime());
-              const overlapEnd = Math.min(defectEnd.getTime(), nextDate.getTime());
-
-              const defectTimeInSeconds = (overlapEnd - overlapStart) / 1000;
-
-              const defectKey = `${suite.id}-${overlapStart}-${overlapEnd}`;
-              if (!unavailableTimeMap.has(defectKey)) {
-                unavailableTimeMap.set(defectKey, defectTimeInSeconds);
-              }
-            }
-          });
-        });
-
-        // Calcular o tempo indisponível total para a categoria
-        const categoryUnavailableTime = Array.from(unavailableTimeMap.values()).reduce(
-          (acc, time) => acc + time,
-          0,
-        );
-
-        const totalCategorySuitesCounts = suiteCategory.suites.length;
-        let categoryAvailableTimeInSeconds =
-          daysTimeInSeconds * totalCategorySuitesCounts - categoryUnavailableTime;
-
-        if (categoryAvailableTimeInSeconds < 0) {
-          categoryAvailableTimeInSeconds = 0;
-        }
-
-        // Calcular a taxa de ocupação para a categoria
-        const categoryOccupancyRateDecimal =
-          categoryAvailableTimeInSeconds > 0
-            ? categoryOccupiedTime / categoryAvailableTimeInSeconds
-            : 0;
-
-        // Adicionar a taxa de ocupação ao objeto dateToOccupancyRates
-        if (!dateToOccupancyRates[dateKey]) {
-          dateToOccupancyRates[dateKey] = {};
-        }
-        dateToOccupancyRates[dateKey][suiteCategory.description] = {
-          occupancyRate: this.formatPercentageUpdate(categoryOccupancyRateDecimal),
-        };
-      });
-
-      // Adicionar o objeto dateToOccupancyRates ao array occupancyRateBySuiteCategory
-      Object.keys(dateToOccupancyRates).forEach((dateKey) => {
-        occupancyRateBySuiteCategory.push({
-          [dateKey]: dateToOccupancyRates[dateKey],
-        });
-      });
-
-      const totalRevenueForDate = Object.values(totalsMap).reduce(
-        (acc, { totalValue }) => acc.plus(totalValue),
-        new Prisma.Decimal(0),
-      );
-      const totalRentalsForDate = currentRentalApartments.length;
-
-      // Cálculo do giro e ticket médio
-      const periodDays = 1;
-      const giro = totalRentalsForDate / (totalSuites * periodDays);
-      const ticketAverage =
-        totalRentalsForDate > 0 ? totalRevenueForDate.dividedBy(totalRentalsForDate).toNumber() : 0;
-
-      // Cálculo do TrevPAR
-      const totalTrevpar = giro * ticketAverage;
-
-      // Adicionar o ticket médio total ao array
-      ticketAverageByDate.push({
-        [dateKey]: {
-          totalAllTicketAverage: this.formatCurrency(ticketAverage),
-        },
-      });
-
-      // Adiciona o TrevPAR ao array
-      trevparByDate.push({
-        [dateKey]: {
-          totalTrevpar: this.formatCurrency(totalTrevpar),
-        },
-      });
-
-      // Cálculo do RevPAR
-      let totalRevenue = new Prisma.Decimal(0);
-      let totalSuitesCount = 0;
-
-      suiteCategories.forEach((suiteCategory: any) => {
-        const suitesInCategoryCount = suiteCategory.suites.length;
-        totalSuitesCount += suitesInCategoryCount;
-
-        const rentalApartmentsInCategory = currentRentalApartments.filter(
-          (rentalApartment: any) =>
-            rentalApartment.suiteStates.suite.suiteCategoryId === suiteCategory.id,
-        );
-
-        rentalApartmentsInCategory.forEach((rentalApartment: any) => {
-          totalRevenue = totalRevenue.plus(
-            rentalApartment.permanenceValueLiquid
-              ? new Prisma.Decimal(rentalApartment.permanenceValueLiquid)
-              : new Prisma.Decimal(0),
-          );
-        });
-      });
-
-      // Calcular o RevPAR
-      const revpar = totalSuitesCount > 0 ? totalRevenue.dividedBy(totalSuitesCount).toNumber() : 0;
-
-      // Adiciona o RevPAR ao array
-      revparByDate.push({
-        [dateKey]: {
-          totalRevpar: this.formatCurrency(revpar),
-        },
-      });
-
-      // Formata os resultados para o dia atual
-      results[dateKey] = Object.keys(rentalTypeMap).map((rentalType) => {
-        const totalValue = totalsMap[rentalType] ? totalsMap[rentalType].totalValue.toNumber() : 0;
-
-        return {
-          [rentalType]: {
-            totalValue: this.formatCurrency(totalValue),
-          },
-        };
-      });
-
-      // Adiciona o total de aluguéis por data
-      rentalsByDate.push({
-        [dateKey]: {
-          totalAllRentalsApartments: totalRentalsForDate,
-        },
-      });
-
-      // Avançar para o próximo dia
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    moment.locale('pt-br');
-
-    let currentDateForWeek = moment.tz(startDate, timezone);
-    const endDateAdjusted = moment.tz(endDate, timezone);
-
-    while (currentDateForWeek.isBefore(endDateAdjusted)) {
-      const dayOfWeek = currentDateForWeek.format('dddd');
-      dayCountMap[dayOfWeek] = (dayCountMap[dayOfWeek] || 0) + 1;
-      currentDateForWeek.add(1, 'day');
-    }
-
-    // Inicializar a estrutura de ocupação por categoria e dia da semana
-    const occupancyByCategoryAndDay: Record<string, Record<string, any>> = {};
-    suiteCategories.forEach((suiteCategory: any) => {
-      occupancyByCategoryAndDay[suiteCategory.description] = {};
-      for (const dayOfWeek in dayCountMap) {
-        occupancyByCategoryAndDay[suiteCategory.description][dayOfWeek] = {
-          totalOccupiedTime: 0,
-          unavailableTime: 0,
-          availableTime: 0,
-          occupancyRate: '0.00%',
-        };
-      }
-    });
-
-    // Calcular totalOccupiedTime por categoria e dia da semana
-    allRentalApartments.forEach((occupiedSuite: any) => {
-      const suiteCategoryDescription =
-        occupiedSuite.suiteStates?.suite?.suiteCategories?.description;
-      const dayOfOccupation = moment.tz(occupiedSuite.checkIn, timezone);
-      const dayOfWeek = dayOfOccupation.format('dddd');
-
-      if (
-        occupancyByCategoryAndDay[suiteCategoryDescription] &&
-        occupancyByCategoryAndDay[suiteCategoryDescription][dayOfWeek]
-      ) {
-        const occupiedTime = occupiedSuite.checkOut.getTime() - occupiedSuite.checkIn.getTime();
-        occupancyByCategoryAndDay[suiteCategoryDescription][dayOfWeek].totalOccupiedTime +=
-          occupiedTime;
-      }
-    });
-
-    // Calcular availableTime e occupancyRate
-    for (const suiteCategory of suiteCategories) {
-      const suitesInCategory = suiteCategory.suites;
-      const suitesInCategoryCount = suitesInCategory.length;
-
-      for (const dayOfWeek in occupancyByCategoryAndDay[suiteCategory.description]) {
-        let unavailableTimeCleaning = 0;
-
-        // Calcular o tempo indisponível por limpeza
-        const suiteCleanings = cleanings.filter((cleaning: any) => {
-          const cleaningDayOfWeek = moment.tz(cleaning.startDate, timezone).format('dddd');
-          return (
-            cleaning.suiteState.suiteId === suitesInCategory[0].id &&
-            cleaningDayOfWeek === dayOfWeek
-          );
-        });
-
-        suiteCleanings.forEach((cleaning: any) => {
-          const cleaningTimeInSeconds =
-            (new Date(cleaning.endDate).getTime() - new Date(cleaning.startDate).getTime()) / 1000;
-          unavailableTimeCleaning += cleaningTimeInSeconds;
-        });
-
-        // Calcular o tempo indisponível por manutenção
-        const suiteDefectsAndMaintenances = blockedMaintenanceDefects.filter(
-          (blockedMaintenanceDefect: any) => {
-            const defectDayOfWeek = moment
-              .tz(blockedMaintenanceDefect.defect.startDate, timezone)
-              .format('dddd');
-            return (
-              blockedMaintenanceDefect.defect.suite.id === suitesInCategory[0].id &&
-              defectDayOfWeek === dayOfWeek
-            );
-          },
-        );
-
-        suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect: any) => {
-          const startDefect = new Date(blockedMaintenanceDefect.defect.startDate);
-          const endDefect = new Date(blockedMaintenanceDefect.defect.endDate);
-          const defectTimeInSeconds = (endDefect.getTime() - startDefect.getTime()) / 1000;
-          unavailableTimeCleaning += defectTimeInSeconds;
-        });
-
-        const daysTimeInSeconds = dayCountMap[dayOfWeek] * 24 * 60 * 60;
-        let availableTimeInSeconds =
-          daysTimeInSeconds * suitesInCategoryCount - unavailableTimeCleaning;
-
-        if (availableTimeInSeconds < 0) {
-          availableTimeInSeconds = 0;
-        }
-
-        occupancyByCategoryAndDay[suiteCategory.description][dayOfWeek].unavailableTime +=
-          unavailableTimeCleaning;
-        occupancyByCategoryAndDay[suiteCategory.description][dayOfWeek].availableTime +=
-          availableTimeInSeconds * 1000;
-
-        // Calcular a taxa de ocupação
-        const totalOccupiedTime =
-          occupancyByCategoryAndDay[suiteCategory.description][dayOfWeek].totalOccupiedTime;
-        const occupancyRate =
-          availableTimeInSeconds > 0 ? (totalOccupiedTime / availableTimeInSeconds) * 100 : 0;
-
-        occupancyByCategoryAndDay[suiteCategory.description][dayOfWeek].occupancyRate =
-          occupancyRate / 1000;
-      }
-    }
-
-    // Calcular totalOccupancyRate por dia da semana
-    const totalOccupancyRateByDay: Record<string, number> = {};
-
-    for (const dayOfWeek in dayCountMap) {
-      let totalOccupiedTimeAllCategories = 0;
-      let totalAvailableTimeAllCategories = 0;
-
-      for (const suiteCategory in occupancyByCategoryAndDay) {
-        totalOccupiedTimeAllCategories +=
-          occupancyByCategoryAndDay[suiteCategory][dayOfWeek].totalOccupiedTime;
-        totalAvailableTimeAllCategories +=
-          occupancyByCategoryAndDay[suiteCategory][dayOfWeek].availableTime;
-      }
-
-      const totalOccupancyRate =
-        totalAvailableTimeAllCategories > 0
-          ? (totalOccupiedTimeAllCategories / totalAvailableTimeAllCategories) * 100
-          : 0;
-
-      totalOccupancyRateByDay[dayOfWeek] = totalOccupancyRate;
-    }
-
-    // Preencher o occupancyRateByWeekArray com os dados calculados
-    for (const suiteCategory in occupancyByCategoryAndDay) {
-      const categoryData: WeeklyOccupancyData = {
-        [suiteCategory]: {},
-      };
-
-      for (const dayOfWeek in occupancyByCategoryAndDay[suiteCategory]) {
-        const dayData = occupancyByCategoryAndDay[suiteCategory][dayOfWeek];
-
-        categoryData[suiteCategory][dayOfWeek.toLowerCase()] = {
-          occupancyRate: Number(dayData.occupancyRate.toFixed(2)),
-          totalOccupancyRate: Number(totalOccupancyRateByDay[dayOfWeek].toFixed(2)),
-        };
-      }
-
-      occupancyRateByWeekArray.push(categoryData);
-    }
-
-    // Calcular o giro por categoria e dia da semana
-    let currentDateForGiro = moment.tz(startDate, timezone);
-    const endDateAdjustedForGiro = moment.tz(endDate, timezone);
-
-    // Inicializar a estrutura de giro por categoria e dia da semana
-    const giroByCategoryAndDay: Record<string, Record<string, any>> = {};
-    suiteCategories.forEach((suiteCategory: any) => {
-      giroByCategoryAndDay[suiteCategory.description] = {};
-      for (const dayOfWeek in dayCountMap) {
-        giroByCategoryAndDay[suiteCategory.description][dayOfWeek] = {
-          giroTotal: 0,
-          rentalsCount: 0,
-        };
-      }
-    });
-
-    // Contar locações por categoria e dia da semana
-    while (currentDateForGiro.isBefore(endDateAdjustedForGiro)) {
-      const dayOfWeek = currentDateForGiro.format('dddd');
-
-      // Filtrar os apartamentos alugados para o dia atual
-      const rentalsForCurrentDay = allRentalApartments.filter((rental: any) => {
-        const checkInDate = moment.tz(rental.checkIn, timezone);
-        return checkInDate.isSame(currentDateForGiro, 'day');
-      });
-
-      // Contar o número de locações por categoria
-      rentalsForCurrentDay.forEach((rental: any) => {
-        const suiteCategoryDescription = rental.suiteStates?.suite?.suiteCategories?.description;
-
-        if (!suiteCategoryDescription) {
-          return;
-        }
-
-        // Incrementa o número de locações para a categoria e dia da semana
-        if (giroByCategoryAndDay[suiteCategoryDescription]) {
-          giroByCategoryAndDay[suiteCategoryDescription][dayOfWeek].rentalsCount++;
-        }
-      });
-
-      currentDateForGiro.add(1, 'day');
-    }
-
-    // Cálculo do giro por categoria e dia
-    const totalRentalsByDay: Record<string, number> = {};
-    let allSuites = 0;
-
-    for (const suiteCategory of suiteCategories) {
-      const suitesInCategoryCount = suiteCategory.suites.length;
-      allSuites += suitesInCategoryCount;
-
-      for (const dayOfWeek in giroByCategoryAndDay[suiteCategory.description]) {
-        const categoryData = giroByCategoryAndDay[suiteCategory.description][dayOfWeek];
-
-        // Acumular locações por dia da semana
-        if (!totalRentalsByDay[dayOfWeek]) {
-          totalRentalsByDay[dayOfWeek] = 0;
-        }
-        totalRentalsByDay[dayOfWeek] += categoryData.rentalsCount;
-
-        // Cálculo do giro para a categoria e dia
-        if (categoryData.rentalsCount > 0 && suitesInCategoryCount > 0) {
-          const days = dayCountMap[dayOfWeek];
-          const giro = categoryData.rentalsCount / suitesInCategoryCount / days;
-
-          categoryData.giroTotal = giro;
-        } else {
-          categoryData.giroTotal = 0;
-          categoryData.rentalsCount = 0;
-        }
-      }
-    }
-
-    // Calcular o totalGiro
-    for (const suiteCategory of suiteCategories) {
-      for (const dayOfWeek in giroByCategoryAndDay[suiteCategory.description]) {
-        const categoryData = giroByCategoryAndDay[suiteCategory.description][dayOfWeek];
-
-        if (!categoryData) continue;
-
-        const totalGiro = totalRentalsByDay[dayOfWeek] / (allSuites || 1);
-        const daysCount = dayCountMap[dayOfWeek];
-        const adjustedTotalGiro = daysCount > 0 ? totalGiro / daysCount : 0;
-
-        categoryData.totalGiro = adjustedTotalGiro;
-      }
-    }
-
-    // Preencher o giroByWeekArray com os dados calculados
-    for (const suiteCategory in giroByCategoryAndDay) {
-      const categoryData: WeeklyGiroData = {
-        [suiteCategory]: {},
-      };
-
-      for (const dayOfWeek in giroByCategoryAndDay[suiteCategory]) {
-        const dayData = giroByCategoryAndDay[suiteCategory][dayOfWeek];
-
-        categoryData[suiteCategory][dayOfWeek.toLowerCase()] = {
-          giro: Number(dayData.giroTotal.toFixed(2)),
-          totalGiro: Number(dayData.totalGiro.toFixed(2)),
-        };
-      }
-
-      giroByWeekArray.push(categoryData);
-    }
-
-    const dataTableBillingRentalType = Object.entries(results).map(([date, rentals]) => ({
-      [date]: rentals,
-    }));
-
-    // Cálculo do RevenueByDate
-    const revenueByDate: DateValueData[] = [];
-    currentDate = new Date(startDate);
-
-    while (currentDate <= endDate) {
-      const dateKey = new Intl.DateTimeFormat('pt-BR').format(currentDate);
-      const allRentalApartmentsForDate = allRentalApartments.filter(
-        (ra: any) =>
-          ra.checkIn >= currentDate && ra.checkIn < new Date(currentDate.getTime() + 86400000),
-      );
-
-      let totalValueForCurrentDate = new Prisma.Decimal(0);
-      allRentalApartmentsForDate.forEach((rentalApartment) => {
-        const permanenceValueLiquid = rentalApartment.permanenceValueLiquid
-          ? new Prisma.Decimal(rentalApartment.permanenceValueLiquid)
-          : new Prisma.Decimal(0);
-        const priceSale = rentalApartment.saleLease?.stockOutId
-          ? stockOutMap[rentalApartment.saleLease.stockOutId] || new Prisma.Decimal(0)
-          : new Prisma.Decimal(0);
-
-        totalValueForCurrentDate = totalValueForCurrentDate.plus(
-          permanenceValueLiquid.plus(priceSale),
-        );
-      });
-
-      revenueByDate.push({
-        [dateKey]: {
-          totalValue: this.formatCurrency(totalValueForCurrentDate.toNumber()),
-        },
-      });
-
-      // Avançar para o próximo dia
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    // Cálculo do RevenueBySuiteCategory
-    const revenueBySuiteCategory = suiteCategories.map((suiteCategory) => {
-      const suitesInCategory = suiteCategory.suites;
-      let totalValueForCategory = new Prisma.Decimal(0);
-
-      allRentalApartments.forEach((rentalApartment) => {
-        if (
-          suitesInCategory.some((suite: any) => suite.id === rentalApartment.suiteStates?.suite?.id)
-        ) {
-          const permanenceValueLiquid = rentalApartment.permanenceValueLiquid
-            ? new Prisma.Decimal(rentalApartment.permanenceValueLiquid)
-            : new Prisma.Decimal(0);
-          let priceSale = new Prisma.Decimal(0);
-
-          if (rentalApartment.saleLease?.stockOutId) {
-            priceSale = stockOutMap[rentalApartment.saleLease.stockOutId] || new Prisma.Decimal(0);
-          }
-
-          totalValueForCategory = totalValueForCategory.plus(permanenceValueLiquid.plus(priceSale));
-        }
-      });
-
-      return {
-        [suiteCategory.description]: {
-          totalValue: this.formatCurrency(totalValueForCategory.toNumber()),
-        },
-      };
-    });
-
-    suiteCategories.forEach((suiteCategory) => {
-      const suitesInCategoryCount = suiteCategory.suites.length;
-      const occupiedSuitesInCategory = allRentalApartments.filter(
-        (rentalApartment) =>
-          rentalApartment.suiteStates?.suite?.suiteCategoryId === suiteCategory.id,
-      );
-
-      let totalOccupiedTime = 0;
-      let unavailableTimeCleaning = 0;
-      let maxUnavailableTime = 0;
-
-      occupiedSuitesInCategory.forEach((occupiedSuite) => {
-        const occupiedTimeInSeconds = this.calculateOccupationTime(
-          occupiedSuite.checkIn,
-          occupiedSuite.checkOut,
-        );
-        totalOccupiedTime += occupiedTimeInSeconds;
-
-        const permanenceValueLiquid = occupiedSuite.permanenceValueLiquid
-          ? new Prisma.Decimal(occupiedSuite.permanenceValueLiquid)
-          : new Prisma.Decimal(0);
-        let priceSale = new Prisma.Decimal(0);
-        let discountSale = new Prisma.Decimal(0);
-
-        const saleLease = occupiedSuite.saleLease;
-        if (saleLease && saleLease.stockOut?.stockOutItem) {
-          priceSale = saleLease.stockOut.stockOutItem.reduce(
-            (
-              acc: { plus: (arg0: Prisma.Decimal) => any },
-              item: { priceSale: Prisma.Decimal.Value; quantity: Prisma.Decimal.Value },
-            ) =>
-              acc.plus(new Prisma.Decimal(item.priceSale).times(new Prisma.Decimal(item.quantity))),
-            new Prisma.Decimal(0),
-          );
-
-          discountSale = saleLease.stockOut.sale?.discount
-            ? new Prisma.Decimal(saleLease.stockOut.sale.discount)
-            : new Prisma.Decimal(0);
-          priceSale = priceSale.minus(discountSale);
-        }
-
-        const totalValue = permanenceValueLiquid.plus(priceSale);
-        categoryTotalsMap[suiteCategory.id].totalValue =
-          categoryTotalsMap[suiteCategory.id].totalValue.plus(totalValue);
-        totalAllValue = totalAllValue.plus(totalValue);
-
-        if (totalValue.gt(0)) {
-          categoryTotalsMap[suiteCategory.id].categoryTotalRentals++;
-          totalRentals++;
-
-          totalRental = totalRental.plus(permanenceValueLiquid);
-          totalSale = totalSale.plus(priceSale);
-
-          categoryTotalsMap[suiteCategory.id].categoryTotalSale =
-            categoryTotalsMap[suiteCategory.id].categoryTotalSale.plus(priceSale);
-          categoryTotalsMap[suiteCategory.id].categoryTotalRental =
-            categoryTotalsMap[suiteCategory.id].categoryTotalRental.plus(permanenceValueLiquid);
-        }
-      });
-
-      suiteCategory.suites.forEach((suite: any) => {
-        const suiteDefectsAndMaintenances = blockedMaintenanceDefects.filter(
-          (blockedMaintenanceDefect) =>
-            blockedMaintenanceDefect.defect.suite.id === suite.id &&
-            blockedMaintenanceDefect.suiteState.suite.id === suite.id,
-        );
-
-        suiteDefectsAndMaintenances.forEach((blockedMaintenanceDefect) => {
-          const startDefect = new Date(blockedMaintenanceDefect.defect.startDate);
-          const endDefect = new Date(blockedMaintenanceDefect.defect.endDate);
-          const startMaintenance = new Date(blockedMaintenanceDefect.suiteState.startDate);
-          const endMaintenance = new Date(blockedMaintenanceDefect.suiteState.endDate);
-
-          const defectTimeInSeconds = (endDefect.getTime() - startDefect.getTime()) / 1000;
-          const maintenanceTimeInSeconds =
-            (endMaintenance.getTime() - startMaintenance.getTime()) / 1000;
-          maxUnavailableTime += Math.max(defectTimeInSeconds, maintenanceTimeInSeconds);
-        });
-
-        cleanings
-          .filter((cleaning) => cleaning.suiteState.suiteId === suite.id)
-          .forEach((cleaning) => {
-            unavailableTimeCleaning +=
-              (new Date(cleaning.endDate).getTime() - new Date(cleaning.startDate).getTime()) /
-              1000;
-          });
-      });
-
-      const unavailableTime = maxUnavailableTime + unavailableTimeCleaning;
-      const availableTimeInSeconds = daysTimeInSeconds * suitesInCategoryCount - unavailableTime;
-
-      totalOccupiedTimeAllCategories += totalOccupiedTime;
-      totalAvailableTimeAllCategories += availableTimeInSeconds;
-
-      const categoryData = categoryTotalsMap[suiteCategory.id];
-      categoryData.totalOccupiedTime = totalOccupiedTime;
-      categoryData.unavailableTime = unavailableTime;
-      categoryData.availableTime = availableTimeInSeconds;
-      categoryData.rentalsCount += occupiedSuitesInCategory.length;
-      allRentals += occupiedSuitesInCategory.length;
-
-      if (categoryData.rentalsCount > 0 && suitesInCategoryCount > 0) {
-        const days = (endDate.getTime() - startDate.getTime()) / (1000 * 86400);
-        const giro = categoryData.rentalsCount / suitesInCategoryCount / days;
-        categoryData.giroTotal += giro;
-      }
-    });
-
-    const totalResult = {
-      totalAllRentalsApartments: allRentals,
-      totalAllValue: this.formatCurrency(Number(totalAllValue.plus(totalSaleDirect))),
-      totalAllTicketAverage:
-        totalRentals > 0
-          ? this.formatCurrency(
-              totalSale.plus(totalRental).plus(totalSaleDirect).dividedBy(totalRentals).toNumber(),
-            )
-          : 'R$ 0,00',
-      totalGiro: Number(
-        (
-          allRentals /
-          (totalSuites || 1) /
-          ((endDate.getTime() - startDate.getTime()) / (1000 * 86400))
-        ).toFixed(2),
-      ),
-      totalRevpar: this.formatCurrency(
-        (Number(
-          allRentals /
-            (totalSuites || 1) /
-            ((endDate.getTime() - startDate.getTime()) / (1000 * 86400)),
-        ) *
-          Number(totalRental)) /
-          totalRentals,
-      ),
-      totalTrevpar: this.formatCurrency(
-        (Number(
-          allRentals /
-            (totalSuites || 1) /
-            ((endDate.getTime() - startDate.getTime()) / (1000 * 86400)),
-        ) *
-          Number(totalSale.plus(totalRental).plus(totalSaleDirect))) /
-          totalRentals,
-      ),
-      totalAverageOccupationTime: this.formatTime(
-        totalOccupiedTimeAllCategories / (allRentals || 1),
-      ),
-      totalOccupancyRate: this.formatPercentageUpdate(
-        totalOccupiedTimeAllCategories / (totalAvailableTimeAllCategories || 1),
-      ),
-    };
-
-    suiteCategories.forEach((suiteCategory) => {
-      const categoryData = categoryTotalsMap[suiteCategory.id];
-      if (categoryData && categoryData.rentalsCount > 0) {
-        const occupancyRateDecimal =
-          categoryData.availableTime > 0
-            ? categoryData.totalOccupiedTime / categoryData.availableTime
-            : 0;
-
-        const ticketAverageSale =
-          categoryData.categoryTotalRentals > 0
-            ? categoryData.categoryTotalSale.dividedBy(categoryData.categoryTotalRentals).toNumber()
-            : 0;
-
-        const ticketAverageRental =
-          categoryData.categoryTotalRentals > 0
-            ? categoryData.categoryTotalRental
-                .dividedBy(categoryData.categoryTotalRentals)
-                .toNumber()
-            : 0;
-
-        const totalTicketAverage = ticketAverageSale + ticketAverageRental;
-
-        kpisData.push({
-          [suiteCategory.description]: {
-            totalRentalsApartments: categoryData.rentalsCount,
-            totalValue: Number(categoryData.totalValue),
-            totalTicketAverage: totalTicketAverage,
-            giro: Number(categoryData.giroTotal),
-            revpar: categoryData.giroTotal * ticketAverageRental,
-            trevpar: categoryData.giroTotal * totalTicketAverage,
-            averageOccupationTime: this.formatTime(
-              categoryData.totalOccupiedTime / (categoryData.rentalsCount || 1),
-            ),
-            occupancyRate: occupancyRateDecimal,
-          },
-        });
-      }
-    });
-
-    const bigNumbers = {
-      currentDate: {
-        totalAllValue: this.formatCurrency(Number(totalAllValue.plus(totalSaleDirect))),
-        totalAllRentalsApartments: allRentals,
-        totalAllTicketAverage: totalResult.totalAllTicketAverage,
-        totalAllRevpar: totalResult.totalRevpar,
-        totalAverageOccupationTime: totalResult.totalAverageOccupationTime,
-        totalAllGiro: totalResult.totalGiro,
-      },
-    };
-
-    return {
-      Company: 'Tout',
-      BigNumbers: [bigNumbers],
-      BillingRentalType: dataTableBillingRentalType,
-      RevenueByDate: revenueByDate,
-      RevenueBySuiteCategory: revenueBySuiteCategory,
-      RentalsByDate: rentalsByDate,
-      RevparByDate: revparByDate,
-      TicketAverageByDate: ticketAverageByDate,
-      TrevparByDate: trevparByDate,
-      OccupancyRateByDate: occupancyRateByDate,
-      OccupancyRateBySuiteCategory: occupancyRateBySuiteCategory,
-      DataTableSuiteCategory: kpisData,
-      TotalResult: totalResult,
-      DataTableOccupancyRateByWeek: occupancyRateByWeekArray,
-      DataTableGiroByWeek: giroByWeekArray,
-    };
   }
 
   private calculateOccupationTime(checkIn: Date, checkOut: Date): number {
@@ -3597,8 +2599,9 @@ export class CompanyService {
 
       // Taxa de ocupação CORRETA: (tempo ocupado / tempo disponível) × 100
       // Tempo disponível = (suítes × dias × 86400 segundos) - tempo indisponível
-      const totalAvailableTime = (totalSuitesInCategory * periodDays * 86400) - unavailableTime;
-      const occupancyRate = totalAvailableTime > 0 ? (totalOccupiedTime / totalAvailableTime) * 100 : 0;
+      const totalAvailableTime = totalSuitesInCategory * periodDays * 86400 - unavailableTime;
+      const occupancyRate =
+        totalAvailableTime > 0 ? (totalOccupiedTime / totalAvailableTime) * 100 : 0;
 
       return {
         [item.suite_category_name]: {
@@ -3680,11 +2683,19 @@ export class CompanyService {
     `;
 
     // Processamento em TypeScript
-    const dayNames = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+    const dayNames = [
+      'domingo',
+      'segunda-feira',
+      'terça-feira',
+      'quarta-feira',
+      'quinta-feira',
+      'sexta-feira',
+      'sábado',
+    ];
 
     // Contar quantos dias de cada dia da semana existem no período
     const dayCountMap: { [day: string]: number } = {};
-    dayNames.forEach(day => dayCountMap[day] = 0);
+    dayNames.forEach((day) => (dayCountMap[day] = 0));
 
     let currentDateOccupancy = moment.tz(startDate, timezone).startOf('day');
     const endMomentOccupancy = moment.tz(endDate, timezone).endOf('day');
@@ -3697,7 +2708,9 @@ export class CompanyService {
     }
 
     // Criar estrutura de dados por categoria e dia da semana
-    const occupancyByCategory: { [category: string]: { [day: string]: { occupied: number; unavailable: number } } } = {};
+    const occupancyByCategory: {
+      [category: string]: { [day: string]: { occupied: number; unavailable: number } };
+    } = {};
 
     metadataResult.forEach((meta) => {
       const category = meta.category_name;
@@ -3730,7 +2743,8 @@ export class CompanyService {
       const category = unavailable.category_name;
 
       const dayOfWeek = dayNames[startDate.getDay()];
-      const unavailableTime = (new Date(unavailable.end_date).getTime() - startDate.getTime()) / 1000;
+      const unavailableTime =
+        (new Date(unavailable.end_date).getTime() - startDate.getTime()) / 1000;
 
       if (occupancyByCategory[category] && occupancyByCategory[category][dayOfWeek]) {
         occupancyByCategory[category][dayOfWeek].unavailable += unavailableTime;
@@ -3751,41 +2765,44 @@ export class CompanyService {
       totalOccupancyByDay[day] = { occupied: 0, available: 0 };
     });
 
-    const dataTableOccupancyRateByWeek: any[] = Object.entries(occupancyByCategory).map(([category, dayData]) => {
-      const totalSuites = metadataByCategory[category]?.totalSuites || 1;
+    const dataTableOccupancyRateByWeek: any[] = Object.entries(occupancyByCategory).map(
+      ([category, dayData]) => {
+        const totalSuites = metadataByCategory[category]?.totalSuites || 1;
 
-      const result: any = {};
-      result[category] = {};
+        const result: any = {};
+        result[category] = {};
 
-      dayNames.forEach((day) => {
-        const daysCount = dayCountMap[day] || 1;
-        const occupiedTime = dayData[day].occupied;
-        const unavailableTime = dayData[day].unavailable;
+        dayNames.forEach((day) => {
+          const daysCount = dayCountMap[day] || 1;
+          const occupiedTime = dayData[day].occupied;
+          const unavailableTime = dayData[day].unavailable;
 
-        // Tempo disponível = (dias × suites × 86400) - tempo_indisponível
-        const availableTime = (daysCount * totalSuites * 86400) - unavailableTime;
-        const occupancyRate = availableTime > 0 ? (occupiedTime / availableTime) * 100 : 0;
+          // Tempo disponível = (dias × suites × 86400) - tempo_indisponível
+          const availableTime = daysCount * totalSuites * 86400 - unavailableTime;
+          const occupancyRate = availableTime > 0 ? (occupiedTime / availableTime) * 100 : 0;
 
-        result[category][day] = {
-          occupancyRate: Number(occupancyRate.toFixed(2)),
-          totalOccupancyRate: 0, // Será preenchido depois
-        };
+          result[category][day] = {
+            occupancyRate: Number(occupancyRate.toFixed(2)),
+            totalOccupancyRate: 0, // Será preenchido depois
+          };
 
-        // Acumular para totalOccupancyRate
-        totalOccupancyByDay[day].occupied += occupiedTime;
-        totalOccupancyByDay[day].available += availableTime;
-      });
+          // Acumular para totalOccupancyRate
+          totalOccupancyByDay[day].occupied += occupiedTime;
+          totalOccupancyByDay[day].available += availableTime;
+        });
 
-      return result;
-    });
+        return result;
+      },
+    );
 
     // Calcular e preencher totalOccupancyRate
     dataTableOccupancyRateByWeek.forEach((item) => {
       const category = Object.keys(item)[0];
       dayNames.forEach((day) => {
-        const totalRate = totalOccupancyByDay[day].available > 0
-          ? (totalOccupancyByDay[day].occupied / totalOccupancyByDay[day].available) * 100
-          : 0;
+        const totalRate =
+          totalOccupancyByDay[day].available > 0
+            ? (totalOccupancyByDay[day].occupied / totalOccupancyByDay[day].available) * 100
+            : 0;
         item[category][day].totalOccupancyRate = Number(totalRate.toFixed(2));
       });
     });
@@ -3925,7 +2942,13 @@ export class CompanyService {
         acc.totalUnavailableTime += Number(item.unavailable_time) || 0;
         return acc;
       },
-      { totalRentals: 0, totalValue: 0, rentalRevenue: 0, totalOccupiedTime: 0, totalUnavailableTime: 0 }
+      {
+        totalRentals: 0,
+        totalValue: 0,
+        rentalRevenue: 0,
+        totalOccupiedTime: 0,
+        totalUnavailableTime: 0,
+      },
     );
 
     const totalResultTicketAverage =
@@ -3954,7 +2977,8 @@ export class CompanyService {
         : 0;
 
     // Taxa de ocupação total CORRETA: (tempo ocupado / tempo disponível) × 100
-    const totalResultAvailableTime = (totalSuitesCount * daysDiff * 86400) - totalResultFromCategories.totalUnavailableTime;
+    const totalResultAvailableTime =
+      totalSuitesCount * daysDiff * 86400 - totalResultFromCategories.totalUnavailableTime;
     const totalResultOccupancyRate =
       totalResultAvailableTime > 0
         ? (totalResultFromCategories.totalOccupiedTime / totalResultAvailableTime) * 100
