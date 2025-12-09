@@ -2618,36 +2618,77 @@ export class CompanyService {
         AND ca.id IN (10,11,12,15,16,17,18,19,24)
     `;
 
-    // Query 2: Buscar tempos indisponíveis
+    // Query 2: Buscar tempos indisponíveis (COM MERGE de intervalos sobrepostos)
     const unavailableTimesData: any[] = await this.prisma.prismaLocal.$queryRaw`
-      SELECT
-        ca.descricao as category_name,
-        la.datainicio as start_date,
-        la.datafim as end_date
-      FROM limpezaapartamento la
-      INNER JOIN apartamentostate aps ON la.id_sujoapartamento = aps.id
-      INNER JOIN apartamento a ON aps.id_apartamento = a.id
-      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE la.datainicio >= ${formattedStart}::timestamp
-        AND la.datainicio <= ${formattedEnd}::timestamp
-        AND la.datafim IS NOT NULL
-        AND ca.id IN (10,11,12,15,16,17,18,19,24)
+      WITH all_unavailable_periods AS (
+        -- Limpezas
+        SELECT
+          ca.descricao as category_name,
+          a.id as apartamento_id,
+          GREATEST(la.datainicio, ${formattedStart}::timestamp) as period_start,
+          LEAST(la.datafim, ${formattedEnd}::timestamp) as period_end
+        FROM limpezaapartamento la
+        INNER JOIN apartamentostate aps ON la.id_sujoapartamento = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicio < ${formattedEnd}::timestamp
+          AND la.datafim > ${formattedStart}::timestamp
+          AND la.datafim IS NOT NULL
+          AND ca.id IN (10,11,12,15,16,17,18,19,24)
 
-      UNION ALL
+        UNION ALL
 
+        -- Defeitos
+        SELECT
+          ca.descricao as category_name,
+          a.id as apartamento_id,
+          GREATEST(d.datainicio, ${formattedStart}::timestamp) as period_start,
+          LEAST(d.datafim, ${formattedEnd}::timestamp) as period_end
+        FROM defeito d
+        INNER JOIN apartamento a ON d.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE d.datainicio < ${formattedEnd}::timestamp
+          AND d.datafim > ${formattedStart}::timestamp
+          AND d.datafim IS NOT NULL
+          AND ca.id IN (10,11,12,15,16,17,18,19,24)
+      ),
+      periods_with_lag AS (
+        SELECT
+          category_name,
+          apartamento_id,
+          period_start,
+          period_end,
+          LAG(period_end) OVER (PARTITION BY category_name, apartamento_id ORDER BY period_start, period_end) as prev_end
+        FROM all_unavailable_periods
+      ),
+      periods_with_groups AS (
+        SELECT
+          category_name,
+          apartamento_id,
+          period_start,
+          period_end,
+          SUM(CASE WHEN period_start <= prev_end THEN 0 ELSE 1 END)
+            OVER (PARTITION BY category_name, apartamento_id ORDER BY period_start, period_end
+                  ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as period_group
+        FROM periods_with_lag
+      ),
+      merged_intervals AS (
+        SELECT
+          category_name,
+          apartamento_id,
+          period_group,
+          MIN(period_start) as merged_start,
+          MAX(period_end) as merged_end
+        FROM periods_with_groups
+        GROUP BY category_name, apartamento_id, period_group
+        HAVING MAX(period_end) > MIN(period_start)
+      )
       SELECT
-        ca.descricao as category_name,
-        d.datainicio as start_date,
-        GREATEST(d.datafim, COALESCE(aps_manut.datafim, d.datafim)) as end_date
-      FROM defeito d
-      INNER JOIN apartamento a ON d.id_apartamento = a.id
-      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      LEFT JOIN col_bloqueadomanutencao_defeito bmd ON bmd.id_defeito = d.id
-      LEFT JOIN apartamentostate aps_manut ON bmd.id_bloqueadomanutencao = aps_manut.id
-      WHERE d.datainicio >= ${formattedStart}::timestamp
-        AND d.datainicio <= ${formattedEnd}::timestamp
-        AND d.datafim IS NOT NULL
-        AND ca.id IN (10,11,12,15,16,17,18,19,24)
+        category_name,
+        merged_start as start_date,
+        merged_end as end_date
+      FROM merged_intervals
+      ORDER BY category_name, start_date
     `;
 
     // Query 3: Metadados (suítes por categoria)
@@ -2698,31 +2739,113 @@ export class CompanyService {
       });
     });
 
-    // Distribuir tempo ocupado pelos dias da semana corretos (SIMPLIFICADO - igual ao kpiOccupancyRate)
+    // Distribuir tempo ocupado pelos dias da semana corretos
+    // IMPORTANTE: Distribuir proporcionalmente pelos dias que a locação realmente ocupou
     rentalsData.forEach((rental) => {
-      const checkIn = new Date(rental.check_in);
+      const checkIn = moment.tz(rental.check_in, timezone);
+      const checkOut = moment.tz(rental.check_out, timezone);
       const category = rental.category_name;
 
-      // Pegar apenas o dia da semana do checkIn (como no código de referência)
-      const dayOfWeek = dayNames[checkIn.getDay()];
-      const occupiedTime = new Date(rental.check_out).getTime() - checkIn.getTime();
+      // Iterar por cada dia que a locação ocupou
+      let currentDay = checkIn.clone().startOf('day');
+      const lastDay = checkOut.clone().startOf('day');
 
-      if (occupancyByCategory[category] && occupancyByCategory[category][dayOfWeek]) {
-        occupancyByCategory[category][dayOfWeek].occupiedTime += occupiedTime / 1000; // converter para segundos
+      while (currentDay.isSameOrBefore(lastDay, 'day')) {
+        const dayOfWeek = dayNames[currentDay.day()];
+
+        // Calcular quanto tempo foi ocupado neste dia específico
+        const dayStart = moment.max(currentDay.clone().startOf('day'), checkIn);
+        const dayEnd = moment.min(currentDay.clone().endOf('day'), checkOut);
+        const timeInDay = dayEnd.diff(dayStart, 'seconds');
+
+        if (
+          occupancyByCategory[category] &&
+          occupancyByCategory[category][dayOfWeek] &&
+          timeInDay > 0
+        ) {
+          occupancyByCategory[category][dayOfWeek].occupiedTime += timeInDay;
+        }
+
+        currentDay.add(1, 'day');
       }
     });
 
     // Distribuir tempo indisponível pelos dias da semana corretos
+    // IMPORTANTE: Distribuir proporcionalmente pelos dias que o período realmente ocupou
+
+    // MERGE adicional de períodos sobrepostos no TypeScript (garantia extra)
+    // Agrupar por categoria e ordenar por data de início
+    const unavailableByCategory: { [key: string]: any[] } = {};
     unavailableTimesData.forEach((unavailable) => {
-      const startDate = new Date(unavailable.start_date);
+      const category = unavailable.category_name;
+      if (!unavailableByCategory[category]) {
+        unavailableByCategory[category] = [];
+      }
+      unavailableByCategory[category].push(unavailable);
+    });
+
+    // Mesclar períodos sobrepostos para cada categoria
+    const mergedUnavailableData: any[] = [];
+    Object.keys(unavailableByCategory).forEach((category) => {
+      const periods = unavailableByCategory[category].sort(
+        (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
+      );
+
+      if (periods.length === 0) return;
+
+      const merged: any[] = [];
+      let current = periods[0];
+
+      for (let i = 1; i < periods.length; i++) {
+        const next = periods[i];
+        const currentEnd = new Date(current.end_date).getTime();
+        const nextStart = new Date(next.start_date).getTime();
+
+        // Se há sobreposição ou são contíguos, mesclar
+        if (nextStart <= currentEnd) {
+          current = {
+            category_name: category,
+            start_date: current.start_date,
+            end_date:
+              new Date(next.end_date).getTime() > currentEnd ? next.end_date : current.end_date,
+          };
+        } else {
+          // Não há sobreposição, salvar o atual e começar novo
+          merged.push(current);
+          current = next;
+        }
+      }
+      merged.push(current); // Adicionar o último
+
+      mergedUnavailableData.push(...merged);
+    });
+
+    mergedUnavailableData.forEach((unavailable) => {
+      const startTime = moment.tz(unavailable.start_date, timezone);
+      const endTime = moment.tz(unavailable.end_date, timezone);
       const category = unavailable.category_name;
 
-      // Pegar apenas o dia da semana do startDate (como no código de referência)
-      const dayOfWeek = dayNames[startDate.getDay()];
-      const unavailableTime = new Date(unavailable.end_date).getTime() - startDate.getTime();
+      // Iterar por cada dia que o período de indisponibilidade ocupou
+      let currentDay = startTime.clone().startOf('day');
+      const lastDay = endTime.clone().startOf('day');
 
-      if (occupancyByCategory[category] && occupancyByCategory[category][dayOfWeek]) {
-        occupancyByCategory[category][dayOfWeek].unavailableTime += unavailableTime / 1000;
+      while (currentDay.isSameOrBefore(lastDay, 'day')) {
+        const dayOfWeek = dayNames[currentDay.day()];
+
+        // Calcular quanto tempo foi indisponível neste dia específico
+        const dayStart = moment.max(currentDay.clone().startOf('day'), startTime);
+        const dayEnd = moment.min(currentDay.clone().endOf('day'), endTime);
+        const timeInDay = dayEnd.diff(dayStart, 'seconds');
+
+        if (
+          occupancyByCategory[category] &&
+          occupancyByCategory[category][dayOfWeek] &&
+          timeInDay > 0
+        ) {
+          occupancyByCategory[category][dayOfWeek].unavailableTime += timeInDay;
+        }
+
+        currentDay.add(1, 'day');
       }
     });
 

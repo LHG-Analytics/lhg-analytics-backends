@@ -2761,31 +2761,99 @@ export class CompanyService {
       });
     });
 
-    // Processar locações: somar tempo ocupado por dia da semana do check-in
+    // Processar locações: distribuir tempo ocupado proporcionalmente por dia
     rentalsData.forEach((rental) => {
-      const checkIn = new Date(rental.check_in);
-      const checkOut = new Date(rental.check_out);
+      const checkIn = moment.tz(rental.check_in, timezone);
+      const checkOut = moment.tz(rental.check_out, timezone);
       const category = rental.category_name;
 
-      const dayOfWeek = dayNames[checkIn.getDay()];
-      const occupiedTime = (checkOut.getTime() - checkIn.getTime()) / 1000; // segundos
+      // Iterar dia a dia e calcular quanto tempo da locação está em cada dia
+      let currentDay = checkIn.clone().startOf('day');
+      const lastDay = checkOut.clone().startOf('day');
 
-      if (occupancyByCategory[category] && occupancyByCategory[category][dayOfWeek]) {
-        occupancyByCategory[category][dayOfWeek].occupied += occupiedTime;
+      while (currentDay.isSameOrBefore(lastDay, 'day')) {
+        const dayOfWeek = dayNames[currentDay.day()];
+
+        // Calcular o tempo ocupado neste dia específico
+        const dayStart = moment.max(currentDay.clone().startOf('day'), checkIn);
+        const dayEnd = moment.min(currentDay.clone().endOf('day'), checkOut);
+        const timeInDay = dayEnd.diff(dayStart, 'seconds');
+
+        if (occupancyByCategory[category] && occupancyByCategory[category][dayOfWeek] && timeInDay > 0) {
+          occupancyByCategory[category][dayOfWeek].occupied += timeInDay;
+        }
+
+        currentDay.add(1, 'day');
       }
     });
 
-    // Processar tempos indisponíveis: processar TODAS as suítes (sem filtro)
+    // Agrupar períodos indisponíveis por categoria
+    const unavailableByCategory: { [key: string]: any[] } = {};
     unavailableTimesData.forEach((unavailable) => {
-      const startDate = new Date(unavailable.start_date);
+      const category = unavailable.category_name;
+      if (!unavailableByCategory[category]) {
+        unavailableByCategory[category] = [];
+      }
+      unavailableByCategory[category].push(unavailable);
+    });
+
+    // Mesclar períodos sobrepostos para cada categoria
+    const mergedUnavailableData: any[] = [];
+    Object.keys(unavailableByCategory).forEach((category) => {
+      const periods = unavailableByCategory[category].sort(
+        (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
+      );
+
+      if (periods.length === 0) return;
+
+      const merged: any[] = [];
+      let current = periods[0];
+
+      for (let i = 1; i < periods.length; i++) {
+        const next = periods[i];
+        const currentEnd = new Date(current.end_date).getTime();
+        const nextStart = new Date(next.start_date).getTime();
+
+        if (nextStart <= currentEnd) {
+          // Períodos se sobrepõem, mesclar
+          current = {
+            category_name: category,
+            start_date: current.start_date,
+            end_date: new Date(next.end_date).getTime() > currentEnd ? next.end_date : current.end_date,
+          };
+        } else {
+          // Não se sobrepõem, adicionar current e avançar
+          merged.push(current);
+          current = next;
+        }
+      }
+      merged.push(current);
+      mergedUnavailableData.push(...merged);
+    });
+
+    // Processar tempos indisponíveis mesclados: distribuir proporcionalmente por dia
+    mergedUnavailableData.forEach((unavailable) => {
+      const startTime = moment.tz(unavailable.start_date, timezone);
+      const endTime = moment.tz(unavailable.end_date, timezone);
       const category = unavailable.category_name;
 
-      const dayOfWeek = dayNames[startDate.getDay()];
-      const unavailableTime =
-        (new Date(unavailable.end_date).getTime() - startDate.getTime()) / 1000;
+      // Iterar dia a dia e calcular quanto tempo indisponível está em cada dia
+      let currentDay = startTime.clone().startOf('day');
+      const lastDay = endTime.clone().startOf('day');
 
-      if (occupancyByCategory[category] && occupancyByCategory[category][dayOfWeek]) {
-        occupancyByCategory[category][dayOfWeek].unavailable += unavailableTime;
+      while (currentDay.isSameOrBefore(lastDay, 'day')) {
+        const dayOfWeek = dayNames[currentDay.day()];
+
+        // Calcular o tempo indisponível neste dia específico
+        const dayStart = moment.max(currentDay.clone().startOf('day'), startTime);
+        const dayEnd = moment.min(currentDay.clone().endOf('day'), endTime);
+        const timeInDay = dayEnd.diff(dayStart, 'seconds');
+
+        if (occupancyByCategory[category] && occupancyByCategory[category][dayOfWeek] && timeInDay > 0) {
+          occupancyByCategory[category][dayOfWeek].unavailable += timeInDay;
+        }
+
+        currentDay.add(1, 'day');
       }
     });
 
