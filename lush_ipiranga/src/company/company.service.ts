@@ -2456,16 +2456,14 @@ export class CompanyService {
           AND a.dataexclusao IS NULL
         GROUP BY ca.id, ca.descricao
       ),
-      unavailable_times AS (
-        -- Tempo indisponível por limpeza (apenas o tempo dentro do período)
+      all_unavailable_periods AS (
+        -- União de todos os períodos de indisponibilidade (limpeza + defeitos/manutenções)
+        -- Todos cortados para ficarem dentro do período de consulta
         SELECT
           ca.descricao as suite_category_name,
-          COALESCE(SUM(
-            EXTRACT(EPOCH FROM
-              LEAST(la.datafim, ${formattedEnd}::timestamp) -
-              GREATEST(la.datainicio, ${formattedStart}::timestamp)
-            )
-          ), 0) as unavailable_time_seconds
+          a.id as apartamento_id,
+          GREATEST(la.datainicio, ${formattedStart}::timestamp) as period_start,
+          LEAST(la.datafim, ${formattedEnd}::timestamp) as period_end
         FROM limpezaapartamento la
         INNER JOIN apartamentostate aps ON la.id_sujoapartamento = aps.id
         INNER JOIN apartamento a ON aps.id_apartamento = a.id
@@ -2474,29 +2472,63 @@ export class CompanyService {
           AND la.datafim > ${formattedStart}::timestamp
           AND la.datafim IS NOT NULL
           AND ca.id IN (10,11,12,15,16,17,18,19,24)
-        GROUP BY ca.id, ca.descricao
 
         UNION ALL
 
-        -- Tempo indisponível por defeitos/manutenção (apenas o tempo dentro do período)
+        -- Defeitos (sem manutenções)
         SELECT
           ca.descricao as suite_category_name,
-          COALESCE(SUM(
-            EXTRACT(EPOCH FROM
-              LEAST(GREATEST(d.datafim, COALESCE(aps_manut.datafim, d.datafim)), ${formattedEnd}::timestamp) -
-              GREATEST(d.datainicio, ${formattedStart}::timestamp)
-            )
-          ), 0) as unavailable_time_seconds
+          a.id as apartamento_id,
+          GREATEST(d.datainicio, ${formattedStart}::timestamp) as period_start,
+          LEAST(d.datafim, ${formattedEnd}::timestamp) as period_end
         FROM defeito d
         INNER JOIN apartamento a ON d.id_apartamento = a.id
         INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-        LEFT JOIN col_bloqueadomanutencao_defeito bmd ON bmd.id_defeito = d.id
-        LEFT JOIN apartamentostate aps_manut ON bmd.id_bloqueadomanutencao = aps_manut.id
         WHERE d.datainicio < ${formattedEnd}::timestamp
-          AND GREATEST(d.datafim, COALESCE(aps_manut.datafim, d.datafim)) > ${formattedStart}::timestamp
+          AND d.datafim > ${formattedStart}::timestamp
           AND d.datafim IS NOT NULL
           AND ca.id IN (10,11,12,15,16,17,18,19,24)
-        GROUP BY ca.id, ca.descricao
+      ),
+      periods_with_lag AS (
+        -- Adicionar informação do período anterior
+        SELECT
+          suite_category_name,
+          apartamento_id,
+          period_start,
+          period_end,
+          LAG(period_end) OVER (PARTITION BY suite_category_name, apartamento_id ORDER BY period_start, period_end) as prev_end
+        FROM all_unavailable_periods
+      ),
+      periods_with_groups AS (
+        -- Criar grupos baseado em sobreposição
+        SELECT
+          suite_category_name,
+          apartamento_id,
+          period_start,
+          period_end,
+          SUM(CASE WHEN period_start <= prev_end THEN 0 ELSE 1 END)
+            OVER (PARTITION BY suite_category_name, apartamento_id ORDER BY period_start, period_end
+                  ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as period_group
+        FROM periods_with_lag
+      ),
+      merged_intervals AS (
+        -- Calcular intervalo mesclado para cada grupo
+        SELECT
+          suite_category_name,
+          apartamento_id,
+          period_group,
+          MIN(period_start) as merged_start,
+          MAX(period_end) as merged_end
+        FROM periods_with_groups
+        GROUP BY suite_category_name, apartamento_id, period_group
+        HAVING MAX(period_end) > MIN(period_start)
+      ),
+      unavailable_times AS (
+        -- Calcular tempo em segundos para cada intervalo mesclado
+        SELECT
+          suite_category_name,
+          EXTRACT(EPOCH FROM (merged_end - merged_start)) as unavailable_time_seconds
+        FROM merged_intervals
       ),
       total_unavailable AS (
         SELECT
