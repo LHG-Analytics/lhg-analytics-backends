@@ -1535,6 +1535,33 @@ export class CompanyService {
       {} as Record<string, Record<string, { occupancyRate: number; totalOccupancyRate: number }>>,
     );
 
+    // Definir todos os dias da semana em português
+    const allDaysOfWeek = [
+      'domingo',
+      'segunda-feira',
+      'terça-feira',
+      'quarta-feira',
+      'quinta-feira',
+      'sexta-feira',
+      'sábado',
+    ];
+
+    // Preencher dias ausentes com occupancyRate 0 para cada categoria de suíte
+    Object.keys(occupancyRateByWeek).forEach((suiteCategoryName) => {
+      // Pegar o totalOccupancyRate de qualquer dia existente para usar como referência
+      const existingDay = Object.values(occupancyRateByWeek[suiteCategoryName])[0];
+      const totalOccupancyRateReference = existingDay ? existingDay.totalOccupancyRate : 0;
+
+      allDaysOfWeek.forEach((day) => {
+        if (!occupancyRateByWeek[suiteCategoryName][day]) {
+          occupancyRateByWeek[suiteCategoryName][day] = {
+            occupancyRate: 0,
+            totalOccupancyRate: totalOccupancyRateReference,
+          };
+        }
+      });
+    });
+
     // Converte o objeto em um array de objetos
     const occupancyRateByWeekArray: WeeklyOccupancyData[] = Object.entries(occupancyRateByWeek).map(
       ([key, value]) => ({
@@ -1571,6 +1598,22 @@ export class CompanyService {
       },
       {} as Record<string, Record<string, { giro: Prisma.Decimal; totalGiro: Prisma.Decimal }>>,
     );
+
+    // Preencher dias ausentes com giro 0 para cada categoria de suíte
+    Object.keys(giroByWeek).forEach((suiteCategoryName) => {
+      // Pegar o totalGiro de qualquer dia existente para usar como referência
+      const existingDay = Object.values(giroByWeek[suiteCategoryName])[0];
+      const totalGiroReference = existingDay ? existingDay.totalGiro : new Prisma.Decimal(0);
+
+      allDaysOfWeek.forEach((day) => {
+        if (!giroByWeek[suiteCategoryName][day]) {
+          giroByWeek[suiteCategoryName][day] = {
+            giro: new Prisma.Decimal(0),
+            totalGiro: totalGiroReference,
+          };
+        }
+      });
+    });
 
     // Converte o objeto em um array de objetos
     const giroByWeekArray: WeeklyGiroData[] = Object.entries(giroByWeek).map(([key, value]) => ({
@@ -3038,6 +3081,33 @@ export class CompanyService {
         giro: Number(Number(item.category_giro).toFixed(2)),
         totalGiro: Number(Number(item.total_giro).toFixed(2)),
       };
+    });
+
+    // Definir todos os dias da semana em português
+    const allDaysOfWeekSQL = [
+      'domingo',
+      'segunda-feira',
+      'terça-feira',
+      'quarta-feira',
+      'quinta-feira',
+      'sexta-feira',
+      'sábado',
+    ];
+
+    // Preencher dias ausentes com giro 0 para cada categoria de suíte
+    Object.keys(giroByCategory).forEach((categoryName) => {
+      // Pegar o totalGiro de qualquer dia existente para usar como referência
+      const existingDay = Object.values(giroByCategory[categoryName])[0];
+      const totalGiroReference = existingDay ? existingDay.totalGiro : 0;
+
+      allDaysOfWeekSQL.forEach((day) => {
+        if (!giroByCategory[categoryName][day]) {
+          giroByCategory[categoryName][day] = {
+            giro: 0,
+            totalGiro: totalGiroReference,
+          };
+        }
+      });
     });
 
     const dataTableGiroByWeek: any[] = Object.entries(giroByCategory).map(
