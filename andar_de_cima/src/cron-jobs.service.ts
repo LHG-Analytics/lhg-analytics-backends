@@ -56,7 +56,8 @@ export class CronJobsService {
     private readonly restaurantTicketAverage: RestaurantTicketAverageService,
   ) {}
 
-  @Cron('3 0,6,16 * * *', { timeZone: 'America/Sao_Paulo' })
+  // DESATIVADO NA BRANCH DEVELOPER - Cron jobs desabilitados para testes
+  @Cron('3 0,6,16 * * *', { timeZone: 'America/Sao_Paulo', disabled: true })
   async scheduleDailyJobs() {
     if (this.isJobRunning) {
       console.log('O cron job já está em execução. Ignorando nova execução.');
