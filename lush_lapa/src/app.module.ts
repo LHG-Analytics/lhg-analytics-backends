@@ -29,9 +29,11 @@ import { RestaurantModule } from './restaurant/restaurant.module';
 import { RestaurantRevenueModule } from './restaurantRevenue/restaurantRevenue.module';
 import { RestaurantSalesModule } from './restaurantSales/restaurantSales.module';
 import { RestaurantTicketAverageModule } from './restaurantTicketAverage/restaurantTicketAverage.module';
+import { CacheModule } from './cache/cache.module';
 
 @Module({
   imports: [
+    CacheModule, // Módulo de cache para KPIs real-time
     ThrottlerModule.forRoot([
       {
         ttl: 60000, // 1 minute
