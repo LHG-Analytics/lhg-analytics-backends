@@ -1976,14 +1976,27 @@ export class CompanyService {
 
     const formattedEnd = moment.utc(endDate).format('YYYY-MM-DD HH:mm:ss');
 
-    // Gera array completo de datas APENAS no período solicitado pelo usuário (exibição)
+    // Calcular a diferença de dias para determinar se agrupa por mês ou por dia
+    const rangeDays = moment(endDate).diff(moment(startDate), 'days');
+    const groupByMonth = rangeDays > 40;
+
+    // Gera array completo de períodos (datas ou meses) APENAS no período solicitado pelo usuário (exibição)
     const periodsArray: string[] = [];
     let currentDate = moment(startDate).utc();
     const userEndDate = moment(endDate).utc();
 
-    while (currentDate.isBefore(userEndDate, 'day')) {
-      periodsArray.push(currentDate.format('DD/MM/YYYY'));
-      currentDate.add(1, 'day');
+    if (groupByMonth) {
+      // Agrupar por mês: gera array de meses no formato MM/YYYY
+      while (currentDate.isBefore(userEndDate, 'month') || currentDate.isSame(userEndDate, 'month')) {
+        periodsArray.push(currentDate.format('MM/YYYY'));
+        currentDate.add(1, 'month');
+      }
+    } else {
+      // Agrupar por dia: gera array de datas no formato DD/MM/YYYY
+      while (currentDate.isBefore(userEndDate, 'day')) {
+        periodsArray.push(currentDate.format('DD/MM/YYYY'));
+        currentDate.add(1, 'day');
+      }
     }
 
     // Função SQL para calcular receita completa (locação + vendas diretas)
@@ -2430,22 +2443,22 @@ export class CompanyService {
       };
     }
 
-    // Cria mapeamento de dados por data (seguindo padrão do bookings.service)
-    const revenueDataMap = new Map();
-
-    // DEBUG: verificar dados retornados
+    // Cria mapeamento de dados por data ou mês (seguindo padrão do bookings.service)
+    const revenueDataMap = new Map<string, number>();
 
     revenueByDateResult.forEach((item: any) => {
       // Usar moment para padronizar formato igual ao periodsArray
-      const dateKey = moment.utc(item.date).format('DD/MM/YYYY');
-      revenueDataMap.set(dateKey, item);
+      const dateKey = groupByMonth
+        ? moment.utc(item.date).format('MM/YYYY')
+        : moment.utc(item.date).format('DD/MM/YYYY');
+      const currentValue = revenueDataMap.get(dateKey) || 0;
+      revenueDataMap.set(dateKey, currentValue + Number(item.daily_revenue || 0));
     });
 
     const revenueByDate: ApexChartsData = {
       categories: [...periodsArray],
-      series: [...periodsArray].map((dateKey: string) => {
-        const item = revenueDataMap.get(dateKey);
-        return item ? Number(item.daily_revenue) : 0;
+      series: [...periodsArray].map((periodKey: string) => {
+        return revenueDataMap.get(periodKey) || 0;
       }),
     };
 
@@ -2454,15 +2467,18 @@ export class CompanyService {
       series: revenueBySuiteCategoryResult.map((item) => Number(item.category_revenue) || 0),
     };
 
-    // Mapeamento de dados do BillingRentalType
-    const billingDataMap = new Map();
+    // Mapeamento de dados do BillingRentalType (agrupando por mês se necessário)
+    const billingDataMap = new Map<string, Record<string, number>>();
     billingRentalTypeResult.forEach((item: any) => {
       // Usar moment para padronizar formato igual ao periodsArray
-      const dateKey = moment.utc(item.date).format('DD/MM/YYYY');
+      const dateKey = groupByMonth
+        ? moment.utc(item.date).format('MM/YYYY')
+        : moment.utc(item.date).format('DD/MM/YYYY');
       if (!billingDataMap.has(dateKey)) {
         billingDataMap.set(dateKey, {});
       }
-      billingDataMap.get(dateKey)[item.rental_type] = Number(item.total_revenue);
+      const currentValue = billingDataMap.get(dateKey)![item.rental_type] || 0;
+      billingDataMap.get(dateKey)![item.rental_type] = currentValue + Number(item.total_revenue);
     });
 
     // BillingRentalType seguindo padrão do bookings.service
@@ -2479,26 +2495,28 @@ export class CompanyService {
       categories: [...periodsArray],
       series: allRentalTypes.map((rentalType) => ({
         name: rentalType,
-        data: [...periodsArray].map((dateKey: string) => {
-          const item = billingDataMap.get(dateKey);
+        data: [...periodsArray].map((periodKey: string) => {
+          const item = billingDataMap.get(periodKey);
           return item && item[rentalType] ? item[rentalType] : 0;
         }),
       })),
     };
 
-    // Criar mapeamento de dados para RentalsByDate (seguindo padrão do bookings.service)
-    const rentalsDataMap = new Map();
+    // Criar mapeamento de dados para RentalsByDate (agrupando por mês se necessário)
+    const rentalsDataMap = new Map<string, number>();
     rentalsByDateResult.forEach((item: any) => {
       // Usar moment para padronizar formato igual ao periodsArray
-      const dateKey = moment.utc(item.date).format('DD/MM/YYYY');
-      rentalsDataMap.set(dateKey, item);
+      const dateKey = groupByMonth
+        ? moment.utc(item.date).format('MM/YYYY')
+        : moment.utc(item.date).format('DD/MM/YYYY');
+      const currentValue = rentalsDataMap.get(dateKey) || 0;
+      rentalsDataMap.set(dateKey, currentValue + Number(item.total_rentals || 0));
     });
 
     const rentalsByDate: ApexChartsData = {
       categories: [...periodsArray],
-      series: [...periodsArray].map((dateKey: string) => {
-        const item = rentalsDataMap.get(dateKey);
-        return item ? Number(item.total_rentals) : 0;
+      series: [...periodsArray].map((periodKey: string) => {
+        return rentalsDataMap.get(periodKey) || 0;
       }),
     };
 
@@ -2512,35 +2530,47 @@ export class CompanyService {
       series: revenueByDate.series.map((revenue) => Number((revenue / totalSuites).toFixed(2))),
     };
 
-    // Criar mapeamento de dados para TicketAverageByDate (seguindo padrão do bookings.service)
-    const ticketDataMap = new Map();
+    // Criar mapeamento de dados para TicketAverageByDate (agrupando por mês se necessário)
+    // Para ticket médio, precisamos calcular a média ponderada (soma dos tickets / número de dias)
+    const ticketDataMap = new Map<string, { sum: number; count: number }>();
     ticketAverageByDateResult.forEach((item: any) => {
       // Usar moment para padronizar formato igual ao periodsArray
-      const dateKey = moment.utc(item.date).format('DD/MM/YYYY');
-      ticketDataMap.set(dateKey, item);
+      const dateKey = groupByMonth
+        ? moment.utc(item.date).format('MM/YYYY')
+        : moment.utc(item.date).format('DD/MM/YYYY');
+      const current = ticketDataMap.get(dateKey) || { sum: 0, count: 0 };
+      const ticketValue = Number(item.avg_ticket) || 0;
+      if (ticketValue > 0) {
+        ticketDataMap.set(dateKey, { sum: current.sum + ticketValue, count: current.count + 1 });
+      }
     });
 
     const ticketAverageByDate: ApexChartsData = {
       categories: [...periodsArray],
-      series: [...periodsArray].map((dateKey: string) => {
-        const item = ticketDataMap.get(dateKey);
-        return item ? Number((Number(item.avg_ticket) || 0).toFixed(2)) : 0;
+      series: [...periodsArray].map((periodKey: string) => {
+        const item = ticketDataMap.get(periodKey);
+        if (!item || item.count === 0) return 0;
+        return Number((item.sum / item.count).toFixed(2));
       }),
     };
 
-    // Criar mapeamento de dados para TrevparByDate (seguindo padrão do bookings.service)
-    const trevparDataMap = new Map();
+    // Criar mapeamento de dados para TrevparByDate (agrupando por mês se necessário)
+    // Para TREVPAR, somamos a receita total e depois dividimos por suítes
+    const trevparDataMap = new Map<string, number>();
     trevparByDateResult.forEach((item: any) => {
       // Usar moment para padronizar formato igual ao periodsArray
-      const dateKey = moment.utc(item.date).format('DD/MM/YYYY');
-      trevparDataMap.set(dateKey, item);
+      const dateKey = groupByMonth
+        ? moment.utc(item.date).format('MM/YYYY')
+        : moment.utc(item.date).format('DD/MM/YYYY');
+      const currentValue = trevparDataMap.get(dateKey) || 0;
+      trevparDataMap.set(dateKey, currentValue + Number(item.total_revenue || 0));
     });
 
     const trevparByDate: ApexChartsData = {
       categories: [...periodsArray],
-      series: [...periodsArray].map((dateKey: string) => {
-        const item = trevparDataMap.get(dateKey);
-        return item ? Number((Number(item.total_revenue) / totalSuites).toFixed(2)) : 0;
+      series: [...periodsArray].map((periodKey: string) => {
+        const totalRevenue = trevparDataMap.get(periodKey) || 0;
+        return Number((totalRevenue / totalSuites).toFixed(2));
       }),
     };
 
@@ -2553,51 +2583,57 @@ export class CompanyService {
       }),
     };
 
-    // Calcular taxa de ocupação por categoria (formato ApexCharts com dates em categories e suites em series)
-    const occupancyBySuiteCategoryMap = new Map<string, Map<string, number>>();
+    // Calcular taxa de ocupação por categoria (formato ApexCharts com dates/meses em categories e suites em series)
+    // Para agrupamento por mês, precisamos somar as locações e calcular a média de ocupação
+    const occupancyBySuiteCategoryMap = new Map<string, Map<string, { totalRentals: number; count: number }>>();
     const allSuiteCategoriesSet = new Set<string>();
-    const allDatesSet = new Set<string>();
 
     // Processar dados do occupancyRateBySuiteCategoryResult
     occupancyRateBySuiteCategoryResult.forEach((item) => {
-      const dateKey = moment(item.rental_date).format('DD/MM/YYYY');
+      const dateKey = groupByMonth
+        ? moment(item.rental_date).format('MM/YYYY')
+        : moment(item.rental_date).format('DD/MM/YYYY');
       const suiteCategoryName = item.suite_category;
       const totalRentals = Number(item.total_rentals) || 0;
 
-      // Calcular taxa de ocupação baseada no número de suítes da categoria
-      const categoryInfo = suitesByCategoryResult.find(
-        (s) => s.suite_category === suiteCategoryName,
-      );
-      const totalSuitesInCategory = categoryInfo
-        ? Number(categoryInfo.total_suites_in_category)
-        : 1;
-      const occupancyRate = Number((totalRentals / totalSuitesInCategory).toFixed(2));
-
-      allDatesSet.add(dateKey);
       allSuiteCategoriesSet.add(suiteCategoryName);
 
       if (!occupancyBySuiteCategoryMap.has(dateKey)) {
         occupancyBySuiteCategoryMap.set(dateKey, new Map());
       }
-      occupancyBySuiteCategoryMap.get(dateKey)!.set(suiteCategoryName, occupancyRate);
+      const categoryMap = occupancyBySuiteCategoryMap.get(dateKey)!;
+      const current = categoryMap.get(suiteCategoryName) || { totalRentals: 0, count: 0 };
+      categoryMap.set(suiteCategoryName, {
+        totalRentals: current.totalRentals + totalRentals,
+        count: current.count + 1,
+      });
     });
 
-    // Criar array de datas ordenadas
-    const sortedDates = Array.from(allDatesSet).sort((a, b) => {
-      const dateA = moment(a, 'DD/MM/YYYY');
-      const dateB = moment(b, 'DD/MM/YYYY');
-      return dateA.isBefore(dateB) ? -1 : 1;
-    });
-
-    // Criar series para cada categoria de suíte
+    // Criar series para cada categoria de suíte usando periodsArray
     const occupancyRateBySuiteCategory: ApexChartsSeriesData = {
-      categories: sortedDates,
-      series: Array.from(allSuiteCategoriesSet).map((suiteCategoryName) => ({
-        name: suiteCategoryName,
-        data: sortedDates.map(
-          (date) => occupancyBySuiteCategoryMap.get(date)?.get(suiteCategoryName) || 0,
-        ),
-      })),
+      categories: [...periodsArray],
+      series: Array.from(allSuiteCategoriesSet).map((suiteCategoryName) => {
+        // Obter número de suítes na categoria
+        const categoryInfo = suitesByCategoryResult.find(
+          (s) => s.suite_category === suiteCategoryName,
+        );
+        const totalSuitesInCategory = categoryInfo
+          ? Number(categoryInfo.total_suites_in_category)
+          : 1;
+
+        return {
+          name: suiteCategoryName,
+          data: [...periodsArray].map((periodKey) => {
+            const categoryData = occupancyBySuiteCategoryMap.get(periodKey)?.get(suiteCategoryName);
+            if (!categoryData) return 0;
+            // Para agrupamento por mês, calculamos a média de ocupação
+            const avgRentals = groupByMonth
+              ? categoryData.totalRentals / categoryData.count
+              : categoryData.totalRentals;
+            return Number((avgRentals / totalSuitesInCategory).toFixed(2));
+          }),
+        };
+      }),
     };
 
     // === IMPLEMENTAÇÃO DO DATATABLESUITEACATEGORY ===
