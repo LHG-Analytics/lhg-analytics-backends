@@ -2,12 +2,17 @@ import { BadRequestException, Injectable, NotFoundException, Logger } from '@nes
 import * as moment from 'moment-timezone';
 import { ChannelTypeEnum, PeriodEnum, Prisma, RentalTypeEnum } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
+import { KpiCacheService } from '../cache/kpi-cache.service';
+import { CachePeriodEnum } from '../cache/cache.interfaces';
 
 @Injectable()
 export class BookingsService {
   private readonly logger = new Logger(BookingsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private kpiCacheService: KpiCacheService,
+  ) {}
 
   async findAllBookings(period: PeriodEnum) {
     // Define o fuso horário padrão como São Paulo
@@ -1874,6 +1879,22 @@ export class BookingsService {
   }
 
   async calculateKpibyDateRangeSQL(startDate: Date, endDate: Date): Promise<any> {
+    // Usa cache para evitar recalcular os mesmos períodos
+    const result = await this.kpiCacheService.getOrCalculate(
+      'bookings',
+      CachePeriodEnum.CUSTOM,
+      async () => this._calculateKpibyDateRangeSQLInternal(startDate, endDate),
+      { start: startDate, end: endDate },
+    );
+
+    return result.data;
+  }
+
+  /**
+   * Método interno que faz o cálculo real dos KPIs de Bookings
+   * Chamado pelo cache service quando há cache miss
+   */
+  private async _calculateKpibyDateRangeSQLInternal(startDate: Date, endDate: Date): Promise<any> {
     const formattedStart = moment
       .utc(startDate)
       .set({ hour: 0, minute: 0, second: 0 })
