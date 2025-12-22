@@ -645,15 +645,47 @@ export class GovernanceService {
   }
 
   async calculateKpibyDateRangeSQL(startDate: Date, endDate: Date): Promise<any> {
-    // Usa cache para evitar recalcular os mesmos períodos
-    const result = await this.kpiCacheService.getOrCalculate(
+    // Calcula o período anterior automaticamente
+    const startMoment = moment(startDate);
+    const endMoment = moment(endDate);
+    const daysDiff = endMoment.diff(startMoment, 'days') + 1; // +1 porque inclui ambos os dias
+
+    // Período anterior: mesmo número de dias, terminando no dia anterior ao startDate
+    const previousEndDate = startMoment.clone().subtract(1, 'day').toDate();
+    const previousStartDate = moment(previousEndDate).subtract(daysDiff - 1, 'days').toDate();
+
+    // Busca período atual com cache
+    const currentResult = await this.kpiCacheService.getOrCalculate(
       'governance',
       CachePeriodEnum.CUSTOM,
       async () => this._calculateKpibyDateRangeSQLInternal(startDate, endDate),
       { start: startDate, end: endDate },
     );
 
-    return result.data;
+    // Busca período anterior com cache
+    const previousResult = await this.kpiCacheService.getOrCalculate(
+      'governance',
+      CachePeriodEnum.CUSTOM,
+      async () => this._calculateKpibyDateRangeSQLInternal(previousStartDate, previousEndDate),
+      { start: previousStartDate, end: previousEndDate },
+    );
+
+    return {
+      currentPeriod: currentResult.data,
+      previousPeriod: previousResult.data,
+      metadata: {
+        current: {
+          startDate: moment(startDate).format('DD/MM/YYYY'),
+          endDate: moment(endDate).format('DD/MM/YYYY'),
+          days: daysDiff,
+        },
+        previous: {
+          startDate: moment(previousStartDate).format('DD/MM/YYYY'),
+          endDate: moment(previousEndDate).format('DD/MM/YYYY'),
+          days: daysDiff,
+        },
+      },
+    };
   }
 
   /**

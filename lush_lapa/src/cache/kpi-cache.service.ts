@@ -109,7 +109,7 @@ export class KpiCacheService {
     customDates?: DateRange,
   ): Promise<void> {
     const key = this.buildCacheKey(service, period, customDates);
-    const ttl = this.getTTL(period);
+    const ttl = this.getTTL(period, customDates);
 
     try {
       // Limpa cache se excedeu tamanho máximo
@@ -178,11 +178,39 @@ export class KpiCacheService {
   }
 
   /**
-   * Obtém TTL baseado no período
+   * Obtém TTL baseado no período ou no tamanho do range de datas (para CUSTOM)
+   * Regras para período CUSTOM:
+   * - 1-10 dias: 10 minutos (600s) - calcula rápido, pode mudar frequentemente
+   * - 11-30 dias: 30 minutos (1800s) - período médio
+   * - 31+ dias: 3 horas (10800s) - acumulado, dados mais estáveis
    */
-  private getTTL(period: CachePeriodEnum): number {
-    const strategy = CACHE_STRATEGY[period];
-    return strategy?.ttl || CACHE_STRATEGY.CUSTOM.ttl;
+  private getTTL(period: CachePeriodEnum, customDates?: DateRange): number {
+    // Para períodos não-customizados, usa a estratégia padrão
+    if (period !== CachePeriodEnum.CUSTOM) {
+      const strategy = CACHE_STRATEGY[period];
+      return strategy?.ttl || CACHE_STRATEGY.CUSTOM.ttl;
+    }
+
+    // Para período CUSTOM, calcula TTL baseado no tamanho do range
+    if (customDates) {
+      const startMoment = moment(customDates.start);
+      const endMoment = moment(customDates.end);
+      const daysDiff = endMoment.diff(startMoment, 'days');
+
+      if (daysDiff <= 10) {
+        // 1-10 dias: 10 minutos
+        return 600;
+      } else if (daysDiff <= 30) {
+        // 11-30 dias: 30 minutos
+        return 1800;
+      } else {
+        // 31+ dias: 3 horas
+        return 10800;
+      }
+    }
+
+    // Fallback para valor padrão
+    return CACHE_STRATEGY.CUSTOM.ttl;
   }
 
   /**
