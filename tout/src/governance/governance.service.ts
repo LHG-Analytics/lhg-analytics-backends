@@ -3,15 +3,10 @@ import * as moment from 'moment-timezone';
 import { Moment } from 'moment-timezone';
 import { PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
-import { KpiCacheService } from '../cache/kpi-cache.service';
-import { CachePeriodEnum } from '../cache/cache.interfaces';
 
 @Injectable()
 export class GovernanceService {
-  constructor(
-    private prisma: PrismaService,
-    private kpiCacheService: KpiCacheService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   async findAllGovernance(period: PeriodEnum) {
     // Define o fuso horário padrão como São Paulo
@@ -1162,122 +1157,6 @@ ORDER BY
       EmployeeCleaningByShift: cleaningsByPeriodShift,
       EmployeeReport: employeeReport,
       TeamSizing: teamSizing,
-    };
-  }
-
-  /**
-   * Método real-time com cache para KPIs de Governança
-   * Calcula KPIs diretamente do banco local com cache inteligente
-   */
-  async findAllGovernanceRealTime(
-    period: CachePeriodEnum,
-    customStartDate?: Date,
-    customEndDate?: Date,
-  ): Promise<any> {
-    // Define o fuso horário padrão como São Paulo
-    moment.tz.setDefault('America/Sao_Paulo');
-
-    let startDate: moment.Moment;
-    let endDate: moment.Moment;
-
-    // Obtém o horário atual em "America/Sao_Paulo"
-    const today = moment.tz('America/Sao_Paulo');
-
-    // Define o `endDate` como ontem às 05:59:59 (fim do dia contábil)
-    endDate = today.clone().subtract(1, 'day').set({
-      hour: 5,
-      minute: 59,
-      second: 59,
-      millisecond: 999,
-    });
-
-    // Calcula o `startDate` com base no período
-    switch (period) {
-      case CachePeriodEnum.LAST_7_D:
-        startDate = endDate.clone().subtract(6, 'days').set({
-          hour: 6,
-          minute: 0,
-          second: 0,
-          millisecond: 0,
-        });
-        break;
-
-      case CachePeriodEnum.LAST_MONTH:
-        // Último mês fechado (do dia 1 ao último dia do mês anterior)
-        const lastMonth = today.clone().subtract(1, 'month');
-        startDate = lastMonth.clone().startOf('month').set({
-          hour: 6,
-          minute: 0,
-          second: 0,
-          millisecond: 0,
-        });
-        endDate = lastMonth.clone().endOf('month').set({
-          hour: 5,
-          minute: 59,
-          second: 59,
-          millisecond: 999,
-        });
-        break;
-
-      case CachePeriodEnum.YEAR_TO_DATE:
-        // Acumulado do ano (1º de janeiro até ontem)
-        startDate = today.clone().startOf('year').set({
-          hour: 6,
-          minute: 0,
-          second: 0,
-          millisecond: 0,
-        });
-        break;
-
-      case CachePeriodEnum.CUSTOM:
-        if (!customStartDate || !customEndDate) {
-          throw new BadRequestException(
-            'Para período CUSTOM, startDate e endDate são obrigatórios',
-          );
-        }
-        startDate = moment.tz(customStartDate, 'America/Sao_Paulo').set({
-          hour: 6,
-          minute: 0,
-          second: 0,
-          millisecond: 0,
-        });
-        endDate = moment.tz(customEndDate, 'America/Sao_Paulo').set({
-          hour: 5,
-          minute: 59,
-          second: 59,
-          millisecond: 999,
-        });
-        break;
-
-      default:
-        throw new BadRequestException('Período inválido');
-    }
-
-    // Converte para Date
-    const startDateUTC = startDate.toDate();
-    const endDateUTC = endDate.toDate();
-
-    // Usa o cache service para obter ou calcular os dados
-    const result = await this.kpiCacheService.getOrCalculate(
-      'governance',
-      period,
-      async () => {
-        // Chama o método SQL que já existe
-        return this.calculateKpibyDateRangeSQL(startDateUTC, endDateUTC);
-      },
-      { start: startDateUTC, end: endDateUTC },
-    );
-
-    return {
-      ...result.data,
-      _cache: {
-        period,
-        startDate: startDateUTC.toISOString(),
-        endDate: endDateUTC.toISOString(),
-        source: 'real-time',
-        fromCache: result.fromCache,
-        calculationTime: result.calculationTime,
-      },
     };
   }
 }

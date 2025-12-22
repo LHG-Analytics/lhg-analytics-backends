@@ -2,7 +2,6 @@ import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query } fro
 import { ApiBadRequestResponse, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PeriodEnum } from '@client-online';
 import { GovernanceService } from './governance.service';
-import { CachePeriodEnum } from '../cache/cache.interfaces';
 
 @ApiTags('Governance')
 @Controller('Governance')
@@ -58,70 +57,6 @@ export class GovernanceController {
     } catch (error) {
       throw new BadRequestException(`Failed to fetch KPIs: ${error.message}`);
     }
-  }
-
-  /**
-   * Endpoint Real-Time com Cache para KPIs de Governança
-   * Usa cálculo direto do banco local com cache inteligente
-   */
-  @Get('operational/realtime')
-  @ApiQuery({
-    name: 'period',
-    required: true,
-    description: 'Período para cálculo real-time',
-    example: 'LAST_7_D',
-    enum: CachePeriodEnum,
-  })
-  @ApiQuery({
-    name: 'startDate',
-    required: false,
-    description: 'Data de início para período CUSTOM (formato: DD/MM/YYYY)',
-    example: '01/12/2024',
-  })
-  @ApiQuery({
-    name: 'endDate',
-    required: false,
-    description: 'Data de término para período CUSTOM (formato: DD/MM/YYYY)',
-    example: '21/12/2024',
-  })
-  @HttpCode(HttpStatus.OK)
-  @ApiNotFoundResponse({ description: 'No KPI found.' })
-  @ApiBadRequestResponse({ description: 'Failed to fetch KPI.' })
-  async getGovernanceRealTime(
-    @Query('period') period: CachePeriodEnum,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ): Promise<any> {
-    if (!period) {
-      throw new BadRequestException('O parâmetro period é obrigatório.');
-    }
-
-    // Valida se é um período válido
-    if (!Object.values(CachePeriodEnum).includes(period)) {
-      throw new BadRequestException(
-        `Período inválido. Use: ${Object.values(CachePeriodEnum).join(', ')}`,
-      );
-    }
-
-    // Para período CUSTOM, converte as datas
-    let customStart: Date | undefined;
-    let customEnd: Date | undefined;
-
-    if (period === CachePeriodEnum.CUSTOM) {
-      if (!startDate || !endDate) {
-        throw new BadRequestException(
-          'Para período CUSTOM, startDate e endDate são obrigatórios.',
-        );
-      }
-      customStart = this.convertToDate(startDate);
-      customEnd = this.convertToDate(endDate, true);
-    }
-
-    return this.governanceService.findAllGovernanceRealTime(
-      period,
-      customStart,
-      customEnd,
-    );
   }
 
   private convertToDate(dateStr?: string, isEndDate: boolean = false): Date | undefined {
