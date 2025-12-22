@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PeriodEnum, Prisma, RentalTypeEnum } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
 import * as moment from 'moment-timezone';
+import { KpiCacheService } from '../cache/kpi-cache.service';
+import { CachePeriodEnum } from '../cache/cache.interfaces';
 
 // Type definitions for better type safety - Numeric versions for SQL function
 interface BigNumbersDataSQL {
@@ -226,7 +228,10 @@ export interface CompanyKpiApexChartsResponse {
 
 @Injectable()
 export class CompanyService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private kpiCacheService: KpiCacheService,
+  ) {}
 
   async findAllCompany(period: PeriodEnum): Promise<CompanyKpiApexChartsResponse> {
     // Define o fuso horário padrão como São Paulo
@@ -1824,6 +1829,25 @@ export class CompanyService {
   }
 
   async calculateKpisByDateRangeSQL(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<CompanyKpiApexChartsResponse> {
+    // Usa cache para evitar recalcular os mesmos períodos
+    const result = await this.kpiCacheService.getOrCalculate(
+      'company',
+      CachePeriodEnum.CUSTOM,
+      async () => this._calculateKpisByDateRangeSQLInternal(startDate, endDate),
+      { start: startDate, end: endDate },
+    );
+
+    return result.data;
+  }
+
+  /**
+   * Método interno que faz o cálculo real dos KPIs de Company
+   * Chamado pelo cache service quando há cache miss
+   */
+  private async _calculateKpisByDateRangeSQLInternal(
     startDate: Date,
     endDate: Date,
   ): Promise<CompanyKpiApexChartsResponse> {
