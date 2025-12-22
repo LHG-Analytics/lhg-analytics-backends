@@ -2,9 +2,15 @@ import { PeriodEnum, Prisma } from '@client-online';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { PrismaService } from '../prisma/prisma.service';
+import { KpiCacheService } from '../cache/kpi-cache.service';
+import { CachePeriodEnum } from '../cache/cache.interfaces';
+
 @Injectable()
 export class RestaurantService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private kpiCacheService: KpiCacheService,
+  ) {}
 
   async findAllRestaurants(period: PeriodEnum) {
     // Define o fuso horário padrão como São Paulo
@@ -905,6 +911,22 @@ export class RestaurantService {
   }
 
   async calculateKpisByDateRange(startDate: Date, endDate: Date) {
+    // Usa cache para evitar recalcular os mesmos períodos
+    const result = await this.kpiCacheService.getOrCalculate(
+      'restaurant',
+      CachePeriodEnum.CUSTOM,
+      async () => this._calculateKpisByDateRangeInternal(startDate, endDate),
+      { start: startDate, end: endDate },
+    );
+
+    return result.data;
+  }
+
+  /**
+   * Método interno que faz o cálculo real dos KPIs de Restaurante
+   * Chamado pelo cache service quando há cache miss
+   */
+  private async _calculateKpisByDateRangeInternal(startDate: Date, endDate: Date) {
     const abProductTypes = [40, 47, 33, 34, 32, 15, 13, 44, 10, 11, 31, 41, 27, 26, 25, 35];
 
     const aProductTypes = [47, 32, 13, 44, 10, 11, 31, 41, 27];
