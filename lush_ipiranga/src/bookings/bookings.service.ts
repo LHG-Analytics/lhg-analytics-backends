@@ -1904,21 +1904,83 @@ export class BookingsService {
       { start: previousStartDate, end: previousEndDate },
     );
 
-    return {
-      currentPeriod: currentResult.data,
-      previousPeriod: previousResult.data,
-      metadata: {
-        current: {
-          startDate: moment(startDate).format('DD/MM/YYYY'),
-          endDate: moment(endDate).format('DD/MM/YYYY'),
-          days: daysDiff,
-        },
-        previous: {
-          startDate: moment(previousStartDate).format('DD/MM/YYYY'),
-          endDate: moment(previousEndDate).format('DD/MM/YYYY'),
-          days: daysDiff,
-        },
+    const currentData = currentResult.data;
+    const previousData = previousResult.data;
+
+    // Extrair BigNumbers dos períodos
+    const currentBigNumbers = currentData.BigNumbers[0];
+    const previousBigNumbers = previousData.BigNumbers[0];
+
+    // Calcular previsão mensal (monthlyForecast)
+    const nowForForecast = moment.tz('America/Sao_Paulo');
+    const currentMonthStart = nowForForecast.clone().startOf('month');
+    const currentMonthEnd = nowForForecast.clone().endOf('month');
+    const todayForForecast = nowForForecast.clone().startOf('day');
+    const yesterday = todayForForecast.clone().subtract(1, 'day');
+
+    // Dias do mês
+    const totalDaysInMonth = currentMonthEnd.date();
+    const daysElapsed = yesterday.date();
+    const remainingDays = totalDaysInMonth - daysElapsed;
+
+    // Buscar dados do mês atual para forecast (do dia 1 até ontem)
+    const monthStartDate = currentMonthStart.clone().set({ hour: 0, minute: 0, second: 0 }).toDate();
+    const monthEndDate = yesterday.clone().set({ hour: 23, minute: 59, second: 59 }).toDate();
+
+    // Busca dados do mês com cache
+    const monthlyResult = await this.kpiCacheService.getOrCalculate(
+      'bookings',
+      CachePeriodEnum.CUSTOM,
+      async () => this._calculateKpibyDateRangeSQLInternal(monthStartDate, monthEndDate),
+      { start: monthStartDate, end: monthEndDate },
+    );
+
+    const monthlyData = monthlyResult.data;
+    const monthlyBigNumbers = monthlyData.BigNumbers[0];
+
+    // Calcular forecast
+    let monthlyForecast: any = undefined;
+
+    if (daysElapsed > 0) {
+      const monthlyTotalValue = monthlyBigNumbers.currentDate.totalAllValue;
+      const monthlyTotalBookings = monthlyBigNumbers.currentDate.totalAllBookings;
+
+      // Média diária
+      const dailyAverageValue = monthlyTotalValue / daysElapsed;
+      const dailyAverageBookings = monthlyTotalBookings / daysElapsed;
+
+      // Projeções
+      const forecastValue = monthlyTotalValue + dailyAverageValue * remainingDays;
+      const forecastBookings = monthlyTotalBookings + dailyAverageBookings * remainingDays;
+
+      // Métricas recalculadas
+      const forecastTicketAverage =
+        forecastBookings > 0 ? Number((forecastValue / forecastBookings).toFixed(2)) : 0;
+
+      monthlyForecast = {
+        totalAllValueForecast: Number(forecastValue.toFixed(2)),
+        totalAllBookingsForecast: Math.round(forecastBookings),
+        totalAllTicketAverageForecast: forecastTicketAverage,
+        totalAllRepresentativenessForecast: monthlyBigNumbers.currentDate.totalAllRepresentativeness,
+      };
+    }
+
+    // Montar BigNumbers com previousDate e monthlyForecast
+    const combinedBigNumbers = {
+      currentDate: currentBigNumbers.currentDate,
+      previousDate: {
+        totalAllValuePreviousData: previousBigNumbers.currentDate.totalAllValue,
+        totalAllBookingsPreviousData: previousBigNumbers.currentDate.totalAllBookings,
+        totalAllTicketAveragePreviousData: previousBigNumbers.currentDate.totalAllTicketAverage,
+        totalAllRepresentativenessPreviousData: previousBigNumbers.currentDate.totalAllRepresentativeness,
       },
+      monthlyForecast,
+    };
+
+    // Retornar dados do período atual com BigNumbers combinado
+    return {
+      ...currentData,
+      BigNumbers: [combinedBigNumbers],
     };
   }
 

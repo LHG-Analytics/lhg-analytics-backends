@@ -1831,7 +1831,7 @@ export class CompanyService {
   async calculateKpisByDateRangeSQL(
     startDate: Date,
     endDate: Date,
-  ): Promise<any> {
+  ): Promise<CompanyKpiApexChartsResponse> {
     // Calcula o período anterior automaticamente
     const startMoment = moment(startDate);
     const endMoment = moment(endDate);
@@ -1857,21 +1857,108 @@ export class CompanyService {
       { start: previousStartDate, end: previousEndDate },
     );
 
-    return {
-      currentPeriod: currentResult.data,
-      previousPeriod: previousResult.data,
-      metadata: {
-        current: {
-          startDate: moment(startDate).format('DD/MM/YYYY'),
-          endDate: moment(endDate).format('DD/MM/YYYY'),
-          days: daysDiff,
-        },
-        previous: {
-          startDate: moment(previousStartDate).format('DD/MM/YYYY'),
-          endDate: moment(previousEndDate).format('DD/MM/YYYY'),
-          days: daysDiff,
-        },
+    const currentData = currentResult.data;
+    const previousData = previousResult.data;
+
+    // Extrair BigNumbers do período atual
+    const currentBigNumbers = currentData.BigNumbers[0];
+    const previousBigNumbers = previousData.BigNumbers[0];
+
+    // Calcular previsão mensal (monthlyForecast)
+    const nowForForecast = moment.tz('America/Sao_Paulo');
+    const currentMonthStart = nowForForecast.clone().startOf('month');
+    const currentMonthEnd = nowForForecast.clone().endOf('month');
+    const todayForForecast = nowForForecast.clone().startOf('day');
+    const yesterday = todayForForecast.clone().subtract(1, 'day');
+
+    // Dias do mês
+    const totalDaysInMonth = currentMonthEnd.date();
+    const daysElapsed = yesterday.date();
+    const remainingDays = totalDaysInMonth - daysElapsed;
+
+    // Buscar dados do mês atual para forecast (do dia 1 até ontem)
+    const monthStartDate = currentMonthStart.clone().set({ hour: 6, minute: 0, second: 0 }).toDate();
+    const monthEndDate = yesterday.clone().set({ hour: 5, minute: 59, second: 59 }).add(1, 'day').toDate();
+
+    // Busca dados do mês com cache
+    const monthlyResult = await this.kpiCacheService.getOrCalculate(
+      'company',
+      CachePeriodEnum.CUSTOM,
+      async () => this._calculateKpisByDateRangeSQLInternal(monthStartDate, monthEndDate),
+      { start: monthStartDate, end: monthEndDate },
+    );
+
+    const monthlyData = monthlyResult.data;
+    const monthlyBigNumbers = monthlyData.BigNumbers[0];
+
+    // Calcular forecast
+    let monthlyForecast: BigNumbersDataSQL['monthlyForecast'] | undefined;
+
+    if (daysElapsed > 0) {
+      const monthlyTotalValue = monthlyBigNumbers.currentDate.totalAllValue;
+      const monthlyTotalRentals = monthlyBigNumbers.currentDate.totalAllRentalsApartments;
+
+      // Média diária
+      const dailyAverageValue = monthlyTotalValue / daysElapsed;
+      const dailyAverageRentals = monthlyTotalRentals / daysElapsed;
+
+      // Projeções
+      const forecastValue = monthlyTotalValue + dailyAverageValue * remainingDays;
+      const forecastRentals = monthlyTotalRentals + dailyAverageRentals * remainingDays;
+
+      // Buscar total de suítes
+      const totalSuitesSQL = `
+        SELECT COUNT(*) as total_suites
+        FROM apartamento a
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE ca.id IN (7,8,9,10,11,12)
+          AND a.dataexclusao IS NULL
+      `;
+      const totalSuitesResult: any[] = await this.prisma.prismaLocal.$queryRaw<any[]>(
+        Prisma.sql([totalSuitesSQL]),
+      );
+      const totalSuitesCount = Number(totalSuitesResult[0]?.total_suites) || 1;
+
+      // Métricas recalculadas
+      const forecastTicketAverage =
+        forecastRentals > 0 ? Number((forecastValue / forecastRentals).toFixed(2)) : 0;
+      const forecastGiro =
+        totalSuitesCount > 0 && totalDaysInMonth > 0
+          ? Number((forecastRentals / totalSuitesCount / totalDaysInMonth).toFixed(2))
+          : 0;
+      const forecastTrevpar =
+        totalSuitesCount > 0 && totalDaysInMonth > 0
+          ? Number((forecastValue / totalSuitesCount / totalDaysInMonth).toFixed(2))
+          : 0;
+
+      monthlyForecast = {
+        totalAllValueForecast: Number(forecastValue.toFixed(2)),
+        totalAllRentalsApartmentsForecast: Math.round(forecastRentals),
+        totalAllTicketAverageForecast: forecastTicketAverage,
+        totalAllTrevparForecast: forecastTrevpar,
+        totalAllGiroForecast: forecastGiro,
+        totalAverageOccupationTimeForecast: monthlyBigNumbers.currentDate.totalAverageOccupationTime,
+      };
+    }
+
+    // Montar BigNumbers com previousDate e monthlyForecast
+    const combinedBigNumbers: BigNumbersDataSQL = {
+      currentDate: currentBigNumbers.currentDate,
+      previousDate: {
+        totalAllValuePreviousData: previousBigNumbers.currentDate.totalAllValue,
+        totalAllRentalsApartmentsPreviousData: previousBigNumbers.currentDate.totalAllRentalsApartments,
+        totalAllTicketAveragePreviousData: previousBigNumbers.currentDate.totalAllTicketAverage,
+        totalAllTrevparPreviousData: previousBigNumbers.currentDate.totalAllTrevpar,
+        totalAllGiroPreviousData: previousBigNumbers.currentDate.totalAllGiro,
+        totalAverageOccupationTimePreviousData: previousBigNumbers.currentDate.totalAverageOccupationTime,
       },
+      monthlyForecast,
+    };
+
+    // Retornar dados do período atual com BigNumbers combinado
+    return {
+      ...currentData,
+      BigNumbers: [combinedBigNumbers],
     };
   }
 
