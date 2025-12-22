@@ -3,10 +3,15 @@ import * as moment from 'moment-timezone';
 import { Moment } from 'moment-timezone';
 import { PeriodEnum, Prisma } from '@client-online';
 import { PrismaService } from '../prisma/prisma.service';
+import { KpiCacheService } from '../cache/kpi-cache.service';
+import { CachePeriodEnum } from '../cache/cache.interfaces';
 
 @Injectable()
 export class GovernanceService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private kpiCacheService: KpiCacheService,
+  ) {}
 
   async findAllGovernance(period: PeriodEnum) {
     // Define o fuso horário padrão como São Paulo
@@ -640,6 +645,22 @@ export class GovernanceService {
   }
 
   async calculateKpibyDateRangeSQL(startDate: Date, endDate: Date): Promise<any> {
+    // Usa cache para evitar recalcular os mesmos períodos
+    const result = await this.kpiCacheService.getOrCalculate(
+      'governance',
+      CachePeriodEnum.CUSTOM,
+      async () => this._calculateKpibyDateRangeSQLInternal(startDate, endDate),
+      { start: startDate, end: endDate },
+    );
+
+    return result.data;
+  }
+
+  /**
+   * Método interno que faz o cálculo real dos KPIs de Governança
+   * Chamado pelo cache service quando há cache miss
+   */
+  private async _calculateKpibyDateRangeSQLInternal(startDate: Date, endDate: Date): Promise<any> {
     const formattedStart = moment
       .utc(startDate)
       .set({ hour: 6, minute: 0, second: 0 })
