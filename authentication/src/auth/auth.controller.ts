@@ -5,11 +5,13 @@ import {
   Res,
   HttpCode,
   HttpStatus,
+  Get,
+  Request,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Public } from './decorators/public.decorator';
 import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
@@ -33,26 +35,33 @@ export class AuthController {
     );
     const { access_token } = await this.authService.login(user);
 
-    // Configurações do cookie httpOnly (mais seguro)
+    // SOLUÇÃO IDEAL PARA SAME-DOMAIN:
+    // Cookie httpOnly com sameSite: 'strict' = Máxima segurança
+    // Funciona perfeitamente quando frontend e backend estão no mesmo domínio
     const isProduction = this.configService.get('NODE_ENV') === 'production';
     const cookieMaxAge =
       this.configService.get('JWT_EXPIRATION_TIME') === '1h'
         ? 3600000 // 1 hora em milissegundos
         : 3600000; // padrão 1 hora
 
-    // Define o cookie httpOnly com configurações de segurança
+    // Define cookie httpOnly com configurações ideais para same-domain
     res.cookie('access_token', access_token, {
-      httpOnly: true, // Protege contra XSS - não acessível via JavaScript
-      secure: isProduction, // Apenas HTTPS em produção
-      sameSite: 'strict', // Protege contra CSRF
+      httpOnly: true, // ✅ Protege contra XSS - não acessível via JavaScript
+      secure: isProduction, // ✅ Apenas HTTPS em produção
+      sameSite: 'strict', // ✅ Proteção máxima contra CSRF (funciona em same-domain)
       maxAge: cookieMaxAge,
       path: '/',
     });
 
-    // Retorna o token também no body para compatibilidade (opcional)
-    // Em produção, considere remover isso e usar apenas cookies
+    // ✅ NÃO retorna token no body - apenas informações do usuário
+    // Token está seguro no cookie httpOnly (não acessível via JS)
     return res.json({
-      access_token,
+      user: {
+        id: user.id,
+        email: user.email,
+        unit: user.unit,
+        role: user.role,
+      },
       message: 'Login realizado com sucesso',
     });
   }
@@ -61,14 +70,29 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   async logout(@Res() res: Response) {
-    // Remove o cookie httpOnly
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
+
+    // Remove o cookie httpOnly (mesmas configurações do login)
     res.clearCookie('access_token', {
       httpOnly: true,
-      secure: this.configService.get('NODE_ENV') === 'production',
-      sameSite: 'strict',
+      secure: isProduction, // Mesmo do login
+      sameSite: 'strict', // Mesmo do login
       path: '/',
     });
 
     return res.json({ message: 'Logout realizado com sucesso' });
+  }
+
+  @Get('me')
+  @ApiBearerAuth('JWT-auth')
+  async getCurrentUser(@Request() req: any) {
+    // O usuário é populado automaticamente pelo JwtAuthGuard
+    // através do JwtStrategy.validate()
+    return {
+      id: req.user.id,
+      email: req.user.email,
+      unit: req.user.unit,
+      role: req.user.role,
+    };
   }
 }
