@@ -6,12 +6,16 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 
 config();
 
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
+
+    // Configuração do cookie-parser para ler cookies httpOnly
+    app.use(cookieParser());
 
     // Configuração de segurança com Helmet
     app.use(
