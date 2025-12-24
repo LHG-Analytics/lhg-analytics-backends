@@ -91,6 +91,7 @@ export class AuthController {
     // através do JwtStrategy.validate()
     return {
       id: req.user.id,
+      name: req.user.name,
       email: req.user.email,
       unit: req.user.unit,
       role: req.user.role,
