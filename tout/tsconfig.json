@@ -1,4 +1,5 @@
 {
+  //"extends": "../tsconfig.base.json",
   "compilerOptions": {
     "module": "commonjs",
     "declaration": true,
@@ -12,15 +13,15 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
-    "strict": false,
     "strictNullChecks": false,
     "noImplicitAny": false,
-    "strictBindCallApply": true,
+    "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": true,
+    "noFallthroughCasesInSwitch": false,
     "paths": {
       "@client-online": ["dist/generated/client-online"],
-      "@client-local": ["dist/generated/client-local"]
+      "@client-local": ["dist/generated/client-local"],
+      "@auth/*": ["../authentication/src/*"]
     }
   },
   "include": ["src/**/*", "src/prisma/generated/**/*"],

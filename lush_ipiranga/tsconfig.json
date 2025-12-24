@@ -21,10 +21,8 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@client-online": ["dist/generated/client-online"],
-      "@client-local": ["dist/generated/client-local"]
-      /*"@auth/*": [
-        "../authentication/src/*"
-      ]*/
+      "@client-local": ["dist/generated/client-local"],
+      "@auth/*": ["../authentication/src/*"]
     }
   },
   "include": ["src/**/*", "src/prisma/generated/**/*"],

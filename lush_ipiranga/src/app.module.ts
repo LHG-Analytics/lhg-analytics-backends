@@ -4,7 +4,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { UserModule } from './user/user.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
 import { KpiAlosModule } from './kpiAlos/kpiAlos.module';
@@ -27,6 +26,7 @@ import { BookingsTicketAverageModule } from './bookingsTicketAverage/bookingsTic
 import { BookingsRepresentativenessModule } from './bookingsRepresentativeness/bookingsRepresentativeness.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard'; // Importa o guard de autenticação
+import { AuthModule } from './auth/auth.module';
 import { RestaurantModule } from './restaurant/restaurant.module';
 import { RestaurantRevenueModule } from './restaurantRevenue/restaurantRevenue.module';
 import { RestaurantSalesModule } from './restaurantSales/restaurantSales.module';
@@ -44,8 +44,8 @@ import { CacheModule } from './cache/cache.module';
         limit: 100, // 100 requests per minute
       },
     ]),
-    UserModule,
     PrismaModule,
+    AuthModule,
     KpiAlosModule,
     KpiRevenueModule,
     KpiTotalRentalsModule,

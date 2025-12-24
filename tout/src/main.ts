@@ -21,6 +21,7 @@ import { UpdateKpiAlosDto } from './kpiAlos/dto/update-kpiAlos.dto';
 import { CreateKpiRevenueDto } from './kpiRevenue/dto/create-kpiRevenue.dto';
 import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 
 // Carregar variáveis de ambiente do arquivo .env
 config();
@@ -48,6 +49,9 @@ async function bootstrap() {
       }),
     );
 
+    // Configuração do cookie-parser para ler cookies httpOnly
+    app.use(cookieParser());
+
     const servicePrefix = process.env.SERVICE_PREFIX_TOUT || 'tout';
     app.setGlobalPrefix(`${servicePrefix}/api`);
     const isProduction = process.env.NODE_ENV === 'production';
@@ -59,6 +63,7 @@ async function bootstrap() {
       .setVersion('1.0')
       //.addBearerAuth()
       .addServer(isProduction ? '/tout' : '/')
+      .addTag('Auth')
       .addTag('KpiAlos')
       .addTag('KpiRevenue')
       .addTag('KpiTotalRentals')
@@ -101,13 +106,22 @@ async function bootstrap() {
 
     // Configuração de CORS
     const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
-      'https://lhg-analytics.vercel.app', // Substitua pela URL do seu frontend
+      'https://lhg-analytics.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002',
+      'http://localhost:3003',
+      'http://localhost:3004',
+      'http://localhost:3005', // Authentication service
     ];
 
     const corsOptions: CorsOptions = {
       origin: (origin, callback) => {
-        // Em produção, seja mais permissivo para evitar problemas com health checks e requests internos
-        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'production') {
+        // Permite requisições sem origin (ex: Postman, curl) ou de origens permitidas
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else if (process.env.NODE_ENV === 'production') {
+          // Em produção, seja permissivo para health checks
           callback(null, true);
         } else {
           // Log da origem rejeitada para debug

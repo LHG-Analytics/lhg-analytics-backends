@@ -30,6 +30,7 @@ import { RestaurantRevenueModule } from './restaurantRevenue/restaurantRevenue.m
 import { RestaurantSalesModule } from './restaurantSales/restaurantSales.module';
 import { RestaurantTicketAverageModule } from './restaurantTicketAverage/restaurantTicketAverage.module';
 import { CacheModule } from './cache/cache.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { CacheModule } from './cache/cache.module';
     ]),
     ScheduleModule.forRoot(),
     PrismaModule,
+    AuthModule,
     KpiAlosModule,
     KpiRevenueModule,
     KpiTotalRentalsModule,

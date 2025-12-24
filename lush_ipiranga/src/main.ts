@@ -21,6 +21,7 @@ import { UpdateKpiAlosDto } from './kpiAlos/dto/update-kpiAlos.dto';
 import { CreateKpiRevenueDto } from './kpiRevenue/dto/create-kpiRevenue.dto';
 import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 
 // Carregar variáveis de ambiente do arquivo .env
 config();
@@ -31,6 +32,9 @@ async function bootstrap() {
 
     // Configuração de segurança com Helmet
     app.use(helmet());
+
+    // Configuração do cookie-parser para ler cookies httpOnly
+    app.use(cookieParser());
 
     const servicePrefix = process.env.SERVICE_PREFIX_IPIRANGA || 'ipiranga';
     app.setGlobalPrefix(`${servicePrefix}/api`);
@@ -46,7 +50,7 @@ async function bootstrap() {
         'JWT-auth',
       )*/
       .addServer(isProduction ? '/lush_ipiranga' : '/')
-      .addTag('users')
+      .addTag('Auth')
       .addTag('KpiAlos')
       .addTag('KpiRevenue')
       .addTag('KpiTotalRentals')
@@ -89,20 +93,52 @@ async function bootstrap() {
     }
 
     // Configuração de CORS
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
-      'https://lhg-analytics.vercel.app', // Substitua pela URL do seu frontend
+    // Sempre inclui as origens padrão + qualquer origem adicional do .env
+    const port = process.env.PORT_IPIRANGA || 3001;
+    const defaultOrigins = [
+      'https://lhg-analytics.vercel.app', // Frontend em produção
+      'http://localhost:3000', // Proxy/Frontend local
+      'http://localhost:3005', // Authentication service
+      'http://localhost:3001', // Lush Ipiranga (Swagger)
+      'http://localhost:3002', // Lush Lapa (Swagger)
+      'http://localhost:3003', // Tout (Swagger)
+      'http://localhost:3004', // Andar de Cima (Swagger)
     ];
+    const envOrigins =
+      process.env.ALLOWED_ORIGINS?.split(',')
+        .map((o) => o.trim())
+        .filter(Boolean) || [];
+    const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
 
     const corsOptions: CorsOptions = {
       origin: (origin, callback) => {
-        // Em produção, seja mais permissivo para evitar problemas com health checks e requests internos
-        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'production') {
+        console.log('CORS - Origin recebida:', origin);
+        console.log('CORS - Origens permitidas:', allowedOrigins);
+
+        // Permite requisições sem origin (ex: Postman, curl, Swagger)
+        if (!origin) {
+          console.log('CORS - Permitindo requisição sem origin');
           callback(null, true);
-        } else {
-          // Log da origem rejeitada para debug
-          console.log('CORS rejeitou origem:', origin);
-          callback(new Error('Not allowed by CORS'), false);
+          return;
         }
+
+        // Verifica se a origin está na lista permitida
+        if (allowedOrigins.includes(origin)) {
+          console.log('CORS - Origin permitida');
+          callback(null, true);
+          return;
+        }
+
+        // Em produção, seja permissivo para health checks
+        if (process.env.NODE_ENV === 'production') {
+          console.log('CORS - Permitindo em produção');
+          callback(null, true);
+          return;
+        }
+
+        // Rejeita origem não permitida
+        console.log('CORS - REJEITANDO origem:', origin);
+        callback(new Error('Not allowed by CORS'), false);
       },
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
       allowedHeaders: ['Authorization', 'Content-Type'],
@@ -121,8 +157,6 @@ async function bootstrap() {
     );
 
     app.enableCors(corsOptions);
-
-    const port = process.env.PORT_IPIRANGA || 3001;
 
     // Use a porta do ambiente ou 3001 como padrão
     await app.listen(port, () => {
