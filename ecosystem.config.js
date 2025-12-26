@@ -5,7 +5,6 @@ module.exports = {
     {
       name: "proxy",
       script: "./server.mjs",
-      cwd: "/opt/render/project/src",
       node_args: "-r module-alias/register",
       env: {
         PORT: process.env.PORT || 3000,
@@ -17,7 +16,6 @@ module.exports = {
     {
       name: "auth",
       script: "./authentication/dist/main.js",
-      cwd: "/opt/render/project/src",
       env: {
         NODE_ENV: "production",
         SUPABASE_URL_USERS: process.env.SUPABASE_URL_USERS,
@@ -32,7 +30,6 @@ module.exports = {
     {
       name: "lush_ipiranga",
       script: "./lush_ipiranga/dist/main.js",
-      cwd: "/opt/render/project/src",
       node_args: "-r module-alias/register",
       env: {
         NODE_ENV: "production",
@@ -47,7 +44,6 @@ module.exports = {
     {
       name: "lush_lapa",
       script: "./lush_lapa/dist/main.js",
-      cwd: "/opt/render/project/src",
       node_args: "-r module-alias/register",
       env: {
         NODE_ENV: "production",
@@ -62,7 +58,6 @@ module.exports = {
     {
       name: "tout",
       script: "./tout/dist/main.js",
-      cwd: "/opt/render/project/src",
       node_args: "-r module-alias/register",
       env: {
         NODE_ENV: "production",
@@ -77,7 +72,6 @@ module.exports = {
     {
       name: "andar_de_cima",
       script: "./andar_de_cima/dist/main.js",
-      cwd: "/opt/render/project/src",
       node_args: "-r module-alias/register",
       env: {
         NODE_ENV: "production",
