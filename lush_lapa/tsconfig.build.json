@@ -2,6 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "baseUrl": "./",
+    "rootDir": "src",
     "paths": {
       "@client-online": ["dist/generated/client-online"],
       "@client-local": ["dist/generated/client-local"],
