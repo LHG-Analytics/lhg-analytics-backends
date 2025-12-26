@@ -29,7 +29,7 @@ module.exports = {
     },
     {
       name: "lush_ipiranga",
-      script: "./lush_ipiranga/dist/main.js",
+      script: "./lush_ipiranga/dist/lush_ipiranga/src/main.js",
       node_args: "-r module-alias/register",
       env: {
         NODE_ENV: "production",
@@ -43,7 +43,7 @@ module.exports = {
     },
     {
       name: "lush_lapa",
-      script: "./lush_lapa/dist/main.js",
+      script: "./lush_lapa/dist/lush_lapa/src/main.js",
       node_args: "-r module-alias/register",
       env: {
         NODE_ENV: "production",
@@ -57,7 +57,7 @@ module.exports = {
     },
     {
       name: "tout",
-      script: "./tout/dist/main.js",
+      script: "./tout/dist/tout/src/main.js",
       node_args: "-r module-alias/register",
       env: {
         NODE_ENV: "production",
@@ -71,7 +71,7 @@ module.exports = {
     },
     {
       name: "andar_de_cima",
-      script: "./andar_de_cima/dist/main.js",
+      script: "./andar_de_cima/dist/andar_de_cima/src/main.js",
       node_args: "-r module-alias/register",
       env: {
         NODE_ENV: "production",
