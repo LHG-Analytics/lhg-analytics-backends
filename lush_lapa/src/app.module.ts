@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -15,8 +14,6 @@ import { KpiGiroModule } from './kpiGiro/kpiGiro.module';
 import { KpiRevparModule } from './kpiRevpar/kpiRevpar.module';
 import { KpiTrevparModule } from './kpiTrevpar/kpiTrevpar.module';
 import { CompanyModule } from './company/company.module';
-import { CronJobsService } from './cron-jobs.service';
-import { CronJobsModule } from './cron-jobs.module';
 import { CleaningsModule } from './cleanings/cleanings.module';
 import { ApartmentInspectionModule } from './apartmentInspection/apartment-inspection.module';
 import { GovernanceModule } from './governance/governance.module';
@@ -41,7 +38,6 @@ import { AuthModule } from './auth/auth.module';
         limit: 100, // 100 requests per minute
       },
     ]),
-    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     KpiAlosModule,
@@ -53,7 +49,6 @@ import { AuthModule } from './auth/auth.module';
     KpiRevparModule,
     KpiTrevparModule,
     CompanyModule,
-    CronJobsModule,
     CleaningsModule,
     ApartmentInspectionModule,
     GovernanceModule,
@@ -71,7 +66,6 @@ import { AuthModule } from './auth/auth.module';
   providers: [
     AppService,
     PrismaService,
-    CronJobsService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

@@ -85,7 +85,6 @@ async function bootstrap() {
       .addTag('Restaurants')
       .addTag('Governance')
       .addTag('Bookings')
-      .addTag('CronJobs')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig, {

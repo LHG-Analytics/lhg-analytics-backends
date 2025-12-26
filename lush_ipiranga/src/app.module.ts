@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -15,8 +14,6 @@ import { KpiGiroModule } from './kpiGiro/kpiGiro.module';
 import { KpiRevparModule } from './kpiRevpar/kpiRevpar.module';
 import { KpiTrevparModule } from './kpiTrevpar/kpiTrevpar.module';
 import { CompanyModule } from './company/company.module';
-import { CronJobsService } from './cron-jobs.service';
-import { CronJobsModule } from './cron-jobs.module';
 import { CleaningsModule } from './cleanings/cleanings.module';
 import { ApartmentInspectionModule } from './apartmentInspection/apartment-inspection.module';
 import { GovernanceModule } from './governance/governance.module';
@@ -36,7 +33,6 @@ import { CacheModule } from './cache/cache.module';
 
 @Module({
   imports: [
-    ScheduleModule.forRoot(),
     CacheModule, // Módulo de cache para KPIs real-time
     ThrottlerModule.forRoot([
       {
@@ -55,7 +51,6 @@ import { CacheModule } from './cache/cache.module';
     KpiRevparModule,
     KpiTrevparModule,
     CompanyModule,
-    CronJobsModule,
     CleaningsModule,
     ApartmentInspectionModule,
     GovernanceModule,
@@ -74,7 +69,6 @@ import { CacheModule } from './cache/cache.module';
   providers: [
     AppService,
     PrismaService,
-    CronJobsService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
