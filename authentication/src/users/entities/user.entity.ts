@@ -3,7 +3,7 @@ import {
   Prisma,
   UserRole,
   UserUnit,
-} from '../../../dist/generated/client-online';
+} from '@prisma/client';
 
 export class User implements Prisma.UserUncheckedCreateInput {
   id?: number;
