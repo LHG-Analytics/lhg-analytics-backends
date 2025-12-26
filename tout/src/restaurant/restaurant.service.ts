@@ -1,10 +1,9 @@
 import { Prisma } from '@client-local';
-import { PeriodEnum } from '../common/enums';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
-import { PrismaService } from '../prisma/prisma.service';
-import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
+import { KpiCacheService } from '../cache/kpi-cache.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class RestaurantService {
@@ -12,7 +11,6 @@ export class RestaurantService {
     private prisma: PrismaService,
     private kpiCacheService: KpiCacheService,
   ) {}
-
 
   async calculateKpisByDateRange(startDate: Date, endDate: Date) {
     // Calcula o período anterior automaticamente

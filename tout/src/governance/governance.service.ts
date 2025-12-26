@@ -1,11 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import * as moment from 'moment-timezone';
-import { Moment } from 'moment-timezone';
 import { Prisma } from '@client-local';
-import { PeriodEnum } from '../common/enums';
-import { PrismaService } from '../prisma/prisma.service';
-import { KpiCacheService } from '../cache/kpi-cache.service';
+import { Injectable } from '@nestjs/common';
+import * as moment from 'moment-timezone';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
+import { KpiCacheService } from '../cache/kpi-cache.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class GovernanceService {
@@ -13,7 +11,6 @@ export class GovernanceService {
     private prisma: PrismaService,
     private kpiCacheService: KpiCacheService,
   ) {}
-
 
   async calculateKpibyDateRangeSQL(startDate: Date, endDate: Date): Promise<any> {
     // Calcula o período anterior automaticamente
@@ -23,7 +20,9 @@ export class GovernanceService {
 
     // Período anterior: mesmo número de dias, terminando no dia anterior ao startDate
     const previousEndDate = startMoment.clone().subtract(1, 'day').toDate();
-    const previousStartDate = moment(previousEndDate).subtract(daysDiff - 1, 'days').toDate();
+    const previousStartDate = moment(previousEndDate)
+      .subtract(daysDiff - 1, 'days')
+      .toDate();
 
     // Busca período atual com cache
     const currentResult = await this.kpiCacheService.getOrCalculate(
@@ -61,8 +60,15 @@ export class GovernanceService {
     const remainingDays = totalDaysInMonth - daysElapsed;
 
     // Buscar dados do mês atual para forecast (do dia 1 até ontem)
-    const monthStartDate = currentMonthStart.clone().set({ hour: 6, minute: 0, second: 0 }).toDate();
-    const monthEndDate = yesterday.clone().set({ hour: 5, minute: 59, second: 59 }).add(1, 'day').toDate();
+    const monthStartDate = currentMonthStart
+      .clone()
+      .set({ hour: 6, minute: 0, second: 0 })
+      .toDate();
+    const monthEndDate = yesterday
+      .clone()
+      .set({ hour: 5, minute: 59, second: 59 })
+      .add(1, 'day')
+      .toDate();
 
     // Busca dados do mês com cache
     const monthlyResult = await this.kpiCacheService.getOrCalculate(
@@ -103,7 +109,8 @@ export class GovernanceService {
       currentDate: currentBigNumbers.currentDate,
       previousDate: {
         totalAllSuitesCleaningsPreviousData: previousBigNumbers.currentDate.totalAllSuitesCleanings,
-        totalAllAverageDailyCleaningPreviousData: previousBigNumbers.currentDate.totalAllAverageDailyCleaning,
+        totalAllAverageDailyCleaningPreviousData:
+          previousBigNumbers.currentDate.totalAllAverageDailyCleaning,
         totalAllInspectionsPreviousData: previousBigNumbers.currentDate.totalAllInspections,
       },
       monthlyForecast,

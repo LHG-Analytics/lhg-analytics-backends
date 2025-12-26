@@ -1,27 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import * as moment from 'moment-timezone';
-import { Moment } from 'moment-timezone';
 import { Prisma } from '@client-local';
-import { PeriodEnum } from '../common/enums';
-import { PrismaService } from '../prisma/prisma.service';
-import { KpiCacheService } from '../cache/kpi-cache.service';
+import { Injectable } from '@nestjs/common';
+import * as moment from 'moment-timezone';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
-
-// Definindo interfaces para melhor tipagem
-interface CleaningData {
-  employeeName: string;
-  createdDate: Date;
-  averageDailyCleaning: number;
-  shift: string;
-  totalDaysWorked: number;
-  totalSuitesCleanings: number;
-  totalAllSuitesCleanings: number;
-  totalAllAverageDailyCleaning: number;
-}
-
-interface CleaningByDateAcc {
-  [key: string]: { totalSuitesCleanings: number };
-}
+import { KpiCacheService } from '../cache/kpi-cache.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 interface EmployeeData {
   name: string;
@@ -50,7 +32,6 @@ export class GovernanceService {
     private kpiCacheService: KpiCacheService,
   ) {}
 
-
   async calculateKpibyDateRangeSQL(startDate: Date, endDate: Date): Promise<any> {
     // Calcula o período anterior automaticamente
     const startMoment = moment(startDate);
@@ -59,7 +40,9 @@ export class GovernanceService {
 
     // Período anterior: mesmo número de dias, terminando no dia anterior ao startDate
     const previousEndDate = startMoment.clone().subtract(1, 'day').toDate();
-    const previousStartDate = moment(previousEndDate).subtract(daysDiff - 1, 'days').toDate();
+    const previousStartDate = moment(previousEndDate)
+      .subtract(daysDiff - 1, 'days')
+      .toDate();
 
     // Busca período atual com cache
     const currentResult = await this.kpiCacheService.getOrCalculate(
@@ -97,7 +80,10 @@ export class GovernanceService {
     const remainingDays = totalDaysInMonth - daysElapsed;
 
     // Buscar dados do mês atual para forecast (do dia 1 até ontem)
-    const monthStartDate = currentMonthStart.clone().set({ hour: 6, minute: 0, second: 0 }).toDate();
+    const monthStartDate = currentMonthStart
+      .clone()
+      .set({ hour: 6, minute: 0, second: 0 })
+      .toDate();
     const monthEndDate = yesterday
       .clone()
       .set({ hour: 5, minute: 59, second: 59 })

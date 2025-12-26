@@ -34,7 +34,6 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         DATABASE_URL_LOCAL_IPIRANGA: process.env.DATABASE_URL_LOCAL_IPIRANGA,
-        DATABASE_URL_ONLINE_IPIRANGA: process.env.DATABASE_URL_ONLINE_IPIRANGA,
         SERVICE_PREFIX: "ipiranga",
         PORT: 3001,
       },
@@ -49,7 +48,6 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         DATABASE_URL_LOCAL_LAPA: process.env.DATABASE_URL_LOCAL_LAPA,
-        DATABASE_URL_ONLINE_LAPA: process.env.DATABASE_URL_ONLINE_LAPA,
         SERVICE_PREFIX: "lapa",
         PORT: 3002,
       },
@@ -64,7 +62,6 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         DATABASE_URL_LOCAL_TOUT: process.env.DATABASE_URL_LOCAL_TOUT,
-        DATABASE_URL_ONLINE_TOUT: process.env.DATABASE_URL_ONLINE_TOUT,
         SERVICE_PREFIX: "tout",
         PORT: 3003,
       },
@@ -80,8 +77,6 @@ module.exports = {
         NODE_ENV: "production",
         DATABASE_URL_LOCAL_ANDAR_DE_CIMA:
           process.env.DATABASE_URL_LOCAL_ANDAR_DE_CIMA,
-        DATABASE_URL_ONLINE_ANDAR_DE_CIMA:
-          process.env.DATABASE_URL_ONLINE_ANDAR_DE_CIMA,
         SERVICE_PREFIX: "andar_de_cima",
         PORT: 3004,
       },

@@ -1,6 +1,5 @@
 import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { ApiBadRequestResponse, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { $Enums } from '@client-local';
 import { GovernanceService } from './governance.service';
 
 @ApiTags('Governance')
