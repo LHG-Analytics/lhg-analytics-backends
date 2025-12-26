@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import * as moment from 'moment-timezone';
-import { ChannelTypeEnum, PeriodEnum, Prisma, RentalTypeEnum } from '@client-online';
+import { Prisma } from '@client-local';
+import { PeriodEnum, RentalTypeEnum, ChannelTypeEnum } from '../common/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';

@@ -1,4 +1,4 @@
-import { Prisma } from '@client-online';
+import { Prisma } from '@client-local';
 
 export class Company implements Prisma.CompanyUncheckedCreateInput {
   id: number;

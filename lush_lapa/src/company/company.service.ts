@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PeriodEnum, Prisma, RentalTypeEnum } from '@client-online';
+import { Prisma } from '@client-local';
+import { PeriodEnum, RentalTypeEnum } from '../common/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import * as moment from 'moment-timezone';
 import { KpiCacheService } from '../cache/kpi-cache.service';

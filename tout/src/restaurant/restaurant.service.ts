@@ -1,4 +1,5 @@
-import { PeriodEnum, Prisma } from '@client-online';
+import { Prisma } from '@client-local';
+import { PeriodEnum } from '../common/enums';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { PrismaService } from '../prisma/prisma.service';

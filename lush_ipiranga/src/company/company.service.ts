@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PeriodEnum, Prisma, RentalTypeEnum } from '@client-online';
+import { Prisma } from '@client-local';
+import { PeriodEnum, RentalTypeEnum } from '../common/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import * as moment from 'moment-timezone';
 import { KpiCacheService } from '../cache/kpi-cache.service';
@@ -243,7 +244,6 @@ export class CompanyService {
     private readonly prisma: PrismaService,
     private kpiCacheService: KpiCacheService,
   ) {}
-
 
   private formatCurrency(value: number): string {
     return value.toLocaleString('pt-BR', {
@@ -1239,9 +1239,8 @@ export class CompanyService {
 
         // Tempo disponível = total de suítes × dias × 86400 segundos
         const totalAvailableTime = totalSuites * daysInPeriod * 86400;
-        const occupancyRate = totalAvailableTime > 0
-          ? (totalOccupiedTime / totalAvailableTime) * 100
-          : 0;
+        const occupancyRate =
+          totalAvailableTime > 0 ? (totalOccupiedTime / totalAvailableTime) * 100 : 0;
         return Number(occupancyRate.toFixed(2));
       }),
     };

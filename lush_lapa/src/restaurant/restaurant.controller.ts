@@ -1,4 +1,4 @@
-import { PeriodEnum } from '@client-online';
+import { PeriodEnum } from '../common/enums';
 import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { ApiBadRequestResponse, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { RestaurantService } from './restaurant.service';
