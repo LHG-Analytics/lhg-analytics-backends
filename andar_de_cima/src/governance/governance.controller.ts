@@ -8,24 +8,6 @@ import { GovernanceService } from './governance.service';
 export class GovernanceController {
   constructor(private readonly governanceService: GovernanceService) {}
 
-  @Get('operational')
-  @ApiQuery({
-    name: 'period',
-    required: true,
-    description: 'Período para o qual o KPI será calculado',
-    example: 'LAST_7_D',
-    enum: $Enums.PeriodEnum, // Adiciona o enum como parâmetro na documentação da API
-  })
-  async getAllGovernanceOperationals(
-    @Query('period') period: $Enums.PeriodEnum, // Adiciona o período como parâmetro opcional
-  ) {
-    if (!period) {
-      throw new BadRequestException('The period parameter is required.');
-    }
-
-    // Chamar o serviço para buscar os Operationals de todas as governances
-    return this.governanceService.findAllGovernance(period);
-  }
 
   @Get('kpis/date-range')
   @ApiQuery({

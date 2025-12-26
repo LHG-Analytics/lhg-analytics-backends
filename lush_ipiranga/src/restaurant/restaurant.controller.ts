@@ -13,24 +13,6 @@ import { RestaurantService } from './restaurant.service';
 export class RestaurantController {
   constructor(private readonly restaurantService: RestaurantService) {}
 
-  @Get('restaurants')
-  @ApiQuery({
-    name: 'period',
-    required: true,
-    description: 'Período para o qual o restaurant será calculado',
-    example: 'LAST_7_D',
-    enum: PeriodEnum, // Adiciona o enum como parâmetro na documentação da API
-  })
-  async getAllBookings(
-    @Query('period') period: PeriodEnum, // Adiciona o período como parâmetro opcional
-  ) {
-    if (!period) {
-      throw new BadRequestException('The period parameter is required.');
-    }
-
-    // Chamar o serviço para buscar os KPIs de todas as empresas
-    return this.restaurantService.findAllRestaurants(period);
-  }
 
   @Get('restaurants/date-range')
   @ApiQuery({

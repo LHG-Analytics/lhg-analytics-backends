@@ -1,29 +1,22 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient as PrismaClientLocal } from '@client-local';
-import { PrismaClient as PrismaClientOnline } from '@client-online';
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
   public prismaLocal: PrismaClientLocal;
-  public prismaOnline: PrismaClientOnline;
 
   constructor() {
     this.prismaLocal = new PrismaClientLocal({
-      log: ['error'],
-    });
-    this.prismaOnline = new PrismaClientOnline({
       log: ['error'],
     });
   }
 
   async onModuleInit() {
     await this.prismaLocal.$connect();
-    await this.prismaOnline.$connect();
   }
 
   async onModuleDestroy() {
     await this.prismaLocal.$disconnect();
-    await this.prismaOnline.$disconnect();
   }
 
   // Método para reutilizar uma conexão

@@ -8,24 +8,6 @@ import { BookingsService } from './bookings.service';
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
 
-  @Get('bookings')
-  @ApiQuery({
-    name: 'period',
-    required: true,
-    description: 'Período para o qual o booking será calculado',
-    example: 'LAST_7_D',
-    enum: PeriodEnum, // Adiciona o enum como parâmetro na documentação da API
-  })
-  async getAllBookings(
-    @Query('period') period: PeriodEnum, // Adiciona o período como parâmetro opcional
-  ) {
-    if (!period) {
-      throw new BadRequestException('The period parameter is required.');
-    }
-
-    // Chamar o serviço para buscar os KPIs de todas as empresas
-    return this.bookingsService.findAllBookings(period);
-  }
 
   @Get('bookings/date-range')
   @ApiQuery({

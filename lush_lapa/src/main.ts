@@ -6,7 +6,7 @@ import { join } from 'path';
 if (process.env.NODE_ENV === 'production') {
   addAliases({
     '@client-local': join(__dirname, 'generated/client-local'),
-    '@client-online': join(__dirname, 'generated/client-online'),
+    
   });
 }
 import 'dotenv/config';
@@ -16,10 +16,6 @@ import { PrismaService } from './prisma/prisma.service';
 import { ValidationPipe } from '@nestjs/common';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { CreateKpiAlosDto } from './kpiAlos/dto/create-kpiAlos.dto';
-import { UpdateKpiAlosDto } from './kpiAlos/dto/update-kpiAlos.dto';
-import { CreateKpiRevenueDto } from './kpiRevenue/dto/create-kpiRevenue.dto';
-import { UpdateKpiRevenueDto } from './kpiRevenue/dto/update-kpiRevenue.dto';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 
@@ -61,32 +57,13 @@ async function bootstrap() {
       //.addBearerAuth()
       .addServer(isProduction ? '/lush_lapa' : '/')
       .addTag('Auth')
-      .addTag('KpiAlos')
-      .addTag('KpiRevenue')
-      .addTag('KpiTotalRentals')
-      .addTag('KpiTicketAverage')
-      .addTag('KpiOccupancyRate')
-      .addTag('KpiGiro')
-      .addTag('KpiRevpar')
-      .addTag('KpiTrevpar')
-      .addTag('Cleanings')
-      .addTag('Inspections')
-      .addTag('BookingsRevenue')
-      .addTag('BookingsTotalRentals')
-      .addTag('BookingsTicketAverage')
-      .addTag('BookingsRepresentativeness')
-      .addTag('RestaurantRevenue')
-      .addTag('RestaurantSales')
-      .addTag('RestaurantTicketAverage')
       .addTag('Company')
       .addTag('Restaurants')
       .addTag('Bookings')
       .addTag('Governance')
       .build();
 
-    const document = SwaggerModule.createDocument(app, swaggerConfig, {
-      extraModels: [CreateKpiAlosDto, UpdateKpiAlosDto, CreateKpiRevenueDto, UpdateKpiRevenueDto],
-    });
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('lapa/api', app, document);
     console.log('Swagger UI disponível em: /lapa/api');
 

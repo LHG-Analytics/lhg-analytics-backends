@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "clean": "rimraf dist",
-    "generate": "npx prisma generate --schema=./prisma-schemas/lush_ipiranga_online/schema.online.prisma && npx prisma generate --schema=./prisma-schemas/lush_ipiranga_local/schema.local1.prisma",
+    "generate": "npx prisma generate --schema=./prisma-schemas/lush_ipiranga_local/schema.local1.prisma",
     "postinstall": "npm run generate",
     "build": "npm run generate && tsc -p tsconfig.build.json",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -101,7 +101,6 @@
     "testEnvironment": "node"
   },
   "_moduleAliases": {
-    "@client-local": "dist/generated/client-local",
-    "@client-online": "dist/generated/client-online"
+    "@client-local": "dist/generated/client-local"
   }
 }

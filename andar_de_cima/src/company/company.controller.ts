@@ -8,25 +8,6 @@ import { CompanyService } from './company.service';
 export class CompanyController {
   constructor(private readonly companyService: CompanyService) {}
 
-  @Get('kpis')
-  @ApiQuery({
-    name: 'period',
-    required: true,
-    description: 'Período para o qual o KPI será calculado',
-    example: 'LAST_7_D',
-    enum: $Enums.PeriodEnum, // Adiciona o enum como parâmetro na documentação da API
-  })
-  async getAllCompaniesKpis(
-    @Query('period') period: $Enums.PeriodEnum, // Adiciona o período como parâmetro opcional
-  ) {
-    if (!period) {
-      throw new BadRequestException('The period parameter is required.');
-    }
-
-    // Chamar o serviço para buscar os KPIs de todas as empresas
-    return this.companyService.findAllCompany(period);
-  }
-
   @Get('kpis/date-range')
   @ApiQuery({
     name: 'startDate',
