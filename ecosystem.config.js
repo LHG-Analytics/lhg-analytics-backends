@@ -7,10 +7,10 @@ module.exports = {
       script: "./server.mjs",
       node_args: "-r module-alias/register",
       env: {
-        PORT: 3000,
+        PORT: process.env.PORT || 3000,
       },
       env_production: {
-        PORT: 3000,
+        PORT: process.env.PORT || 3000,
       },
     },
     {
