@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "clean": "rimraf dist",
-    "generate": "npx prisma generate --schema=./prisma-schemas/tout_online/schema.online.prisma && npx prisma generate --schema=./prisma-schemas/tout_local/schema.local1.prisma",
+    "generate": "npx prisma generate --schema=./prisma-schemas/tout_local/schema.local1.prisma",
     "postinstall": "npm run generate",
     "build": "npm run generate && tsc -p tsconfig.build.json",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -100,6 +100,5 @@
   },
   "_moduleAliases": {
     "@client-local": "dist/generated/client-local",
-    "@client-online": "dist/generated/client-online"
   }
 }
