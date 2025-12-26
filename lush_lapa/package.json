@@ -99,6 +99,7 @@
     "testEnvironment": "node"
   },
   "_moduleAliases": {
-    "@client-local": "dist/lush_lapa/src/generated/client-local"
+    "@client-local": "dist/lush_lapa/src/generated/client-local",
+    "@auth": "dist/authentication/src"
   }
 }
