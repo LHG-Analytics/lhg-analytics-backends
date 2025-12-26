@@ -6,7 +6,7 @@ import { join } from 'path';
 if (process.env.NODE_ENV === 'production') {
   addAliases({
     '@client-local': join(__dirname, 'generated/client-local'),
-    
+    '@auth': join(__dirname, '../../../../authentication/dist'),
   });
 }
 import 'dotenv/config';
