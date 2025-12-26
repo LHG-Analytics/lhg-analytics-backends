@@ -150,6 +150,15 @@ interface WeeklyGiroData {
   };
 }
 
+interface WeeklyTrevparData {
+  [suiteCategory: string]: {
+    [dayOfWeek: string]: {
+      trevpar: number;
+      totalTrevpar: number;
+    };
+  };
+}
+
 interface RentalTypeData {
   [rentalType: string]: {
     totalValue: number;
@@ -218,12 +227,14 @@ export interface CompanyKpiApexChartsResponse {
   RevparByDate: ApexChartsData;
   TicketAverageByDate: ApexChartsData;
   TrevparByDate: ApexChartsData;
+  GiroByDate: ApexChartsData;
   OccupancyRateByDate: ApexChartsData;
   OccupancyRateBySuiteCategory: ApexChartsSeriesData;
   DataTableSuiteCategory: SuiteCategoryData[];
   TotalResult: TotalResultDataSQL;
   DataTableOccupancyRateByWeek: WeeklyOccupancyData[];
   DataTableGiroByWeek: WeeklyGiroData[];
+  DataTableTrevparByWeek: WeeklyTrevparData[];
 }
 
 @Injectable()
@@ -1672,12 +1683,14 @@ export class CompanyService {
       RevparByDate: revparByDate,
       TicketAverageByDate: ticketAverageByDate,
       TrevparByDate: trevparByDate,
+      GiroByDate: { categories: [], series: [] },
       OccupancyRateByDate: occupancyRateByDate,
       OccupancyRateBySuiteCategory: occupancyRateBySuiteCategory,
       DataTableSuiteCategory: dataTableSuiteCategory,
       TotalResult: TotalResult,
       DataTableOccupancyRateByWeek: occupancyRateByWeekArray,
       DataTableGiroByWeek: giroByWeekArray,
+      DataTableTrevparByWeek: [],
     };
   }
 
@@ -2297,6 +2310,52 @@ export class CompanyService {
       GROUP BY ca.descricao
     `;
 
+    // SQL para calcular Giro por data
+    const giroByDateSQL = `
+      SELECT
+        CASE
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        END as date,
+        COUNT(*) as total_rentals
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      INNER JOIN apartamento a ON aps.id_apartamento = a.id
+      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+      WHERE la.datainicialdaocupacao >= '${formattedStart}'
+        AND la.datainicialdaocupacao <= '${formattedEnd}'
+        AND la.fimocupacaotipo = 'FINALIZADA'
+        AND ca.descricao IN ('LUSH', 'LUSH HIDRO', 'LUSH LOUNGE HIDRO', 'LUSH SPA', 'LUSH SPLASH', 'LUSH SPA SPLASH')
+      GROUP BY CASE
+        WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+      END
+      ORDER BY date
+    `;
+
+    // SQL para calcular tempo de ocupação por data (para OccupancyRate correto)
+    const occupancyTimeByDateSQL = `
+      SELECT
+        CASE
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        END as date,
+        SUM(EXTRACT(EPOCH FROM (la.datafinaldaocupacao - la.datainicialdaocupacao))) as total_occupied_time
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      INNER JOIN apartamento a ON aps.id_apartamento = a.id
+      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+      WHERE la.datainicialdaocupacao >= '${formattedStart}'
+        AND la.datainicialdaocupacao <= '${formattedEnd}'
+        AND la.fimocupacaotipo = 'FINALIZADA'
+        AND ca.descricao IN ('LUSH', 'LUSH HIDRO', 'LUSH LOUNGE HIDRO', 'LUSH SPA', 'LUSH SPLASH', 'LUSH SPA SPLASH')
+      GROUP BY CASE
+        WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+      END
+      ORDER BY date
+    `;
+
     // Executa TODAS as consultas SQL em paralelo (seguindo padrão do bookings.service)
     const [
       bigNumbersResult,
@@ -2310,6 +2369,8 @@ export class CompanyService {
       trevparByDateResult,
       occupancyRateBySuiteCategoryResult,
       suitesByCategoryResult,
+      giroByDateResult,
+      occupancyTimeByDateResult,
     ] = await Promise.all([
       this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([bigNumbersSQL])),
       this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalSaleDirectSQL])),
@@ -2322,6 +2383,8 @@ export class CompanyService {
       this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([trevparByDateSQL])),
       this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([occupancyRateBySuiteCategorySQL])),
       this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([suitesByCategorySQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([giroByDateSQL])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([occupancyTimeByDateSQL])),
     ]);
 
     // Processa BigNumbers
@@ -2574,12 +2637,73 @@ export class CompanyService {
       }),
     };
 
-    // Calcular OccupancyRateByDate - Taxa de ocupação por data (usando dados já coletados)
+    // Calcular OccupancyRateByDate - Taxa de ocupação por data
+    // Taxa de ocupação = (tempo ocupado / tempo disponível) × 100
+    // Tempo disponível = total de suítes × 86400 segundos (1 dia)
+    const occupancyTimeDataMap = new Map<string, number>();
+    occupancyTimeByDateResult.forEach((item: any) => {
+      // Usar moment para padronizar formato igual ao periodsArray
+      const dateKey = groupByMonth
+        ? moment.utc(item.date).format('MM/YYYY')
+        : moment.utc(item.date).format('DD/MM/YYYY');
+      const currentTime = occupancyTimeDataMap.get(dateKey) || 0;
+      occupancyTimeDataMap.set(dateKey, currentTime + Number(item.total_occupied_time || 0));
+    });
+
     const occupancyRateByDate: ApexChartsData = {
-      categories: rentalsByDate.categories,
-      series: rentalsByDate.series.map((rentals) => {
-        const occupancyRate = rentals / totalSuites;
+      categories: [...periodsArray],
+      series: [...periodsArray].map((periodKey: string) => {
+        const totalOccupiedTime = occupancyTimeDataMap.get(periodKey) || 0;
+        // Para agrupamento por mês, precisamos calcular quantos dias tem no período
+        // Para diário, é sempre 1 dia
+        let daysInPeriod = 1;
+        if (groupByMonth) {
+          // Contar quantos dias existem no mês dentro do período pesquisado
+          const [month, year] = periodKey.split('/');
+          const firstDayOfMonth = moment.utc(`${year}-${month}-01`);
+          const lastDayOfMonth = firstDayOfMonth.clone().endOf('month');
+          const periodStart = moment.utc(startDate);
+          const periodEnd = moment.utc(endDate);
+
+          const effectiveStart = moment.max(firstDayOfMonth, periodStart);
+          const effectiveEnd = moment.min(lastDayOfMonth, periodEnd);
+          daysInPeriod = effectiveEnd.diff(effectiveStart, 'days') + 1;
+        }
+
+        // Tempo disponível = total de suítes × dias × 86400 segundos
+        const totalAvailableTime = totalSuites * daysInPeriod * 86400;
+        const occupancyRate = totalAvailableTime > 0
+          ? (totalOccupiedTime / totalAvailableTime) * 100
+          : 0;
         return Number(occupancyRate.toFixed(2));
+      }),
+    };
+
+    // Calcular GiroByDate - Giro por data
+    // Giro = total de locações / total de suítes
+    // Para agrupamento por mês, somamos as locações do mês e calculamos a média diária
+    const giroDataMap = new Map<string, { totalRentals: number; daysCount: number }>();
+    giroByDateResult.forEach((item: any) => {
+      // Usar moment para padronizar formato igual ao periodsArray
+      const dateKey = groupByMonth
+        ? moment.utc(item.date).format('MM/YYYY')
+        : moment.utc(item.date).format('DD/MM/YYYY');
+      const current = giroDataMap.get(dateKey) || { totalRentals: 0, daysCount: 0 };
+      giroDataMap.set(dateKey, {
+        totalRentals: current.totalRentals + Number(item.total_rentals || 0),
+        daysCount: current.daysCount + 1,
+      });
+    });
+
+    const giroByDate: ApexChartsData = {
+      categories: [...periodsArray],
+      series: [...periodsArray].map((periodKey: string) => {
+        const item = giroDataMap.get(periodKey);
+        if (!item || item.daysCount === 0) return 0;
+        // Se agrupado por mês, calculamos a média diária (total de locações / dias do mês / suítes)
+        // Se diário, é simplesmente (locações do dia / suítes)
+        const avgRentals = groupByMonth ? item.totalRentals / item.daysCount : item.totalRentals;
+        return Number((avgRentals / totalSuites).toFixed(2));
       }),
     };
 
@@ -3356,6 +3480,7 @@ export class CompanyService {
       RevparByDate: revparByDate,
       TicketAverageByDate: ticketAverageByDate,
       TrevparByDate: trevparByDate,
+      GiroByDate: giroByDate,
       OccupancyRateByDate: occupancyRateByDate,
       OccupancyRateBySuiteCategory: occupancyRateBySuiteCategory,
       DataTableSuiteCategory: dataTableSuiteCategory,
@@ -3371,6 +3496,7 @@ export class CompanyService {
       },
       DataTableOccupancyRateByWeek: dataTableOccupancyRateByWeek,
       DataTableGiroByWeek: dataTableGiroByWeek,
+      DataTableTrevparByWeek: [],
     };
   }
 
