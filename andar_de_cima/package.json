@@ -99,6 +99,6 @@
     "testEnvironment": "node"
   },
   "_moduleAliases": {
-    "@client-local": "dist/generated/client-local",
+    "@client-local": "dist/generated/client-local"
   }
 }
