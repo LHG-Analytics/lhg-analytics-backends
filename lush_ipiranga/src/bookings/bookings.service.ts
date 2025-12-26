@@ -129,8 +129,8 @@ export class BookingsService {
       BookingsRevenueByPeriodEcommerce,
       KpiRevenue,
       KpiRevenuePreviousData,
-    ] = await this.prisma.prismaOnline.$transaction([
-      this.prisma.prismaOnline.bookingsRevenue.findMany({
+    ] = await this.prisma.prismaLocal.$transaction([
+      this.prisma.prismaLocal.bookingsRevenue.findMany({
         where: {
           period: period,
           createdDate: {
@@ -146,7 +146,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenue.findMany({
+      this.prisma.prismaLocal.bookingsRevenue.findMany({
         where: {
           period: period,
           createdDate: {
@@ -163,7 +163,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentals.findMany({
+      this.prisma.prismaLocal.bookingsTotalRentals.findMany({
         where: {
           period: period,
           createdDate: {
@@ -179,7 +179,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentals.findMany({
+      this.prisma.prismaLocal.bookingsTotalRentals.findMany({
         where: {
           period: period,
           createdDate: {
@@ -196,7 +196,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTicketAverage.findMany({
+      this.prisma.prismaLocal.bookingsTicketAverage.findMany({
         where: {
           period: period,
           createdDate: {
@@ -212,7 +212,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTicketAverage.findMany({
+      this.prisma.prismaLocal.bookingsTicketAverage.findMany({
         where: {
           period: period,
           createdDate: {
@@ -229,7 +229,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRepresentativeness.findMany({
+      this.prisma.prismaLocal.bookingsRepresentativeness.findMany({
         where: {
           period: period,
           createdDate: {
@@ -245,7 +245,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRepresentativeness.findMany({
+      this.prisma.prismaLocal.bookingsRepresentativeness.findMany({
         where: {
           period: period,
           createdDate: {
@@ -262,7 +262,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenueByPayment.findMany({
+      this.prisma.prismaLocal.bookingsRevenueByPayment.findMany({
         where: {
           period: period,
           createdDate: {
@@ -279,7 +279,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenueByChannelType.findMany({
+      this.prisma.prismaLocal.bookingsRevenueByChannelType.findMany({
         where: {
           period: period,
           createdDate: {
@@ -297,7 +297,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentalsByRentalType.findMany({
+      this.prisma.prismaLocal.bookingsTotalRentalsByRentalType.findMany({
         where: {
           period: period,
           createdDate: {
@@ -314,7 +314,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenueByPeriod.findMany({
+      this.prisma.prismaLocal.bookingsRevenueByPeriod.findMany({
         where: {
           period: period,
           createdDate: {
@@ -331,7 +331,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRepresentativenessByPeriod.findMany({
+      this.prisma.prismaLocal.bookingsRepresentativenessByPeriod.findMany({
         where: {
           period: period,
           createdDate: {
@@ -348,7 +348,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentalsByPeriod.findMany({
+      this.prisma.prismaLocal.bookingsTotalRentalsByPeriod.findMany({
         where: {
           period: period,
           createdDate: {
@@ -365,7 +365,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentalsByChannelType.findMany({
+      this.prisma.prismaLocal.bookingsTotalRentalsByChannelType.findMany({
         where: {
           period: period,
           createdDate: {
@@ -383,7 +383,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTicketAverageByChannelType.findMany({
+      this.prisma.prismaLocal.bookingsTicketAverageByChannelType.findMany({
         where: {
           period: period,
           createdDate: {
@@ -401,7 +401,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRepresentativenessByChannelType.findMany({
+      this.prisma.prismaLocal.bookingsRepresentativenessByChannelType.findMany({
         where: {
           period: period,
           createdDate: {
@@ -419,7 +419,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenueByChannelType.aggregate({
+      this.prisma.prismaLocal.bookingsRevenueByChannelType.aggregate({
         _sum: {
           totalValue: true,
         },
@@ -433,7 +433,7 @@ export class BookingsService {
           },
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenueByChannelType.aggregate({
+      this.prisma.prismaLocal.bookingsRevenueByChannelType.aggregate({
         _sum: {
           totalValue: true,
         },
@@ -448,7 +448,7 @@ export class BookingsService {
           },
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentalsByChannelType.aggregate({
+      this.prisma.prismaLocal.bookingsTotalRentalsByChannelType.aggregate({
         _sum: {
           totalBookings: true,
         },
@@ -462,7 +462,7 @@ export class BookingsService {
           },
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentalsByChannelType.aggregate({
+      this.prisma.prismaLocal.bookingsTotalRentalsByChannelType.aggregate({
         _sum: {
           totalBookings: true,
         },
@@ -477,7 +477,7 @@ export class BookingsService {
           },
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentalsByPeriodEcommerce.findMany({
+      this.prisma.prismaLocal.bookingsTotalRentalsByPeriodEcommerce.findMany({
         where: {
           period: period,
           createdDate: {
@@ -494,7 +494,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenueByPeriodEcommerce.findMany({
+      this.prisma.prismaLocal.bookingsRevenueByPeriodEcommerce.findMany({
         where: {
           period: period,
           createdDate: {
@@ -511,7 +511,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.kpiRevenue.findMany({
+      this.prisma.prismaLocal.kpiRevenue.findMany({
         where: {
           period: period,
           createdDate: {
@@ -526,7 +526,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.kpiRevenue.findMany({
+      this.prisma.prismaLocal.kpiRevenue.findMany({
         where: {
           period: period,
           createdDate: {
@@ -574,18 +574,18 @@ export class BookingsService {
     };
 
     const paymentMethods = {
-      categories: BookingsRevenueByPayment.map((item) => item.paymentMethod),
-      series: BookingsRevenueByPayment.map((item) => Number(item.totalValue)),
+      categories: BookingsRevenueByPayment.map((item: any) => item.paymentMethod),
+      series: BookingsRevenueByPayment.map((item: any) => Number(item.totalValue)),
     };
 
     const billingPerChannel = {
-      categories: BookingsRevenueByChannelType.map((item) => item.channelType),
-      series: BookingsRevenueByChannelType.map((item) => Number(item.totalValue)),
+      categories: BookingsRevenueByChannelType.map((item: any) => item.channelType),
+      series: BookingsRevenueByChannelType.map((item: any) => Number(item.totalValue)),
     };
 
     const reservationsByRentalType = {
-      categories: BookingsTotalRentalsByRentalType.map((item) => item.rentalType),
-      series: BookingsTotalRentalsByRentalType.map((item) => Number(item.totalBookings)),
+      categories: BookingsTotalRentalsByRentalType.map((item: any) => item.rentalType),
+      series: BookingsTotalRentalsByRentalType.map((item: any) => Number(item.totalBookings)),
     };
 
     // Aplicar o filtro se o período for LAST_6_M
@@ -596,10 +596,10 @@ export class BookingsService {
     }
 
     const billingOfReservationsByPeriod = {
-      categories: filteredDataRevenuePeriod.map((item) =>
+      categories: filteredDataRevenuePeriod.map((item: any) =>
         moment.utc(item.createdDate).tz('America/Sao_Paulo').format('DD/MM/YYYY'),
       ),
-      series: filteredDataRevenuePeriod.map((item) => Number(item.totalValue)),
+      series: filteredDataRevenuePeriod.map((item: any) => Number(item.totalValue)),
     };
 
     // Aplicar o filtro se o período for LAST_6_M
@@ -613,10 +613,10 @@ export class BookingsService {
     }
 
     const representativenessOfReservesByPeriod = {
-      categories: filteredDataRepresentativenessPeriod.map((item) =>
+      categories: filteredDataRepresentativenessPeriod.map((item: any) =>
         moment.utc(item.createdDate).tz('America/Sao_Paulo').format('DD/MM/YYYY'),
       ),
-      series: filteredDataRepresentativenessPeriod.map((item) =>
+      series: filteredDataRepresentativenessPeriod.map((item: any) =>
         Number(item.totalRepresentativeness),
       ),
     };
@@ -629,10 +629,10 @@ export class BookingsService {
     }
 
     const numberOfReservationsPerPeriod = {
-      categories: filteredDataTotalRentalsPeriod.map((item) =>
+      categories: filteredDataTotalRentalsPeriod.map((item: any) =>
         moment.utc(item.createdDate).tz('America/Sao_Paulo').format('DD/MM/YYYY'),
       ),
-      series: filteredDataTotalRentalsPeriod.map((item) => Number(item.totalBookings)),
+      series: filteredDataTotalRentalsPeriod.map((item: any) => Number(item.totalBookings)),
     };
 
     const kpiTableByChannelType = {
@@ -776,10 +776,10 @@ export class BookingsService {
     }
 
     const reservationsOfEcommerceByPeriod = {
-      categories: filteredDataTotalRentalsByPeriodEcommerce.map((item) =>
+      categories: filteredDataTotalRentalsByPeriodEcommerce.map((item: any) =>
         moment.utc(item.createdDate).tz('America/Sao_Paulo').format('DD/MM/YYYY'),
       ),
-      series: filteredDataTotalRentalsByPeriodEcommerce.map((item) => Number(item.totalBookings)),
+      series: filteredDataTotalRentalsByPeriodEcommerce.map((item: any) => Number(item.totalBookings)),
     };
 
     // Aplicar o filtro se o período for LAST_6_M
@@ -793,10 +793,10 @@ export class BookingsService {
     }
 
     const billingOfEcommerceByPeriod = {
-      categories: filteredDataRevenueByPeriodEcommerce.map((item) =>
+      categories: filteredDataRevenueByPeriodEcommerce.map((item: any) =>
         moment.utc(item.createdDate).tz('America/Sao_Paulo').format('DD/MM/YYYY'),
       ),
-      series: filteredDataRevenueByPeriodEcommerce.map((item) => Number(item.totalValue)),
+      series: filteredDataRevenueByPeriodEcommerce.map((item: any) => Number(item.totalValue)),
     };
 
     return {

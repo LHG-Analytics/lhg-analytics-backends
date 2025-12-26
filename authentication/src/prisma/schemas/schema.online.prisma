@@ -1,7 +1,6 @@
 // Configura o banco de dados do Supabase como fonte de dados
 generator client {
     provider = "prisma-client-js"
-    output   = "../../../dist/generated/client-online"
 }
 
 datasource db {

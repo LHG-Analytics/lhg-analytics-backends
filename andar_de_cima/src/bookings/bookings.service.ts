@@ -123,8 +123,8 @@ export class BookingsService {
       BookingsRevenueByPeriodEcommerce,
       KpiRevenue,
       KpiRevenuePreviousData,
-    ] = await this.prisma.prismaOnline.$transaction([
-      this.prisma.prismaOnline.bookingsRevenue.findMany({
+    ] = await this.prisma.prismaLocal.$transaction([
+      this.prisma.prismaLocal.bookingsRevenue.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -140,7 +140,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenue.findMany({
+      this.prisma.prismaLocal.bookingsRevenue.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -157,7 +157,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentals.findMany({
+      this.prisma.prismaLocal.bookingsTotalRentals.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -173,7 +173,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentals.findMany({
+      this.prisma.prismaLocal.bookingsTotalRentals.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -190,7 +190,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTicketAverage.findMany({
+      this.prisma.prismaLocal.bookingsTicketAverage.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -206,7 +206,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTicketAverage.findMany({
+      this.prisma.prismaLocal.bookingsTicketAverage.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -223,7 +223,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRepresentativeness.findMany({
+      this.prisma.prismaLocal.bookingsRepresentativeness.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -239,7 +239,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRepresentativeness.findMany({
+      this.prisma.prismaLocal.bookingsRepresentativeness.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -256,7 +256,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenueByPayment.findMany({
+      this.prisma.prismaLocal.bookingsRevenueByPayment.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -273,7 +273,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenueByChannelType.findMany({
+      this.prisma.prismaLocal.bookingsRevenueByChannelType.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -291,7 +291,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentalsByRentalType.findMany({
+      this.prisma.prismaLocal.bookingsTotalRentalsByRentalType.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -308,7 +308,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenueByPeriod.findMany({
+      this.prisma.prismaLocal.bookingsRevenueByPeriod.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -325,7 +325,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRepresentativenessByPeriod.findMany({
+      this.prisma.prismaLocal.bookingsRepresentativenessByPeriod.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -342,7 +342,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentalsByPeriod.findMany({
+      this.prisma.prismaLocal.bookingsTotalRentalsByPeriod.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -359,7 +359,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentalsByChannelType.findMany({
+      this.prisma.prismaLocal.bookingsTotalRentalsByChannelType.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -377,7 +377,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsTicketAverageByChannelType.findMany({
+      this.prisma.prismaLocal.bookingsTicketAverageByChannelType.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -395,7 +395,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRepresentativenessByChannelType.findMany({
+      this.prisma.prismaLocal.bookingsRepresentativenessByChannelType.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -413,7 +413,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenueByChannelType.aggregate({
+      this.prisma.prismaLocal.bookingsRevenueByChannelType.aggregate({
         _sum: {
           totalValue: true,
         },
@@ -427,7 +427,7 @@ export class BookingsService {
           },
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenueByChannelType.aggregate({
+      this.prisma.prismaLocal.bookingsRevenueByChannelType.aggregate({
         _sum: {
           totalValue: true,
         },
@@ -442,7 +442,7 @@ export class BookingsService {
           },
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentalsByChannelType.aggregate({
+      this.prisma.prismaLocal.bookingsTotalRentalsByChannelType.aggregate({
         _sum: {
           totalBookings: true,
         },
@@ -456,7 +456,7 @@ export class BookingsService {
           },
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentalsByChannelType.aggregate({
+      this.prisma.prismaLocal.bookingsTotalRentalsByChannelType.aggregate({
         _sum: {
           totalBookings: true,
         },
@@ -471,7 +471,7 @@ export class BookingsService {
           },
         },
       }),
-      this.prisma.prismaOnline.bookingsTotalRentalsByPeriodEcommerce.findMany({
+      this.prisma.prismaLocal.bookingsTotalRentalsByPeriodEcommerce.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -488,7 +488,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.bookingsRevenueByPeriodEcommerce.findMany({
+      this.prisma.prismaLocal.bookingsRevenueByPeriodEcommerce.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -505,7 +505,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.kpiRevenue.findMany({
+      this.prisma.prismaLocal.kpiRevenue.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
@@ -520,7 +520,7 @@ export class BookingsService {
           createdDate: 'desc',
         },
       }),
-      this.prisma.prismaOnline.kpiRevenue.findMany({
+      this.prisma.prismaLocal.kpiRevenue.findMany({
         where: {
           period: period as PeriodEnum,
           createdDate: {
