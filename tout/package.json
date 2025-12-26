@@ -99,7 +99,6 @@
     "testEnvironment": "node"
   },
   "_moduleAliases": {
-    "@client-local": "dist/tout/src/generated/client-local",
-    "@auth": "dist/authentication/src"
+    "@client-local": "dist/tout/src/generated/client-local"
   }
 }
