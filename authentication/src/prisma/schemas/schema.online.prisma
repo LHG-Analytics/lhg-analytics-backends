@@ -9,15 +9,29 @@ datasource db {
 }
 
 model User {
-    id        Int      @id @default(autoincrement())
-    email     String   @unique
-    password  String
-    name      String?
-    cpf       String   @unique
-    role      UserRole
-    unit      UserUnit
+    id            Int            @id @default(autoincrement())
+    email         String         @unique
+    password      String
+    name          String?
+    cpf           String         @unique
+    role          UserRole
+    unit          UserUnit
+    createdAt     DateTime       @default(now())
+    updatedAt     DateTime       @updatedAt
+    refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+    id        String   @id @default(uuid())
+    token     String   @unique
+    userId    Int
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    expiresAt DateTime
     createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    revoked   Boolean  @default(false)
+
+    @@index([userId])
+    @@index([token])
 }
 
 enum UserRole {

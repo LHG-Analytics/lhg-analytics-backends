@@ -3,12 +3,13 @@ import {
   Post,
   Body,
   Res,
+  Req,
   HttpCode,
   HttpStatus,
   Get,
   Request,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Response, Request as ExpressRequest } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
@@ -18,10 +19,22 @@ import { ConfigService } from '@nestjs/config';
 @ApiTags('Auth')
 @Controller()
 export class AuthController {
+  private readonly ACCESS_TOKEN_MAX_AGE = 3600000; // 1 hora em ms
+  private readonly REFRESH_TOKEN_MAX_AGE = 7 * 24 * 3600000; // 7 dias em ms
+
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
   ) {}
+
+  private getCookieConfig(isProduction: boolean) {
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'strict' as const,
+      path: '/',
+    };
+  }
 
   @Post('login')
   @Public()
@@ -31,28 +44,23 @@ export class AuthController {
       loginDto.email,
       loginDto.password,
     );
-    const { access_token } = await this.authService.login(user);
+    const { access_token, refresh_token } = await this.authService.login(user);
 
-    // SOLUÇÃO IDEAL PARA SAME-DOMAIN:
-    // Cookie httpOnly com sameSite: 'strict' = Máxima segurança
-    // Funciona perfeitamente quando frontend e backend estão no mesmo domínio
     const isProduction = this.configService.get('NODE_ENV') === 'production';
-    const cookieMaxAge =
-      this.configService.get('JWT_EXPIRATION_TIME') === '1h'
-        ? 3600000 // 1 hora em milissegundos
-        : 3600000; // padrão 1 hora
+    const cookieConfig = this.getCookieConfig(isProduction);
 
-    // Define cookie httpOnly com configurações ideais para same-domain
+    // Access token - expira em 1h
     res.cookie('access_token', access_token, {
-      httpOnly: true, // ✅ Protege contra XSS - não acessível via JavaScript
-      secure: isProduction, // ✅ Apenas HTTPS em produção
-      sameSite: 'strict', // ✅ Proteção máxima contra CSRF (funciona em same-domain)
-      maxAge: cookieMaxAge,
-      path: '/',
+      ...cookieConfig,
+      maxAge: this.ACCESS_TOKEN_MAX_AGE,
     });
 
-    // ✅ NÃO retorna token no body - apenas informações do usuário
-    // Token está seguro no cookie httpOnly (não acessível via JS)
+    // Refresh token - expira em 7 dias
+    res.cookie('refresh_token', refresh_token, {
+      ...cookieConfig,
+      maxAge: this.REFRESH_TOKEN_MAX_AGE,
+    });
+
     return res.json({
       user: {
         id: user.id,
@@ -65,19 +73,70 @@ export class AuthController {
     });
   }
 
+  @Post('refresh')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Req() req: ExpressRequest, @Res() res: Response) {
+    const refreshToken = req.cookies?.refresh_token;
+
+    if (!refreshToken) {
+      return res.status(HttpStatus.UNAUTHORIZED).json({
+        message: 'Refresh token não encontrado',
+      });
+    }
+
+    try {
+      const { access_token, refresh_token, user } =
+        await this.authService.refreshTokens(refreshToken);
+
+      const isProduction = this.configService.get('NODE_ENV') === 'production';
+      const cookieConfig = this.getCookieConfig(isProduction);
+
+      // Novos tokens
+      res.cookie('access_token', access_token, {
+        ...cookieConfig,
+        maxAge: this.ACCESS_TOKEN_MAX_AGE,
+      });
+
+      res.cookie('refresh_token', refresh_token, {
+        ...cookieConfig,
+        maxAge: this.REFRESH_TOKEN_MAX_AGE,
+      });
+
+      return res.json({
+        user,
+        message: 'Tokens renovados com sucesso',
+      });
+    } catch {
+      // Limpa os cookies em caso de erro
+      const isProduction = this.configService.get('NODE_ENV') === 'production';
+      const cookieConfig = this.getCookieConfig(isProduction);
+
+      res.clearCookie('access_token', cookieConfig);
+      res.clearCookie('refresh_token', cookieConfig);
+
+      return res.status(HttpStatus.UNAUTHORIZED).json({
+        message: 'Sessão expirada. Faça login novamente.',
+      });
+    }
+  }
+
   @Post('logout')
   @Public()
   @HttpCode(HttpStatus.OK)
-  async logout(@Res() res: Response) {
+  async logout(@Req() req: ExpressRequest, @Res() res: Response) {
+    const refreshToken = req.cookies?.refresh_token;
     const isProduction = this.configService.get('NODE_ENV') === 'production';
+    const cookieConfig = this.getCookieConfig(isProduction);
 
-    // Remove o cookie httpOnly (mesmas configurações do login)
-    res.clearCookie('access_token', {
-      httpOnly: true,
-      secure: isProduction, // Mesmo do login
-      sameSite: 'strict', // Mesmo do login
-      path: '/',
-    });
+    // Invalida o refresh token no banco
+    if (refreshToken) {
+      await this.authService.logout(refreshToken);
+    }
+
+    // Remove os cookies
+    res.clearCookie('access_token', cookieConfig);
+    res.clearCookie('refresh_token', cookieConfig);
 
     return res.json({ message: 'Logout realizado com sucesso' });
   }
@@ -85,8 +144,6 @@ export class AuthController {
   @Get('me')
   @ApiBearerAuth('JWT-auth')
   async getCurrentUser(@Request() req: any) {
-    // O usuário é populado automaticamente pelo JwtAuthGuard
-    // através do JwtStrategy.validate()
     return {
       id: req.user.id,
       email: req.user.email,
