@@ -9,30 +9,50 @@ import { LoginDto } from './dto/login.dto';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
+  private readonly ACCESS_TOKEN_MAX_AGE = 3600000; // 1 hora em ms
+  private readonly REFRESH_TOKEN_MAX_AGE = 7 * 24 * 3600000; // 7 dias em ms
+
   constructor(
     private readonly authService: AuthService,
     private readonly prismaAuthService: PrismaAuthService,
   ) {}
+
+  private getCookieConfig() {
+    return {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+      path: '/',
+    };
+  }
 
   @Post('login')
   @ApiOperation({ summary: 'Fazer login no sistema' })
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Login realizado com sucesso' })
   @ApiResponse({ status: 401, description: 'Credenciais inválidas' })
-  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     try {
       // Validar usuário
       const user = await this.authService.validateUser(loginDto.email, loginDto.password);
 
-      // Gerar token
+      // Gerar tokens
       const result = await this.authService.login(user);
+      const cookieConfig = this.getCookieConfig();
 
-      // Configurar o cookie httpOnly com o token JWT
+      // Access token - expira em 1h
       response.cookie('access_token', result.access_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 3600000, // 1 hora
+        ...cookieConfig,
+        maxAge: this.ACCESS_TOKEN_MAX_AGE,
+      });
+
+      // Refresh token - expira em 7 dias
+      response.cookie('refresh_token', result.refresh_token, {
+        ...cookieConfig,
+        maxAge: this.REFRESH_TOKEN_MAX_AGE,
       });
 
       return {
@@ -53,11 +73,71 @@ export class AuthController {
     }
   }
 
+  @Post('refresh')
+  @ApiOperation({ summary: 'Renovar tokens de autenticação' })
+  @ApiResponse({ status: 200, description: 'Tokens renovados com sucesso' })
+  @ApiResponse({ status: 401, description: 'Refresh token inválido ou expirado' })
+  async refresh(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const refreshToken = (request as any).cookies?.refresh_token;
+
+    if (!refreshToken) {
+      return response.status(HttpStatus.UNAUTHORIZED).json({
+        message: 'Refresh token não encontrado',
+      });
+    }
+
+    try {
+      const result = await this.authService.refreshTokens(refreshToken);
+      const cookieConfig = this.getCookieConfig();
+
+      // Novos tokens
+      response.cookie('access_token', result.access_token, {
+        ...cookieConfig,
+        maxAge: this.ACCESS_TOKEN_MAX_AGE,
+      });
+
+      response.cookie('refresh_token', result.refresh_token, {
+        ...cookieConfig,
+        maxAge: this.REFRESH_TOKEN_MAX_AGE,
+      });
+
+      return {
+        user: result.user,
+        message: 'Tokens renovados com sucesso',
+      };
+    } catch {
+      const cookieConfig = this.getCookieConfig();
+      response.clearCookie('access_token', cookieConfig);
+      response.clearCookie('refresh_token', cookieConfig);
+
+      return response.status(HttpStatus.UNAUTHORIZED).json({
+        message: 'Sessão expirada. Faça login novamente.',
+      });
+    }
+  }
+
   @Post('logout')
   @ApiOperation({ summary: 'Fazer logout do sistema' })
   @ApiResponse({ status: 200, description: 'Logout realizado com sucesso' })
-  async logout(@Res({ passthrough: true }) response: Response) {
-    response.clearCookie('access_token');
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const refreshToken = (request as any).cookies?.refresh_token;
+    const cookieConfig = this.getCookieConfig();
+
+    // Invalida o refresh token no banco
+    if (refreshToken) {
+      await this.authService.logout(refreshToken);
+    }
+
+    // Remove os cookies
+    response.clearCookie('access_token', cookieConfig);
+    response.clearCookie('refresh_token', cookieConfig);
+
     return { message: 'Logout realizado com sucesso' };
   }
 
