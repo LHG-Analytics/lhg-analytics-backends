@@ -55,6 +55,9 @@ export class AuthController {
         maxAge: this.REFRESH_TOKEN_MAX_AGE,
       });
 
+      // Calcula quando o access token expira
+      const expiresAt = new Date(Date.now() + this.ACCESS_TOKEN_MAX_AGE).toISOString();
+
       return {
         message: 'Login realizado com sucesso',
         user: {
@@ -64,6 +67,7 @@ export class AuthController {
           unit: user.unit,
           role: user.role,
         },
+        expiresAt,
       };
     } catch (error) {
       return response.status(HttpStatus.UNAUTHORIZED).json({
@@ -104,9 +108,13 @@ export class AuthController {
         maxAge: this.REFRESH_TOKEN_MAX_AGE,
       });
 
+      // Calcula quando o novo access token expira
+      const expiresAt = new Date(Date.now() + this.ACCESS_TOKEN_MAX_AGE).toISOString();
+
       return {
         user: result.user,
         message: 'Tokens renovados com sucesso',
+        expiresAt,
       };
     } catch {
       const cookieConfig = this.getCookieConfig();
