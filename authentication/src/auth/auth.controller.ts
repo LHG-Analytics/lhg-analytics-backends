@@ -152,8 +152,10 @@ export class AuthController {
   @Get('me')
   @ApiBearerAuth('JWT-auth')
   async getCurrentUser(@Request() req: any) {
-    // Calcula expiresAt baseado no tempo do token (1h)
-    const expiresAt = new Date(Date.now() + this.ACCESS_TOKEN_MAX_AGE).toISOString();
+    // Converte o exp do JWT (segundos desde epoch) para ISO string
+    const expiresAt = req.user.exp
+      ? new Date(req.user.exp * 1000).toISOString()
+      : null;
 
     return {
       id: req.user.id,
