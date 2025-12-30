@@ -61,6 +61,9 @@ export class AuthController {
       maxAge: this.REFRESH_TOKEN_MAX_AGE,
     });
 
+    // Calcula quando o access token expira
+    const expiresAt = new Date(Date.now() + this.ACCESS_TOKEN_MAX_AGE).toISOString();
+
     return res.json({
       user: {
         id: user.id,
@@ -70,6 +73,7 @@ export class AuthController {
         role: user.role,
       },
       message: 'Login realizado com sucesso',
+      expiresAt,
     });
   }
 
@@ -103,9 +107,13 @@ export class AuthController {
         maxAge: this.REFRESH_TOKEN_MAX_AGE,
       });
 
+      // Calcula quando o novo access token expira
+      const expiresAt = new Date(Date.now() + this.ACCESS_TOKEN_MAX_AGE).toISOString();
+
       return res.json({
         user,
         message: 'Tokens renovados com sucesso',
+        expiresAt,
       });
     } catch {
       // Limpa os cookies em caso de erro
@@ -144,12 +152,16 @@ export class AuthController {
   @Get('me')
   @ApiBearerAuth('JWT-auth')
   async getCurrentUser(@Request() req: any) {
+    // Calcula expiresAt baseado no tempo do token (1h)
+    const expiresAt = new Date(Date.now() + this.ACCESS_TOKEN_MAX_AGE).toISOString();
+
     return {
       id: req.user.id,
       email: req.user.email,
       name: req.user.name,
       unit: req.user.unit,
       role: req.user.role,
+      expiresAt,
     };
   }
 }
