@@ -1539,7 +1539,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
         AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
     `;
 
     // Query 2: Buscar tempos indisponíveis (COM suite_id para filtrar depois)
@@ -1556,7 +1556,7 @@ export class CompanyService {
       WHERE la.datainicio >= ${formattedStart}::timestamp
         AND la.datainicio <= ${formattedEnd}::timestamp
         AND la.datafim IS NOT NULL
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
 
       UNION ALL
 
@@ -1573,7 +1573,7 @@ export class CompanyService {
       WHERE d.datainicio >= ${formattedStart}::timestamp
         AND d.datainicio <= ${formattedEnd}::timestamp
         AND d.datafim IS NOT NULL
-        AND ca.id IN (2,3,4,5,6,7)
+        AND ca.id IN (2,3,4,5,6,7,12)
     `;
 
     // Query 3: Metadados (suítes por categoria + primeira suíte de cada categoria)
@@ -1584,7 +1584,7 @@ export class CompanyService {
           a.id as first_suite_id
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
-        WHERE ca.id IN (2,3,4,5,6,7)
+        WHERE ca.id IN (2,3,4,5,6,7,12)
           ORDER BY ca.id, a.id
       )
       SELECT
@@ -1594,7 +1594,7 @@ export class CompanyService {
       FROM categoriaapartamento ca
       INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
       INNER JOIN first_suite_per_category fs ON ca.descricao = fs.category_name
-      WHERE ca.id IN (2,3,4,5,6,7)
+      WHERE ca.id IN (2,3,4,5,6,7,12)
       GROUP BY ca.descricao, fs.first_suite_id
     `;
 
@@ -1971,6 +1971,213 @@ export class CompanyService {
       }),
     );
 
+    // === IMPLEMENTAÇÃO DO DATATABLETREVPARBYWEEK ===
+    // Consulta SQL para TRevPAR semanal por categoria
+    // TRevPAR = (receita total + gorjeta) / total de suítes / dias
+    const trevparByWeekResult: any[] = await this.prisma.prismaLocal.$queryRaw`
+      WITH weekly_revenue AS (
+        SELECT
+          ca.descricao as suite_category_name,
+          EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          ) as day_of_week_num,
+          CASE EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          )
+            WHEN 0 THEN 'domingo'
+            WHEN 1 THEN 'segunda-feira'
+            WHEN 2 THEN 'terça-feira'
+            WHEN 3 THEN 'quarta-feira'
+            WHEN 4 THEN 'quinta-feira'
+            WHEN 5 THEN 'sexta-feira'
+            WHEN 6 THEN 'sábado'
+          END as day_of_week,
+          -- Receita total (permanência + ocupacional + consumo - desconto + gorjeta)
+          SUM(
+            COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
+            COALESCE(
+              (
+                SELECT COALESCE(SUM(
+                  CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
+                ), 0)
+                FROM vendalocacao vl
+                INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
+                INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+                WHERE vl.id_locacaoapartamento = la.id_apartamentostate
+                  AND sei.cancelado IS NULL
+              ), 0
+            ) -
+            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0) +
+            COALESCE(CAST(la.gorjeta AS DECIMAL(15,4)), 0)
+          ) as day_revenue
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
+          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND ca.id IN (2,3,4,5,6,7,12)
+        GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM
+          CASE
+            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+            ELSE la.datainicialdaocupacao
+          END
+        )
+      ),
+      suite_counts_by_category AS (
+        SELECT
+          ca.descricao as suite_category_name,
+          COUNT(DISTINCT a.id) as total_suites_in_category
+        FROM categoriaapartamento ca
+        INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
+        WHERE ca.id IN (2,3,4,5,6,7,12)
+          AND a.dataexclusao IS NULL
+        GROUP BY ca.id, ca.descricao
+      ),
+      days_in_period AS (
+        SELECT
+          EXTRACT(DOW FROM d::date) as day_of_week_num,
+          CASE EXTRACT(DOW FROM d::date)
+            WHEN 0 THEN 'domingo'
+            WHEN 1 THEN 'segunda-feira'
+            WHEN 2 THEN 'terça-feira'
+            WHEN 3 THEN 'quarta-feira'
+            WHEN 4 THEN 'quinta-feira'
+            WHEN 5 THEN 'sexta-feira'
+            WHEN 6 THEN 'sábado'
+          END as day_of_week,
+          COUNT(*) as days_count
+        FROM generate_series(${formattedStart}::timestamp, ${formattedEnd}::timestamp, '1 day'::interval) d
+        GROUP BY EXTRACT(DOW FROM d::date)
+      ),
+      total_revenue_by_day AS (
+        SELECT
+          EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          ) as day_of_week_num,
+          CASE EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          )
+            WHEN 0 THEN 'domingo'
+            WHEN 1 THEN 'segunda-feira'
+            WHEN 2 THEN 'terça-feira'
+            WHEN 3 THEN 'quarta-feira'
+            WHEN 4 THEN 'quinta-feira'
+            WHEN 5 THEN 'sexta-feira'
+            WHEN 6 THEN 'sábado'
+          END as day_of_week,
+          SUM(
+            COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
+            COALESCE(
+              (
+                SELECT COALESCE(SUM(
+                  CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
+                ), 0)
+                FROM vendalocacao vl
+                INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
+                INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+                WHERE vl.id_locacaoapartamento = la.id_apartamentostate
+                  AND sei.cancelado IS NULL
+              ), 0
+            ) -
+            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0) +
+            COALESCE(CAST(la.gorjeta AS DECIMAL(15,4)), 0)
+          ) as total_day_revenue
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
+          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND ca.id IN (2,3,4,5,6,7,12)
+        GROUP BY EXTRACT(DOW FROM
+          CASE
+            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+            ELSE la.datainicialdaocupacao
+          END
+        )
+      )
+      SELECT
+        wr.suite_category_name,
+        wr.day_of_week,
+        wr.day_revenue,
+        sc.total_suites_in_category,
+        dp.days_count,
+        tr.total_day_revenue,
+        -- TRevPAR por categoria e dia da semana (receita / suítes / dias)
+        CASE
+          WHEN sc.total_suites_in_category > 0 AND dp.days_count > 0 THEN
+            wr.day_revenue::DECIMAL / (sc.total_suites_in_category * dp.days_count)
+          ELSE 0
+        END as category_trevpar,
+        -- TRevPAR total para o dia da semana (todas as categorias)
+        CASE
+          WHEN ${totalSuites}::DECIMAL > 0 AND dp.days_count > 0 THEN
+            tr.total_day_revenue::DECIMAL / (${totalSuites}::DECIMAL * dp.days_count)
+          ELSE 0
+        END as total_trevpar
+      FROM weekly_revenue wr
+      INNER JOIN suite_counts_by_category sc ON wr.suite_category_name = sc.suite_category_name
+      INNER JOIN days_in_period dp ON wr.day_of_week_num = dp.day_of_week_num
+      INNER JOIN total_revenue_by_day tr ON wr.day_of_week_num = tr.day_of_week_num
+      ORDER BY wr.suite_category_name, wr.day_of_week_num
+    `;
+
+    // Transformar os resultados no formato esperado (WeeklyTrevparData[])
+    const trevparByCategory: { [category: string]: { [day: string]: any } } = {};
+
+    trevparByWeekResult.forEach((item) => {
+      const categoryName = item.suite_category_name;
+      const dayName = item.day_of_week;
+
+      if (!trevparByCategory[categoryName]) {
+        trevparByCategory[categoryName] = {};
+      }
+
+      trevparByCategory[categoryName][dayName] = {
+        trevpar: Number(Number(item.category_trevpar).toFixed(2)),
+        totalTrevpar: Number(Number(item.total_trevpar).toFixed(2)),
+      };
+    });
+
+    // Preencher dias ausentes com trevpar 0 para cada categoria de suíte
+    Object.keys(trevparByCategory).forEach((categoryName) => {
+      // Pegar o totalTrevpar de qualquer dia existente para usar como referência
+      const existingDay = Object.values(trevparByCategory[categoryName])[0];
+      const totalTrevparReference = existingDay ? existingDay.totalTrevpar : 0;
+
+      allDaysOfWeekSQL.forEach((day) => {
+        if (!trevparByCategory[categoryName][day]) {
+          trevparByCategory[categoryName][day] = {
+            trevpar: 0,
+            totalTrevpar: totalTrevparReference,
+          };
+        }
+      });
+    });
+
+    const dataTableTrevparByWeek: any[] = Object.entries(trevparByCategory).map(
+      ([categoryName, dayData]) => ({
+        [categoryName]: dayData,
+      }),
+    );
+
     // Calcular TotalResult somando todos os valores do DataTableSuiteCategory
     // Isso garante que os totais sejam a soma exata das categorias (SEM vendas diretas)
     const totalResultFromCategories = suiteCategoryKpisResult.reduce(
@@ -2051,7 +2258,7 @@ export class CompanyService {
       },
       DataTableOccupancyRateByWeek: dataTableOccupancyRateByWeek,
       DataTableGiroByWeek: dataTableGiroByWeek,
-      DataTableTrevparByWeek: [],
+      DataTableTrevparByWeek: dataTableTrevparByWeek,
     };
   }
 
