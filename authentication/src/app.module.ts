@@ -7,6 +7,9 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { CacheModule } from './cache/cache.module';
+import { DatabaseModule } from './database/database.module';
+import { CompanyModule } from './company/company.module';
 
 @Module({
   imports: [
@@ -17,6 +20,9 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
         limit: 100, // 100 requests per minute (global)
       },
     ]),
+    CacheModule,
+    DatabaseModule,
+    CompanyModule,
     UsersModule,
     AuthModule,
   ],
