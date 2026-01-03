@@ -848,11 +848,16 @@ export class CompanyService {
       ORDER BY date
     `;
 
+    // SQL para calcular tempo de ocupação por categoria de suíte e data
+    // Taxa de ocupação = (tempo ocupado / tempo disponível) × 100
     const occupancyRateBySuiteCategorySQL = `
       SELECT
         ca.descricao as suite_category,
-        DATE(la.datainicialdaocupacao) as rental_date,
-        COUNT(la.id_apartamentostate) as total_rentals
+        CASE
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        END as rental_date,
+        SUM(EXTRACT(EPOCH FROM (la.datafinaldaocupacao - la.datainicialdaocupacao))) as total_occupied_time
       FROM locacaoapartamento la
       INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
       INNER JOIN apartamento a ON aps.id_apartamento = a.id
@@ -861,7 +866,10 @@ export class CompanyService {
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
-      GROUP BY ca.descricao, DATE(la.datainicialdaocupacao)
+      GROUP BY ca.descricao, CASE
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        END
       ORDER BY rental_date, ca.descricao
     `;
 
@@ -1274,10 +1282,10 @@ export class CompanyService {
     };
 
     // Calcular taxa de ocupação por categoria (formato ApexCharts com dates/meses em categories e suites em series)
-    // Para agrupamento por mês, precisamos somar as locações e calcular a média de ocupação
+    // Taxa de ocupação = (tempo ocupado / tempo disponível) × 100
     const occupancyBySuiteCategoryMap = new Map<
       string,
-      Map<string, { totalRentals: number; count: number }>
+      Map<string, { totalOccupiedTime: number; daysCount: number }>
     >();
     const allSuiteCategoriesSet = new Set<string>();
 
@@ -1287,7 +1295,7 @@ export class CompanyService {
         ? moment(item.rental_date).format('MM/YYYY')
         : moment(item.rental_date).format('DD/MM/YYYY');
       const suiteCategoryName = item.suite_category;
-      const totalRentals = Number(item.total_rentals) || 0;
+      const totalOccupiedTime = Number(item.total_occupied_time) || 0;
 
       allSuiteCategoriesSet.add(suiteCategoryName);
 
@@ -1295,10 +1303,10 @@ export class CompanyService {
         occupancyBySuiteCategoryMap.set(dateKey, new Map());
       }
       const categoryMap = occupancyBySuiteCategoryMap.get(dateKey)!;
-      const current = categoryMap.get(suiteCategoryName) || { totalRentals: 0, count: 0 };
+      const current = categoryMap.get(suiteCategoryName) || { totalOccupiedTime: 0, daysCount: 0 };
       categoryMap.set(suiteCategoryName, {
-        totalRentals: current.totalRentals + totalRentals,
-        count: current.count + 1,
+        totalOccupiedTime: current.totalOccupiedTime + totalOccupiedTime,
+        daysCount: current.daysCount + 1,
       });
     });
 
@@ -1319,11 +1327,28 @@ export class CompanyService {
           data: [...periodsArray].map((periodKey) => {
             const categoryData = occupancyBySuiteCategoryMap.get(periodKey)?.get(suiteCategoryName);
             if (!categoryData) return 0;
-            // Para agrupamento por mês, calculamos a média de ocupação
-            const avgRentals = groupByMonth
-              ? categoryData.totalRentals / categoryData.count
-              : categoryData.totalRentals;
-            return Number((avgRentals / totalSuitesInCategory).toFixed(2));
+
+            // Para agrupamento por mês, precisamos calcular quantos dias tem no período
+            let daysInPeriod = 1;
+            if (groupByMonth) {
+              const [month, year] = periodKey.split('/');
+              const firstDayOfMonth = moment.utc(`${year}-${month}-01`);
+              const lastDayOfMonth = firstDayOfMonth.clone().endOf('month');
+              const periodStart = moment.utc(startDate);
+              const periodEnd = moment.utc(endDate);
+
+              const effectiveStart = moment.max(firstDayOfMonth, periodStart);
+              const effectiveEnd = moment.min(lastDayOfMonth, periodEnd);
+              daysInPeriod = effectiveEnd.diff(effectiveStart, 'days') + 1;
+            }
+
+            // Tempo disponível = total de suítes na categoria × dias × 86400 segundos
+            const totalAvailableTime = totalSuitesInCategory * daysInPeriod * 86400;
+            const occupancyRate =
+              totalAvailableTime > 0
+                ? (categoryData.totalOccupiedTime / totalAvailableTime) * 100
+                : 0;
+            return Number(occupancyRate.toFixed(2));
           }),
         };
       }),
