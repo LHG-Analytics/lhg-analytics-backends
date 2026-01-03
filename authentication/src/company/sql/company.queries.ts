@@ -20,7 +20,10 @@ export function formatDateForSQL(dateStr: string): string {
  * Calcula os timestamps de início e fim considerando o corte das 6h
  * startDate 06:00:00 até endDate+1 05:59:59
  */
-export function getDateRangeWithCutoff(startDate: string, endDate: string): { startTimestamp: string; endTimestamp: string } {
+export function getDateRangeWithCutoff(
+  startDate: string,
+  endDate: string,
+): { startTimestamp: string; endTimestamp: string } {
   const formattedStart = formatDateForSQL(startDate);
   const formattedEnd = formatDateForSQL(endDate);
 
@@ -47,9 +50,16 @@ export function getCategoryIds(unit: UnitKey): string {
 /**
  * Query para BigNumbers - totais do período
  */
-export function getBigNumbersSQL(unit: UnitKey, startDate: string, endDate: string): string {
+export function getBigNumbersSQL(
+  unit: UnitKey,
+  startDate: string,
+  endDate: string,
+): string {
   const categoryIds = getCategoryIds(unit);
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
 
   return `
     WITH receita_consumo AS (
@@ -104,9 +114,16 @@ export function getBigNumbersSQL(unit: UnitKey, startDate: string, endDate: stri
 /**
  * Query para Revenue por data
  */
-export function getRevenueByDateSQL(unit: UnitKey, startDate: string, endDate: string): string {
+export function getRevenueByDateSQL(
+  unit: UnitKey,
+  startDate: string,
+  endDate: string,
+): string {
   const categoryIds = getCategoryIds(unit);
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
 
   return `
     WITH receita_consumo AS (
@@ -160,9 +177,16 @@ export function getRevenueByDateSQL(unit: UnitKey, startDate: string, endDate: s
 /**
  * Query para Rentals (locações) por data
  */
-export function getRentalsByDateSQL(unit: UnitKey, startDate: string, endDate: string): string {
+export function getRentalsByDateSQL(
+  unit: UnitKey,
+  startDate: string,
+  endDate: string,
+): string {
   const categoryIds = getCategoryIds(unit);
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
 
   return `
     SELECT
@@ -190,9 +214,16 @@ export function getRentalsByDateSQL(unit: UnitKey, startDate: string, endDate: s
 /**
  * Query para TRevPAR por data (inclui gorjetas)
  */
-export function getTrevparByDateSQL(unit: UnitKey, startDate: string, endDate: string): string {
+export function getTrevparByDateSQL(
+  unit: UnitKey,
+  startDate: string,
+  endDate: string,
+): string {
   const categoryIds = getCategoryIds(unit);
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
   const totalSuites = UNIT_CONFIGS[unit].suiteConfig.totalSuites;
 
   return `
@@ -248,9 +279,16 @@ export function getTrevparByDateSQL(unit: UnitKey, startDate: string, endDate: s
 /**
  * Query para Taxa de Ocupação por data
  */
-export function getOccupancyRateByDateSQL(unit: UnitKey, startDate: string, endDate: string): string {
+export function getOccupancyRateByDateSQL(
+  unit: UnitKey,
+  startDate: string,
+  endDate: string,
+): string {
   const categoryIds = getCategoryIds(unit);
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
   const totalSuites = UNIT_CONFIGS[unit].suiteConfig.totalSuites;
   // 18 horas úteis por dia em segundos (6h às 24h = 18h)
   const availableSecondsPerDay = 18 * 3600;
@@ -290,9 +328,16 @@ export function getOccupancyRateByDateSQL(unit: UnitKey, startDate: string, endD
 /**
  * Query para Giro por data (locações por suíte)
  */
-export function getGiroByDateSQL(unit: UnitKey, startDate: string, endDate: string): string {
+export function getGiroByDateSQL(
+  unit: UnitKey,
+  startDate: string,
+  endDate: string,
+): string {
   const categoryIds = getCategoryIds(unit);
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
   const totalSuites = UNIT_CONFIGS[unit].suiteConfig.totalSuites;
 
   return `

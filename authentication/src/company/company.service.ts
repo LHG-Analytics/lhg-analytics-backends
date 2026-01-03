@@ -85,11 +85,18 @@ export class CompanyService {
     // Faz chamadas paralelas para todas as unidades
     const unitPromises = UNITS.map(async (config) => {
       try {
-        const response = await this.fetchUnitKpis(config, startDate, endDate, token);
+        const response = await this.fetchUnitKpis(
+          config,
+          startDate,
+          endDate,
+          token,
+        );
         this.logger.log(`KPIs de ${config.name} obtidos com sucesso`);
         return { config, data: response, success: true };
       } catch (error) {
-        this.logger.error(`Erro ao buscar KPIs de ${config.name}: ${error.message}`);
+        this.logger.error(
+          `Erro ao buscar KPIs de ${config.name}: ${error.message}`,
+        );
         return { config, data: null, success: false };
       }
     });
@@ -142,7 +149,9 @@ export class CompanyService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+        throw new Error(
+          `HTTP ${response.status}: ${response.statusText} - ${errorText}`,
+        );
       }
 
       return response.json();
@@ -152,7 +161,9 @@ export class CompanyService {
       }
       // Melhora mensagem de erro de conexão
       if (error.cause?.code === 'ECONNREFUSED') {
-        throw new Error(`Conexão recusada - ${config.name} não está rodando em ${config.url}`);
+        throw new Error(
+          `Conexão recusada - ${config.name} não está rodando em ${config.url}`,
+        );
       }
       throw error;
     }
@@ -162,7 +173,11 @@ export class CompanyService {
    * Consolida os dados de todas as unidades
    */
   private consolidateData(
-    results: Array<{ config: UnitConfig; data: UnitKpiResponse; success: boolean }>,
+    results: Array<{
+      config: UnitConfig;
+      data: UnitKpiResponse;
+      success: boolean;
+    }>,
   ): UnifiedCompanyKpiResponse {
     // Extrai categories (datas) do primeiro resultado válido
     const categories = results[0].data.RevenueByDate?.categories || [];
@@ -174,10 +189,30 @@ export class CompanyService {
     const revenueByCompany = this.calculateRevenueByCompany(results);
 
     // Consolida séries somando valores de cada data
-    const revenueByDate = this.consolidateSeries(results, 'RevenueByDate', categories, 'sum');
-    const rentalsByDate = this.consolidateSeries(results, 'RentalsByDate', categories, 'sum');
-    const trevparByDate = this.consolidateSeries(results, 'TrevparByDate', categories, 'avg');
-    const occupancyRateByDate = this.consolidateSeries(results, 'OccupancyRateByDate', categories, 'avg');
+    const revenueByDate = this.consolidateSeries(
+      results,
+      'RevenueByDate',
+      categories,
+      'sum',
+    );
+    const rentalsByDate = this.consolidateSeries(
+      results,
+      'RentalsByDate',
+      categories,
+      'sum',
+    );
+    const trevparByDate = this.consolidateSeries(
+      results,
+      'TrevparByDate',
+      categories,
+      'avg',
+    );
+    const occupancyRateByDate = this.consolidateSeries(
+      results,
+      'OccupancyRateByDate',
+      categories,
+      'avg',
+    );
 
     // Ticket médio consolidado = faturamento total / locações totais (por data)
     const ticketAverageByDate = this.calculateConsolidatedTicketAverage(
@@ -202,7 +237,11 @@ export class CompanyService {
    * Consolida BigNumbers de todas as unidades
    */
   private consolidateBigNumbers(
-    results: Array<{ config: UnitConfig; data: UnitKpiResponse; success: boolean }>,
+    results: Array<{
+      config: UnitConfig;
+      data: UnitKpiResponse;
+      success: boolean;
+    }>,
   ): BigNumbersDataSQL {
     const validBigNumbers = results
       .map((r) => r.data.BigNumbers?.[0])
@@ -239,26 +278,34 @@ export class CompanyService {
       totalRentals += bn.currentDate?.totalAllRentalsApartments || 0;
       totalTrevpar += bn.currentDate?.totalAllTrevpar || 0;
       totalGiro += bn.currentDate?.totalAllGiro || 0;
-      totalTmoSeconds += this.timeToSeconds(bn.currentDate?.totalAverageOccupationTime);
+      totalTmoSeconds += this.timeToSeconds(
+        bn.currentDate?.totalAverageOccupationTime,
+      );
 
       // Dados anteriores
       if (bn.previousDate) {
         hasPreviousData = true;
         totalValuePrev += bn.previousDate.totalAllValuePreviousData || 0;
-        totalRentalsPrev += bn.previousDate.totalAllRentalsApartmentsPreviousData || 0;
+        totalRentalsPrev +=
+          bn.previousDate.totalAllRentalsApartmentsPreviousData || 0;
         totalTrevparPrev += bn.previousDate.totalAllTrevparPreviousData || 0;
         totalGiroPrev += bn.previousDate.totalAllGiroPreviousData || 0;
-        totalTmoSecondsPrev += this.timeToSeconds(bn.previousDate.totalAverageOccupationTimePreviousData);
+        totalTmoSecondsPrev += this.timeToSeconds(
+          bn.previousDate.totalAverageOccupationTimePreviousData,
+        );
       }
 
       // Dados forecast
       if (bn.monthlyForecast) {
         hasForecastData = true;
         totalValueForecast += bn.monthlyForecast.totalAllValueForecast || 0;
-        totalRentalsForecast += bn.monthlyForecast.totalAllRentalsApartmentsForecast || 0;
+        totalRentalsForecast +=
+          bn.monthlyForecast.totalAllRentalsApartmentsForecast || 0;
         totalTrevparForecast += bn.monthlyForecast.totalAllTrevparForecast || 0;
         totalGiroForecast += bn.monthlyForecast.totalAllGiroForecast || 0;
-        totalTmoSecondsForecast += this.timeToSeconds(bn.monthlyForecast.totalAverageOccupationTimeForecast);
+        totalTmoSecondsForecast += this.timeToSeconds(
+          bn.monthlyForecast.totalAverageOccupationTimeForecast,
+        );
       }
     });
 
@@ -280,26 +327,42 @@ export class CompanyService {
     };
 
     if (hasPreviousData) {
-      const avgTicketPrev = totalRentalsPrev > 0 ? totalValuePrev / totalRentalsPrev : 0;
+      const avgTicketPrev =
+        totalRentalsPrev > 0 ? totalValuePrev / totalRentalsPrev : 0;
       result.previousDate = {
         totalAllValuePreviousData: Number(totalValuePrev.toFixed(2)),
         totalAllRentalsApartmentsPreviousData: totalRentalsPrev,
         totalAllTicketAveragePreviousData: Number(avgTicketPrev.toFixed(2)),
-        totalAllTrevparPreviousData: Number((totalTrevparPrev / unitCount).toFixed(2)),
-        totalAllGiroPreviousData: Number((totalGiroPrev / unitCount).toFixed(2)),
-        totalAverageOccupationTimePreviousData: this.secondsToTime(totalTmoSecondsPrev / unitCount),
+        totalAllTrevparPreviousData: Number(
+          (totalTrevparPrev / unitCount).toFixed(2),
+        ),
+        totalAllGiroPreviousData: Number(
+          (totalGiroPrev / unitCount).toFixed(2),
+        ),
+        totalAverageOccupationTimePreviousData: this.secondsToTime(
+          totalTmoSecondsPrev / unitCount,
+        ),
       };
     }
 
     if (hasForecastData) {
-      const avgTicketForecast = totalRentalsForecast > 0 ? totalValueForecast / totalRentalsForecast : 0;
+      const avgTicketForecast =
+        totalRentalsForecast > 0
+          ? totalValueForecast / totalRentalsForecast
+          : 0;
       result.monthlyForecast = {
         totalAllValueForecast: Number(totalValueForecast.toFixed(2)),
         totalAllRentalsApartmentsForecast: totalRentalsForecast,
         totalAllTicketAverageForecast: Number(avgTicketForecast.toFixed(2)),
-        totalAllTrevparForecast: Number((totalTrevparForecast / unitCount).toFixed(2)),
-        totalAllGiroForecast: Number((totalGiroForecast / unitCount).toFixed(2)),
-        totalAverageOccupationTimeForecast: this.secondsToTime(totalTmoSecondsForecast / unitCount),
+        totalAllTrevparForecast: Number(
+          (totalTrevparForecast / unitCount).toFixed(2),
+        ),
+        totalAllGiroForecast: Number(
+          (totalGiroForecast / unitCount).toFixed(2),
+        ),
+        totalAverageOccupationTimeForecast: this.secondsToTime(
+          totalTmoSecondsForecast / unitCount,
+        ),
       };
     }
 
@@ -310,14 +373,19 @@ export class CompanyService {
    * Calcula RevenueByCompany - faturamento total de cada unidade
    */
   private calculateRevenueByCompany(
-    results: Array<{ config: UnitConfig; data: UnitKpiResponse; success: boolean }>,
+    results: Array<{
+      config: UnitConfig;
+      data: UnitKpiResponse;
+      success: boolean;
+    }>,
   ): ApexChartsData {
     const categories: string[] = [];
     const series: number[] = [];
 
     results.forEach((r) => {
       categories.push(r.config.name);
-      const totalRevenue = r.data.BigNumbers?.[0]?.currentDate?.totalAllValue || 0;
+      const totalRevenue =
+        r.data.BigNumbers?.[0]?.currentDate?.totalAllValue || 0;
       series.push(Number(totalRevenue.toFixed(2)));
     });
 
@@ -328,7 +396,11 @@ export class CompanyService {
    * Consolida séries de dados somando ou fazendo média por data
    */
   private consolidateSeries(
-    results: Array<{ config: UnitConfig; data: UnitKpiResponse; success: boolean }>,
+    results: Array<{
+      config: UnitConfig;
+      data: UnitKpiResponse;
+      success: boolean;
+    }>,
     field: string,
     categories: string[],
     mode: 'sum' | 'avg',
@@ -352,7 +424,9 @@ export class CompanyService {
     if (mode === 'avg') {
       for (let i = 0; i < consolidatedSeries.length; i++) {
         if (counts[i] > 0) {
-          consolidatedSeries[i] = Number((consolidatedSeries[i] / counts[i]).toFixed(2));
+          consolidatedSeries[i] = Number(
+            (consolidatedSeries[i] / counts[i]).toFixed(2),
+          );
         }
       }
     } else {

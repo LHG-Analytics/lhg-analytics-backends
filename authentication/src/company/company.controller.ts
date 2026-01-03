@@ -4,8 +4,22 @@
  * Versão Multi-Tenant - conexão direta aos bancos
  */
 
-import { Controller, Get, Query, HttpException, HttpStatus, Logger, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Query,
+  HttpException,
+  HttpStatus,
+  Logger,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiQuery,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { CompanyMultitenantService } from './company-multitenant.service';
 import { UnifiedCompanyKpiResponse } from './company.interfaces';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,7 +36,8 @@ export class CompanyController {
   @Get('kpis/date-range')
   @ApiOperation({
     summary: 'Obtém KPIs consolidados de Company de todas as unidades',
-    description: 'Retorna dados consolidados de faturamento, locações, ticket médio, taxa de ocupação, TRevPAR e giro de todas as unidades (Lush Ipiranga, Lush Lapa, Andar de Cima, Tout). Utiliza conexão direta com os bancos de dados.',
+    description:
+      'Retorna dados consolidados de faturamento, locações, ticket médio, taxa de ocupação, TRevPAR e giro de todas as unidades (Lush Ipiranga, Lush Lapa, Andar de Cima, Tout). Utiliza conexão direta com os bancos de dados.',
   })
   @ApiQuery({
     name: 'startDate',
