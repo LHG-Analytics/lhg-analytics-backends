@@ -1,8 +1,17 @@
-import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CompanyService } from './company.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '@auth/auth/guards/roles.guard';
+import { UnitsGuard } from '@auth/auth/guards/units.guard';
+import { Roles } from '@auth/auth/decorators/roles.decorator';
+import { Units } from '@auth/auth/decorators/units.decorator';
 
 @ApiTags('Company')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard, UnitsGuard)
+@Roles('ADMIN', 'GERENTE_GERAL', 'GERENTE_FINANCEIRO')
+@Units('LHG', 'ANDAR_DE_CIMA')
 @Controller('Company')
 export class CompanyController {
   constructor(private readonly companyService: CompanyService) {}

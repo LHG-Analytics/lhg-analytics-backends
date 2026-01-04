@@ -1,9 +1,18 @@
-import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PeriodEnum } from '../common/enums';
 import { BookingsService } from './bookings.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '@auth/auth/guards/roles.guard';
+import { UnitsGuard } from '@auth/auth/guards/units.guard';
+import { Roles } from '@auth/auth/decorators/roles.decorator';
+import { Units } from '@auth/auth/decorators/units.decorator';
 
 @ApiTags('Bookings')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard, UnitsGuard)
+@Roles('ADMIN', 'GERENTE_GERAL', 'GERENTE_RESERVAS')
+@Units('LHG', 'TOUT')
 @Controller('Bookings')
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}

@@ -1,9 +1,18 @@
-import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 
 import { GovernanceService } from './governance.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '@auth/auth/guards/roles.guard';
+import { UnitsGuard } from '@auth/auth/guards/units.guard';
+import { Roles } from '@auth/auth/decorators/roles.decorator';
+import { Units } from '@auth/auth/decorators/units.decorator';
 
 @ApiTags('Governance')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard, UnitsGuard)
+@Roles('ADMIN', 'GERENTE_GERAL', 'GERENTE_OPERACIONAL')
+@Units('LHG', 'TOUT')
 @Controller('Governance')
 export class GovernanceController {
   constructor(private readonly governanceService: GovernanceService) {}

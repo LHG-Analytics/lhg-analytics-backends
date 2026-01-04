@@ -23,10 +23,16 @@ import {
 import { CompanyMultitenantService } from './company-multitenant.service';
 import { UnifiedCompanyKpiResponse } from './company.interfaces';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { UnitsGuard } from '../auth/guards/units.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Units } from '../auth/decorators/units.decorator';
 
 @ApiTags('Company')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, UnitsGuard)
+@Roles('ADMIN')
+@Units('LHG')
 @Controller('Company')
 export class CompanyController {
   private readonly logger = new Logger(CompanyController.name);
