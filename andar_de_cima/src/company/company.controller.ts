@@ -2,10 +2,10 @@ import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query, UseG
 import { ApiBadRequestResponse, ApiBearerAuth, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CompanyService } from './company.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '@auth/auth/guards/roles.guard';
-import { UnitsGuard } from '@auth/auth/guards/units.guard';
-import { Roles } from '@auth/auth/decorators/roles.decorator';
-import { Units } from '@auth/auth/decorators/units.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { UnitsGuard } from '../auth/units.guard';
+import { Roles } from '../auth/roles.decorator';
+import { Units } from '../auth/units.decorator';
 
 @ApiTags('Company')
 @ApiBearerAuth()
