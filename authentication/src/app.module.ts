@@ -10,6 +10,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CacheModule } from './cache/cache.module';
 import { DatabaseModule } from './database/database.module';
 import { CompanyModule } from './company/company.module';
+import { RestaurantModule } from './restaurant/restaurant.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CompanyModule } from './company/company.module';
     CacheModule,
     DatabaseModule,
     CompanyModule,
+    RestaurantModule,
     UsersModule,
     AuthModule,
   ],
