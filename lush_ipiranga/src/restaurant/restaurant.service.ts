@@ -183,7 +183,7 @@ export class RestaurantService {
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
   LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart} AND ${formattedEnd}
+  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
   GROUP BY ra."id_apartamentostate", so.id, s."desconto", ra."datainicialdaocupacao"
 `;
@@ -217,7 +217,7 @@ export class RestaurantService {
     WHERE soi."cancelado" IS NULL
     GROUP BY soi."id_saidaestoque"
   ) AS so_total ON so_total."id_saidaestoque" = so.id
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart} AND ${formattedEnd}
+  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
   GROUP BY "date"
   ORDER BY "date" DESC
@@ -233,7 +233,7 @@ export class RestaurantService {
       TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
       ra."valortotal" AS "valor"
     FROM "locacaoapartamento" ra
-    WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart} AND ${formattedEnd}
+    WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
       AND ra."fimocupacaotipo" = 'FINALIZADA'
 
     UNION ALL
@@ -246,7 +246,7 @@ export class RestaurantService {
     INNER JOIN "saidaestoque" so ON so.id = vd."id_saidaestoque"
     LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
     LEFT JOIN "venda" v ON v."id_saidaestoque" = so.id
-    WHERE so."datasaida" BETWEEN ${formattedStart} AND ${formattedEnd}
+    WHERE so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
     GROUP BY TO_CHAR(so."datasaida" - INTERVAL '6 hours', 'YYYY-MM-DD'), v."desconto"
   ) AS all_revenues
   GROUP BY "date"
@@ -264,7 +264,7 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart} AND ${formattedEnd}
+  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${abProductTypesParam})
   GROUP BY "date"
@@ -281,7 +281,7 @@ export class RestaurantService {
   JOIN "produto" p ON p.id = pe."id_produto"
   JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
   WHERE tp.id IN (${abProductTypesParam})
-    AND so."datasaida" BETWEEN ${formattedStart} AND ${formattedEnd}
+    AND so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
   GROUP BY p."descricao"
   ORDER BY "totalSales" DESC
   LIMIT 10;
@@ -298,7 +298,7 @@ export class RestaurantService {
   JOIN "produto" p ON p.id = pe."id_produto"
   JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
   WHERE tp.id IN (${abProductTypesParam})
-    AND so."datasaida" BETWEEN ${formattedStart} AND ${formattedEnd}
+    AND so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
   GROUP BY p."descricao"
   HAVING SUM(soi."quantidade") > 0
   ORDER BY "totalSales" ASC
@@ -344,7 +344,7 @@ export class RestaurantService {
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
 
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart} AND ${formattedEnd}
+  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
 
   GROUP BY "date"
@@ -363,7 +363,7 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart} AND ${formattedEnd}
+  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${aProductTypesParam})
   GROUP BY "date", tp."descricao"
@@ -382,7 +382,7 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart} AND ${formattedEnd}
+  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${bProductTypesParam})
   GROUP BY "date", tp."descricao"
@@ -401,7 +401,7 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart} AND ${formattedEnd}
+  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${aProductTypesParam})
   GROUP BY tp."descricao"
@@ -420,7 +420,7 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart} AND ${formattedEnd}
+  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${bProductTypesParam})
   GROUP BY tp."descricao"
@@ -441,7 +441,7 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart} AND ${formattedEnd}
+  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${othersProductTypesParam})
   GROUP BY tp."descricao"
