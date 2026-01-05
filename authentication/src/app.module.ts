@@ -11,6 +11,7 @@ import { CacheModule } from './cache/cache.module';
 import { DatabaseModule } from './database/database.module';
 import { CompanyModule } from './company/company.module';
 import { RestaurantModule } from './restaurant/restaurant.module';
+import { BookingsModule } from './bookings/bookings.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { RestaurantModule } from './restaurant/restaurant.module';
     DatabaseModule,
     CompanyModule,
     RestaurantModule,
+    BookingsModule,
     UsersModule,
     AuthModule,
   ],
