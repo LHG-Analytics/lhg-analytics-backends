@@ -272,9 +272,15 @@ export class BookingsMultitenantService {
     remainingDays: number,
     totalDaysInMonth: number,
   ): UnifiedBookingsKpiResponse {
-    // Gera todas as datas do período
-    const allDates = this.generateDateRange(startDate, endDate);
-    const categories = allDates.map((d) => this.formatDateDisplay(d));
+    // Calcula a diferença de dias para determinar se agrupa por mês ou por dia
+    const start = this.parseDate(startDate);
+    const end = this.parseDate(endDate);
+    const rangeDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const groupByMonth = rangeDays > 40;
+
+    // Gera todas as datas/meses do período e prepara as categorias
+    const allPeriods = this.generatePeriodRange(startDate, endDate, groupByMonth);
+    const categories = allPeriods;
 
     // Consolida BigNumbers (com previousDate e monthlyForecast)
     const bigNumbers = this.consolidateBigNumbers(results, daysElapsed, remainingDays, totalDaysInMonth);
@@ -282,26 +288,26 @@ export class BookingsMultitenantService {
     // Consolida BigNumbersEcommerce
     const bigNumbersEcommerce = this.consolidateEcommerceBigNumbers(results);
 
-    // RevenueByCompany - faturamento de reservas de cada unidade por data
-    const revenueByCompany = this.calculateRevenueByCompany(results, categories, allDates);
+    // RevenueByCompany - faturamento de reservas de cada unidade por data/mês
+    const revenueByCompany = this.calculateRevenueByCompanyGrouped(results, categories, groupByMonth);
 
-    // BookingsByCompany - quantidade de reservas de cada unidade por data
-    const bookingsByCompany = this.calculateBookingsByCompany(results, categories, allDates);
+    // BookingsByCompany - quantidade de reservas de cada unidade por data/mês
+    const bookingsByCompany = this.calculateBookingsByCompanyGrouped(results, categories, groupByMonth);
 
-    // BillingOfReservationsByPeriod - faturamento por unidade por data
-    const billingOfReservationsByPeriod = this.calculateBillingByPeriod(results, categories, allDates);
+    // BillingOfReservationsByPeriod - faturamento por unidade por data/mês
+    const billingOfReservationsByPeriod = this.calculateBillingByPeriodGrouped(results, categories, groupByMonth);
 
-    // RepresentativenessOfReservesByPeriod - representatividade por unidade por data
-    const representativenessOfReservesByPeriod = this.calculateRepresentativenessByPeriod(results, categories, allDates);
+    // RepresentativenessOfReservesByPeriod - representatividade por unidade por data/mês
+    const representativenessOfReservesByPeriod = this.calculateRepresentativenessByPeriodGrouped(results, categories, groupByMonth);
 
-    // NumberOfReservationsPerPeriod - número de reservas por unidade por data
-    const numberOfReservationsPerPeriod = this.calculateNumberOfReservationsByPeriod(results, categories, allDates);
+    // NumberOfReservationsPerPeriod - número de reservas por unidade por data/mês
+    const numberOfReservationsPerPeriod = this.calculateNumberOfReservationsByPeriodGrouped(results, categories, groupByMonth);
 
-    // ReservationsOfEcommerceByPeriod - reservas ecommerce por unidade por data
-    const reservationsOfEcommerceByPeriod = this.calculateEcommerceReservationsByPeriod(results, categories, allDates);
+    // ReservationsOfEcommerceByPeriod - reservas ecommerce por unidade por data/mês
+    const reservationsOfEcommerceByPeriod = this.calculateEcommerceReservationsByPeriodGrouped(results, categories, groupByMonth);
 
-    // BillingOfEcommerceByPeriod - faturamento ecommerce por unidade por data
-    const billingOfEcommerceByPeriod = this.calculateEcommerceBillingByPeriod(results, categories, allDates);
+    // BillingOfEcommerceByPeriod - faturamento ecommerce por unidade por data/mês
+    const billingOfEcommerceByPeriod = this.calculateEcommerceBillingByPeriodGrouped(results, categories, groupByMonth);
 
     return {
       Company: 'LHG',
@@ -672,5 +678,251 @@ export class BookingsMultitenantService {
   private parseDate(dateStr: string): Date {
     const [day, month, year] = dateStr.split('/').map(Number);
     return new Date(year, month - 1, day);
+  }
+
+  /**
+   * Gera array de períodos entre startDate e endDate
+   * Se groupByMonth=true, retorna MM/YYYY; senão, retorna DD/MM/YYYY
+   */
+  private generatePeriodRange(startDate: string, endDate: string, groupByMonth: boolean): string[] {
+    const periods: string[] = [];
+    const start = this.parseDate(startDate);
+    const end = this.parseDate(endDate);
+
+    if (groupByMonth) {
+      // Agrupa por mês - gera MM/YYYY
+      const current = new Date(start.getFullYear(), start.getMonth(), 1);
+      while (current <= end) {
+        const month = (current.getMonth() + 1).toString().padStart(2, '0');
+        const year = current.getFullYear();
+        periods.push(`${month}/${year}`);
+        current.setMonth(current.getMonth() + 1);
+      }
+    } else {
+      // Por dia - gera DD/MM/YYYY
+      const current = new Date(start);
+      while (current <= end) {
+        periods.push(this.formatDateDisplay(this.formatDateKey(current)));
+        current.setDate(current.getDate() + 1);
+      }
+    }
+
+    return periods;
+  }
+
+  /**
+   * Formata data YYYY-MM-DD para MM/YYYY
+   */
+  private formatDateToMonth(dateKey: string): string {
+    const [year, month] = dateKey.split('-');
+    return `${month}/${year}`;
+  }
+
+  /**
+   * Agrega dados de um Map por período (dia ou mês)
+   */
+  private aggregateDataByPeriod(dataMap: Map<string, number>, groupByMonth: boolean): Map<string, number> {
+    const aggregated = new Map<string, number>();
+
+    for (const [dateKey, value] of dataMap.entries()) {
+      const periodKey = groupByMonth ? this.formatDateToMonth(dateKey) : this.formatDateDisplay(dateKey);
+      const current = aggregated.get(periodKey) || 0;
+      aggregated.set(periodKey, current + value);
+    }
+
+    return aggregated;
+  }
+
+  /**
+   * Calcula RevenueByCompany agrupado por período (dia ou mês)
+   */
+  private calculateRevenueByCompanyGrouped(
+    results: UnitBookingsKpiData[],
+    categories: string[],
+    groupByMonth: boolean,
+  ): ApexChartsMultiSeriesData {
+    const series: Array<{ name: string; data: number[] }> = [];
+
+    for (const r of results) {
+      const aggregatedData = this.aggregateDataByPeriod(r.billingByDate, groupByMonth);
+      const data: number[] = [];
+
+      for (const period of categories) {
+        data.push(Number((aggregatedData.get(period) || 0).toFixed(2)));
+      }
+
+      series.push({
+        name: r.unitName,
+        data,
+      });
+    }
+
+    return { categories, series };
+  }
+
+  /**
+   * Calcula BookingsByCompany agrupado por período (dia ou mês)
+   */
+  private calculateBookingsByCompanyGrouped(
+    results: UnitBookingsKpiData[],
+    categories: string[],
+    groupByMonth: boolean,
+  ): ApexChartsMultiSeriesData {
+    const series: Array<{ name: string; data: number[] }> = [];
+
+    for (const r of results) {
+      const aggregatedData = this.aggregateDataByPeriod(r.bookingsByDate, groupByMonth);
+      const data: number[] = [];
+
+      for (const period of categories) {
+        data.push(aggregatedData.get(period) || 0);
+      }
+
+      series.push({
+        name: r.unitName,
+        data,
+      });
+    }
+
+    return { categories, series };
+  }
+
+  /**
+   * Calcula BillingByPeriod agrupado por período (dia ou mês)
+   */
+  private calculateBillingByPeriodGrouped(
+    results: UnitBookingsKpiData[],
+    categories: string[],
+    groupByMonth: boolean,
+  ): ApexChartsMultiSeriesData {
+    const series: Array<{ name: string; data: number[] }> = [];
+
+    for (const r of results) {
+      const aggregatedData = this.aggregateDataByPeriod(r.billingByDate, groupByMonth);
+      const data: number[] = [];
+
+      for (const period of categories) {
+        data.push(Number((aggregatedData.get(period) || 0).toFixed(2)));
+      }
+
+      series.push({
+        name: r.unitName,
+        data,
+      });
+    }
+
+    return { categories, series };
+  }
+
+  /**
+   * Calcula RepresentativenessByPeriod agrupado por período (dia ou mês)
+   */
+  private calculateRepresentativenessByPeriodGrouped(
+    results: UnitBookingsKpiData[],
+    categories: string[],
+    groupByMonth: boolean,
+  ): ApexChartsMultiSeriesData {
+    const series: Array<{ name: string; data: number[] }> = [];
+
+    for (const r of results) {
+      const aggregatedData = this.aggregateDataByPeriod(r.billingByDate, groupByMonth);
+      const totalPeriodBilling = Array.from(aggregatedData.values()).reduce((sum, val) => sum + val, 0);
+
+      const data: number[] = [];
+
+      for (const period of categories) {
+        const periodBilling = aggregatedData.get(period) || 0;
+        const percent = totalPeriodBilling > 0 ? periodBilling / totalPeriodBilling : 0;
+        data.push(Number(percent.toFixed(4)));
+      }
+
+      series.push({
+        name: r.unitName,
+        data,
+      });
+    }
+
+    return { categories, series };
+  }
+
+  /**
+   * Calcula NumberOfReservationsByPeriod agrupado por período (dia ou mês)
+   */
+  private calculateNumberOfReservationsByPeriodGrouped(
+    results: UnitBookingsKpiData[],
+    categories: string[],
+    groupByMonth: boolean,
+  ): ApexChartsMultiSeriesData {
+    const series: Array<{ name: string; data: number[] }> = [];
+
+    for (const r of results) {
+      const aggregatedData = this.aggregateDataByPeriod(r.bookingsByDate, groupByMonth);
+      const data: number[] = [];
+
+      for (const period of categories) {
+        data.push(aggregatedData.get(period) || 0);
+      }
+
+      series.push({
+        name: r.unitName,
+        data,
+      });
+    }
+
+    return { categories, series };
+  }
+
+  /**
+   * Calcula EcommerceReservationsByPeriod agrupado por período (dia ou mês)
+   */
+  private calculateEcommerceReservationsByPeriodGrouped(
+    results: UnitBookingsKpiData[],
+    categories: string[],
+    groupByMonth: boolean,
+  ): ApexChartsMultiSeriesData {
+    const series: Array<{ name: string; data: number[] }> = [];
+
+    for (const r of results) {
+      const aggregatedData = this.aggregateDataByPeriod(r.ecommerceBookingsByDate, groupByMonth);
+      const data: number[] = [];
+
+      for (const period of categories) {
+        data.push(aggregatedData.get(period) || 0);
+      }
+
+      series.push({
+        name: r.unitName,
+        data,
+      });
+    }
+
+    return { categories, series };
+  }
+
+  /**
+   * Calcula EcommerceBillingByPeriod agrupado por período (dia ou mês)
+   */
+  private calculateEcommerceBillingByPeriodGrouped(
+    results: UnitBookingsKpiData[],
+    categories: string[],
+    groupByMonth: boolean,
+  ): ApexChartsMultiSeriesData {
+    const series: Array<{ name: string; data: number[] }> = [];
+
+    for (const r of results) {
+      const aggregatedData = this.aggregateDataByPeriod(r.ecommerceBillingByDate, groupByMonth);
+      const data: number[] = [];
+
+      for (const period of categories) {
+        data.push(Number((aggregatedData.get(period) || 0).toFixed(2)));
+      }
+
+      series.push({
+        name: r.unitName,
+        data,
+      });
+    }
+
+    return { categories, series };
   }
 }

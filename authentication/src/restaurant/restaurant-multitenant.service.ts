@@ -267,27 +267,33 @@ export class RestaurantMultitenantService {
     remainingDays: number,
     totalDaysInMonth: number,
   ): UnifiedRestaurantKpiResponse {
-    // Gera todas as datas do período
-    const allDates = this.generateDateRange(startDate, endDate);
-    const categories = allDates.map((d) => this.formatDateDisplay(d));
+    // Calcula a diferença de dias para determinar se agrupa por mês ou por dia
+    const start = this.parseDate(startDate);
+    const end = this.parseDate(endDate);
+    const rangeDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const groupByMonth = rangeDays > 40;
+
+    // Gera todas as datas/meses do período e prepara as categorias
+    const allPeriods = this.generatePeriodRange(startDate, endDate, groupByMonth);
+    const categories = allPeriods;
 
     // Consolida BigNumbers (com previousDate e monthlyForecast)
     const bigNumbers = this.consolidateBigNumbers(results, daysElapsed, remainingDays, totalDaysInMonth);
 
-    // RevenueByCompany - receita A&B de cada unidade por data
-    const revenueByCompany = this.calculateRevenueByCompany(results, categories, allDates);
+    // RevenueByCompany - receita A&B de cada unidade por data/mês
+    const revenueByCompany = this.calculateRevenueByCompanyGrouped(results, categories, groupByMonth);
 
-    // SalesByCompany - quantidade de vendas com A&B de cada unidade por data
-    const salesByCompany = this.calculateSalesByCompany(results, categories, allDates);
+    // SalesByCompany - quantidade de vendas com A&B de cada unidade por data/mês
+    const salesByCompany = this.calculateSalesByCompanyGrouped(results, categories, groupByMonth);
 
-    // RevenueAbByPeriod - receita A&B por unidade por data
-    const revenueAbByPeriod = this.calculateRevenueAbByPeriod(results, categories, allDates);
+    // RevenueAbByPeriod - receita A&B por unidade por data/mês
+    const revenueAbByPeriod = this.calculateRevenueAbByPeriodGrouped(results, categories, groupByMonth);
 
-    // RevenueAbByPeriodPercent - percentual A&B por unidade por data
-    const revenueAbByPeriodPercent = this.calculateRevenueAbByPeriodPercent(results, categories, allDates);
+    // RevenueAbByPeriodPercent - percentual A&B por unidade por data/mês
+    const revenueAbByPeriodPercent = this.calculateRevenueAbByPeriodPercentGrouped(results, categories, groupByMonth);
 
-    // TicketAverageByPeriod - ticket médio por unidade por data
-    const ticketAverageByPeriod = this.calculateTicketAverageByPeriod(results, categories, allDates);
+    // TicketAverageByPeriod - ticket médio por unidade por data/mês
+    const ticketAverageByPeriod = this.calculateTicketAverageByPeriodGrouped(results, categories, groupByMonth);
 
     return {
       Company: 'LHG',
@@ -398,132 +404,163 @@ export class RestaurantMultitenantService {
   }
 
   /**
-   * Calcula RevenueByCompany - receita A&B de cada unidade com séries nomeadas
+   * Calcula RevenueByCompany com agrupamento por mês
    */
-  private calculateRevenueByCompany(
+  private calculateRevenueByCompanyGrouped(
     results: UnitRestaurantKpiData[],
     categories: string[],
-    allDates: string[],
+    groupByMonth: boolean,
   ): ApexChartsMultiSeriesData {
     const series: Array<{ name: string; data: number[] }> = [];
 
     for (const r of results) {
-      const data: number[] = [];
-      for (const dateKey of allDates) {
-        data.push(Number((r.revenueAbByDate.get(dateKey) || 0).toFixed(2)));
-      }
-      series.push({
-        name: r.unitName,
-        data,
-      });
+      const periodDataMap = this.aggregateDataByPeriod(r.revenueAbByDate, groupByMonth);
+      const data = categories.map((period) => Number((periodDataMap.get(period) || 0).toFixed(2)));
+      series.push({ name: r.unitName, data });
     }
 
     return { categories, series };
   }
 
   /**
-   * Calcula SalesByCompany - quantidade de vendas de cada unidade com séries nomeadas
+   * Calcula SalesByCompany com agrupamento por mês
    */
-  private calculateSalesByCompany(
+  private calculateSalesByCompanyGrouped(
     results: UnitRestaurantKpiData[],
     categories: string[],
-    allDates: string[],
+    groupByMonth: boolean,
   ): ApexChartsMultiSeriesData {
     const series: Array<{ name: string; data: number[] }> = [];
 
     for (const r of results) {
-      const data: number[] = [];
-      for (const dateKey of allDates) {
-        data.push(r.salesByDate.get(dateKey) || 0);
-      }
-      series.push({
-        name: r.unitName,
-        data,
-      });
+      const periodDataMap = this.aggregateDataByPeriod(r.salesByDate, groupByMonth);
+      const data = categories.map((period) => periodDataMap.get(period) || 0);
+      series.push({ name: r.unitName, data });
     }
 
     return { categories, series };
   }
 
   /**
-   * Calcula RevenueAbByPeriod - receita A&B por unidade por data
+   * Calcula RevenueAbByPeriod com agrupamento por mês
    */
-  private calculateRevenueAbByPeriod(
+  private calculateRevenueAbByPeriodGrouped(
     results: UnitRestaurantKpiData[],
     categories: string[],
-    allDates: string[],
+    groupByMonth: boolean,
   ): ApexChartsMultiSeriesData {
     const series: Array<{ name: string; data: number[] }> = [];
 
-    // Adiciona série para cada unidade
     for (const r of results) {
-      const data: number[] = [];
-      for (const dateKey of allDates) {
-        data.push(Number((r.revenueAbByDate.get(dateKey) || 0).toFixed(2)));
-      }
-      series.push({
-        name: r.unitName,
-        data,
-      });
+      const periodDataMap = this.aggregateDataByPeriod(r.revenueAbByDate, groupByMonth);
+      const data = categories.map((period) => Number((periodDataMap.get(period) || 0).toFixed(2)));
+      series.push({ name: r.unitName, data });
     }
 
     return { categories, series };
   }
 
   /**
-   * Calcula RevenueAbByPeriodPercent - percentual A&B por unidade por data
+   * Calcula RevenueAbByPeriodPercent com agrupamento por mês
    */
-  private calculateRevenueAbByPeriodPercent(
+  private calculateRevenueAbByPeriodPercentGrouped(
     results: UnitRestaurantKpiData[],
     categories: string[],
-    allDates: string[],
+    groupByMonth: boolean,
   ): ApexChartsMultiSeriesData {
     const series: Array<{ name: string; data: number[] }> = [];
 
-    // Adiciona série para cada unidade
     for (const r of results) {
-      const data: number[] = [];
-      for (const dateKey of allDates) {
-        const revenueAb = r.revenueAbByDate.get(dateKey) || 0;
-        const totalRevenue = r.totalRevenueByDate.get(dateKey) || 0;
+      const revenueAbMap = this.aggregateDataByPeriod(r.revenueAbByDate, groupByMonth);
+      const totalRevenueMap = this.aggregateDataByPeriod(r.totalRevenueByDate, groupByMonth);
+
+      const data = categories.map((period) => {
+        const revenueAb = revenueAbMap.get(period) || 0;
+        const totalRevenue = totalRevenueMap.get(period) || 0;
         const percent = totalRevenue > 0 ? revenueAb / totalRevenue : 0;
-        data.push(Number(percent.toFixed(2)));
-      }
-      series.push({
-        name: r.unitName,
-        data,
+        return Number(percent.toFixed(2));
       });
+      series.push({ name: r.unitName, data });
     }
 
     return { categories, series };
   }
 
   /**
-   * Calcula TicketAverageByPeriod - ticket médio por unidade por data
+   * Calcula TicketAverageByPeriod com agrupamento por mês
    */
-  private calculateTicketAverageByPeriod(
+  private calculateTicketAverageByPeriodGrouped(
     results: UnitRestaurantKpiData[],
     categories: string[],
-    allDates: string[],
+    groupByMonth: boolean,
   ): ApexChartsMultiSeriesData {
     const series: Array<{ name: string; data: number[] }> = [];
 
-    // Adiciona série para cada unidade
     for (const r of results) {
-      const data: number[] = [];
-      for (const dateKey of allDates) {
-        const revenueAb = r.revenueAbByDate.get(dateKey) || 0;
-        const rentalsWithAb = r.rentalsWithAbByDate.get(dateKey) || 0;
+      const revenueAbMap = this.aggregateDataByPeriod(r.revenueAbByDate, groupByMonth);
+      const rentalsMap = this.aggregateDataByPeriod(r.rentalsWithAbByDate, groupByMonth);
+
+      const data = categories.map((period) => {
+        const revenueAb = revenueAbMap.get(period) || 0;
+        const rentalsWithAb = rentalsMap.get(period) || 0;
         const ticketAvg = rentalsWithAb > 0 ? revenueAb / rentalsWithAb : 0;
-        data.push(Number(ticketAvg.toFixed(2)));
-      }
-      series.push({
-        name: r.unitName,
-        data,
+        return Number(ticketAvg.toFixed(2));
       });
+      series.push({ name: r.unitName, data });
     }
 
     return { categories, series };
+  }
+
+  /**
+   * Agrega dados por período (dia ou mês)
+   */
+  private aggregateDataByPeriod(
+    dataMap: Map<string, number>,
+    groupByMonth: boolean,
+  ): Map<string, number> {
+    const aggregated = new Map<string, number>();
+
+    for (const [dateKey, value] of dataMap.entries()) {
+      const periodKey = groupByMonth
+        ? this.formatDateToMonth(dateKey)
+        : this.formatDateDisplay(dateKey);
+
+      const current = aggregated.get(periodKey) || 0;
+      aggregated.set(periodKey, current + value);
+    }
+
+    return aggregated;
+  }
+
+  /**
+   * Gera array de períodos (datas ou meses) entre startDate e endDate
+   * @param groupByMonth Se true, agrupa por mês (MM/YYYY), senão por dia (DD/MM/YYYY)
+   */
+  private generatePeriodRange(startDate: string, endDate: string, groupByMonth: boolean): string[] {
+    const periods: string[] = [];
+    const start = this.parseDate(startDate);
+    const end = this.parseDate(endDate);
+
+    if (groupByMonth) {
+      // Agrupar por mês: gera array de meses no formato MM/YYYY
+      const current = new Date(start.getFullYear(), start.getMonth(), 1);
+      while (current <= end) {
+        const month = (current.getMonth() + 1).toString().padStart(2, '0');
+        const year = current.getFullYear();
+        periods.push(`${month}/${year}`);
+        current.setMonth(current.getMonth() + 1);
+      }
+    } else {
+      // Agrupar por dia: gera array de datas no formato DD/MM/YYYY
+      const current = new Date(start);
+      while (current <= end) {
+        periods.push(this.formatDateBR(current));
+        current.setDate(current.getDate() + 1);
+      }
+    }
+
+    return periods;
   }
 
   /**
@@ -565,6 +602,14 @@ export class RestaurantMultitenantService {
   private formatDateDisplay(dateKey: string): string {
     const [year, month, day] = dateKey.split('-');
     return `${day}/${month}/${year}`;
+  }
+
+  /**
+   * Formata data (YYYY-MM-DD) para mês (MM/YYYY)
+   */
+  private formatDateToMonth(dateKey: string): string {
+    const [year, month] = dateKey.split('-');
+    return `${month}/${year}`;
   }
 
   /**

@@ -299,23 +299,31 @@ export class CompanyMultitenantService {
     remainingDays: number,
     totalDaysInMonth: number,
   ): UnifiedCompanyKpiResponse {
-    // Gera todas as datas do período
-    const allDates = this.generateDateRange(startDate, endDate);
-    const categories = allDates.map((d) => this.formatDateDisplay(d));
+    // Calcula a diferença de dias para determinar se agrupa por mês ou por dia
+    const start = this.parseDate(startDate);
+    const end = this.parseDate(endDate);
+    const rangeDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const groupByMonth = rangeDays > 40;
+
+    // Gera todas as datas/meses do período
+    const allPeriods = this.generatePeriodRange(startDate, endDate, groupByMonth);
+    const categories = allPeriods;
 
     // Consolida BigNumbers (com previousDate e monthlyForecast)
-    const bigNumbers = this.consolidateBigNumbers(results, daysElapsed, remainingDays, totalDaysInMonth);
+    // rangeDays + 1 porque inclui o dia inicial e final
+    const daysInSelectedPeriod = rangeDays + 1;
+    const bigNumbers = this.consolidateBigNumbers(results, daysElapsed, remainingDays, totalDaysInMonth, daysInSelectedPeriod);
 
     // RevenueByCompany - faturamento total de cada unidade
     const revenueByCompany = this.calculateRevenueByCompany(results);
 
-    // Consolida séries por data
-    const revenueByDate = this.consolidateSeries(results, 'revenueByDate', allDates, 'sum');
-    const rentalsByDate = this.consolidateSeries(results, 'rentalsByDate', allDates, 'sum');
-    const trevparByDate = this.consolidateSeries(results, 'trevparByDate', allDates, 'avg');
-    const occupancyRateByDate = this.consolidateSeries(results, 'occupancyRateByDate', allDates, 'avg');
+    // Consolida séries por data/mês
+    const revenueByDate = this.consolidateSeriesGrouped(results, 'revenueByDate', allPeriods, 'sum', groupByMonth);
+    const rentalsByDate = this.consolidateSeriesGrouped(results, 'rentalsByDate', allPeriods, 'sum', groupByMonth);
+    const trevparByDate = this.consolidateSeriesGrouped(results, 'trevparByDate', allPeriods, 'avg', groupByMonth);
+    const occupancyRateByDate = this.consolidateSeriesGrouped(results, 'occupancyRateByDate', allPeriods, 'avg', groupByMonth);
 
-    // Ticket médio consolidado = faturamento total / locações totais (por data)
+    // Ticket médio consolidado = faturamento total / locações totais (por data/mês)
     const ticketAverageByDate = this.calculateConsolidatedTicketAverage(
       revenueByDate,
       rentalsByDate,
@@ -342,6 +350,7 @@ export class CompanyMultitenantService {
     daysElapsed: number,
     remainingDays: number,
     totalDaysInMonth: number,
+    daysInSelectedPeriod: number,
   ): BigNumbersDataSQL {
     // --- Dados atuais (período selecionado) ---
     let totalValue = 0;
@@ -390,27 +399,25 @@ export class CompanyMultitenantService {
       0,
     );
 
-    // Calcula número de dias no período selecionado (para cálculos de Trevpar e Giro do período)
-    // Usamos daysElapsed para o período do mês atual
-    const daysInPeriod = daysElapsed > 0 ? daysElapsed : 1;
-
     // --- Cálculos período atual ---
+    // Usa daysInSelectedPeriod para calcular Trevpar e Giro do período selecionado
     const avgTicket = totalRentals > 0 ? totalValue / totalRentals : 0;
-    const avgTrevpar = totalSuites > 0 && daysInPeriod > 0
-      ? (totalValue + totalTips) / totalSuites / daysInPeriod
+    const avgTrevpar = totalSuites > 0 && daysInSelectedPeriod > 0
+      ? (totalValue + totalTips) / totalSuites / daysInSelectedPeriod
       : 0;
-    const avgGiro = totalSuites > 0 && daysInPeriod > 0
-      ? totalRentals / totalSuites / daysInPeriod
+    const avgGiro = totalSuites > 0 && daysInSelectedPeriod > 0
+      ? totalRentals / totalSuites / daysInSelectedPeriod
       : 0;
     const avgOccupiedSeconds = totalRentals > 0 ? totalOccupiedSeconds / totalRentals : 0;
 
     // --- Cálculos período anterior ---
+    // O período anterior tem a mesma duração do período selecionado
     const avgTicketPrev = totalRentalsPrev > 0 ? totalValuePrev / totalRentalsPrev : 0;
-    const avgTrevparPrev = totalSuites > 0 && daysInPeriod > 0
-      ? (totalValuePrev + totalTipsPrev) / totalSuites / daysInPeriod
+    const avgTrevparPrev = totalSuites > 0 && daysInSelectedPeriod > 0
+      ? (totalValuePrev + totalTipsPrev) / totalSuites / daysInSelectedPeriod
       : 0;
-    const avgGiroPrev = totalSuites > 0 && daysInPeriod > 0
-      ? totalRentalsPrev / totalSuites / daysInPeriod
+    const avgGiroPrev = totalSuites > 0 && daysInSelectedPeriod > 0
+      ? totalRentalsPrev / totalSuites / daysInSelectedPeriod
       : 0;
     const avgOccupiedSecondsPrev = totalRentalsPrev > 0 ? totalOccupiedSecondsPrev / totalRentalsPrev : 0;
 
@@ -483,34 +490,47 @@ export class CompanyMultitenantService {
   }
 
   /**
-   * Consolida séries de dados somando ou fazendo média por data
+   * Consolida séries de dados somando ou fazendo média por data/mês
+   * Suporta agrupamento por mês quando groupByMonth = true
    */
-  private consolidateSeries(
+  private consolidateSeriesGrouped(
     results: UnitKpiData[],
     field: keyof Pick<UnitKpiData, 'revenueByDate' | 'rentalsByDate' | 'trevparByDate' | 'occupancyRateByDate' | 'giroByDate'>,
-    dates: string[],
+    periods: string[],
     mode: 'sum' | 'avg',
+    groupByMonth: boolean,
   ): ApexChartsData {
     const series: number[] = [];
 
-    for (const dateKey of dates) {
-      let total = 0;
-      let count = 0;
+    // Primeiro, agrupa os dados de todas as unidades por período
+    const periodDataMap = new Map<string, { total: number; count: number }>();
 
-      for (const r of results) {
-        const value = r[field].get(dateKey) || 0;
-        total += value;
-        if (value > 0) count++;
-      }
+    for (const r of results) {
+      for (const [dateKey, value] of r[field].entries()) {
+        // Converte a chave de data para o formato do período (dia ou mês)
+        const periodKey = groupByMonth
+          ? this.formatDateToMonth(dateKey)
+          : this.formatDateDisplay(dateKey);
 
-      if (mode === 'avg' && count > 0) {
-        series.push(Number((total / count).toFixed(2)));
-      } else {
-        series.push(Number(total.toFixed(2)));
+        const current = periodDataMap.get(periodKey) || { total: 0, count: 0 };
+        current.total += value;
+        if (value > 0) current.count++;
+        periodDataMap.set(periodKey, current);
       }
     }
 
-    return { categories: dates.map((d) => this.formatDateDisplay(d)), series };
+    // Gera a série baseada nos períodos
+    for (const periodKey of periods) {
+      const data = periodDataMap.get(periodKey) || { total: 0, count: 0 };
+
+      if (mode === 'avg' && data.count > 0) {
+        series.push(Number((data.total / data.count).toFixed(2)));
+      } else {
+        series.push(Number(data.total.toFixed(2)));
+      }
+    }
+
+    return { categories: periods, series };
   }
 
   /**
@@ -530,6 +550,36 @@ export class CompanyMultitenantService {
     }
 
     return { categories: revenue.categories, series };
+  }
+
+  /**
+   * Gera array de períodos (datas ou meses) entre startDate e endDate
+   * @param groupByMonth Se true, agrupa por mês (MM/YYYY), senão por dia (DD/MM/YYYY)
+   */
+  private generatePeriodRange(startDate: string, endDate: string, groupByMonth: boolean): string[] {
+    const periods: string[] = [];
+    const start = this.parseDate(startDate);
+    const end = this.parseDate(endDate);
+
+    if (groupByMonth) {
+      // Agrupar por mês: gera array de meses no formato MM/YYYY
+      const current = new Date(start.getFullYear(), start.getMonth(), 1);
+      while (current <= end) {
+        const month = (current.getMonth() + 1).toString().padStart(2, '0');
+        const year = current.getFullYear();
+        periods.push(`${month}/${year}`);
+        current.setMonth(current.getMonth() + 1);
+      }
+    } else {
+      // Agrupar por dia: gera array de datas no formato DD/MM/YYYY
+      const current = new Date(start);
+      while (current <= end) {
+        periods.push(this.formatDateBR(current));
+        current.setDate(current.getDate() + 1);
+      }
+    }
+
+    return periods;
   }
 
   /**
@@ -571,6 +621,14 @@ export class CompanyMultitenantService {
   private formatDateDisplay(dateKey: string): string {
     const [year, month, day] = dateKey.split('-');
     return `${day}/${month}/${year}`;
+  }
+
+  /**
+   * Formata data (YYYY-MM-DD) para mês (MM/YYYY)
+   */
+  private formatDateToMonth(dateKey: string): string {
+    const [year, month] = dateKey.split('-');
+    return `${month}/${year}`;
   }
 
   /**
