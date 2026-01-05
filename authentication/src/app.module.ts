@@ -12,6 +12,7 @@ import { DatabaseModule } from './database/database.module';
 import { CompanyModule } from './company/company.module';
 import { RestaurantModule } from './restaurant/restaurant.module';
 import { BookingsModule } from './bookings/bookings.module';
+import { GovernanceModule } from './governance/governance.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { BookingsModule } from './bookings/bookings.module';
     CompanyModule,
     RestaurantModule,
     BookingsModule,
+    GovernanceModule,
     UsersModule,
     AuthModule,
   ],
