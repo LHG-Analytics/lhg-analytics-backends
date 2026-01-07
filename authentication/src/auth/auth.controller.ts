@@ -28,12 +28,27 @@ export class AuthController {
   ) {}
 
   private getCookieConfig(isProduction: boolean) {
-    return {
+    const config: {
+      httpOnly: boolean;
+      secure: boolean;
+      sameSite: 'strict' | 'lax' | 'none';
+      path: string;
+      domain?: string;
+    } = {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'strict' as const,
+      sameSite: isProduction ? 'lax' : 'lax', // 'lax' permite envio em navegação cross-site
       path: '/',
     };
+
+    // Em produção, define o domínio para compartilhar cookies entre subdomínios
+    // Ex: .seudominio.com.br permite auth.seudominio.com.br e api.seudominio.com.br
+    const cookieDomain = this.configService.get<string>('COOKIE_DOMAIN');
+    if (cookieDomain) {
+      config.domain = cookieDomain;
+    }
+
+    return config;
   }
 
   @Post('login')
