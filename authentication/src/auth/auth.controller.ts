@@ -77,7 +77,9 @@ export class AuthController {
     });
 
     // Calcula quando o access token expira
-    const expiresAt = new Date(Date.now() + this.ACCESS_TOKEN_MAX_AGE).toISOString();
+    const expiresAt = new Date(
+      Date.now() + this.ACCESS_TOKEN_MAX_AGE,
+    ).toISOString();
 
     return res.json({
       user: {
@@ -123,7 +125,9 @@ export class AuthController {
       });
 
       // Calcula quando o novo access token expira
-      const expiresAt = new Date(Date.now() + this.ACCESS_TOKEN_MAX_AGE).toISOString();
+      const expiresAt = new Date(
+        Date.now() + this.ACCESS_TOKEN_MAX_AGE,
+      ).toISOString();
 
       return res.json({
         user,
