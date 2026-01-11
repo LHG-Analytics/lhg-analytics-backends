@@ -151,11 +151,11 @@ interface WeeklyGiroData {
   };
 }
 
-interface WeeklyTrevparData {
+interface WeeklyRevparData {
   [suiteCategory: string]: {
     [dayOfWeek: string]: {
-      trevpar: number;
-      totalTrevpar: number;
+      revpar: number;
+      totalRevpar: number;
     };
   };
 }
@@ -235,7 +235,7 @@ export interface CompanyKpiApexChartsResponse {
   TotalResult: TotalResultDataSQL;
   DataTableOccupancyRateByWeek: WeeklyOccupancyData[];
   DataTableGiroByWeek: WeeklyGiroData[];
-  DataTableTrevparByWeek: WeeklyTrevparData[];
+  DataTableRevparByWeek: WeeklyRevparData[];
 }
 
 @Injectable()
@@ -2029,10 +2029,11 @@ export class CompanyService {
       }),
     );
 
-    // === IMPLEMENTAÇÃO DO DATATABLETREVPARBYWEEK ===
-    // Consulta SQL para TRevPAR semanal por categoria
-    // TRevPAR = (receita total + gorjeta) / total de suítes / dias
-    const trevparByWeekResult: any[] = await this.prisma.prismaLocal.$queryRaw`
+    // === IMPLEMENTAÇÃO DO DATATABLEREVPARBYWEEK ===
+    // Consulta SQL para RevPAR semanal por categoria
+    // RevPAR = (receita de locação) / total de suítes / dias
+    // Receita de locação = permanência + ocupacional - desconto (SEM consumo e SEM gorjeta)
+    const revparByWeekResult: any[] = await this.prisma.prismaLocal.$queryRaw`
       WITH weekly_revenue AS (
         SELECT
           ca.descricao as suite_category_name,
@@ -2056,24 +2057,11 @@ export class CompanyService {
             WHEN 5 THEN 'sexta-feira'
             WHEN 6 THEN 'sábado'
           END as day_of_week,
-          -- Receita total (permanência + ocupacional + consumo - desconto + gorjeta)
+          -- Receita de locação (permanência + ocupacional - desconto) SEM consumo e SEM gorjeta
           SUM(
             COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
-            COALESCE(
-              (
-                SELECT COALESCE(SUM(
-                  CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
-                ), 0)
-                FROM vendalocacao vl
-                INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
-                INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
-                WHERE vl.id_locacaoapartamento = la.id_apartamentostate
-                  AND sei.cancelado IS NULL
-              ), 0
-            ) -
-            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0) +
-            COALESCE(CAST(la.gorjeta AS DECIMAL(15,4)), 0)
+            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
+            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
           ) as day_revenue
         FROM locacaoapartamento la
         INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
@@ -2138,23 +2126,11 @@ export class CompanyService {
             WHEN 5 THEN 'sexta-feira'
             WHEN 6 THEN 'sábado'
           END as day_of_week,
+          -- Receita de locação (permanência + ocupacional - desconto) SEM consumo e SEM gorjeta
           SUM(
             COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
-            COALESCE(
-              (
-                SELECT COALESCE(SUM(
-                  CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
-                ), 0)
-                FROM vendalocacao vl
-                INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
-                INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
-                WHERE vl.id_locacaoapartamento = la.id_apartamentostate
-                  AND sei.cancelado IS NULL
-              ), 0
-            ) -
-            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0) +
-            COALESCE(CAST(la.gorjeta AS DECIMAL(15,4)), 0)
+            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
+            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
           ) as total_day_revenue
         FROM locacaoapartamento la
         INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
@@ -2178,18 +2154,18 @@ export class CompanyService {
         sc.total_suites_in_category,
         dp.days_count,
         tr.total_day_revenue,
-        -- TRevPAR por categoria e dia da semana (receita / suítes / dias)
+        -- RevPAR por categoria e dia da semana (receita de locação / suítes / dias)
         CASE
           WHEN sc.total_suites_in_category > 0 AND dp.days_count > 0 THEN
             wr.day_revenue::DECIMAL / (sc.total_suites_in_category * dp.days_count)
           ELSE 0
-        END as category_trevpar,
-        -- TRevPAR total para o dia da semana (todas as categorias)
+        END as category_revpar,
+        -- RevPAR total para o dia da semana (todas as categorias)
         CASE
           WHEN ${totalSuites}::DECIMAL > 0 AND dp.days_count > 0 THEN
             tr.total_day_revenue::DECIMAL / (${totalSuites}::DECIMAL * dp.days_count)
           ELSE 0
-        END as total_trevpar
+        END as total_revpar
       FROM weekly_revenue wr
       INNER JOIN suite_counts_by_category sc ON wr.suite_category_name = sc.suite_category_name
       INNER JOIN days_in_period dp ON wr.day_of_week_num = dp.day_of_week_num
@@ -2197,40 +2173,40 @@ export class CompanyService {
       ORDER BY wr.suite_category_name, wr.day_of_week_num
     `;
 
-    // Transformar os resultados no formato esperado (WeeklyTrevparData[])
-    const trevparByCategory: { [category: string]: { [day: string]: any } } = {};
+    // Transformar os resultados no formato esperado (WeeklyRevparData[])
+    const revparByCategory: { [category: string]: { [day: string]: any } } = {};
 
-    trevparByWeekResult.forEach((item) => {
+    revparByWeekResult.forEach((item) => {
       const categoryName = item.suite_category_name;
       const dayName = item.day_of_week;
 
-      if (!trevparByCategory[categoryName]) {
-        trevparByCategory[categoryName] = {};
+      if (!revparByCategory[categoryName]) {
+        revparByCategory[categoryName] = {};
       }
 
-      trevparByCategory[categoryName][dayName] = {
-        trevpar: Number(Number(item.category_trevpar).toFixed(2)),
-        totalTrevpar: Number(Number(item.total_trevpar).toFixed(2)),
+      revparByCategory[categoryName][dayName] = {
+        revpar: Number(Number(item.category_revpar).toFixed(2)),
+        totalRevpar: Number(Number(item.total_revpar).toFixed(2)),
       };
     });
 
-    // Preencher dias ausentes com trevpar 0 para cada categoria de suíte
-    Object.keys(trevparByCategory).forEach((categoryName) => {
-      // Pegar o totalTrevpar de qualquer dia existente para usar como referência
-      const existingDay = Object.values(trevparByCategory[categoryName])[0];
-      const totalTrevparReference = existingDay ? existingDay.totalTrevpar : 0;
+    // Preencher dias ausentes com revpar 0 para cada categoria de suíte
+    Object.keys(revparByCategory).forEach((categoryName) => {
+      // Pegar o totalRevpar de qualquer dia existente para usar como referência
+      const existingDay = Object.values(revparByCategory[categoryName])[0];
+      const totalRevparReference = existingDay ? existingDay.totalRevpar : 0;
 
       allDaysOfWeekSQL.forEach((day) => {
-        if (!trevparByCategory[categoryName][day]) {
-          trevparByCategory[categoryName][day] = {
-            trevpar: 0,
-            totalTrevpar: totalTrevparReference,
+        if (!revparByCategory[categoryName][day]) {
+          revparByCategory[categoryName][day] = {
+            revpar: 0,
+            totalRevpar: totalRevparReference,
           };
         }
       });
     });
 
-    const dataTableTrevparByWeek: any[] = Object.entries(trevparByCategory).map(
+    const dataTableRevparByWeek: any[] = Object.entries(revparByCategory).map(
       ([categoryName, dayData]) => ({
         [categoryName]: dayData,
       }),
@@ -2316,7 +2292,7 @@ export class CompanyService {
       },
       DataTableOccupancyRateByWeek: dataTableOccupancyRateByWeek,
       DataTableGiroByWeek: dataTableGiroByWeek,
-      DataTableTrevparByWeek: dataTableTrevparByWeek,
+      DataTableRevparByWeek: dataTableRevparByWeek,
     };
   }
 
