@@ -86,14 +86,17 @@ export class RestaurantService {
 
     if (daysElapsed > 0) {
       const monthlyTotalValue = monthlyBigNumbers.currentDate.totalAllValue;
+      const monthlyTotalSalesRevenue = monthlyBigNumbers.currentDate.totalAllSalesRevenue;
       const monthlyTotalSales = monthlyBigNumbers.currentDate.totalAllSales;
 
       // Média diária
       const dailyAverageValue = monthlyTotalValue / daysElapsed;
+      const dailyAverageSalesRevenue = monthlyTotalSalesRevenue / daysElapsed;
       const dailyAverageSales = monthlyTotalSales / daysElapsed;
 
       // Projeções
       const forecastValue = monthlyTotalValue + dailyAverageValue * remainingDays;
+      const forecastSalesRevenue = monthlyTotalSalesRevenue + dailyAverageSalesRevenue * remainingDays;
       const forecastSales = monthlyTotalSales + dailyAverageSales * remainingDays;
 
       // Métricas recalculadas
@@ -102,10 +105,13 @@ export class RestaurantService {
 
       monthlyForecast = {
         totalAllValueForecast: Number(forecastValue.toFixed(2)),
+        totalAllSalesRevenueForecast: Number(forecastSalesRevenue.toFixed(2)),
         totalAllSalesForecast: Math.round(forecastSales),
         totalAllTicketAverageForecast: forecastTicketAverage,
         totalAllTicketAverageByTotalRentalsForecast:
           monthlyBigNumbers.currentDate.totalAllTicketAverageByTotalRentals,
+        abRepresentativityForecast: monthlyBigNumbers.currentDate.abRepresentativity,
+        salesRepresentativityForecast: monthlyBigNumbers.currentDate.salesRepresentativity,
       };
     }
 
@@ -114,10 +120,13 @@ export class RestaurantService {
       currentDate: currentBigNumbers.currentDate,
       previousDate: {
         totalAllValuePreviousData: previousBigNumbers.currentDate.totalAllValue,
+        totalAllSalesRevenuePreviousData: previousBigNumbers.currentDate.totalAllSalesRevenue,
         totalAllSalesPreviousData: previousBigNumbers.currentDate.totalAllSales,
         totalAllTicketAveragePreviousData: previousBigNumbers.currentDate.totalAllTicketAverage,
         totalAllTicketAverageByTotalRentalsPreviousData:
           previousBigNumbers.currentDate.totalAllTicketAverageByTotalRentals,
+        abRepresentativityPreviousData: previousBigNumbers.currentDate.abRepresentativity,
+        salesRepresentativityPreviousData: previousBigNumbers.currentDate.salesRepresentativity,
       },
       monthlyForecast,
     };
@@ -140,6 +149,12 @@ export class RestaurantService {
 
     const bProductTypes = [40, 34, 15, 26, 25, 35];
 
+    // A&B sem os IDs 32, 33, 44 (para ranking de mais vendidos)
+    const abProductTypesForRanking = [40, 47, 34, 2, 15, 13, 10, 11, 31, 41, 27, 26, 25, 35];
+
+    // A&B sem os IDs 32, 2, 27, 33, 44 (para ranking de menos vendidos)
+    const abProductTypesForLeastRanking = [40, 47, 34, 15, 13, 10, 11, 31, 41, 26, 25, 35];
+
     const othersList = [45, 24, 38, 39, 37];
 
     const formattedStart = moment
@@ -157,6 +172,8 @@ export class RestaurantService {
     const aProductTypesSqlList = aProductTypes.join(', ');
     const bProductTypesSqlList = bProductTypes.join(', ');
     const othersProductTypesSqlList = othersList.join(', ');
+    const abProductTypesForRankingSqlList = abProductTypesForRanking.join(', ');
+    const abProductTypesForLeastRankingSqlList = abProductTypesForLeastRanking.join(', ');
 
     const kpisRawSql = `
   SELECT
@@ -269,36 +286,38 @@ export class RestaurantService {
 `;
 
     const bestSellingItemsSql = `
-  SELECT 
+  SELECT
     p."descricao" AS "productName",
+    SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
     SUM(soi."quantidade") AS "totalSales"
   FROM "saidaestoque" so
   JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
   JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
   JOIN "produto" p ON p.id = pe."id_produto"
   JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE tp.id IN (${abProductTypesSqlList})
+  WHERE tp.id IN (${abProductTypesForRankingSqlList})
     AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
   GROUP BY p."descricao"
-  ORDER BY "totalSales" DESC
+  ORDER BY "totalRevenue" DESC
   LIMIT 10;
 `;
 
-    // Consulta para os 10 menos vendidos
+    // Consulta para os 10 menos vendidos por faturamento
     const leastSellingItemsSql = `
-  SELECT 
+  SELECT
     p."descricao" AS "productName",
+    SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
     SUM(soi."quantidade") AS "totalSales"
   FROM "saidaestoque" so
   JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
   JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
   JOIN "produto" p ON p.id = pe."id_produto"
   JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE tp.id IN (${abProductTypesSqlList})
+  WHERE tp.id IN (${abProductTypesForLeastRankingSqlList})
     AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
   GROUP BY p."descricao"
-  HAVING SUM(soi."quantidade") > 0
-  ORDER BY "totalSales" ASC
+  HAVING SUM(soi."precovenda" * soi."quantidade") > 0
+  ORDER BY "totalRevenue" ASC
   LIMIT 10;
 `;
 
@@ -440,6 +459,52 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
   ORDER BY revenue DESC
 `;
 
+    // Query para faturamento total da empresa (locações + vendas diretas)
+    const companyTotalRevenueSql = `
+  SELECT
+    COALESCE(SUM("valor"), 0) AS "totalCompanyRevenue"
+  FROM (
+    SELECT ra."valortotal" AS "valor"
+    FROM "locacaoapartamento" ra
+    WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+      AND ra."fimocupacaotipo" = 'FINALIZADA'
+
+    UNION ALL
+
+    SELECT COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) - COALESCE(v."desconto", 0) AS "valor"
+    FROM "vendadireta" vd
+    INNER JOIN "saidaestoque" so ON so.id = vd."id_saidaestoque"
+    LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+    LEFT JOIN "venda" v ON v."id_saidaestoque" = so.id
+    WHERE so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    GROUP BY v."desconto"
+  ) AS all_revenues
+`;
+
+    // Query para receita total de vendas/consumo (todos os produtos, não só A&B)
+    const totalSalesRevenueSql = `
+  SELECT
+    COALESCE(SUM(
+      (soi."precovenda" * soi."quantidade") *
+      (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
+    ), 0) AS "totalSalesRevenue"
+  FROM "locacaoapartamento" ra
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+  LEFT JOIN (
+    SELECT
+      soi."id_saidaestoque",
+      SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+    FROM "saidaestoqueitem" soi
+    WHERE soi."cancelado" IS NULL
+    GROUP BY soi."id_saidaestoque"
+  ) AS so_total ON so_total."id_saidaestoque" = so.id
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+`;
+
     try {
       const [
         rawResult,
@@ -454,6 +519,8 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         resultByFood,
         resultByDrink,
         resultByOthers,
+        companyTotalRevenueResult,
+        totalSalesRevenueResult,
       ] = await Promise.all([
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([kpisRawSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueAbPeriodSql])),
@@ -467,6 +534,8 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([reportByFoodSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([reportByDrinkSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([reportByOthersSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([companyTotalRevenueSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalSalesRevenueSql])),
       ]);
 
       // --- BigNumbers ---
@@ -504,6 +573,20 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         rentalsWithABCount > 0 ? totalABNetRevenue.div(rentalsWithABCount) : new Prisma.Decimal(0);
       const totalAllTicketAverageByTotalRentals =
         totalRentals > 0 ? totalABNetRevenue.div(totalRentals) : new Prisma.Decimal(0);
+
+      // Faturamento total da empresa e receita total de vendas
+      const companyTotalRevenue = Number(companyTotalRevenueResult[0]?.totalCompanyRevenue || 0);
+      const totalSalesRevenue = Number(totalSalesRevenueResult[0]?.totalSalesRevenue || 0);
+
+      // Representatividades (em percentual)
+      const abRepresentativity =
+        companyTotalRevenue > 0
+          ? Number(((Number(totalABNetRevenue) / companyTotalRevenue) * 100).toFixed(2))
+          : 0;
+      const salesRepresentativity =
+        companyTotalRevenue > 0
+          ? Number(((totalSalesRevenue / companyTotalRevenue) * 100).toFixed(2))
+          : 0;
 
       const isMonthly = moment(endDate).diff(moment(startDate), 'days') > 31;
 
@@ -566,15 +649,28 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
       };
 
       // --- BestSellingItems / LeastSellingItems ---
-      const bestSellingItems = {
-        categories: bestSellingResult.map((item: any) => item.productName),
-        series: bestSellingResult.map((item: any) => Number(item.totalSales)),
-      };
+      // Representatividade calculada com base na receita total de A&B
+      const totalABRevenueNumber = Number(totalABNetRevenue);
 
-      const leastSellingItems = {
-        categories: leastSellingResult.map((item: any) => item.productName),
-        series: leastSellingResult.map((item: any) => Number(item.totalSales)),
-      };
+      const bestSellingItems = bestSellingResult.map((item: any) => ({
+        name: item.productName,
+        totalRevenue: Number(Number(item.totalRevenue).toFixed(2)),
+        totalSales: Number(item.totalSales),
+        totalRepresentation:
+          totalABRevenueNumber > 0
+            ? Number(((Number(item.totalRevenue) / totalABRevenueNumber) * 100).toFixed(2))
+            : 0,
+      }));
+
+      const leastSellingItems = leastSellingResult.map((item: any) => ({
+        name: item.productName,
+        totalRevenue: Number(Number(item.totalRevenue).toFixed(2)),
+        totalSales: Number(item.totalSales),
+        totalRepresentation:
+          totalABRevenueNumber > 0
+            ? Number(((Number(item.totalRevenue) / totalABRevenueNumber) * 100).toFixed(2))
+            : 0,
+      }));
 
       // --- RevenueByGroupPeriod ---
       const revenueGrouped = new Map<
@@ -724,11 +820,14 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
           {
             currentDate: {
               totalAllValue: Number(totalABNetRevenue.toFixed(2)),
+              totalAllSalesRevenue: Number(totalSalesRevenue.toFixed(2)),
               totalAllSales: totalAllSales,
               totalAllTicketAverage: Number(totalAllTicketAverage.toFixed(2)),
               totalAllTicketAverageByTotalRentals: Number(
                 totalAllTicketAverageByTotalRentals.toFixed(2),
               ),
+              abRepresentativity: abRepresentativity,
+              salesRepresentativity: salesRepresentativity,
             },
           },
         ],

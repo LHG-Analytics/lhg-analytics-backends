@@ -35,23 +35,7 @@ async function bootstrap() {
     const app = await NestFactory.create(AppModule);
 
     // Configuração de segurança com Helmet
-    app.use(
-      helmet({
-        contentSecurityPolicy: {
-          directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'"],
-            imgSrc: ["'self'", 'data:', 'https:'],
-          },
-        },
-        hsts: {
-          maxAge: 31536000,
-          includeSubDomains: true,
-          preload: true,
-        },
-      }),
-    );
+    app.use(helmet());
 
     // Configuração do cookie-parser para ler cookies httpOnly
     app.use(cookieParser());
@@ -89,33 +73,56 @@ async function bootstrap() {
     }
 
     // Configuração de CORS
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
-      'https://lhg-analytics.vercel.app',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'http://localhost:3003',
-      'http://localhost:3004',
+    // Sempre inclui as origens padrão + qualquer origem adicional do .env
+    const port = process.env.PORT_ANDAR_DE_CIMA || 3004;
+    const defaultOrigins = [
+      'https://lhg-analytics.vercel.app', // Frontend em produção
+      'http://localhost:3000', // Proxy/Frontend local
       'http://localhost:3005', // Authentication service
+      'http://localhost:3001', // Lush Ipiranga (Swagger)
+      'http://localhost:3002', // Lush Lapa (Swagger)
+      'http://localhost:3003', // Tout (Swagger)
+      'http://localhost:3004', // Andar de Cima (Swagger)
     ];
+    const envOrigins =
+      process.env.ALLOWED_ORIGINS?.split(',')
+        .map((o) => o.trim())
+        .filter(Boolean) || [];
+    const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
 
     const corsOptions: CorsOptions = {
       origin: (origin, callback) => {
-        // Permite requisições sem origin (ex: Postman, curl) ou de origens permitidas
-        if (!origin || allowedOrigins.includes(origin)) {
+        console.log('CORS - Origin recebida:', origin);
+        console.log('CORS - Origens permitidas:', allowedOrigins);
+
+        // Permite requisições sem origin (ex: Postman, curl, Swagger)
+        if (!origin) {
+          console.log('CORS - Permitindo requisição sem origin');
           callback(null, true);
-        } else if (process.env.NODE_ENV === 'production') {
-          // Em produção, seja permissivo para health checks
-          callback(null, true);
-        } else {
-          // Log da origem rejeitada para debug
-          console.log('CORS rejeitou origem:', origin);
-          callback(new Error('Not allowed by CORS'), false);
+          return;
         }
+
+        // Verifica se a origin está na lista permitida
+        if (allowedOrigins.includes(origin)) {
+          console.log('CORS - Origin permitida');
+          callback(null, true);
+          return;
+        }
+
+        // Em produção, seja permissivo para health checks
+        if (process.env.NODE_ENV === 'production') {
+          console.log('CORS - Permitindo em produção');
+          callback(null, true);
+          return;
+        }
+
+        // Rejeita origem não permitida
+        console.log('CORS - REJEITANDO origem:', origin);
+        callback(new Error('Not allowed by CORS'), false);
       },
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-      allowedHeaders: ['Authorization', 'Content-Type'], // Adicionando Authorization aqui
-      credentials: true, // Se estiver enviando cookies, mantenha true
+      allowedHeaders: ['Authorization', 'Content-Type'],
+      credentials: true,
     };
 
     // Configuração global de validação
@@ -130,8 +137,6 @@ async function bootstrap() {
     );
 
     app.enableCors(corsOptions);
-
-    const port = process.env.PORT_ANDAR_DE_CIMA || 3004;
 
     // Use a porta do ambiente ou 3004 como padrão
     await app.listen(port, () => {
