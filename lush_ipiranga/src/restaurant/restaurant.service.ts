@@ -149,11 +149,17 @@ export class RestaurantService {
 
     const bProductTypes = [56, 79, 54, 55, 80, 53];
 
-    // A&B sem os IDs 78, 77 e 63 (para ranking de mais vendidos)
-    const abProductTypesForRanking = [64, 57, 56, 79, 54, 55, 80, 53, 62, 59, 61, 58];
+    // Alimentos para ranking (aProductTypes sem 78, 77, 63)
+    const aProductTypesForRanking = [64, 57, 62, 59, 61, 58];
 
-    // A&B sem os IDs 78, 77, 63 e 57 (para ranking de menos vendidos)
-    const abProductTypesForLeastRanking = [64, 56, 79, 54, 55, 80, 53, 62, 59, 61, 58];
+    // Bebidas para ranking (bProductTypes - nenhum removido)
+    const bProductTypesForRanking = [56, 79, 54, 55, 80, 53];
+
+    // Alimentos para ranking de menos vendidos (aProductTypes sem 78, 77, 63, 57)
+    const aProductTypesForLeastRanking = [64, 62, 59, 61, 58];
+
+    // Bebidas para ranking de menos vendidos (bProductTypes - nenhum removido)
+    const bProductTypesForLeastRanking = [56, 79, 54, 55, 80, 53];
 
     const othersList = [71, 72, 69, 68, 70];
 
@@ -175,8 +181,10 @@ export class RestaurantService {
 
     // Safe parameterized query - convert concatenated arrays to Prisma.join
     const abProductTypesParam = Prisma.join(abProductTypes);
-    const abProductTypesForRankingParam = Prisma.join(abProductTypesForRanking);
-    const abProductTypesForLeastRankingParam = Prisma.join(abProductTypesForLeastRanking);
+    const aProductTypesForRankingParam = Prisma.join(aProductTypesForRanking);
+    const bProductTypesForRankingParam = Prisma.join(bProductTypesForRanking);
+    const aProductTypesForLeastRankingParam = Prisma.join(aProductTypesForLeastRanking);
+    const bProductTypesForLeastRankingParam = Prisma.join(bProductTypesForLeastRanking);
 
     const kpisRawSql = Prisma.sql`
   SELECT
@@ -288,7 +296,8 @@ export class RestaurantService {
   ORDER BY "date" DESC
 `;
 
-    const bestSellingItemsSql = Prisma.sql`
+    // Consultas separadas para ALIMENTOS
+    const bestSellingFoodSql = Prisma.sql`
   SELECT
     p."descricao" AS "productName",
     SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
@@ -298,15 +307,14 @@ export class RestaurantService {
   JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
   JOIN "produto" p ON p.id = pe."id_produto"
   JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE tp.id IN (${abProductTypesForRankingParam})
+  WHERE tp.id IN (${aProductTypesForRankingParam})
     AND so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
   GROUP BY p."descricao"
   ORDER BY "totalRevenue" DESC
   LIMIT 10;
 `;
 
-    // Consulta para os 10 menos vendidos por faturamento
-    const leastSellingItemsSql = Prisma.sql`
+    const leastSellingFoodSql = Prisma.sql`
   SELECT
     p."descricao" AS "productName",
     SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
@@ -316,7 +324,43 @@ export class RestaurantService {
   JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
   JOIN "produto" p ON p.id = pe."id_produto"
   JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE tp.id IN (${abProductTypesForLeastRankingParam})
+  WHERE tp.id IN (${aProductTypesForLeastRankingParam})
+    AND so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+  GROUP BY p."descricao"
+  HAVING SUM(soi."precovenda" * soi."quantidade") > 0
+  ORDER BY "totalRevenue" ASC
+  LIMIT 10;
+`;
+
+    // Consultas separadas para BEBIDAS
+    const bestSellingDrinksSql = Prisma.sql`
+  SELECT
+    p."descricao" AS "productName",
+    SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
+    SUM(soi."quantidade") AS "totalSales"
+  FROM "saidaestoque" so
+  JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
+  JOIN "produto" p ON p.id = pe."id_produto"
+  JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  WHERE tp.id IN (${bProductTypesForRankingParam})
+    AND so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+  GROUP BY p."descricao"
+  ORDER BY "totalRevenue" DESC
+  LIMIT 10;
+`;
+
+    const leastSellingDrinksSql = Prisma.sql`
+  SELECT
+    p."descricao" AS "productName",
+    SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
+    SUM(soi."quantidade") AS "totalSales"
+  FROM "saidaestoque" so
+  JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
+  JOIN "produto" p ON p.id = pe."id_produto"
+  JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  WHERE tp.id IN (${bProductTypesForLeastRankingParam})
     AND so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
   GROUP BY p."descricao"
   HAVING SUM(soi."precovenda" * soi."quantidade") > 0
@@ -521,8 +565,10 @@ export class RestaurantService {
         rawPeriodResult,
         rawTotalRevenueResult,
         rawAbTicketCountResult,
-        bestSellingResult,
-        leastSellingResult,
+        bestSellingFoodResult,
+        leastSellingFoodResult,
+        bestSellingDrinksResult,
+        leastSellingDrinksResult,
         revenueGroupByPeriodResult,
         rawAPeriodResult,
         rawBPeriodResult,
@@ -536,8 +582,10 @@ export class RestaurantService {
         this.prisma.prismaLocal.$queryRaw<any[]>(revenueAbPeriodSql),
         this.prisma.prismaLocal.$queryRaw<any[]>(totalRevenueByPeriodSql),
         this.prisma.prismaLocal.$queryRaw<any[]>(abTicketCountByPeriodSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(bestSellingItemsSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(leastSellingItemsSql),
+        this.prisma.prismaLocal.$queryRaw<any[]>(bestSellingFoodSql),
+        this.prisma.prismaLocal.$queryRaw<any[]>(leastSellingFoodSql),
+        this.prisma.prismaLocal.$queryRaw<any[]>(bestSellingDrinksSql),
+        this.prisma.prismaLocal.$queryRaw<any[]>(leastSellingDrinksSql),
         this.prisma.prismaLocal.$queryRaw<any[]>(revenueGroupByPeriodSql),
         this.prisma.prismaLocal.$queryRaw<any[]>(revenueAPeriodSql),
         this.prisma.prismaLocal.$queryRaw<any[]>(revenueBPeriodSql),
@@ -658,11 +706,11 @@ export class RestaurantService {
         }),
       };
 
-      // --- BestSellingItems / LeastSellingItems ---
+      // --- Rankings de Alimentos e Bebidas ---
       // Representatividade calculada com base na receita total de A&B
       const totalABRevenueNumber = Number(totalABNetRevenue);
 
-      const bestSellingItems = bestSellingResult.map((item) => ({
+      const bestSellingFood = bestSellingFoodResult.map((item: any) => ({
         name: item.productName,
         totalRevenue: Number(Number(item.totalRevenue).toFixed(2)),
         totalSales: Number(item.totalSales),
@@ -672,7 +720,27 @@ export class RestaurantService {
             : 0,
       }));
 
-      const leastSellingItems = leastSellingResult.map((item) => ({
+      const leastSellingFood = leastSellingFoodResult.map((item: any) => ({
+        name: item.productName,
+        totalRevenue: Number(Number(item.totalRevenue).toFixed(2)),
+        totalSales: Number(item.totalSales),
+        totalRepresentation:
+          totalABRevenueNumber > 0
+            ? Number(((Number(item.totalRevenue) / totalABRevenueNumber) * 100).toFixed(2))
+            : 0,
+      }));
+
+      const bestSellingDrinks = bestSellingDrinksResult.map((item: any) => ({
+        name: item.productName,
+        totalRevenue: Number(Number(item.totalRevenue).toFixed(2)),
+        totalSales: Number(item.totalSales),
+        totalRepresentation:
+          totalABRevenueNumber > 0
+            ? Number(((Number(item.totalRevenue) / totalABRevenueNumber) * 100).toFixed(2))
+            : 0,
+      }));
+
+      const leastSellingDrinks = leastSellingDrinksResult.map((item: any) => ({
         name: item.productName,
         totalRevenue: Number(Number(item.totalRevenue).toFixed(2)),
         totalSales: Number(item.totalSales),
@@ -829,8 +897,10 @@ export class RestaurantService {
         RevenueAbByPeriod: revenueAbByPeriod,
         RevenueAbByPeriodPercent: revenueAbByPeriodPercent,
         TicketAverageByPeriod: ticketAverageByPeriod,
-        BestSellingItems: bestSellingItems,
-        LeastSellingItems: leastSellingItems,
+        BestSellingFood: bestSellingFood,
+        LeastSellingFood: leastSellingFood,
+        BestSellingDrinks: bestSellingDrinks,
+        LeastSellingDrinks: leastSellingDrinks,
         RevenueByGroupPeriod: revenueByGroupPeriod,
         RevenueFoodByPeriod: revenueAByPeriod,
         RevenueDrinksByPeriod: revenueBByPeriod,

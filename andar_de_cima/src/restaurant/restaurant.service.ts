@@ -151,11 +151,17 @@ export class RestaurantService {
 
     const othersList = [12, 8, 19, 11, 9];
 
-    // A&B sem os IDs 28, 7 (para ranking de mais vendidos)
-    const abProductTypesForRanking = [6, 13, 2, 4, 5, 3, 20, 14, 16, 18, 15, 17];
+    // Alimentos para ranking (aProductTypes sem 28, 7)
+    const aProductTypesForRanking = [14, 16, 18, 15, 17];
 
-    // A&B sem os IDs 28, 14, 7 (para ranking de menos vendidos)
-    const abProductTypesForLeastRanking = [6, 13, 2, 4, 5, 3, 20, 16, 18, 15, 17];
+    // Bebidas para ranking (bProductTypes - nenhum removido)
+    const bProductTypesForRanking = [6, 13, 2, 4, 5, 3, 20];
+
+    // Alimentos para ranking de menos vendidos (aProductTypes sem 28, 14, 7)
+    const aProductTypesForLeastRanking = [16, 18, 15, 17];
+
+    // Bebidas para ranking de menos vendidos (bProductTypes - nenhum removido)
+    const bProductTypesForLeastRanking = [6, 13, 2, 4, 5, 3, 20];
 
     const formattedStart = moment
       .utc(startDate)
@@ -172,6 +178,10 @@ export class RestaurantService {
     const aProductTypesSqlList = aProductTypes.join(', ');
     const bProductTypesSqlList = bProductTypes.join(', ');
     const othersProductTypesSqlList = othersList.join(', ');
+    const aProductTypesForRankingSqlList = aProductTypesForRanking.join(', ');
+    const bProductTypesForRankingSqlList = bProductTypesForRanking.join(', ');
+    const aProductTypesForLeastRankingSqlList = aProductTypesForLeastRanking.join(', ');
+    const bProductTypesForLeastRankingSqlList = bProductTypesForLeastRanking.join(', ');
 
     const kpisRawSql = `
   SELECT
@@ -283,10 +293,8 @@ export class RestaurantService {
   ORDER BY "date" DESC
 `;
 
-    const abProductTypesForRankingSqlList = abProductTypesForRanking.join(', ');
-    const abProductTypesForLeastRankingSqlList = abProductTypesForLeastRanking.join(', ');
-
-    const bestSellingItemsSql = `
+    // Query para os 10 alimentos mais vendidos por faturamento
+    const bestSellingFoodSql = `
   SELECT
     p."descricao" AS "productName",
     SUM(soi."quantidade") AS "totalSales",
@@ -296,15 +304,15 @@ export class RestaurantService {
   JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
   JOIN "produto" p ON p.id = pe."id_produto"
   JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE tp.id IN (${abProductTypesForRankingSqlList})
+  WHERE tp.id IN (${aProductTypesForRankingSqlList})
     AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
   GROUP BY p."descricao"
   ORDER BY "totalRevenue" DESC
   LIMIT 10;
 `;
 
-    // Consulta para os 10 menos vendidos
-    const leastSellingItemsSql = `
+    // Query para os 10 alimentos menos vendidos por faturamento
+    const leastSellingFoodSql = `
   SELECT
     p."descricao" AS "productName",
     SUM(soi."quantidade") AS "totalSales",
@@ -314,7 +322,44 @@ export class RestaurantService {
   JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
   JOIN "produto" p ON p.id = pe."id_produto"
   JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE tp.id IN (${abProductTypesForLeastRankingSqlList})
+  WHERE tp.id IN (${aProductTypesForLeastRankingSqlList})
+    AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+  GROUP BY p."descricao"
+  HAVING SUM(soi."precovenda" * soi."quantidade") > 0
+  ORDER BY "totalRevenue" ASC
+  LIMIT 10;
+`;
+
+    // Query para as 10 bebidas mais vendidas por faturamento
+    const bestSellingDrinksSql = `
+  SELECT
+    p."descricao" AS "productName",
+    SUM(soi."quantidade") AS "totalSales",
+    SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue"
+  FROM "saidaestoque" so
+  JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
+  JOIN "produto" p ON p.id = pe."id_produto"
+  JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  WHERE tp.id IN (${bProductTypesForRankingSqlList})
+    AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+  GROUP BY p."descricao"
+  ORDER BY "totalRevenue" DESC
+  LIMIT 10;
+`;
+
+    // Query para as 10 bebidas menos vendidas por faturamento
+    const leastSellingDrinksSql = `
+  SELECT
+    p."descricao" AS "productName",
+    SUM(soi."quantidade") AS "totalSales",
+    SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue"
+  FROM "saidaestoque" so
+  JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
+  JOIN "produto" p ON p.id = pe."id_produto"
+  JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  WHERE tp.id IN (${bProductTypesForLeastRankingSqlList})
     AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
   GROUP BY p."descricao"
   HAVING SUM(soi."precovenda" * soi."quantidade") > 0
@@ -512,8 +557,10 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         rawPeriodResult,
         rawTotalRevenueResult,
         rawAbTicketCountResult,
-        bestSellingResult,
-        leastSellingResult,
+        bestSellingFoodResult,
+        leastSellingFoodResult,
+        bestSellingDrinksResult,
+        leastSellingDrinksResult,
         revenueGroupByPeriodResult,
         rawAPeriodResult,
         rawBPeriodResult,
@@ -527,8 +574,10 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueAbPeriodSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalRevenueByPeriodSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([abTicketCountByPeriodSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([bestSellingItemsSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([leastSellingItemsSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([bestSellingFoodSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([leastSellingFoodSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([bestSellingDrinksSql])),
+        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([leastSellingDrinksSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueGroupByPeriodSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueAPeriodSql])),
         this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueBPeriodSql])),
@@ -650,8 +699,8 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         }),
       };
 
-      // --- BestSellingItems / LeastSellingItems ---
-      const bestSellingItems = bestSellingResult.map((item) => ({
+      // --- Rankings separados por Food e Drinks ---
+      const bestSellingFood = bestSellingFoodResult.map((item) => ({
         name: item.productName,
         totalRevenue: Number(Number(item.totalRevenue).toFixed(2)),
         totalSales: Number(item.totalSales),
@@ -661,7 +710,27 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
             : 0,
       }));
 
-      const leastSellingItems = leastSellingResult.map((item) => ({
+      const leastSellingFood = leastSellingFoodResult.map((item) => ({
+        name: item.productName,
+        totalRevenue: Number(Number(item.totalRevenue).toFixed(2)),
+        totalSales: Number(item.totalSales),
+        totalRepresentation:
+          totalABRevenueNumber > 0
+            ? Number(((Number(item.totalRevenue) / totalABRevenueNumber) * 100).toFixed(2))
+            : 0,
+      }));
+
+      const bestSellingDrinks = bestSellingDrinksResult.map((item) => ({
+        name: item.productName,
+        totalRevenue: Number(Number(item.totalRevenue).toFixed(2)),
+        totalSales: Number(item.totalSales),
+        totalRepresentation:
+          totalABRevenueNumber > 0
+            ? Number(((Number(item.totalRevenue) / totalABRevenueNumber) * 100).toFixed(2))
+            : 0,
+      }));
+
+      const leastSellingDrinks = leastSellingDrinksResult.map((item) => ({
         name: item.productName,
         totalRevenue: Number(Number(item.totalRevenue).toFixed(2)),
         totalSales: Number(item.totalSales),
@@ -818,8 +887,10 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         RevenueAbByPeriod: revenueAbByPeriod,
         RevenueAbByPeriodPercent: revenueAbByPeriodPercent,
         TicketAverageByPeriod: ticketAverageByPeriod,
-        BestSellingItems: bestSellingItems,
-        LeastSellingItems: leastSellingItems,
+        BestSellingFood: bestSellingFood,
+        LeastSellingFood: leastSellingFood,
+        BestSellingDrinks: bestSellingDrinks,
+        LeastSellingDrinks: leastSellingDrinks,
         RevenueByGroupPeriod: revenueByGroupPeriod,
         RevenueFoodByPeriod: revenueAByPeriod,
         RevenueDrinksByPeriod: revenueBByPeriod,
