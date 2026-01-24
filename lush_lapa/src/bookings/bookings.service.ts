@@ -206,11 +206,7 @@ FROM "reserva" r
 WHERE
   r."cancelada" IS NULL
   AND r."valorcontratado" IS NOT NULL
-  AND (
-    (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-    OR
-    (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-  )
+  AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
 GROUP BY ROLLUP (r."id_tipoorigemreserva")
 HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva" IS NULL
 ORDER BY "id_tipoorigemreserva";
@@ -224,11 +220,7 @@ FROM "reserva" r
 WHERE
   r."cancelada" IS NULL
   AND r."valorcontratado" IS NOT NULL
-  AND (
-    (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-    OR
-    (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-  )
+  AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
 GROUP BY ROLLUP (r."id_tipoorigemreserva")
 HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva" IS NULL
 ORDER BY "id_tipoorigemreserva";
@@ -268,11 +260,7 @@ FROM vendas_diretas vd, locacoes loc;
       AND nl."dataexclusao" IS NULL
       AND nl."tipolancamento" = 'RESERVA'
       AND nl."id_contapagarreceber" IS NULL
-      AND (
-        (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-        OR
-        (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      )
+      AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
   ),
   pagamentos_reserva AS (
     -- Lançamentos do tipo RESERVA (usa valor contratado)
@@ -289,11 +277,7 @@ FROM vendas_diretas vd, locacoes loc;
       AND nl."tipolancamento" = 'RESERVA'
       AND nl."id_contapagarreceber" IS NULL
       AND mp."dataexclusao" IS NULL
-      AND (
-        (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-        OR
-        (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      )
+      AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
   ),
   pagamentos_locacao AS (
     -- Lançamentos do tipo LOCACAO apenas para reservas SEM lançamento RESERVA
@@ -311,11 +295,7 @@ FROM vendas_diretas vd, locacoes loc;
       AND nl."id_contapagarreceber" IS NULL
       AND mp."dataexclusao" IS NULL
       AND r."id" NOT IN (SELECT reserva_id FROM reservas_com_pagamento)
-      AND (
-        (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-        OR
-        (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      )
+      AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
   ),
   todos_pagamentos AS (
     SELECT "paymentMethod", "valor", reserva_id FROM pagamentos_reserva
@@ -345,34 +325,20 @@ FROM vendas_diretas vd, locacoes loc;
   LEFT JOIN "locacaoapartamento" la ON r."id_locacaoapartamento" = la."id_apartamentostate"
   WHERE r."cancelada" IS NULL
     AND r."valorcontratado" IS NOT NULL
-    AND (
-      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      OR
-      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-    );
+    AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}';
 `;
 
     // SQL para obter dados agrupados por data para os períodos
     const billingByDateSQL = `
   SELECT
-    DATE(CASE
-      WHEN r."id_tipoorigemreserva" IN (7, 8) THEN r."datainicio"
-      ELSE r."dataatendimento"
-    END) as booking_date,
+    DATE(r."dataatendimento") as booking_date,
     ROUND(SUM(r."valorcontratado")::numeric, 2) AS total_value,
     COUNT(*) AS total_bookings
   FROM "reserva" r
   WHERE r."cancelada" IS NULL
     AND r."valorcontratado" IS NOT NULL
-    AND (
-      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      OR
-      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-    )
-    AND DATE(CASE
-      WHEN r."id_tipoorigemreserva" IN (7, 8) THEN r."datainicio"
-      ELSE r."dataatendimento"
-    END) BETWEEN DATE('${formattedStart}') AND DATE('${formattedEnd}')
+    AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND DATE(r."dataatendimento") BETWEEN DATE('${formattedStart}') AND DATE('${formattedEnd}')
   GROUP BY booking_date
   ORDER BY booking_date DESC;
 `;
@@ -380,39 +346,31 @@ FROM vendas_diretas vd, locacoes loc;
     // SQL para dados de ecommerce por data (canal 4 = RESERVA_API)
     const ecommerceByDateSQL = `
   SELECT
-    DATE(CASE
-      WHEN r."id_tipoorigemreserva" IN (7, 8) THEN r."datainicio"
-      ELSE r."dataatendimento"
-    END) as booking_date,
+    DATE(r."dataatendimento") as booking_date,
     ROUND(SUM(r."valorcontratado")::numeric, 2) AS total_value,
     COUNT(*) AS total_bookings
   FROM "reserva" r
   WHERE r."cancelada" IS NULL
     AND r."valorcontratado" IS NOT NULL
     AND r."id_tipoorigemreserva" = 4
-    AND (
-      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      OR
-      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-    )
-    AND DATE(CASE
-      WHEN r."id_tipoorigemreserva" IN (7, 8) THEN r."datainicio"
-      ELSE r."dataatendimento"
-    END) BETWEEN DATE('${formattedStart}') AND DATE('${formattedEnd}')
+    AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND DATE(r."dataatendimento") BETWEEN DATE('${formattedStart}') AND DATE('${formattedEnd}')
   GROUP BY booking_date
   ORDER BY booking_date DESC;
 `;
 
-    // Query SQL para classificação refinada de canais (removed Airbnb - id_tipoorigemreserva = 9)
+    // Query SQL para classificação refinada de canais
+    // Para WEBSITE (id=4): usa periodocontratado + hora para classificar SCHEDULED vs IMMEDIATE
+    // Para WEBSITE: usa novo_lancamento com versao=0 e tipolancamento='RESERVA' para obter o valor correto
     const billingPerChannelSQL = `
   WITH reservas_com_canal_refinado AS (
     SELECT
       r."id",
-      r."valorcontratado",
       r."id_tipoorigemreserva",
       r."datainicio",
       r."dataatendimento",
       r."reserva_programada_guia",
+      r."periodocontratado",
       CASE
         WHEN r."id_tipoorigemreserva" = 1 THEN 'INTERNAL'
         WHEN r."id_tipoorigemreserva" = 6 THEN 'INTERNAL'
@@ -426,10 +384,16 @@ FROM vendas_diretas vd, locacoes loc;
           END
         WHEN r."id_tipoorigemreserva" = 4 THEN
           CASE
-            -- Verifica se a hora é "fechada" (20:00, 15:00, 13:00) - reserva programada
-            WHEN EXTRACT(HOUR FROM r."datainicio") IN (20, 15, 13)
-                 AND EXTRACT(MINUTE FROM r."datainicio") = 0
-                 AND EXTRACT(SECOND FROM r."datainicio") = 0 THEN 'WEBSITE_SCHEDULED'
+            -- Dayuse: periodo 06:00 + hora 13
+            WHEN r."periodocontratado" = '06:00' AND EXTRACT(HOUR FROM r."datainicio") = 13 THEN 'WEBSITE_SCHEDULED'
+            -- Pernoite: periodo 16:00 + hora 20
+            WHEN r."periodocontratado" = '16:00' AND EXTRACT(HOUR FROM r."datainicio") = 20 THEN 'WEBSITE_SCHEDULED'
+            -- Diária: periodo 21:00 + hora 15
+            WHEN r."periodocontratado" = '21:00' AND EXTRACT(HOUR FROM r."datainicio") = 15 THEN 'WEBSITE_SCHEDULED'
+            -- Periodo NULL + horários programados
+            WHEN r."periodocontratado" IS NULL
+                 AND EXTRACT(HOUR FROM r."datainicio") IN (12, 13, 15, 18, 20)
+                 AND EXTRACT(MINUTE FROM r."datainicio") = 0 THEN 'WEBSITE_SCHEDULED'
             ELSE 'WEBSITE_IMMEDIATE'
           END
         ELSE CONCAT('CANAL_', r."id_tipoorigemreserva")
@@ -437,17 +401,43 @@ FROM vendas_diretas vd, locacoes loc;
     FROM "reserva" r
     WHERE r."cancelada" IS NULL
       AND r."valorcontratado" IS NOT NULL
-      AND (
-        (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-        OR
-        (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      )
+      AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+  ),
+  -- Para canais que não são WEBSITE (4), usa valorcontratado
+  valores_outros_canais AS (
+    SELECT
+      rcr."id",
+      rcr.channel_type,
+      r."valorcontratado" AS valor
+    FROM reservas_com_canal_refinado rcr
+    JOIN "reserva" r ON rcr."id" = r."id"
+    WHERE rcr."id_tipoorigemreserva" != 4
+  ),
+  -- Para canal WEBSITE (4), usa novo_lancamento com versao=0 e tipolancamento='RESERVA'
+  valores_website AS (
+    SELECT
+      rcr."id",
+      rcr.channel_type,
+      COALESCE(SUM(nl."valor"), 0) AS valor
+    FROM reservas_com_canal_refinado rcr
+    JOIN "novo_lancamento" nl ON rcr."id" = nl."id_originado"
+    WHERE rcr."id_tipoorigemreserva" = 4
+      AND nl."versao" = 0
+      AND nl."dataexclusao" IS NULL
+      AND nl."tipolancamento" = 'RESERVA'
+    GROUP BY rcr."id", rcr.channel_type
+  ),
+  -- União de todos os valores
+  todos_valores AS (
+    SELECT "id", channel_type, valor FROM valores_outros_canais
+    UNION ALL
+    SELECT "id", channel_type, valor FROM valores_website
   )
   SELECT
     channel_type,
-    ROUND(SUM("valorcontratado")::numeric, 2) AS "totalValue",
-    COUNT(*) AS "totalBookings"
-  FROM reservas_com_canal_refinado
+    ROUND(SUM(valor)::numeric, 2) AS "totalValue",
+    COUNT(DISTINCT "id") AS "totalBookings"
+  FROM todos_valores
   GROUP BY channel_type
   ORDER BY "totalValue" DESC;
 `;
@@ -747,12 +737,18 @@ FROM vendas_diretas vd, locacoes loc;
       }),
     };
 
+    // BigNumbers usa os totais do billingPerChannelData para consistência com KpiTableByChannelType
+    const bigNumbersTicketAverage =
+      totalChannelBookings > 0 ? Number((totalChannelRevenue / totalChannelBookings).toFixed(2)) : 0;
+    const bigNumbersRepresentativeness =
+      revenueTotal > 0 ? Number((totalChannelRevenue / revenueTotal).toFixed(4)) : 0;
+
     const bigNumbers = {
       currentDate: {
-        totalAllValue: totalValue,
-        totalAllBookings: totalBookings,
-        totalAllTicketAverage: ticketAverage,
-        totalAllRepresentativeness: representativeness,
+        totalAllValue: Number(totalChannelRevenue.toFixed(2)),
+        totalAllBookings: totalChannelBookings,
+        totalAllTicketAverage: bigNumbersTicketAverage,
+        totalAllRepresentativeness: bigNumbersRepresentativeness,
       },
     };
 

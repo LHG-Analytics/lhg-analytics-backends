@@ -7,8 +7,14 @@ if (process.env.NODE_ENV === 'production') {
   addAliases({
     '@client-local': join(__dirname, 'generated/client-local'),
     '@auth/auth/auth.service': join(__dirname, '../../../../authentication/dist/auth/auth.service'),
-    '@auth/prisma/prisma.service': join(__dirname, '../../../../authentication/dist/prisma/prisma.service'),
-    '@auth/auth/interfaces/jwt-payload.interface': join(__dirname, '../../../../authentication/dist/auth/interfaces/jwt-payload.interface'),
+    '@auth/prisma/prisma.service': join(
+      __dirname,
+      '../../../../authentication/dist/prisma/prisma.service',
+    ),
+    '@auth/auth/interfaces/jwt-payload.interface': join(
+      __dirname,
+      '../../../../authentication/dist/auth/interfaces/jwt-payload.interface',
+    ),
   });
 }
 import { config } from 'dotenv';
