@@ -85,11 +85,11 @@ export class BookingsController {
       );
     }
 
-    // Ajusta as horas conforme necessário
+    // Ajusta as horas conforme necessário (00:00:00 às 23:59:59 para reservas)
     if (isEndDate) {
-      date.setUTCHours(5, 59, 59, 999); // Define o final às 05:59:59.999
+      date.setUTCHours(23, 59, 59, 999); // Define o final às 23:59:59.999
     } else {
-      date.setUTCHours(6, 0, 0, 0); // Define o início às 06:00
+      date.setUTCHours(0, 0, 0, 0); // Define o início às 00:00
     }
 
     return date;
