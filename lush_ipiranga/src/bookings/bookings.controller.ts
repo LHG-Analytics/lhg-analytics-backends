@@ -1,12 +1,25 @@
-import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiBearerAuth, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { PeriodEnum } from '../common/enums';
-import { BookingsService } from './bookings.service';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiNotFoundResponse,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { UnitsGuard } from '../auth/units.guard';
 import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import { Units } from '../auth/units.decorator';
+import { UnitsGuard } from '../auth/units.guard';
+import { BookingsService } from './bookings.service';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
@@ -16,7 +29,6 @@ import { Units } from '../auth/units.decorator';
 @Controller('Bookings')
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
-
 
   @Get('bookings/date-range')
   @ApiQuery({
