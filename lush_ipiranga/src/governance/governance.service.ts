@@ -79,6 +79,7 @@ export class GovernanceService {
     const remainingDays = totalDaysInMonth - daysElapsed;
 
     // Buscar dados do mês atual para forecast (do dia 1 até ontem)
+    // Período contábil: 06:00 às 05:59
     const monthStartDate = currentMonthStart
       .clone()
       .set({ hour: 6, minute: 0, second: 0 })
@@ -147,6 +148,7 @@ export class GovernanceService {
    * Chamado pelo cache service quando há cache miss
    */
   private async _calculateKpibyDateRangeSQLInternal(startDate: Date, endDate: Date): Promise<any> {
+    // Período contábil: 06:00 às 05:59
     const formattedStart = moment
       .utc(startDate)
       .set({ hour: 6, minute: 0, second: 0 })
@@ -441,9 +443,11 @@ real_shift_maid_count AS (
 SELECT
   ss.shift,
   ss.total_average_shift_cleaning,
-  ROUND(ss.total_average_shift_cleaning / 7.0)::int AS ideal_shift_maid,
+  -- Fórmula: ARREDONDAR.PARA.CIMA(Média Suítes ÷ 8) × 1,29
+  -- Meta: 8 suítes/camareira/dia | Escala 6x1 + férias | Fator cobertura: 1,29 (365÷283 dias trabalhados)
+  ROUND(CEIL(ss.total_average_shift_cleaning / 8.0) * 1.29)::int AS ideal_shift_maid,
   COALESCE(rsm.real_shift_maid, 0) AS real_shift_maid,
-  COALESCE(rsm.real_shift_maid, 0) - (ROUND(ss.total_average_shift_cleaning / 7.0)::int) AS difference,
+  COALESCE(rsm.real_shift_maid, 0) - (ROUND(CEIL(ss.total_average_shift_cleaning / 8.0) * 1.29)::int) AS difference,
   jsonb_object_agg(
     sda.weekday,
     jsonb_build_object(
@@ -545,6 +549,7 @@ ORDER BY
 
     const totalAllSuitesCleanings = cleaningTotalResultRaw?.[0]?.totalSuitesCleaned || 0;
 
+    // Período contábil: 06:00 às 05:59
     const accountingStart = moment.utc(startDate).set({ hour: 6, minute: 0, second: 0 });
     const accountingEnd = moment
       .utc(endDate)

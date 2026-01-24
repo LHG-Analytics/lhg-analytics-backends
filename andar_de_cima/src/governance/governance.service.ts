@@ -442,9 +442,11 @@ real_shift_maid_count AS (
 SELECT
   ss.shift,
   ss.total_average_shift_cleaning,
-  ROUND(ss.total_average_shift_cleaning / 9.0)::int AS ideal_shift_maid,
+  -- Fórmula: ARREDONDAR.PARA.CIMA(Média Suítes ÷ 8) × 1,29
+  -- Meta: 8 suítes/camareira/dia | Escala 6x1 + férias | Fator cobertura: 1,29 (365÷283 dias trabalhados)
+  ROUND(CEIL(ss.total_average_shift_cleaning / 8.0) * 1.29)::int AS ideal_shift_maid,
   COALESCE(rsm.real_shift_maid, 0) AS real_shift_maid,
-  COALESCE(rsm.real_shift_maid, 0) - (ROUND(ss.total_average_shift_cleaning / 9.0)::int) AS difference,
+  COALESCE(rsm.real_shift_maid, 0) - (ROUND(CEIL(ss.total_average_shift_cleaning / 8.0) * 1.29)::int) AS difference,
   jsonb_object_agg(
     sda.weekday,
     jsonb_build_object(

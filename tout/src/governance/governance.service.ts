@@ -424,9 +424,11 @@ real_shift_maid_count AS (
 SELECT
   ss.shift,
   ss.total_average_shift_cleaning,
-  ROUND(ss.total_average_shift_cleaning / 11.0)::int AS ideal_shift_maid,
+  -- Fórmula: ARREDONDAR.PARA.CIMA(Média Suítes ÷ 10) × 1,29
+  -- Meta: 10 suítes/camareira/dia | Escala 6x1 + férias | Fator cobertura: 1,29 (365÷283 dias trabalhados)
+  ROUND(CEIL(ss.total_average_shift_cleaning / 10.0) * 1.29)::int AS ideal_shift_maid,
   COALESCE(rsm.real_shift_maid, 0) AS real_shift_maid,
-  COALESCE(rsm.real_shift_maid, 0) - (ROUND(ss.total_average_shift_cleaning / 11.0)::int) AS difference,
+  COALESCE(rsm.real_shift_maid, 0) - (ROUND(CEIL(ss.total_average_shift_cleaning / 10.0) * 1.29)::int) AS difference,
   jsonb_object_agg(
     sda.weekday,
     jsonb_build_object(
@@ -464,21 +466,21 @@ ORDER BY
       teamSizingResult,
     ] = await Promise.all([
       this.prisma.prismaLocal.$queryRaw<{ totalSuitesCleaned: number }[]>(
-        Prisma.sql`${totalSuitesCleanedSql}`,
+        Prisma.sql([totalSuitesCleanedSql]),
       ),
       this.prisma.prismaLocal.$queryRaw<{ totalInspections: number }[]>(
-        Prisma.sql`${totalInspectionsSql}`,
+        Prisma.sql([totalInspectionsSql]),
       ),
       this.prisma.prismaLocal.$queryRaw<{ name: string; value: number }[]>(
-        Prisma.sql`${supervisorPerformanceSQL}`,
+        Prisma.sql([supervisorPerformanceSQL]),
       ),
       this.prisma.prismaLocal.$queryRaw<{ name: string; value: number }[]>(
-        Prisma.sql`${shiftCleaningSQL}`,
+        Prisma.sql([shiftCleaningSQL]),
       ),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql`${cleaningsByPeriodSql}`),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql`${cleaningsByPeriodShiftSql}`),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql`${employeeReportSql}`),
-      this.prisma.prismaLocal.$queryRaw<TeamSizingRow[]>(Prisma.sql`${teamSizingSQL}`),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([cleaningsByPeriodSql])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([cleaningsByPeriodShiftSql])),
+      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([employeeReportSql])),
+      this.prisma.prismaLocal.$queryRaw<TeamSizingRow[]>(Prisma.sql([teamSizingSQL])),
     ]);
 
     const orderedWeekdays = ['domingo', 'sabado', 'sexta', 'quinta', 'quarta', 'terca', 'segunda'];
