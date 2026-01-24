@@ -144,10 +144,61 @@ export class BookingsService {
       monthlyForecast,
     };
 
-    // Retornar dados do período atual com BigNumbers combinado
+    // Extrair BigNumbersEcommerce dos períodos
+    const currentEcommerce = currentData.BigNumbersEcommerce[0];
+    const previousEcommerce = previousData.BigNumbersEcommerce[0];
+    const monthlyEcommerce = monthlyData.BigNumbersEcommerce[0];
+
+    // Calcular forecast para ecommerce
+    let ecommerceMonthlyForecast: any = undefined;
+
+    if (daysElapsed > 0) {
+      const monthlyEcommerceValue = monthlyEcommerce.currentDate.totalAllValue;
+      const monthlyEcommerceBookings = monthlyEcommerce.currentDate.totalAllBookings;
+
+      // Média diária
+      const dailyAverageEcommerceValue = monthlyEcommerceValue / daysElapsed;
+      const dailyAverageEcommerceBookings = monthlyEcommerceBookings / daysElapsed;
+
+      // Projeções
+      const forecastEcommerceValue =
+        monthlyEcommerceValue + dailyAverageEcommerceValue * remainingDays;
+      const forecastEcommerceBookings =
+        monthlyEcommerceBookings + dailyAverageEcommerceBookings * remainingDays;
+
+      // Métricas recalculadas
+      const forecastEcommerceTicketAverage =
+        forecastEcommerceBookings > 0
+          ? Number((forecastEcommerceValue / forecastEcommerceBookings).toFixed(2))
+          : 0;
+
+      ecommerceMonthlyForecast = {
+        totalAllValueForecast: Number(forecastEcommerceValue.toFixed(2)),
+        totalAllBookingsForecast: Math.round(forecastEcommerceBookings),
+        totalAllTicketAverageForecast: forecastEcommerceTicketAverage,
+        totalAllRepresentativenessForecast:
+          monthlyEcommerce.currentDate.totalAllRepresentativeness,
+      };
+    }
+
+    // Montar BigNumbersEcommerce com previousDate e monthlyForecast
+    const combinedBigNumbersEcommerce = {
+      currentDate: currentEcommerce.currentDate,
+      previousDate: {
+        totalAllValuePreviousData: previousEcommerce.currentDate.totalAllValue,
+        totalAllBookingsPreviousData: previousEcommerce.currentDate.totalAllBookings,
+        totalAllTicketAveragePreviousData: previousEcommerce.currentDate.totalAllTicketAverage,
+        totalAllRepresentativenessPreviousData:
+          previousEcommerce.currentDate.totalAllRepresentativeness,
+      },
+      monthlyForecast: ecommerceMonthlyForecast,
+    };
+
+    // Retornar dados do período atual com BigNumbers e BigNumbersEcommerce combinados
     return {
       ...currentData,
       BigNumbers: [combinedBigNumbers],
+      BigNumbersEcommerce: [combinedBigNumbersEcommerce],
     };
   }
 
