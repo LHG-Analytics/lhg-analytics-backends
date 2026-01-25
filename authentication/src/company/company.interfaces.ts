@@ -8,6 +8,18 @@ export interface ApexChartsData {
   series: number[];
 }
 
+// Série nomeada para gráficos por unidade
+export interface NamedSeries {
+  name: string;
+  data: number[];
+}
+
+// Estrutura ApexCharts com séries nomeadas por unidade
+export interface ApexChartsSeriesData {
+  categories: string[];
+  series: NamedSeries[];
+}
+
 // BigNumbers consolidados
 export interface BigNumbersDataSQL {
   currentDate: {
@@ -72,11 +84,11 @@ export interface UnifiedCompanyKpiResponse {
   Company: string;
   BigNumbers: BigNumbersDataSQL[];
   RevenueByCompany: ApexChartsData; // Faturamento total de cada unidade
-  RevenueByDate: ApexChartsData; // Faturamento consolidado por data
-  RentalsByDate: ApexChartsData; // Locações consolidadas por data
-  TicketAverageByDate: ApexChartsData; // Ticket médio consolidado por data
-  TrevparByDate: ApexChartsData; // TRevPAR consolidado por data
-  OccupancyRateByDate: ApexChartsData; // Taxa de ocupação consolidada por data
+  RevenueByDate: ApexChartsSeriesData; // Faturamento por unidade por data
+  RentalsByDate: ApexChartsSeriesData; // Locações por unidade por data
+  TicketAverageByDate: ApexChartsSeriesData; // Ticket médio por unidade por data
+  TrevparByDate: ApexChartsSeriesData; // TRevPAR por unidade por data
+  OccupancyRateByDate: ApexChartsSeriesData; // Taxa de ocupação por unidade por data
 }
 
 // Configuração de unidade

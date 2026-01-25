@@ -11,6 +11,8 @@ import {
   UnitKpiResponse,
   BigNumbersDataSQL,
   ApexChartsData,
+  ApexChartsSeriesData,
+  NamedSeries,
   UnitConfig,
 } from './company.interfaces';
 
@@ -188,37 +190,32 @@ export class CompanyService {
     // RevenueByCompany - faturamento total de cada unidade
     const revenueByCompany = this.calculateRevenueByCompany(results);
 
-    // Consolida séries somando valores de cada data
-    const revenueByDate = this.consolidateSeries(
+    // Consolida séries por unidade
+    const revenueByDate = this.consolidateSeriesByUnit(
       results,
       'RevenueByDate',
       categories,
-      'sum',
     );
-    const rentalsByDate = this.consolidateSeries(
+    const rentalsByDate = this.consolidateSeriesByUnit(
       results,
       'RentalsByDate',
       categories,
-      'sum',
     );
-    const trevparByDate = this.consolidateSeries(
+    const trevparByDate = this.consolidateSeriesByUnit(
       results,
       'TrevparByDate',
       categories,
-      'avg',
     );
-    const occupancyRateByDate = this.consolidateSeries(
+    const occupancyRateByDate = this.consolidateSeriesByUnit(
       results,
       'OccupancyRateByDate',
       categories,
-      'avg',
     );
 
-    // Ticket médio consolidado = faturamento total / locações totais (por data)
-    const ticketAverageByDate = this.calculateConsolidatedTicketAverage(
+    // Ticket médio por unidade = faturamento / locações (por unidade)
+    const ticketAverageByDate = this.calculateTicketAverageByUnit(
       revenueByDate,
       rentalsByDate,
-      categories,
     );
 
     return {
@@ -393,9 +390,9 @@ export class CompanyService {
   }
 
   /**
-   * Consolida séries de dados somando ou fazendo média por data
+   * Consolida séries de dados retornando uma série nomeada para cada unidade
    */
-  private consolidateSeries(
+  private consolidateSeriesByUnit(
     results: Array<{
       config: UnitConfig;
       data: UnitKpiResponse;
@@ -403,60 +400,58 @@ export class CompanyService {
     }>,
     field: string,
     categories: string[],
-    mode: 'sum' | 'avg',
-  ): ApexChartsData {
-    const consolidatedSeries: number[] = new Array(categories.length).fill(0);
-    const counts: number[] = new Array(categories.length).fill(0);
+  ): ApexChartsSeriesData {
+    const series: NamedSeries[] = [];
 
     results.forEach((r) => {
       const data = r.data[field];
+      const unitData: number[] = new Array(categories.length).fill(0);
+
       if (data?.series && Array.isArray(data.series)) {
         data.series.forEach((value: number, index: number) => {
-          if (index < consolidatedSeries.length) {
-            consolidatedSeries[index] += value || 0;
-            if (value > 0) counts[index]++;
+          if (index < categories.length) {
+            unitData[index] = Number((value || 0).toFixed(2));
           }
         });
       }
+
+      series.push({
+        name: r.config.name,
+        data: unitData,
+      });
     });
 
-    // Se for média, divide pelo número de unidades que tinham dados
-    if (mode === 'avg') {
-      for (let i = 0; i < consolidatedSeries.length; i++) {
-        if (counts[i] > 0) {
-          consolidatedSeries[i] = Number(
-            (consolidatedSeries[i] / counts[i]).toFixed(2),
-          );
-        }
-      }
-    } else {
-      // Arredonda os valores de soma
-      for (let i = 0; i < consolidatedSeries.length; i++) {
-        consolidatedSeries[i] = Number(consolidatedSeries[i].toFixed(2));
-      }
-    }
-
-    return { categories, series: consolidatedSeries };
+    return { categories, series };
   }
 
   /**
-   * Calcula ticket médio consolidado = faturamento total / locações totais
+   * Calcula ticket médio por unidade = faturamento / locações (para cada unidade)
    */
-  private calculateConsolidatedTicketAverage(
-    revenue: ApexChartsData,
-    rentals: ApexChartsData,
-    categories: string[],
-  ): ApexChartsData {
-    const series: number[] = [];
+  private calculateTicketAverageByUnit(
+    revenue: ApexChartsSeriesData,
+    rentals: ApexChartsSeriesData,
+  ): ApexChartsSeriesData {
+    const series: NamedSeries[] = [];
 
-    for (let i = 0; i < categories.length; i++) {
-      const totalRevenue = revenue.series[i] || 0;
-      const totalRentals = rentals.series[i] || 0;
-      const ticketAvg = totalRentals > 0 ? totalRevenue / totalRentals : 0;
-      series.push(Number(ticketAvg.toFixed(2)));
+    for (let u = 0; u < revenue.series.length; u++) {
+      const unitRevenue = revenue.series[u];
+      const unitRentals = rentals.series[u];
+      const unitData: number[] = [];
+
+      for (let i = 0; i < unitRevenue.data.length; i++) {
+        const totalRevenue = unitRevenue.data[i] || 0;
+        const totalRentals = unitRentals.data[i] || 0;
+        const ticketAvg = totalRentals > 0 ? totalRevenue / totalRentals : 0;
+        unitData.push(Number(ticketAvg.toFixed(2)));
+      }
+
+      series.push({
+        name: unitRevenue.name,
+        data: unitData,
+      });
     }
 
-    return { categories, series };
+    return { categories: revenue.categories, series };
   }
 
   /**

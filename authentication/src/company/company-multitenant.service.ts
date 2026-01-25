@@ -12,6 +12,8 @@ import {
   UnifiedCompanyKpiResponse,
   BigNumbersDataSQL,
   ApexChartsData,
+  ApexChartsSeriesData,
+  NamedSeries,
 } from './company.interfaces';
 import {
   getBigNumbersSQL,
@@ -85,20 +87,39 @@ export class CompanyMultitenantService {
     const connectedUnits = this.databaseService.getConnectedUnits();
 
     if (connectedUnits.length === 0) {
-      throw new Error('Nenhuma unidade conectada. Verifique as variáveis de ambiente.');
+      throw new Error(
+        'Nenhuma unidade conectada. Verifique as variáveis de ambiente.',
+      );
     }
 
     this.logger.log(`Buscando KPIs de ${connectedUnits.length} unidades...`);
 
     // Calcula período anterior (mesma duração, imediatamente antes)
-    const { previousStart, previousEnd } = this.calculatePreviousPeriod(startDate, endDate);
+    const { previousStart, previousEnd } = this.calculatePreviousPeriod(
+      startDate,
+      endDate,
+    );
 
     // Calcula período do mês atual para forecast (dia 1 às 06:00 até ontem às 05:59:59)
-    const { monthStart, monthEnd, daysElapsed, remainingDays, totalDaysInMonth } = this.calculateCurrentMonthPeriod();
+    const {
+      monthStart,
+      monthEnd,
+      daysElapsed,
+      remainingDays,
+      totalDaysInMonth,
+    } = this.calculateCurrentMonthPeriod();
 
     // Executa queries em paralelo para cada unidade (período atual + anterior + mês atual para forecast)
     const unitDataPromises = connectedUnits.map((unit) =>
-      this.fetchUnitKpis(unit, startDate, endDate, previousStart, previousEnd, monthStart, monthEnd),
+      this.fetchUnitKpis(
+        unit,
+        startDate,
+        endDate,
+        previousStart,
+        previousEnd,
+        monthStart,
+        monthEnd,
+      ),
     );
 
     const unitResults = await Promise.all(unitDataPromises);
@@ -109,7 +130,14 @@ export class CompanyMultitenantService {
     }
 
     // Consolida os dados
-    const consolidated = this.consolidateData(validResults, startDate, endDate, daysElapsed, remainingDays, totalDaysInMonth);
+    const consolidated = this.consolidateData(
+      validResults,
+      startDate,
+      endDate,
+      daysElapsed,
+      remainingDays,
+      totalDaysInMonth,
+    );
 
     this.logger.log(
       `KPIs consolidados de ${validResults.length} unidades em ${Date.now() - startTime}ms`,
@@ -159,7 +187,10 @@ export class CompanyMultitenantService {
   /**
    * Calcula o período anterior (mesma duração, imediatamente antes)
    */
-  private calculatePreviousPeriod(startDate: string, endDate: string): { previousStart: string; previousEnd: string } {
+  private calculatePreviousPeriod(
+    startDate: string,
+    endDate: string,
+  ): { previousStart: string; previousEnd: string } {
     const start = this.parseDate(startDate);
     const end = this.parseDate(endDate);
 
@@ -205,14 +236,38 @@ export class CompanyMultitenantService {
         occupancyResult,
         giroResult,
       ] = await Promise.all([
-        this.databaseService.query(unit, getBigNumbersSQL(unit, startDate, endDate)),
-        this.databaseService.query(unit, getBigNumbersSQL(unit, previousStart, previousEnd)),
-        this.databaseService.query(unit, getBigNumbersSQL(unit, monthStart, monthEnd)),
-        this.databaseService.query(unit, getRevenueByDateSQL(unit, startDate, endDate)),
-        this.databaseService.query(unit, getRentalsByDateSQL(unit, startDate, endDate)),
-        this.databaseService.query(unit, getTrevparByDateSQL(unit, startDate, endDate)),
-        this.databaseService.query(unit, getOccupancyRateByDateSQL(unit, startDate, endDate)),
-        this.databaseService.query(unit, getGiroByDateSQL(unit, startDate, endDate)),
+        this.databaseService.query(
+          unit,
+          getBigNumbersSQL(unit, startDate, endDate),
+        ),
+        this.databaseService.query(
+          unit,
+          getBigNumbersSQL(unit, previousStart, previousEnd),
+        ),
+        this.databaseService.query(
+          unit,
+          getBigNumbersSQL(unit, monthStart, monthEnd),
+        ),
+        this.databaseService.query(
+          unit,
+          getRevenueByDateSQL(unit, startDate, endDate),
+        ),
+        this.databaseService.query(
+          unit,
+          getRentalsByDateSQL(unit, startDate, endDate),
+        ),
+        this.databaseService.query(
+          unit,
+          getTrevparByDateSQL(unit, startDate, endDate),
+        ),
+        this.databaseService.query(
+          unit,
+          getOccupancyRateByDateSQL(unit, startDate, endDate),
+        ),
+        this.databaseService.query(
+          unit,
+          getGiroByDateSQL(unit, startDate, endDate),
+        ),
       ]);
 
       // Processa BigNumbers atual
@@ -245,22 +300,34 @@ export class CompanyMultitenantService {
       // Processa séries por data
       const revenueByDate = new Map<string, number>();
       for (const row of revenueResult.rows) {
-        revenueByDate.set(this.formatDateKey(row.date), parseFloat(row.daily_revenue) || 0);
+        revenueByDate.set(
+          this.formatDateKey(row.date),
+          parseFloat(row.daily_revenue) || 0,
+        );
       }
 
       const rentalsByDate = new Map<string, number>();
       for (const row of rentalsResult.rows) {
-        rentalsByDate.set(this.formatDateKey(row.date), parseInt(row.total_rentals) || 0);
+        rentalsByDate.set(
+          this.formatDateKey(row.date),
+          parseInt(row.total_rentals) || 0,
+        );
       }
 
       const trevparByDate = new Map<string, number>();
       for (const row of trevparResult.rows) {
-        trevparByDate.set(this.formatDateKey(row.date), parseFloat(row.trevpar) || 0);
+        trevparByDate.set(
+          this.formatDateKey(row.date),
+          parseFloat(row.trevpar) || 0,
+        );
       }
 
       const occupancyRateByDate = new Map<string, number>();
       for (const row of occupancyResult.rows) {
-        occupancyRateByDate.set(this.formatDateKey(row.date), parseFloat(row.occupancy_rate) || 0);
+        occupancyRateByDate.set(
+          this.formatDateKey(row.date),
+          parseFloat(row.occupancy_rate) || 0,
+        );
       }
 
       const giroByDate = new Map<string, number>();
@@ -283,7 +350,9 @@ export class CompanyMultitenantService {
         giroByDate,
       };
     } catch (error) {
-      this.logger.error(`Erro ao buscar KPIs de ${UNIT_CONFIGS[unit].name}: ${error.message}`);
+      this.logger.error(
+        `Erro ao buscar KPIs de ${UNIT_CONFIGS[unit].name}: ${error.message}`,
+      );
       return null;
     }
   }
@@ -302,29 +371,61 @@ export class CompanyMultitenantService {
     // Calcula a diferença de dias para determinar se agrupa por mês ou por dia
     const start = this.parseDate(startDate);
     const end = this.parseDate(endDate);
-    const rangeDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const rangeDays = Math.ceil(
+      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+    );
     const groupByMonth = rangeDays > 40;
 
     // Gera todas as datas/meses do período
-    const allPeriods = this.generatePeriodRange(startDate, endDate, groupByMonth);
+    const allPeriods = this.generatePeriodRange(
+      startDate,
+      endDate,
+      groupByMonth,
+    );
     const categories = allPeriods;
 
     // Consolida BigNumbers (com previousDate e monthlyForecast)
     // rangeDays + 1 porque inclui o dia inicial e final
     const daysInSelectedPeriod = rangeDays + 1;
-    const bigNumbers = this.consolidateBigNumbers(results, daysElapsed, remainingDays, totalDaysInMonth, daysInSelectedPeriod);
+    const bigNumbers = this.consolidateBigNumbers(
+      results,
+      daysElapsed,
+      remainingDays,
+      totalDaysInMonth,
+      daysInSelectedPeriod,
+    );
 
     // RevenueByCompany - faturamento total de cada unidade
     const revenueByCompany = this.calculateRevenueByCompany(results);
 
-    // Consolida séries por data/mês
-    const revenueByDate = this.consolidateSeriesGrouped(results, 'revenueByDate', allPeriods, 'sum', groupByMonth);
-    const rentalsByDate = this.consolidateSeriesGrouped(results, 'rentalsByDate', allPeriods, 'sum', groupByMonth);
-    const trevparByDate = this.consolidateSeriesGrouped(results, 'trevparByDate', allPeriods, 'avg', groupByMonth);
-    const occupancyRateByDate = this.consolidateSeriesGrouped(results, 'occupancyRateByDate', allPeriods, 'avg', groupByMonth);
+    // Consolida séries por unidade por data/mês
+    const revenueByDate = this.consolidateSeriesByUnit(
+      results,
+      'revenueByDate',
+      allPeriods,
+      groupByMonth,
+    );
+    const rentalsByDate = this.consolidateSeriesByUnit(
+      results,
+      'rentalsByDate',
+      allPeriods,
+      groupByMonth,
+    );
+    const trevparByDate = this.consolidateSeriesByUnit(
+      results,
+      'trevparByDate',
+      allPeriods,
+      groupByMonth,
+    );
+    const occupancyRateByDate = this.consolidateSeriesByUnit(
+      results,
+      'occupancyRateByDate',
+      allPeriods,
+      groupByMonth,
+    );
 
-    // Ticket médio consolidado = faturamento total / locações totais (por data/mês)
-    const ticketAverageByDate = this.calculateConsolidatedTicketAverage(
+    // Ticket médio por unidade = faturamento / locações de cada unidade (por data/mês)
+    const ticketAverageByDate = this.calculateTicketAverageByUnit(
       revenueByDate,
       rentalsByDate,
     );
@@ -333,11 +434,11 @@ export class CompanyMultitenantService {
       Company: 'LHG',
       BigNumbers: [bigNumbers],
       RevenueByCompany: revenueByCompany,
-      RevenueByDate: { categories, series: revenueByDate.series },
-      RentalsByDate: { categories, series: rentalsByDate.series },
-      TicketAverageByDate: { categories, series: ticketAverageByDate.series },
-      TrevparByDate: { categories, series: trevparByDate.series },
-      OccupancyRateByDate: { categories, series: occupancyRateByDate.series },
+      RevenueByDate: revenueByDate,
+      RentalsByDate: rentalsByDate,
+      TicketAverageByDate: ticketAverageByDate,
+      TrevparByDate: trevparByDate,
+      OccupancyRateByDate: occupancyRateByDate,
     };
   }
 
@@ -402,24 +503,31 @@ export class CompanyMultitenantService {
     // --- Cálculos período atual ---
     // Usa daysInSelectedPeriod para calcular Trevpar e Giro do período selecionado
     const avgTicket = totalRentals > 0 ? totalValue / totalRentals : 0;
-    const avgTrevpar = totalSuites > 0 && daysInSelectedPeriod > 0
-      ? (totalValue + totalTips) / totalSuites / daysInSelectedPeriod
-      : 0;
-    const avgGiro = totalSuites > 0 && daysInSelectedPeriod > 0
-      ? totalRentals / totalSuites / daysInSelectedPeriod
-      : 0;
-    const avgOccupiedSeconds = totalRentals > 0 ? totalOccupiedSeconds / totalRentals : 0;
+    const avgTrevpar =
+      totalSuites > 0 && daysInSelectedPeriod > 0
+        ? (totalValue + totalTips) / totalSuites / daysInSelectedPeriod
+        : 0;
+    const avgGiro =
+      totalSuites > 0 && daysInSelectedPeriod > 0
+        ? totalRentals / totalSuites / daysInSelectedPeriod
+        : 0;
+    const avgOccupiedSeconds =
+      totalRentals > 0 ? totalOccupiedSeconds / totalRentals : 0;
 
     // --- Cálculos período anterior ---
     // O período anterior tem a mesma duração do período selecionado
-    const avgTicketPrev = totalRentalsPrev > 0 ? totalValuePrev / totalRentalsPrev : 0;
-    const avgTrevparPrev = totalSuites > 0 && daysInSelectedPeriod > 0
-      ? (totalValuePrev + totalTipsPrev) / totalSuites / daysInSelectedPeriod
-      : 0;
-    const avgGiroPrev = totalSuites > 0 && daysInSelectedPeriod > 0
-      ? totalRentalsPrev / totalSuites / daysInSelectedPeriod
-      : 0;
-    const avgOccupiedSecondsPrev = totalRentalsPrev > 0 ? totalOccupiedSecondsPrev / totalRentalsPrev : 0;
+    const avgTicketPrev =
+      totalRentalsPrev > 0 ? totalValuePrev / totalRentalsPrev : 0;
+    const avgTrevparPrev =
+      totalSuites > 0 && daysInSelectedPeriod > 0
+        ? (totalValuePrev + totalTipsPrev) / totalSuites / daysInSelectedPeriod
+        : 0;
+    const avgGiroPrev =
+      totalSuites > 0 && daysInSelectedPeriod > 0
+        ? totalRentalsPrev / totalSuites / daysInSelectedPeriod
+        : 0;
+    const avgOccupiedSecondsPrev =
+      totalRentalsPrev > 0 ? totalOccupiedSecondsPrev / totalRentalsPrev : 0;
 
     // --- Cálculos forecast mensal ---
     // Fórmula: forecastValue = monthlyTotalValue + (dailyAverageValue * remainingDays)
@@ -436,15 +544,21 @@ export class CompanyMultitenantService {
 
       // Projeção: valor atual do mês + (média diária * dias restantes)
       forecastValue = monthlyTotalValue + dailyAvgValue * remainingDays;
-      forecastRentals = Math.round(monthlyTotalRentals + dailyAvgRentals * remainingDays);
-      forecastTrevpar = totalSuites > 0 ? forecastValue / totalSuites / totalDaysInMonth : 0;
-      forecastGiro = totalSuites > 0 ? forecastRentals / totalSuites / totalDaysInMonth : 0;
-      forecastOccupiedSeconds = monthlyTotalRentals > 0
-        ? monthlyTotalOccupiedSeconds / monthlyTotalRentals
-        : 0; // TMO mantém a média do mês
+      forecastRentals = Math.round(
+        monthlyTotalRentals + dailyAvgRentals * remainingDays,
+      );
+      forecastTrevpar =
+        totalSuites > 0 ? forecastValue / totalSuites / totalDaysInMonth : 0;
+      forecastGiro =
+        totalSuites > 0 ? forecastRentals / totalSuites / totalDaysInMonth : 0;
+      forecastOccupiedSeconds =
+        monthlyTotalRentals > 0
+          ? monthlyTotalOccupiedSeconds / monthlyTotalRentals
+          : 0; // TMO mantém a média do mês
     }
 
-    const forecastTicket = forecastRentals > 0 ? forecastValue / forecastRentals : 0;
+    const forecastTicket =
+      forecastRentals > 0 ? forecastValue / forecastRentals : 0;
 
     return {
       currentDate: {
@@ -461,7 +575,9 @@ export class CompanyMultitenantService {
         totalAllTicketAveragePreviousData: Number(avgTicketPrev.toFixed(2)),
         totalAllTrevparPreviousData: Number(avgTrevparPrev.toFixed(2)),
         totalAllGiroPreviousData: Number(avgGiroPrev.toFixed(2)),
-        totalAverageOccupationTimePreviousData: this.secondsToTime(avgOccupiedSecondsPrev),
+        totalAverageOccupationTimePreviousData: this.secondsToTime(
+          avgOccupiedSecondsPrev,
+        ),
       },
       monthlyForecast: {
         totalAllValueForecast: Number(forecastValue.toFixed(2)),
@@ -469,7 +585,9 @@ export class CompanyMultitenantService {
         totalAllTicketAverageForecast: Number(forecastTicket.toFixed(2)),
         totalAllTrevparForecast: Number(forecastTrevpar.toFixed(2)),
         totalAllGiroForecast: Number(forecastGiro.toFixed(2)),
-        totalAverageOccupationTimeForecast: this.secondsToTime(forecastOccupiedSeconds),
+        totalAverageOccupationTimeForecast: this.secondsToTime(
+          forecastOccupiedSeconds,
+        ),
       },
     };
   }
@@ -490,63 +608,81 @@ export class CompanyMultitenantService {
   }
 
   /**
-   * Consolida séries de dados somando ou fazendo média por data/mês
-   * Suporta agrupamento por mês quando groupByMonth = true
+   * Consolida séries de dados por unidade, retornando séries nomeadas
+   * Cada unidade tem sua própria série de dados
    */
-  private consolidateSeriesGrouped(
+  private consolidateSeriesByUnit(
     results: UnitKpiData[],
-    field: keyof Pick<UnitKpiData, 'revenueByDate' | 'rentalsByDate' | 'trevparByDate' | 'occupancyRateByDate' | 'giroByDate'>,
+    field: keyof Pick<
+      UnitKpiData,
+      | 'revenueByDate'
+      | 'rentalsByDate'
+      | 'trevparByDate'
+      | 'occupancyRateByDate'
+      | 'giroByDate'
+    >,
     periods: string[],
-    mode: 'sum' | 'avg',
     groupByMonth: boolean,
-  ): ApexChartsData {
-    const series: number[] = [];
+  ): ApexChartsSeriesData {
+    const series: NamedSeries[] = [];
 
-    // Primeiro, agrupa os dados de todas as unidades por período
-    const periodDataMap = new Map<string, { total: number; count: number }>();
-
+    // Para cada unidade, cria uma série nomeada
     for (const r of results) {
+      const unitData: number[] = [];
+
+      // Cria um mapa dos dados da unidade por período
+      const unitPeriodMap = new Map<string, number>();
       for (const [dateKey, value] of r[field].entries()) {
-        // Converte a chave de data para o formato do período (dia ou mês)
         const periodKey = groupByMonth
           ? this.formatDateToMonth(dateKey)
           : this.formatDateDisplay(dateKey);
 
-        const current = periodDataMap.get(periodKey) || { total: 0, count: 0 };
-        current.total += value;
-        if (value > 0) current.count++;
-        periodDataMap.set(periodKey, current);
+        // Soma valores do mesmo período (caso tenha múltiplos por mês)
+        const current = unitPeriodMap.get(periodKey) || 0;
+        unitPeriodMap.set(periodKey, current + value);
       }
-    }
 
-    // Gera a série baseada nos períodos
-    for (const periodKey of periods) {
-      const data = periodDataMap.get(periodKey) || { total: 0, count: 0 };
-
-      if (mode === 'avg' && data.count > 0) {
-        series.push(Number((data.total / data.count).toFixed(2)));
-      } else {
-        series.push(Number(data.total.toFixed(2)));
+      // Preenche os dados para cada período
+      for (const periodKey of periods) {
+        const value = unitPeriodMap.get(periodKey) || 0;
+        unitData.push(Number(value.toFixed(2)));
       }
+
+      series.push({
+        name: r.unitName,
+        data: unitData,
+      });
     }
 
     return { categories: periods, series };
   }
 
   /**
-   * Calcula ticket médio consolidado = faturamento total / locações totais
+   * Calcula ticket médio por unidade = faturamento / locações de cada unidade
    */
-  private calculateConsolidatedTicketAverage(
-    revenue: ApexChartsData,
-    rentals: ApexChartsData,
-  ): ApexChartsData {
-    const series: number[] = [];
+  private calculateTicketAverageByUnit(
+    revenue: ApexChartsSeriesData,
+    rentals: ApexChartsSeriesData,
+  ): ApexChartsSeriesData {
+    const series: NamedSeries[] = [];
 
-    for (let i = 0; i < revenue.series.length; i++) {
-      const totalRevenue = revenue.series[i] || 0;
-      const totalRentals = rentals.series[i] || 0;
-      const ticketAvg = totalRentals > 0 ? totalRevenue / totalRentals : 0;
-      series.push(Number(ticketAvg.toFixed(2)));
+    // Para cada unidade (série), calcula o ticket médio
+    for (let u = 0; u < revenue.series.length; u++) {
+      const unitRevenue = revenue.series[u];
+      const unitRentals = rentals.series[u];
+      const unitData: number[] = [];
+
+      for (let i = 0; i < unitRevenue.data.length; i++) {
+        const totalRevenue = unitRevenue.data[i] || 0;
+        const totalRentals = unitRentals.data[i] || 0;
+        const ticketAvg = totalRentals > 0 ? totalRevenue / totalRentals : 0;
+        unitData.push(Number(ticketAvg.toFixed(2)));
+      }
+
+      series.push({
+        name: unitRevenue.name,
+        data: unitData,
+      });
     }
 
     return { categories: revenue.categories, series };
@@ -556,7 +692,11 @@ export class CompanyMultitenantService {
    * Gera array de períodos (datas ou meses) entre startDate e endDate
    * @param groupByMonth Se true, agrupa por mês (MM/YYYY), senão por dia (DD/MM/YYYY)
    */
-  private generatePeriodRange(startDate: string, endDate: string, groupByMonth: boolean): string[] {
+  private generatePeriodRange(
+    startDate: string,
+    endDate: string,
+    groupByMonth: boolean,
+  ): string[] {
     const periods: string[] = [];
     const start = this.parseDate(startDate);
     const end = this.parseDate(endDate);
