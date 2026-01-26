@@ -12,6 +12,7 @@ import {
   UnifiedBookingsKpiResponse,
   BookingsBigNumbersData,
   BookingsEcommerceBigNumbersData,
+  ApexChartsData,
   ApexChartsMultiSeriesData,
   UnitBookingsBigNumbers,
   UnitBookingsEcommerce,
@@ -183,6 +184,8 @@ export class BookingsMultitenantService {
         bigNumbersMonthlyResult,
         billingByDateResult,
         ecommerceBigNumbersResult,
+        ecommerceBigNumbersPrevResult,
+        ecommerceBigNumbersMonthlyResult,
         ecommerceByDateResult,
       ] = await Promise.all([
         this.databaseService.query(unit, getBookingsBigNumbersSQL(unit, startDate, endDate)),
@@ -190,6 +193,8 @@ export class BookingsMultitenantService {
         this.databaseService.query(unit, getBookingsBigNumbersSQL(unit, monthStart, monthEnd)),
         this.databaseService.query(unit, getBillingByDateSQL(unit, startDate, endDate)),
         this.databaseService.query(unit, getEcommerceBigNumbersSQL(unit, startDate, endDate)),
+        this.databaseService.query(unit, getEcommerceBigNumbersSQL(unit, previousStart, previousEnd)),
+        this.databaseService.query(unit, getEcommerceBigNumbersSQL(unit, monthStart, monthEnd)),
         this.databaseService.query(unit, getEcommerceByDateSQL(unit, startDate, endDate)),
       ]);
 
@@ -217,11 +222,25 @@ export class BookingsMultitenantService {
         totalRevenue: parseFloat(bnMonthly.total_revenue) || 0,
       };
 
-      // Processa Ecommerce
+      // Processa Ecommerce atual
       const ecom = ecommerceBigNumbersResult.rows[0] || {};
       const ecommerce: UnitBookingsEcommerce = {
         totalValue: parseFloat(ecom.total_ecommerce_value) || 0,
         totalBookings: parseInt(ecom.total_ecommerce_bookings) || 0,
+      };
+
+      // Processa Ecommerce anterior
+      const ecomPrev = ecommerceBigNumbersPrevResult.rows[0] || {};
+      const ecommercePrevious: UnitBookingsEcommerce = {
+        totalValue: parseFloat(ecomPrev.total_ecommerce_value) || 0,
+        totalBookings: parseInt(ecomPrev.total_ecommerce_bookings) || 0,
+      };
+
+      // Processa Ecommerce do mês atual (para forecast)
+      const ecomMonthly = ecommerceBigNumbersMonthlyResult.rows[0] || {};
+      const ecommerceMonthly: UnitBookingsEcommerce = {
+        totalValue: parseFloat(ecomMonthly.total_ecommerce_value) || 0,
+        totalBookings: parseInt(ecomMonthly.total_ecommerce_bookings) || 0,
       };
 
       // Processa séries por data
@@ -250,6 +269,8 @@ export class BookingsMultitenantService {
         bigNumbersPrevious,
         bigNumbersMonthly,
         ecommerce,
+        ecommercePrevious,
+        ecommerceMonthly,
         billingByDate,
         bookingsByDate,
         ecommerceBillingByDate,
@@ -285,14 +306,14 @@ export class BookingsMultitenantService {
     // Consolida BigNumbers (com previousDate e monthlyForecast)
     const bigNumbers = this.consolidateBigNumbers(results, daysElapsed, remainingDays, totalDaysInMonth);
 
-    // Consolida BigNumbersEcommerce
-    const bigNumbersEcommerce = this.consolidateEcommerceBigNumbers(results);
+    // Consolida BigNumbersEcommerce (com previousDate e monthlyForecast)
+    const bigNumbersEcommerce = this.consolidateEcommerceBigNumbers(results, daysElapsed, remainingDays);
 
-    // RevenueByCompany - faturamento de reservas de cada unidade por data/mês
-    const revenueByCompany = this.calculateRevenueByCompanyGrouped(results, categories, groupByMonth);
+    // RevenueByCompany - faturamento total de reservas de cada unidade (consolidado)
+    const revenueByCompany = this.calculateRevenueByCompanyConsolidated(results);
 
-    // BookingsByCompany - quantidade de reservas de cada unidade por data/mês
-    const bookingsByCompany = this.calculateBookingsByCompanyGrouped(results, categories, groupByMonth);
+    // BookingsByCompany - quantidade total de reservas de cada unidade (consolidado)
+    const bookingsByCompany = this.calculateBookingsByCompanyConsolidated(results);
 
     // BillingOfReservationsByPeriod - faturamento por unidade por data/mês
     const billingOfReservationsByPeriod = this.calculateBillingByPeriodGrouped(results, categories, groupByMonth);
@@ -369,11 +390,12 @@ export class BookingsMultitenantService {
 
     // --- Cálculos período atual ---
     const avgTicket = totalBookings > 0 ? totalValue / totalBookings : 0;
-    const representativeness = totalRevenue > 0 ? totalValue / totalRevenue : 0;
+    // Representatividade multiplicada por 100 para mostrar como percentual (frontend só adiciona "%")
+    const representativeness = totalRevenue > 0 ? (totalValue / totalRevenue) * 100 : 0;
 
     // --- Cálculos período anterior ---
     const avgTicketPrev = totalBookingsPrev > 0 ? totalValuePrev / totalBookingsPrev : 0;
-    const representativenessPrev = totalRevenuePrev > 0 ? totalValuePrev / totalRevenuePrev : 0;
+    const representativenessPrev = totalRevenuePrev > 0 ? (totalValuePrev / totalRevenuePrev) * 100 : 0;
 
     // --- Cálculos forecast mensal ---
     // Fórmula: forecastValue = monthlyTotalValue + (dailyAverageValue * remainingDays)
@@ -399,95 +421,144 @@ export class BookingsMultitenantService {
         totalAllValue: Number(totalValue.toFixed(2)),
         totalAllBookings: totalBookings,
         totalAllTicketAverage: Number(avgTicket.toFixed(2)),
-        totalAllRepresentativeness: Number(representativeness.toFixed(4)),
+        totalAllRepresentativeness: Number(representativeness.toFixed(2)),
       },
       previousDate: {
         totalAllValuePreviousData: Number(totalValuePrev.toFixed(2)),
         totalAllBookingsPreviousData: totalBookingsPrev,
         totalAllTicketAveragePreviousData: Number(avgTicketPrev.toFixed(2)),
-        totalAllRepresentativenessPreviousData: Number(representativenessPrev.toFixed(4)),
+        totalAllRepresentativenessPreviousData: Number(representativenessPrev.toFixed(2)),
       },
       monthlyForecast: {
         totalAllValueForecast: Number(forecastValue.toFixed(2)),
         totalAllBookingsForecast: forecastBookings,
         totalAllTicketAverageForecast: Number(forecastTicket.toFixed(2)),
-        totalAllRepresentativenessForecast: Number(forecastRepresentativeness.toFixed(4)),
+        totalAllRepresentativenessForecast: Number(forecastRepresentativeness.toFixed(2)),
       },
     };
   }
 
   /**
-   * Consolida BigNumbersEcommerce de todas as unidades
+   * Consolida BigNumbersEcommerce de todas as unidades (com previousDate e monthlyForecast)
    */
   private consolidateEcommerceBigNumbers(
     results: UnitBookingsKpiData[],
+    daysElapsed: number,
+    remainingDays: number,
   ): BookingsEcommerceBigNumbersData {
+    // --- Dados atuais ---
     let totalValue = 0;
     let totalBookings = 0;
     let totalRevenue = 0;
 
+    // --- Dados anteriores ---
+    let totalValuePrev = 0;
+    let totalBookingsPrev = 0;
+    let totalRevenuePrev = 0;
+
+    // --- Dados do mês atual (para forecast) ---
+    let monthlyTotalValue = 0;
+    let monthlyTotalBookings = 0;
+
     for (const r of results) {
+      // Atuais
       totalValue += r.ecommerce.totalValue;
       totalBookings += r.ecommerce.totalBookings;
       totalRevenue += r.bigNumbers.totalRevenue;
+
+      // Anteriores
+      if (r.ecommercePrevious) {
+        totalValuePrev += r.ecommercePrevious.totalValue;
+        totalBookingsPrev += r.ecommercePrevious.totalBookings;
+      }
+      if (r.bigNumbersPrevious) {
+        totalRevenuePrev += r.bigNumbersPrevious.totalRevenue;
+      }
+
+      // Mês atual (para forecast)
+      if (r.ecommerceMonthly) {
+        monthlyTotalValue += r.ecommerceMonthly.totalValue;
+        monthlyTotalBookings += r.ecommerceMonthly.totalBookings;
+      }
     }
 
+    // --- Cálculos período atual ---
     const avgTicket = totalBookings > 0 ? totalValue / totalBookings : 0;
-    const representativeness = totalRevenue > 0 ? totalValue / totalRevenue : 0;
+    // Representatividade multiplicada por 100 para mostrar como percentual (frontend só adiciona "%")
+    const representativeness = totalRevenue > 0 ? (totalValue / totalRevenue) * 100 : 0;
+
+    // --- Cálculos período anterior ---
+    const avgTicketPrev = totalBookingsPrev > 0 ? totalValuePrev / totalBookingsPrev : 0;
+    const representativenessPrev = totalRevenuePrev > 0 ? (totalValuePrev / totalRevenuePrev) * 100 : 0;
+
+    // --- Cálculos forecast mensal ---
+    let forecastValue = 0;
+    let forecastBookings = 0;
+
+    if (daysElapsed > 0) {
+      const dailyAvgValue = monthlyTotalValue / daysElapsed;
+      const dailyAvgBookings = monthlyTotalBookings / daysElapsed;
+
+      forecastValue = monthlyTotalValue + dailyAvgValue * remainingDays;
+      forecastBookings = Math.round(monthlyTotalBookings + dailyAvgBookings * remainingDays);
+    }
+
+    const forecastTicket = forecastBookings > 0 ? forecastValue / forecastBookings : 0;
+    const forecastRepresentativeness = representativeness; // Mantém o valor atual
 
     return {
       currentDate: {
         totalAllValue: Number(totalValue.toFixed(2)),
         totalAllBookings: totalBookings,
         totalAllTicketAverage: Number(avgTicket.toFixed(2)),
-        totalAllRepresentativeness: Number(representativeness.toFixed(4)),
+        totalAllRepresentativeness: Number(representativeness.toFixed(2)),
+      },
+      previousDate: {
+        totalAllValuePreviousData: Number(totalValuePrev.toFixed(2)),
+        totalAllBookingsPreviousData: totalBookingsPrev,
+        totalAllTicketAveragePreviousData: Number(avgTicketPrev.toFixed(2)),
+        totalAllRepresentativenessPreviousData: Number(representativenessPrev.toFixed(2)),
+      },
+      monthlyForecast: {
+        totalAllValueForecast: Number(forecastValue.toFixed(2)),
+        totalAllBookingsForecast: forecastBookings,
+        totalAllTicketAverageForecast: Number(forecastTicket.toFixed(2)),
+        totalAllRepresentativenessForecast: Number(forecastRepresentativeness.toFixed(2)),
       },
     };
   }
 
   /**
-   * Calcula RevenueByCompany - faturamento de reservas de cada unidade com séries nomeadas
+   * Calcula RevenueByCompany - faturamento total de reservas de cada unidade (consolidado)
+   * Retorna: categories = nomes das unidades, series = valores totais
    */
-  private calculateRevenueByCompany(
+  private calculateRevenueByCompanyConsolidated(
     results: UnitBookingsKpiData[],
-    categories: string[],
-    allDates: string[],
-  ): ApexChartsMultiSeriesData {
-    const series: Array<{ name: string; data: number[] }> = [];
+  ): ApexChartsData {
+    const categories: string[] = [];
+    const series: number[] = [];
 
     for (const r of results) {
-      const data: number[] = [];
-      for (const dateKey of allDates) {
-        data.push(Number((r.billingByDate.get(dateKey) || 0).toFixed(2)));
-      }
-      series.push({
-        name: r.unitName,
-        data,
-      });
+      categories.push(r.unitName);
+      series.push(Number(r.bigNumbers.totalValue.toFixed(2)));
     }
 
     return { categories, series };
   }
 
   /**
-   * Calcula BookingsByCompany - quantidade de reservas de cada unidade com séries nomeadas
+   * Calcula BookingsByCompany - quantidade total de reservas de cada unidade (consolidado)
+   * Retorna: categories = nomes das unidades, series = valores totais
    */
-  private calculateBookingsByCompany(
+  private calculateBookingsByCompanyConsolidated(
     results: UnitBookingsKpiData[],
-    categories: string[],
-    allDates: string[],
-  ): ApexChartsMultiSeriesData {
-    const series: Array<{ name: string; data: number[] }> = [];
+  ): ApexChartsData {
+    const categories: string[] = [];
+    const series: number[] = [];
 
     for (const r of results) {
-      const data: number[] = [];
-      for (const dateKey of allDates) {
-        data.push(r.bookingsByDate.get(dateKey) || 0);
-      }
-      series.push({
-        name: r.unitName,
-        data,
-      });
+      categories.push(r.unitName);
+      series.push(r.bigNumbers.totalBookings);
     }
 
     return { categories, series };
@@ -521,6 +592,7 @@ export class BookingsMultitenantService {
   /**
    * Calcula RepresentativenessOfReservesByPeriod - representatividade por unidade por data
    * Representatividade = faturamento do dia / faturamento total do período
+   * Multiplicada por 100 para mostrar como percentual (frontend só adiciona "%")
    */
   private calculateRepresentativenessByPeriod(
     results: UnitBookingsKpiData[],
@@ -536,8 +608,9 @@ export class BookingsMultitenantService {
       const data: number[] = [];
       for (const dateKey of allDates) {
         const dayBilling = r.billingByDate.get(dateKey) || 0;
-        const percent = totalPeriodBilling > 0 ? dayBilling / totalPeriodBilling : 0;
-        data.push(Number(percent.toFixed(4)));
+        // Multiplica por 100 para mostrar como percentual (ex: 1.6% em vez de 0.016)
+        const percent = totalPeriodBilling > 0 ? (dayBilling / totalPeriodBilling) * 100 : 0;
+        data.push(Number(percent.toFixed(2)));
       }
       series.push({
         name: r.unitName,
@@ -816,6 +889,7 @@ export class BookingsMultitenantService {
 
   /**
    * Calcula RepresentativenessByPeriod agrupado por período (dia ou mês)
+   * Representatividade multiplicada por 100 para mostrar como percentual (frontend só adiciona "%")
    */
   private calculateRepresentativenessByPeriodGrouped(
     results: UnitBookingsKpiData[],
@@ -832,8 +906,9 @@ export class BookingsMultitenantService {
 
       for (const period of categories) {
         const periodBilling = aggregatedData.get(period) || 0;
-        const percent = totalPeriodBilling > 0 ? periodBilling / totalPeriodBilling : 0;
-        data.push(Number(percent.toFixed(4)));
+        // Multiplica por 100 para mostrar como percentual (ex: 1.6% em vez de 0.016)
+        const percent = totalPeriodBilling > 0 ? (periodBilling / totalPeriodBilling) * 100 : 0;
+        data.push(Number(percent.toFixed(2)));
       }
 
       series.push({

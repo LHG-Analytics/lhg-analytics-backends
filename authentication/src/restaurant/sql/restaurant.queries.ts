@@ -6,7 +6,7 @@
  * Exemplo: Dia 01/01/2025 = 01/01/2025 06:00:00 até 02/01/2025 05:59:59
  */
 
-import { UnitKey, UNIT_CONFIGS } from '../../database/database.interfaces';
+import { UnitKey } from '../../database/database.interfaces';
 
 // Configuração de tipos de produtos A&B por unidade
 export interface UnitABConfig {
@@ -49,24 +49,27 @@ export function formatDateForSQL(dateStr: string): string {
 /**
  * Calcula os timestamps de início e fim considerando o corte das 6h
  * startDate 06:00:00 até endDate+1 05:59:59
+ * CORRIGIDO: Usa Date.UTC para evitar problemas de timezone
  */
 export function getDateRangeWithCutoff(
   startDate: string,
   endDate: string,
 ): { startTimestamp: string; endTimestamp: string } {
   const formattedStart = formatDateForSQL(startDate);
-  const formattedEnd = formatDateForSQL(endDate);
 
-  // Parse endDate para calcular D+1
+  // Parse endDate para calcular D+1 usando UTC para evitar problemas de timezone
   const [day, month, year] = endDate.split('/').map(Number);
-  const endDateObj = new Date(year, month - 1, day);
-  endDateObj.setDate(endDateObj.getDate() + 1); // D+1
+  const endDateUTC = new Date(Date.UTC(year, month - 1, day));
+  endDateUTC.setUTCDate(endDateUTC.getUTCDate() + 1); // D+1 em UTC
 
-  const nextDay = endDateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+  // Formata manualmente para evitar conversão de timezone
+  const nextYear = endDateUTC.getUTCFullYear();
+  const nextMonth = String(endDateUTC.getUTCMonth() + 1).padStart(2, '0');
+  const nextDay = String(endDateUTC.getUTCDate()).padStart(2, '0');
 
   return {
     startTimestamp: `${formattedStart} 06:00:00`,
-    endTimestamp: `${nextDay} 05:59:59`,
+    endTimestamp: `${nextYear}-${nextMonth}-${nextDay} 05:59:59`,
   };
 }
 
@@ -77,16 +80,12 @@ export function getAbProductIds(unit: UnitKey): string {
   return UNIT_AB_CONFIGS[unit].abProductTypes.join(',');
 }
 
-/**
- * Obtém os IDs de categorias de suítes formatados para SQL IN clause
- */
-export function getCategoryIds(unit: UnitKey): string {
-  return UNIT_CONFIGS[unit].suiteConfig.categoryIds.join(',');
-}
 
 /**
  * Query para BigNumbers do Restaurant - totais do período
  * Retorna: total de receita A&B líquida, vendas com A&B, e total de locações
+ * CORRIGIDO: Igual ao individual - calcula abTotal via CASE WHEN, não filtra no WHERE
+ * O desconto proporcional é baseado no total bruto de TODOS os itens, não só A&B
  */
 export function getRestaurantBigNumbersSQL(
   unit: UnitKey,
@@ -94,26 +93,105 @@ export function getRestaurantBigNumbersSQL(
   endDate: string,
 ): string {
   const abProductIds = getAbProductIds(unit);
-  const categoryIds = getCategoryIds(unit);
   const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
 
   return `
-    WITH vendas_ab AS (
+    WITH vendas_por_locacao AS (
       SELECT
         la.id_apartamentostate,
-        SUM(soi.precovenda * soi.quantidade) as valor_bruto_ab,
-        COALESCE(v.desconto, 0) as desconto_total,
-        SUM(soi_total.total_bruto) as total_bruto_venda
+        so.id as id_saidaestoque,
+        COALESCE(SUM(soi.precovenda * soi.quantidade), 0) as total_gross,
+        COALESCE(v.desconto, 0) as desconto,
+        COALESCE(SUM(
+          CASE
+            WHEN tp.id IN (${abProductIds})
+            THEN soi.precovenda * soi.quantidade
+            ELSE 0
+          END
+        ), 0) as ab_total
       FROM locacaoapartamento la
       INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-      INNER JOIN apartamento a ON aps.id_apartamento = a.id
-      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
       LEFT JOIN vendalocacao sl ON sl.id_locacaoapartamento = la.id_apartamentostate
       LEFT JOIN saidaestoque so ON so.id = sl.id_saidaestoque
       LEFT JOIN saidaestoqueitem soi ON soi.id_saidaestoque = so.id AND soi.cancelado IS NULL
       LEFT JOIN produtoestoque ps ON ps.id = soi.id_produtoestoque
       LEFT JOIN produto p ON p.id = ps.id_produto
       LEFT JOIN tipoproduto tp ON tp.id = p.id_tipoproduto
+      LEFT JOIN venda v ON v.id_saidaestoque = so.id
+      WHERE la.datainicialdaocupacao >= '${startTimestamp}'::timestamp
+        AND la.datainicialdaocupacao <= '${endTimestamp}'::timestamp
+        AND la.fimocupacaotipo = 'FINALIZADA'
+      GROUP BY la.id_apartamentostate, so.id, v.desconto
+    )
+    SELECT
+      COALESCE(SUM(
+        CASE
+          WHEN ab_total > 0 THEN
+            ab_total - (desconto * ab_total / NULLIF(total_gross, 0))
+          ELSE 0
+        END
+      ), 0) as total_ab_value,
+      COUNT(CASE WHEN ab_total > 0 THEN 1 END) as total_sales_with_ab,
+      COUNT(CASE WHEN total_gross > 0 THEN 1 END) as total_all_sales,
+      COUNT(DISTINCT id_apartamentostate) as total_rentals
+    FROM vendas_por_locacao
+  `;
+}
+
+/**
+ * Query para receita total de vendas (todos produtos) e receita total
+ * Retorna: total de receita de vendas de todos os produtos e receita total (locações + vendas diretas)
+ * CORRIGIDO: Sem filtro de categoria, igual ao individual
+ */
+export function getTotalSalesAndRevenueSQL(
+  unit: UnitKey,
+  startDate: string,
+  endDate: string,
+): string {
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+
+  return `
+    WITH vendas_em_locacoes AS (
+      -- Receita de vendas (todos os produtos) dentro de locações
+      SELECT
+        COALESCE(SUM(
+          (soi.precovenda * soi.quantidade) *
+          (1 - COALESCE(v.desconto, 0) / NULLIF(so_total.total_bruto, 0))
+        ), 0) as total_sales_revenue
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      LEFT JOIN vendalocacao sl ON sl.id_locacaoapartamento = la.id_apartamentostate
+      LEFT JOIN saidaestoque so ON so.id = sl.id_saidaestoque
+      LEFT JOIN saidaestoqueitem soi ON soi.id_saidaestoque = so.id AND soi.cancelado IS NULL
+      LEFT JOIN venda v ON v.id_saidaestoque = so.id
+      LEFT JOIN (
+        SELECT
+          id_saidaestoque,
+          SUM(precovenda * quantidade) as total_bruto
+        FROM saidaestoqueitem
+        WHERE cancelado IS NULL
+        GROUP BY id_saidaestoque
+      ) so_total ON so_total.id_saidaestoque = so.id
+      WHERE la.datainicialdaocupacao >= '${startTimestamp}'::timestamp
+        AND la.datainicialdaocupacao <= '${endTimestamp}'::timestamp
+        AND la.fimocupacaotipo = 'FINALIZADA'
+    ),
+    receita_locacoes AS (
+      -- Receita total de locações (valortotal já inclui consumo)
+      SELECT COALESCE(SUM(la.valortotal), 0) as total_rentals_revenue
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      WHERE la.datainicialdaocupacao >= '${startTimestamp}'::timestamp
+        AND la.datainicialdaocupacao <= '${endTimestamp}'::timestamp
+        AND la.fimocupacaotipo = 'FINALIZADA'
+    ),
+    vendas_diretas AS (
+      -- Receita de vendas diretas (fora de locações)
+      SELECT COALESCE(SUM(
+        COALESCE(soi_total.total_bruto, 0) - COALESCE(v.desconto, 0)
+      ), 0) as total_direct_sales_revenue
+      FROM vendadireta vd
+      INNER JOIN saidaestoque so ON so.id = vd.id_saidaestoque
       LEFT JOIN venda v ON v.id_saidaestoque = so.id
       LEFT JOIN (
         SELECT
@@ -123,37 +201,18 @@ export function getRestaurantBigNumbersSQL(
         WHERE cancelado IS NULL
         GROUP BY id_saidaestoque
       ) soi_total ON soi_total.id_saidaestoque = so.id
-      WHERE la.datainicialdaocupacao >= '${startTimestamp}'::timestamp
-        AND la.datainicialdaocupacao <= '${endTimestamp}'::timestamp
-        AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (${categoryIds})
-        AND tp.id IN (${abProductIds})
-      GROUP BY la.id_apartamentostate, v.desconto
-    ),
-    locacoes AS (
-      SELECT COUNT(*) as total_rentals
-      FROM locacaoapartamento la
-      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-      INNER JOIN apartamento a ON aps.id_apartamento = a.id
-      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE la.datainicialdaocupacao >= '${startTimestamp}'::timestamp
-        AND la.datainicialdaocupacao <= '${endTimestamp}'::timestamp
-        AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (${categoryIds})
+      WHERE so.datasaida >= '${startTimestamp}'::timestamp
+        AND so.datasaida <= '${endTimestamp}'::timestamp
     )
     SELECT
-      COALESCE(SUM(
-        valor_bruto_ab - (valor_bruto_ab * desconto_total / NULLIF(total_bruto_venda, 0))
-      ), 0) as total_ab_value,
-      COUNT(*) as total_sales_with_ab,
-      (SELECT total_rentals FROM locacoes) as total_rentals
-    FROM vendas_ab
-    WHERE valor_bruto_ab > 0
+      (SELECT total_sales_revenue FROM vendas_em_locacoes) as total_sales_revenue,
+      (SELECT total_rentals_revenue FROM receita_locacoes) + (SELECT total_direct_sales_revenue FROM vendas_diretas) as total_revenue
   `;
 }
 
 /**
  * Query para receita A&B por data
+ * CORRIGIDO: Sem filtro de categoria, igual ao individual
  */
 export function getRevenueAbByDateSQL(
   unit: UnitKey,
@@ -161,7 +220,6 @@ export function getRevenueAbByDateSQL(
   endDate: string,
 ): string {
   const abProductIds = getAbProductIds(unit);
-  const categoryIds = getCategoryIds(unit);
   const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
 
   return `
@@ -176,8 +234,6 @@ export function getRevenueAbByDateSQL(
       ), 0) as total_ab_value
     FROM locacaoapartamento la
     INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-    INNER JOIN apartamento a ON aps.id_apartamento = a.id
-    INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
     LEFT JOIN vendalocacao sl ON sl.id_locacaoapartamento = la.id_apartamentostate
     LEFT JOIN saidaestoque so ON so.id = sl.id_saidaestoque
     LEFT JOIN saidaestoqueitem soi ON soi.id_saidaestoque = so.id AND soi.cancelado IS NULL
@@ -196,7 +252,6 @@ export function getRevenueAbByDateSQL(
     WHERE la.datainicialdaocupacao >= '${startTimestamp}'::timestamp
       AND la.datainicialdaocupacao <= '${endTimestamp}'::timestamp
       AND la.fimocupacaotipo = 'FINALIZADA'
-      AND ca.id IN (${categoryIds})
       AND tp.id IN (${abProductIds})
     GROUP BY CASE
       WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
@@ -208,13 +263,13 @@ export function getRevenueAbByDateSQL(
 
 /**
  * Query para receita total por data (para calcular percentual A&B)
+ * CORRIGIDO: Sem filtro de categoria, igual ao individual
  */
 export function getTotalRevenueByDateSQL(
   unit: UnitKey,
   startDate: string,
   endDate: string,
 ): string {
-  const categoryIds = getCategoryIds(unit);
   const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
 
   return `
@@ -231,12 +286,9 @@ export function getTotalRevenueByDateSQL(
         la.valortotal as valor
       FROM locacaoapartamento la
       INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-      INNER JOIN apartamento a ON aps.id_apartamento = a.id
-      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
       WHERE la.datainicialdaocupacao >= '${startTimestamp}'::timestamp
         AND la.datainicialdaocupacao <= '${endTimestamp}'::timestamp
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (${categoryIds})
 
       UNION ALL
 
@@ -265,6 +317,7 @@ export function getTotalRevenueByDateSQL(
 
 /**
  * Query para contagem de locações com A&B por data
+ * CORRIGIDO: Sem filtro de categoria, igual ao individual
  */
 export function getSalesWithAbByDateSQL(
   unit: UnitKey,
@@ -272,7 +325,6 @@ export function getSalesWithAbByDateSQL(
   endDate: string,
 ): string {
   const abProductIds = getAbProductIds(unit);
-  const categoryIds = getCategoryIds(unit);
   const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
 
   return `
@@ -284,8 +336,6 @@ export function getSalesWithAbByDateSQL(
       COUNT(DISTINCT la.id_apartamentostate) as rentals_with_ab
     FROM locacaoapartamento la
     INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-    INNER JOIN apartamento a ON aps.id_apartamento = a.id
-    INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
     LEFT JOIN vendalocacao sl ON sl.id_locacaoapartamento = la.id_apartamentostate
     LEFT JOIN saidaestoque so ON so.id = sl.id_saidaestoque
     LEFT JOIN saidaestoqueitem soi ON soi.id_saidaestoque = so.id AND soi.cancelado IS NULL
@@ -295,7 +345,6 @@ export function getSalesWithAbByDateSQL(
     WHERE la.datainicialdaocupacao >= '${startTimestamp}'::timestamp
       AND la.datainicialdaocupacao <= '${endTimestamp}'::timestamp
       AND la.fimocupacaotipo = 'FINALIZADA'
-      AND ca.id IN (${categoryIds})
       AND tp.id IN (${abProductIds})
     GROUP BY CASE
       WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)

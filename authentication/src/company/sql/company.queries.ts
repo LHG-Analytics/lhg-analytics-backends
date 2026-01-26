@@ -19,24 +19,27 @@ export function formatDateForSQL(dateStr: string): string {
 /**
  * Calcula os timestamps de início e fim considerando o corte das 6h
  * startDate 06:00:00 até endDate+1 05:59:59
+ * CORRIGIDO: Usa Date.UTC para evitar problemas de timezone
  */
 export function getDateRangeWithCutoff(
   startDate: string,
   endDate: string,
 ): { startTimestamp: string; endTimestamp: string } {
   const formattedStart = formatDateForSQL(startDate);
-  const formattedEnd = formatDateForSQL(endDate);
 
-  // Parse endDate para calcular D+1
+  // Parse endDate para calcular D+1 usando UTC para evitar problemas de timezone
   const [day, month, year] = endDate.split('/').map(Number);
-  const endDateObj = new Date(year, month - 1, day);
-  endDateObj.setDate(endDateObj.getDate() + 1); // D+1
+  const endDateUTC = new Date(Date.UTC(year, month - 1, day));
+  endDateUTC.setUTCDate(endDateUTC.getUTCDate() + 1); // D+1 em UTC
 
-  const nextDay = endDateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+  // Formata manualmente para evitar conversão de timezone
+  const nextYear = endDateUTC.getUTCFullYear();
+  const nextMonth = String(endDateUTC.getUTCMonth() + 1).padStart(2, '0');
+  const nextDay = String(endDateUTC.getUTCDate()).padStart(2, '0');
 
   return {
     startTimestamp: `${formattedStart} 06:00:00`,
-    endTimestamp: `${nextDay} 05:59:59`,
+    endTimestamp: `${nextYear}-${nextMonth}-${nextDay} 05:59:59`,
   };
 }
 
@@ -113,59 +116,31 @@ export function getBigNumbersSQL(
 
 /**
  * Query para Revenue por data
+ * CORRIGIDO: Usa valorliquidolocacao igual ao individual (company.service.ts)
+ * Sem filtro de categoria, pois o individual também não filtra
  */
 export function getRevenueByDateSQL(
   unit: UnitKey,
   startDate: string,
   endDate: string,
 ): string {
-  const categoryIds = getCategoryIds(unit);
   const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
     startDate,
     endDate,
   );
 
   return `
-    WITH receita_consumo AS (
-      SELECT
-        la.id_apartamentostate as id_locacao,
-        COALESCE(SUM(
-          CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
-        ), 0) as valor_consumo_bruto
-      FROM locacaoapartamento la
-      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-      INNER JOIN apartamento a ON aps.id_apartamento = a.id
-      INNER JOIN categoriaapartamento ca_apt ON a.id_categoriaapartamento = ca_apt.id
-      INNER JOIN vendalocacao vl ON la.id_apartamentostate = vl.id_locacaoapartamento
-      INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
-      INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
-      WHERE la.datainicialdaocupacao >= '${startTimestamp}'
-        AND la.datainicialdaocupacao <= '${endTimestamp}'
-        AND la.fimocupacaotipo = 'FINALIZADA'
-        AND sei.cancelado IS NULL
-        AND ca_apt.id IN (${categoryIds})
-      GROUP BY la.id_apartamentostate
-    )
     SELECT
       CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
       END as date,
-      COALESCE(SUM(
-        COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-        COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
-        COALESCE(rc.valor_consumo_bruto, 0) -
-        COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
-      ), 0) as daily_revenue
+      COALESCE(SUM(CAST(la.valorliquidolocacao AS DECIMAL)), 0) as daily_revenue
     FROM locacaoapartamento la
     INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-    INNER JOIN apartamento a ON aps.id_apartamento = a.id
-    INNER JOIN categoriaapartamento ca_apt ON a.id_categoriaapartamento = ca_apt.id
-    LEFT JOIN receita_consumo rc ON la.id_apartamentostate = rc.id_locacao
     WHERE la.datainicialdaocupacao >= '${startTimestamp}'
       AND la.datainicialdaocupacao <= '${endTimestamp}'
       AND la.fimocupacaotipo = 'FINALIZADA'
-      AND ca_apt.id IN (${categoryIds})
     GROUP BY CASE
       WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
       ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -213,13 +188,15 @@ export function getRentalsByDateSQL(
 
 /**
  * Query para TRevPAR por data (inclui gorjetas)
+ * CORRIGIDO: Usa valorliquidolocacao + gorjeta igual ao individual
+ * Sem filtro de categoria, pois o individual também não filtra
+ * Retorna total_revenue (soma), divisão por suítes feita no processamento
  */
 export function getTrevparByDateSQL(
   unit: UnitKey,
   startDate: string,
   endDate: string,
 ): string {
-  const categoryIds = getCategoryIds(unit);
   const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
     startDate,
     endDate,
@@ -227,47 +204,20 @@ export function getTrevparByDateSQL(
   const totalSuites = UNIT_CONFIGS[unit].suiteConfig.totalSuites;
 
   return `
-    WITH receita_consumo AS (
-      SELECT
-        la.id_apartamentostate as id_locacao,
-        COALESCE(SUM(
-          CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
-        ), 0) as valor_consumo_bruto
-      FROM locacaoapartamento la
-      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-      INNER JOIN apartamento a ON aps.id_apartamento = a.id
-      INNER JOIN categoriaapartamento ca_apt ON a.id_categoriaapartamento = ca_apt.id
-      INNER JOIN vendalocacao vl ON la.id_apartamentostate = vl.id_locacaoapartamento
-      INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
-      INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
-      WHERE la.datainicialdaocupacao >= '${startTimestamp}'
-        AND la.datainicialdaocupacao <= '${endTimestamp}'
-        AND la.fimocupacaotipo = 'FINALIZADA'
-        AND sei.cancelado IS NULL
-        AND ca_apt.id IN (${categoryIds})
-      GROUP BY la.id_apartamentostate
-    )
     SELECT
       CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
       END as date,
       COALESCE(SUM(
-        COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-        COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
-        COALESCE(rc.valor_consumo_bruto, 0) -
-        COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0) +
-        COALESCE(CAST(la.gorjeta AS DECIMAL(15,4)), 0)
+        COALESCE(CAST(la.valorliquidolocacao AS DECIMAL), 0) +
+        COALESCE(CAST(la.gorjeta AS DECIMAL), 0)
       ), 0) / ${totalSuites} as trevpar
     FROM locacaoapartamento la
     INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-    INNER JOIN apartamento a ON aps.id_apartamento = a.id
-    INNER JOIN categoriaapartamento ca_apt ON a.id_categoriaapartamento = ca_apt.id
-    LEFT JOIN receita_consumo rc ON la.id_apartamentostate = rc.id_locacao
     WHERE la.datainicialdaocupacao >= '${startTimestamp}'
       AND la.datainicialdaocupacao <= '${endTimestamp}'
       AND la.fimocupacaotipo = 'FINALIZADA'
-      AND ca_apt.id IN (${categoryIds})
     GROUP BY CASE
       WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
       ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -360,5 +310,46 @@ export function getGiroByDateSQL(
       ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
     END
     ORDER BY date
+  `;
+}
+
+/**
+ * Query para Vendas Diretas - receita de vendas não vinculadas a locações
+ * Igual ao individual: divide desconto proporcionalmente entre itens da venda
+ */
+export function getSaleDirectSQL(
+  unit: UnitKey,
+  startDate: string,
+  endDate: string,
+): string {
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
+
+  return `
+    SELECT
+      COALESCE(SUM(receita_item), 0) AS receita_bruta,
+      COALESCE(SUM(desconto_proporcional), 0) AS total_descontos,
+      COALESCE(SUM(receita_item - desconto_proporcional), 0) AS total_sale_direct,
+      COUNT(*) AS total_itens,
+      COUNT(DISTINCT venda_id) AS total_vendas_diretas
+    FROM (
+      SELECT
+        se.id as venda_id,
+        CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4)) as receita_item,
+        COALESCE(CAST(v.desconto AS DECIMAL(15,4)), 0) /
+          NULLIF((SELECT COUNT(*) FROM saidaestoqueitem sei2
+                  WHERE sei2.id_saidaestoque = se.id
+                  AND sei2.cancelado IS NULL), 0) as desconto_proporcional
+      FROM saidaestoque se
+      INNER JOIN vendadireta vd ON se.id = vd.id_saidaestoque
+      INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+      LEFT JOIN venda v ON se.id = v.id_saidaestoque
+      WHERE vd.venda_completa = true
+        AND sei.cancelado IS NULL
+        AND sei.datasaidaitem >= '${startTimestamp}'
+        AND sei.datasaidaitem <= '${endTimestamp}'
+    ) vendas_diretas_detalhadas
   `;
 }

@@ -22,6 +22,7 @@ import {
   getTrevparByDateSQL,
   getOccupancyRateByDateSQL,
   getGiroByDateSQL,
+  getSaleDirectSQL,
 } from './sql/company.queries';
 
 interface UnitBigNumbers {
@@ -225,11 +226,14 @@ export class CompanyMultitenantService {
     monthEnd: string,
   ): Promise<UnitKpiData | null> {
     try {
-      // Executa todas as queries em paralelo para a unidade (atual + anterior + mês atual)
+      // Executa todas as queries em paralelo para a unidade (atual + anterior + mês atual + vendas diretas)
       const [
         bigNumbersResult,
         bigNumbersPrevResult,
         bigNumbersMonthlyResult,
+        saleDirectResult,
+        saleDirectPrevResult,
+        saleDirectMonthlyResult,
         revenueResult,
         rentalsResult,
         trevparResult,
@@ -247,6 +251,19 @@ export class CompanyMultitenantService {
         this.databaseService.query(
           unit,
           getBigNumbersSQL(unit, monthStart, monthEnd),
+        ),
+        // Vendas diretas para cada período (igual ao individual)
+        this.databaseService.query(
+          unit,
+          getSaleDirectSQL(unit, startDate, endDate),
+        ),
+        this.databaseService.query(
+          unit,
+          getSaleDirectSQL(unit, previousStart, previousEnd),
+        ),
+        this.databaseService.query(
+          unit,
+          getSaleDirectSQL(unit, monthStart, monthEnd),
         ),
         this.databaseService.query(
           unit,
@@ -270,29 +287,39 @@ export class CompanyMultitenantService {
         ),
       ]);
 
-      // Processa BigNumbers atual
+      // Processa vendas diretas (igual ao individual: totalAllValue = locação + vendas diretas)
+      const sd = saleDirectResult.rows[0] || {};
+      const totalSaleDirect = parseFloat(sd.total_sale_direct) || 0;
+
+      const sdPrev = saleDirectPrevResult.rows[0] || {};
+      const totalSaleDirectPrev = parseFloat(sdPrev.total_sale_direct) || 0;
+
+      const sdMonthly = saleDirectMonthlyResult.rows[0] || {};
+      const totalSaleDirectMonthly = parseFloat(sdMonthly.total_sale_direct) || 0;
+
+      // Processa BigNumbers atual (locação + vendas diretas)
       const bn = bigNumbersResult.rows[0] || {};
       const bigNumbers: UnitBigNumbers = {
         totalRentals: parseInt(bn.total_rentals) || 0,
-        totalValue: parseFloat(bn.total_all_value) || 0,
+        totalValue: (parseFloat(bn.total_all_value) || 0) + totalSaleDirect,
         totalOccupiedTime: parseFloat(bn.total_occupied_time) || 0,
         totalTips: parseFloat(bn.total_tips) || 0,
       };
 
-      // Processa BigNumbers anterior
+      // Processa BigNumbers anterior (locação + vendas diretas)
       const bnPrev = bigNumbersPrevResult.rows[0] || {};
       const bigNumbersPrevious: UnitBigNumbers = {
         totalRentals: parseInt(bnPrev.total_rentals) || 0,
-        totalValue: parseFloat(bnPrev.total_all_value) || 0,
+        totalValue: (parseFloat(bnPrev.total_all_value) || 0) + totalSaleDirectPrev,
         totalOccupiedTime: parseFloat(bnPrev.total_occupied_time) || 0,
         totalTips: parseFloat(bnPrev.total_tips) || 0,
       };
 
-      // Processa BigNumbers do mês atual (para forecast)
+      // Processa BigNumbers do mês atual para forecast (locação + vendas diretas)
       const bnMonthly = bigNumbersMonthlyResult.rows[0] || {};
       const bigNumbersMonthly: UnitBigNumbers = {
         totalRentals: parseInt(bnMonthly.total_rentals) || 0,
-        totalValue: parseFloat(bnMonthly.total_all_value) || 0,
+        totalValue: (parseFloat(bnMonthly.total_all_value) || 0) + totalSaleDirectMonthly,
         totalOccupiedTime: parseFloat(bnMonthly.total_occupied_time) || 0,
         totalTips: parseFloat(bnMonthly.total_tips) || 0,
       };

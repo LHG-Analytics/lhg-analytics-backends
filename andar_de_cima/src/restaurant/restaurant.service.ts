@@ -684,7 +684,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         series: dateKeys.map((key) => {
           const ab = abGrouped.get(key) || 0;
           const total = totalGrouped.get(key) || 0;
-          const percent = total > 0 ? ab / total : 0;
+          const percent = total > 0 ? (ab / total) * 100 : 0;
           return Number(percent.toFixed(2));
         }),
       };

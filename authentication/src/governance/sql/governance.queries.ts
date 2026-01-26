@@ -47,7 +47,10 @@ export function getGovernanceBigNumbersSQL(
   startDate: string,
   endDate: string,
 ): string {
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
 
   return `
     WITH cleanings AS (
@@ -57,7 +60,7 @@ export function getGovernanceBigNumbersSQL(
       WHERE l."datainicio" BETWEEN '${startTimestamp}' AND '${endTimestamp}'
         AND l."datafim" IS NOT NULL
         AND l."motivofim" = 'COMPLETA'
-        AND f."id_cargo" IN (4, 45)
+        AND f."id_cargo" IN (4, 45, 7, 13)
     ),
     inspections AS (
       SELECT COUNT(*)::INT AS total_inspections
@@ -66,7 +69,7 @@ export function getGovernanceBigNumbersSQL(
       JOIN "funcionario" f ON f."id" = u."id_funcionario"
       WHERE va."datainicio" BETWEEN '${startTimestamp}' AND '${endTimestamp}'
         AND va."motivofim" = 'APROVADA'
-        AND f."id_cargo" = 24
+        AND f."id_cargo" IN (24, 6)
     )
     SELECT
       c.total_cleanings,
@@ -83,7 +86,10 @@ export function getShiftCleaningSQL(
   startDate: string,
   endDate: string,
 ): string {
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
 
   return `
     WITH shift_data AS (
@@ -100,7 +106,7 @@ export function getShiftCleaningSQL(
       WHERE l."datainicio" BETWEEN '${startTimestamp}' AND '${endTimestamp}'
         AND l."datafim" IS NOT NULL
         AND l."motivofim" = 'COMPLETA'
-        AND f."id_cargo" IN (4, 45)
+        AND f."id_cargo" IN (4, 45, 7, 13)
     )
     SELECT
       shift AS name,

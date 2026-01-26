@@ -135,6 +135,7 @@ export class GovernanceService {
 
     const formattedEnd = moment
       .utc(endDate)
+      .add(1, 'day') // D+1 para pegar o último dia operacional completo (06:00 até 05:59 do dia seguinte)
       .set({ hour: 5, minute: 59, second: 59 })
       .format('YYYY-MM-DD HH:mm:ss');
 

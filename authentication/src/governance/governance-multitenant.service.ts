@@ -64,34 +64,69 @@ export class GovernanceMultitenantService {
     const connectedUnits = this.databaseService.getConnectedUnits();
 
     if (connectedUnits.length === 0) {
-      throw new Error('Nenhuma unidade conectada. Verifique as variáveis de ambiente.');
+      throw new Error(
+        'Nenhuma unidade conectada. Verifique as variáveis de ambiente.',
+      );
     }
 
-    this.logger.log(`Buscando KPIs de Governance de ${connectedUnits.length} unidades...`);
+    this.logger.log(
+      `Buscando KPIs de Governance de ${connectedUnits.length} unidades...`,
+    );
 
     // Calcula período anterior (mesma duração, imediatamente antes)
-    const { previousStart, previousEnd } = this.calculatePreviousPeriod(startDate, endDate);
+    const { previousStart, previousEnd } = this.calculatePreviousPeriod(
+      startDate,
+      endDate,
+    );
 
     // Calcula período do mês atual para forecast (dia 1 às 06:00 até ontem às 05:59:59)
-    const { monthStart, monthEnd, daysElapsed, remainingDays, totalDaysInMonth } = this.calculateCurrentMonthPeriod();
+    const {
+      monthStart,
+      monthEnd,
+      daysElapsed,
+      remainingDays,
+      totalDaysInMonth,
+    } = this.calculateCurrentMonthPeriod();
 
     // Calcula total de dias do período selecionado
     const totalDaysInPeriod = this.calculateTotalDays(startDate, endDate);
+    const previousDays = this.calculateTotalDays(previousStart, previousEnd);
+    const monthlyDays = this.calculateTotalDays(monthStart, monthEnd);
 
     // Executa queries em paralelo para cada unidade (período atual + anterior + mês atual para forecast)
     const unitDataPromises = connectedUnits.map((unit) =>
-      this.fetchUnitKpis(unit, startDate, endDate, previousStart, previousEnd, monthStart, monthEnd, totalDaysInPeriod),
+      this.fetchUnitKpis(
+        unit,
+        startDate,
+        endDate,
+        previousStart,
+        previousEnd,
+        monthStart,
+        monthEnd,
+        totalDaysInPeriod,
+      ),
     );
 
     const unitResults = await Promise.all(unitDataPromises);
-    const validResults = unitResults.filter((r) => r !== null) as UnitGovernanceKpiData[];
+    const validResults = unitResults.filter(
+      (r) => r !== null,
+    ) as UnitGovernanceKpiData[];
 
     if (validResults.length === 0) {
       throw new Error('Nenhuma unidade retornou dados válidos');
     }
 
-    // Consolida os dados
-    const consolidated = this.consolidateData(validResults, daysElapsed, remainingDays, totalDaysInMonth);
+    // Consolida os dados (passa também as unidades conectadas para garantir que todas apareçam)
+    const consolidated = this.consolidateData(
+      validResults,
+      connectedUnits,
+      totalDaysInPeriod,
+      previousDays,
+      monthlyDays,
+      daysElapsed,
+      remainingDays,
+      totalDaysInMonth,
+    );
 
     this.logger.log(
       `KPIs de Governance consolidados de ${validResults.length} unidades em ${Date.now() - startTime}ms`,
@@ -148,7 +183,10 @@ export class GovernanceMultitenantService {
   /**
    * Calcula o período anterior (mesma duração, imediatamente antes)
    */
-  private calculatePreviousPeriod(startDate: string, endDate: string): { previousStart: string; previousEnd: string } {
+  private calculatePreviousPeriod(
+    startDate: string,
+    endDate: string,
+  ): { previousStart: string; previousEnd: string } {
     const start = this.parseDate(startDate);
     const end = this.parseDate(endDate);
 
@@ -191,10 +229,22 @@ export class GovernanceMultitenantService {
         bigNumbersMonthlyResult,
         shiftCleaningResult,
       ] = await Promise.all([
-        this.databaseService.query(unit, getGovernanceBigNumbersSQL(unit, startDate, endDate)),
-        this.databaseService.query(unit, getGovernanceBigNumbersSQL(unit, previousStart, previousEnd)),
-        this.databaseService.query(unit, getGovernanceBigNumbersSQL(unit, monthStart, monthEnd)),
-        this.databaseService.query(unit, getShiftCleaningSQL(unit, startDate, endDate)),
+        this.databaseService.query(
+          unit,
+          getGovernanceBigNumbersSQL(unit, startDate, endDate),
+        ),
+        this.databaseService.query(
+          unit,
+          getGovernanceBigNumbersSQL(unit, previousStart, previousEnd),
+        ),
+        this.databaseService.query(
+          unit,
+          getGovernanceBigNumbersSQL(unit, monthStart, monthEnd),
+        ),
+        this.databaseService.query(
+          unit,
+          getShiftCleaningSQL(unit, startDate, endDate),
+        ),
       ]);
 
       // Processa BigNumbers atual
@@ -240,7 +290,9 @@ export class GovernanceMultitenantService {
         else if (shiftName === 'terceirizado') shiftData.terceirizado = value;
       }
 
-      this.logger.log(`KPIs de Governance de ${UNIT_CONFIGS[unit].name} obtidos com sucesso`);
+      this.logger.log(
+        `KPIs de Governance de ${UNIT_CONFIGS[unit].name} obtidos com sucesso`,
+      );
 
       return {
         unit,
@@ -251,7 +303,9 @@ export class GovernanceMultitenantService {
         shiftData,
       };
     } catch (error) {
-      this.logger.error(`Erro ao buscar KPIs de Governance de ${UNIT_CONFIGS[unit].name}: ${error.message}`);
+      this.logger.error(
+        `Erro ao buscar KPIs de Governance de ${UNIT_CONFIGS[unit].name}: ${error.message}`,
+      );
       return null;
     }
   }
@@ -261,24 +315,76 @@ export class GovernanceMultitenantService {
    */
   private consolidateData(
     results: UnitGovernanceKpiData[],
+    connectedUnits: UnitKey[],
+    totalDaysInPeriod: number,
+    previousDays: number,
+    monthlyDays: number,
     daysElapsed: number,
     remainingDays: number,
     totalDaysInMonth: number,
   ): UnifiedGovernanceKpiResponse {
+    // Cria um mapa dos resultados por unidade para acesso rápido
+    const resultsMap = new Map<UnitKey, UnitGovernanceKpiData>();
+    for (const r of results) {
+      resultsMap.set(r.unit as UnitKey, r);
+    }
+
+    // Cria dados zerados para unidades que não retornaram dados
+    const allUnitsData: UnitGovernanceKpiData[] = connectedUnits.map(
+      (unit: UnitKey) => {
+        if (resultsMap.has(unit)) {
+          return resultsMap.get(unit)!;
+        }
+        // Retorna dados zerados para unidades que falharam
+        return {
+          unit,
+          unitName: UNIT_CONFIGS[unit].name,
+          bigNumbers: {
+            totalCleanings: 0,
+            totalInspections: 0,
+            totalDays: totalDaysInPeriod,
+          },
+          bigNumbersPrevious: {
+            totalCleanings: 0,
+            totalInspections: 0,
+            totalDays: previousDays,
+          },
+          bigNumbersMonthly: {
+            totalCleanings: 0,
+            totalInspections: 0,
+            totalDays: monthlyDays,
+          },
+          shiftData: {
+            manha: 0,
+            tarde: 0,
+            noite: 0,
+            terceirizado: 0,
+          },
+        };
+      },
+    );
+
     // Consolida BigNumbers (com previousDate e monthlyForecast)
-    const bigNumbers = this.consolidateBigNumbers(results, daysElapsed, remainingDays, totalDaysInMonth);
+    const bigNumbers = this.consolidateBigNumbers(
+      allUnitsData,
+      daysElapsed,
+      remainingDays,
+      totalDaysInMonth,
+    );
 
     // CleaningsByCompany - total de limpezas por unidade
-    const cleaningsByCompany = this.calculateCleaningsByCompany(results);
+    const cleaningsByCompany = this.calculateCleaningsByCompany(allUnitsData);
 
     // AverageCleaningByCompany - média de limpeza por unidade
-    const averageCleaningByCompany = this.calculateAverageCleaningByCompany(results);
+    const averageCleaningByCompany =
+      this.calculateAverageCleaningByCompany(allUnitsData);
 
     // InspectionsByCompany - total de vistorias por unidade
-    const inspectionsByCompany = this.calculateInspectionsByCompany(results);
+    const inspectionsByCompany =
+      this.calculateInspectionsByCompany(allUnitsData);
 
     // ShiftCleaning - limpezas por turno com série nomeada por unidade
-    const shiftCleaning = this.calculateShiftCleaning(results);
+    const shiftCleaning = this.calculateShiftCleaning(allUnitsData);
 
     return {
       Company: 'LHG',
@@ -337,7 +443,8 @@ export class GovernanceMultitenantService {
     const avgDailyCleaning = totalDays > 0 ? totalCleanings / totalDays : 0;
 
     // --- Cálculos período anterior ---
-    const avgDailyCleaningPrev = totalDaysPrev > 0 ? totalCleaningsPrev / totalDaysPrev : 0;
+    const avgDailyCleaningPrev =
+      totalDaysPrev > 0 ? totalCleaningsPrev / totalDaysPrev : 0;
 
     // --- Cálculos forecast mensal ---
     let forecastCleanings = 0;
@@ -350,8 +457,12 @@ export class GovernanceMultitenantService {
       const dailyAvgInspections = monthlyTotalInspections / daysElapsed;
 
       // Projeção: valor atual do mês + (média diária * dias restantes)
-      forecastCleanings = Math.round(monthlyTotalCleanings + dailyAvgCleanings * remainingDays);
-      forecastInspections = Math.round(monthlyTotalInspections + dailyAvgInspections * remainingDays);
+      forecastCleanings = Math.round(
+        monthlyTotalCleanings + dailyAvgCleanings * remainingDays,
+      );
+      forecastInspections = Math.round(
+        monthlyTotalInspections + dailyAvgInspections * remainingDays,
+      );
       forecastAvgDailyCleaning = forecastCleanings / totalDaysInMonth;
     }
 
@@ -363,12 +474,16 @@ export class GovernanceMultitenantService {
       },
       previousDate: {
         totalAllSuitesCleaningsPreviousData: totalCleaningsPrev,
-        totalAllAverageDailyCleaningPreviousData: Number(avgDailyCleaningPrev.toFixed(2)),
+        totalAllAverageDailyCleaningPreviousData: Number(
+          avgDailyCleaningPrev.toFixed(2),
+        ),
         totalAllInspectionsPreviousData: totalInspectionsPrev,
       },
       monthlyForecast: {
         totalAllSuitesCleaningsForecast: forecastCleanings,
-        totalAllAverageDailyCleaningForecast: Number(forecastAvgDailyCleaning.toFixed(2)),
+        totalAllAverageDailyCleaningForecast: Number(
+          forecastAvgDailyCleaning.toFixed(2),
+        ),
         totalAllInspectionsForecast: forecastInspections,
       },
     };
@@ -403,9 +518,10 @@ export class GovernanceMultitenantService {
     const series: Array<{ name: string; data: number[] }> = [];
 
     const data = results.map((r) => {
-      const avg = r.bigNumbers.totalDays > 0
-        ? r.bigNumbers.totalCleanings / r.bigNumbers.totalDays
-        : 0;
+      const avg =
+        r.bigNumbers.totalDays > 0
+          ? r.bigNumbers.totalCleanings / r.bigNumbers.totalDays
+          : 0;
       return Number(avg.toFixed(2));
     });
     series.push({

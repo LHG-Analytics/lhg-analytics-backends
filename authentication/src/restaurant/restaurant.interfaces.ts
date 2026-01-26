@@ -21,29 +21,41 @@ export interface ApexChartsMultiSeriesData {
 export interface RestaurantBigNumbersData {
   currentDate: {
     totalAllValue: number;
+    totalAllSalesRevenue: number;
     totalAllSales: number;
     totalAllTicketAverage: number;
     totalAllTicketAverageByTotalRentals: number;
+    abRepresentativity: number;
+    salesRepresentativity: number;
   };
   previousDate?: {
     totalAllValuePreviousData: number;
+    totalAllSalesRevenuePreviousData: number;
     totalAllSalesPreviousData: number;
     totalAllTicketAveragePreviousData: number;
     totalAllTicketAverageByTotalRentalsPreviousData: number;
+    abRepresentativityPreviousData: number;
+    salesRepresentativityPreviousData: number;
   };
   monthlyForecast?: {
     totalAllValueForecast: number;
+    totalAllSalesRevenueForecast: number;
     totalAllSalesForecast: number;
     totalAllTicketAverageForecast: number;
     totalAllTicketAverageByTotalRentalsForecast: number;
+    abRepresentativityForecast: number;
+    salesRepresentativityForecast: number;
   };
 }
 
 // Dados processados de uma unidade
 export interface UnitRestaurantBigNumbers {
-  totalValue: number;
-  totalSales: number;
-  totalRentals: number;
+  totalValue: number; // Receita A&B
+  totalSalesRevenue: number; // Receita total de vendas (todos produtos)
+  totalSalesWithAb: number; // Quantidade de vendas com A&B (para cálculo de ticket médio)
+  totalAllSales: number; // Quantidade de locações com qualquer consumo (gross > 0)
+  totalRentals: number; // Quantidade de locações
+  totalRevenue: number; // Receita total (locações + vendas diretas)
 }
 
 // Resposta de uma unidade individual (vinda dos backends)
@@ -92,8 +104,8 @@ export interface UnitRestaurantKpiData {
 export interface UnifiedRestaurantKpiResponse {
   Company: string;
   BigNumbers: RestaurantBigNumbersData[];
-  RevenueByCompany: ApexChartsMultiSeriesData; // Receita AB por unidade por data
-  SalesByCompany: ApexChartsMultiSeriesData; // Quantidade de vendas por unidade por data
+  RevenueByCompany: ApexChartsData; // Receita AB total de cada unidade (consolidado)
+  SalesByCompany: ApexChartsData; // Quantidade de vendas total de cada unidade (consolidado)
   RevenueAbByPeriod: ApexChartsMultiSeriesData; // Receita AB por unidade por data (com total consolidado)
   RevenueAbByPeriodPercent: ApexChartsMultiSeriesData; // Percentual AB por unidade por data
   TicketAverageByPeriod: ApexChartsMultiSeriesData; // Ticket médio por unidade por data

@@ -32,13 +32,26 @@ export interface UnitSuiteConfig {
 }
 
 // Configuração completa das unidades
-export const UNIT_CONFIGS: Record<UnitKey, { name: string; envVar: string; suiteConfig: UnitSuiteConfig }> = {
+export const UNIT_CONFIGS: Record<
+  UnitKey,
+  { name: string; envVar: string; suiteConfig: UnitSuiteConfig }
+> = {
   lush_ipiranga: {
     name: 'Lush Ipiranga',
     envVar: 'DATABASE_URL_LOCAL_IPIRANGA',
     suiteConfig: {
       categoryIds: [10, 11, 12, 15, 16, 17, 18, 19, 24],
-      categoryNames: ['LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH'],
+      categoryNames: [
+        'LUSH',
+        'LUSH POP',
+        'LUSH HIDRO',
+        'LUSH LOUNGE',
+        'LUSH SPA',
+        'LUSH CINE',
+        'LUSH SPLASH',
+        'LUSH SPA SPLASH',
+        'CASA LUSH',
+      ],
       totalSuites: 33,
     },
   },
@@ -47,7 +60,14 @@ export const UNIT_CONFIGS: Record<UnitKey, { name: string; envVar: string; suite
     envVar: 'DATABASE_URL_LOCAL_LAPA',
     suiteConfig: {
       categoryIds: [7, 8, 9, 10, 11, 12],
-      categoryNames: ['LUSH', 'LUSH HIDRO', 'LUSH LOUNGE HIDRO', 'LUSH SPA', 'LUSH SPLASH', 'LUSH SPA SPLASH'],
+      categoryNames: [
+        'LUSH',
+        'LUSH HIDRO',
+        'LUSH LOUNGE HIDRO',
+        'LUSH SPA',
+        'LUSH SPLASH',
+        'LUSH SPA SPLASH',
+      ],
       totalSuites: 18,
     },
   },
@@ -56,7 +76,7 @@ export const UNIT_CONFIGS: Record<UnitKey, { name: string; envVar: string; suite
     envVar: 'DATABASE_URL_LOCAL_TOUT',
     suiteConfig: {
       categoryIds: [6, 7, 8, 9, 10, 12],
-      categoryNames: ['TOUT', 'TOUT DELUXE', 'TOUT PREMIUM', 'TOUT SPA', 'TOUT MASTER', 'TOUT HIDRO'],
+      categoryNames: ['A', 'HIDRO', 'RELAX', 'SUBLIME', 'CLUB', 'GLAM'],
       totalSuites: 24,
     },
   },
@@ -65,7 +85,15 @@ export const UNIT_CONFIGS: Record<UnitKey, { name: string; envVar: string; suite
     envVar: 'DATABASE_URL_LOCAL_ANDAR_DE_CIMA',
     suiteConfig: {
       categoryIds: [2, 3, 4, 5, 6, 7, 12],
-      categoryNames: ['ANDAR DE CIMA', 'ANDAR DE CIMA DELUXE', 'ANDAR DE CIMA PREMIUM', 'ANDAR DE CIMA SPA', 'ANDAR DE CIMA MASTER', 'ANDAR DE CIMA HIDRO', 'ANDAR DE CIMA SPLASH'],
+      categoryNames: [
+        'POP',
+        'POP COPAN',
+        'LOVE',
+        'ESPUMA',
+        'ESPUMA LOUNGE',
+        'ESPUMA COPAN',
+        'CUBO',
+      ],
       totalSuites: 16,
     },
   },

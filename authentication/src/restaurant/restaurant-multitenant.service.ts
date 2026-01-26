@@ -11,6 +11,7 @@ import { UnitKey, UNIT_CONFIGS } from '../database/database.interfaces';
 import {
   UnifiedRestaurantKpiResponse,
   RestaurantBigNumbersData,
+  ApexChartsData,
   ApexChartsMultiSeriesData,
   UnitRestaurantBigNumbers,
   UnitRestaurantKpiData,
@@ -20,6 +21,7 @@ import {
   getRevenueAbByDateSQL,
   getTotalRevenueByDateSQL,
   getSalesWithAbByDateSQL,
+  getTotalSalesAndRevenueSQL,
 } from './sql/restaurant.queries';
 
 @Injectable()
@@ -179,6 +181,9 @@ export class RestaurantMultitenantService {
         bigNumbersResult,
         bigNumbersPrevResult,
         bigNumbersMonthlyResult,
+        salesRevenueResult,
+        salesRevenuePrevResult,
+        salesRevenueMonthlyResult,
         revenueAbResult,
         totalRevenueResult,
         salesWithAbResult,
@@ -186,6 +191,9 @@ export class RestaurantMultitenantService {
         this.databaseService.query(unit, getRestaurantBigNumbersSQL(unit, startDate, endDate)),
         this.databaseService.query(unit, getRestaurantBigNumbersSQL(unit, previousStart, previousEnd)),
         this.databaseService.query(unit, getRestaurantBigNumbersSQL(unit, monthStart, monthEnd)),
+        this.databaseService.query(unit, getTotalSalesAndRevenueSQL(unit, startDate, endDate)),
+        this.databaseService.query(unit, getTotalSalesAndRevenueSQL(unit, previousStart, previousEnd)),
+        this.databaseService.query(unit, getTotalSalesAndRevenueSQL(unit, monthStart, monthEnd)),
         this.databaseService.query(unit, getRevenueAbByDateSQL(unit, startDate, endDate)),
         this.databaseService.query(unit, getTotalRevenueByDateSQL(unit, startDate, endDate)),
         this.databaseService.query(unit, getSalesWithAbByDateSQL(unit, startDate, endDate)),
@@ -193,26 +201,38 @@ export class RestaurantMultitenantService {
 
       // Processa BigNumbers atual
       const bn = bigNumbersResult.rows[0] || {};
+      const sr = salesRevenueResult.rows[0] || {};
       const bigNumbers: UnitRestaurantBigNumbers = {
         totalValue: parseFloat(bn.total_ab_value) || 0,
-        totalSales: parseInt(bn.total_sales_with_ab) || 0,
+        totalSalesRevenue: parseFloat(sr.total_sales_revenue) || 0,
+        totalSalesWithAb: parseInt(bn.total_sales_with_ab) || 0,
+        totalAllSales: parseInt(bn.total_all_sales) || 0,
         totalRentals: parseInt(bn.total_rentals) || 0,
+        totalRevenue: parseFloat(sr.total_revenue) || 0,
       };
 
       // Processa BigNumbers anterior
       const bnPrev = bigNumbersPrevResult.rows[0] || {};
+      const srPrev = salesRevenuePrevResult.rows[0] || {};
       const bigNumbersPrevious: UnitRestaurantBigNumbers = {
         totalValue: parseFloat(bnPrev.total_ab_value) || 0,
-        totalSales: parseInt(bnPrev.total_sales_with_ab) || 0,
+        totalSalesRevenue: parseFloat(srPrev.total_sales_revenue) || 0,
+        totalSalesWithAb: parseInt(bnPrev.total_sales_with_ab) || 0,
+        totalAllSales: parseInt(bnPrev.total_all_sales) || 0,
         totalRentals: parseInt(bnPrev.total_rentals) || 0,
+        totalRevenue: parseFloat(srPrev.total_revenue) || 0,
       };
 
       // Processa BigNumbers do mês atual (para forecast)
       const bnMonthly = bigNumbersMonthlyResult.rows[0] || {};
+      const srMonthly = salesRevenueMonthlyResult.rows[0] || {};
       const bigNumbersMonthly: UnitRestaurantBigNumbers = {
         totalValue: parseFloat(bnMonthly.total_ab_value) || 0,
-        totalSales: parseInt(bnMonthly.total_sales_with_ab) || 0,
+        totalSalesRevenue: parseFloat(srMonthly.total_sales_revenue) || 0,
+        totalSalesWithAb: parseInt(bnMonthly.total_sales_with_ab) || 0,
+        totalAllSales: parseInt(bnMonthly.total_all_sales) || 0,
         totalRentals: parseInt(bnMonthly.total_rentals) || 0,
+        totalRevenue: parseFloat(srMonthly.total_revenue) || 0,
       };
 
       // Processa séries por data
@@ -280,11 +300,11 @@ export class RestaurantMultitenantService {
     // Consolida BigNumbers (com previousDate e monthlyForecast)
     const bigNumbers = this.consolidateBigNumbers(results, daysElapsed, remainingDays, totalDaysInMonth);
 
-    // RevenueByCompany - receita A&B de cada unidade por data/mês
-    const revenueByCompany = this.calculateRevenueByCompanyGrouped(results, categories, groupByMonth);
+    // RevenueByCompany - receita A&B total consolidada de cada unidade
+    const revenueByCompany = this.calculateRevenueByCompanyConsolidated(results);
 
-    // SalesByCompany - quantidade de vendas com A&B de cada unidade por data/mês
-    const salesByCompany = this.calculateSalesByCompanyGrouped(results, categories, groupByMonth);
+    // SalesByCompany - quantidade de vendas total consolidada de cada unidade
+    const salesByCompany = this.calculateSalesByCompanyConsolidated(results);
 
     // RevenueAbByPeriod - receita A&B por unidade por data/mês
     const revenueAbByPeriod = this.calculateRevenueAbByPeriodGrouped(results, categories, groupByMonth);
@@ -318,124 +338,162 @@ export class RestaurantMultitenantService {
   ): RestaurantBigNumbersData {
     // --- Dados atuais (período selecionado) ---
     let totalValue = 0;
-    let totalSales = 0;
+    let totalSalesRevenue = 0;
+    let totalSalesWithAb = 0; // Para cálculo do ticket médio (locações com A&B)
+    let totalAllSales = 0; // Para BigNumbers (locações com qualquer consumo)
     let totalRentals = 0;
+    let totalRevenue = 0;
 
     // --- Dados anteriores ---
     let totalValuePrev = 0;
-    let totalSalesPrev = 0;
+    let totalSalesRevenuePrev = 0;
+    let totalSalesWithAbPrev = 0;
+    let totalAllSalesPrev = 0;
     let totalRentalsPrev = 0;
+    let totalRevenuePrev = 0;
 
     // --- Dados do mês atual (para forecast) ---
     let monthlyTotalValue = 0;
-    let monthlyTotalSales = 0;
+    let monthlyTotalSalesRevenue = 0;
+    let monthlyTotalSalesWithAb = 0;
+    let monthlyTotalAllSales = 0;
     let monthlyTotalRentals = 0;
+    let monthlyTotalRevenue = 0;
 
     for (const r of results) {
       // Atuais (período selecionado)
       totalValue += r.bigNumbers.totalValue;
-      totalSales += r.bigNumbers.totalSales;
+      totalSalesRevenue += r.bigNumbers.totalSalesRevenue;
+      totalSalesWithAb += r.bigNumbers.totalSalesWithAb;
+      totalAllSales += r.bigNumbers.totalAllSales;
       totalRentals += r.bigNumbers.totalRentals;
+      totalRevenue += r.bigNumbers.totalRevenue;
 
       // Anteriores
       if (r.bigNumbersPrevious) {
         totalValuePrev += r.bigNumbersPrevious.totalValue;
-        totalSalesPrev += r.bigNumbersPrevious.totalSales;
+        totalSalesRevenuePrev += r.bigNumbersPrevious.totalSalesRevenue;
+        totalSalesWithAbPrev += r.bigNumbersPrevious.totalSalesWithAb;
+        totalAllSalesPrev += r.bigNumbersPrevious.totalAllSales;
         totalRentalsPrev += r.bigNumbersPrevious.totalRentals;
+        totalRevenuePrev += r.bigNumbersPrevious.totalRevenue;
       }
 
       // Mês atual (para forecast)
       if (r.bigNumbersMonthly) {
         monthlyTotalValue += r.bigNumbersMonthly.totalValue;
-        monthlyTotalSales += r.bigNumbersMonthly.totalSales;
+        monthlyTotalSalesRevenue += r.bigNumbersMonthly.totalSalesRevenue;
+        monthlyTotalSalesWithAb += r.bigNumbersMonthly.totalSalesWithAb;
+        monthlyTotalAllSales += r.bigNumbersMonthly.totalAllSales;
         monthlyTotalRentals += r.bigNumbersMonthly.totalRentals;
+        monthlyTotalRevenue += r.bigNumbersMonthly.totalRevenue;
       }
     }
 
     // --- Cálculos período atual ---
-    const avgTicket = totalSales > 0 ? totalValue / totalSales : 0;
+    // Ticket médio usa locações com A&B (totalSalesWithAb), igual ao individual
+    const avgTicket = totalSalesWithAb > 0 ? totalValue / totalSalesWithAb : 0;
     const avgTicketByRentals = totalRentals > 0 ? totalValue / totalRentals : 0;
+    const abRepresentativity = totalRevenue > 0 ? (totalValue / totalRevenue) * 100 : 0;
+    const salesRepresentativity = totalRevenue > 0 ? (totalSalesRevenue / totalRevenue) * 100 : 0;
 
     // --- Cálculos período anterior ---
-    const avgTicketPrev = totalSalesPrev > 0 ? totalValuePrev / totalSalesPrev : 0;
+    const avgTicketPrev = totalSalesWithAbPrev > 0 ? totalValuePrev / totalSalesWithAbPrev : 0;
     const avgTicketByRentalsPrev = totalRentalsPrev > 0 ? totalValuePrev / totalRentalsPrev : 0;
+    const abRepresentativityPrev = totalRevenuePrev > 0 ? (totalValuePrev / totalRevenuePrev) * 100 : 0;
+    const salesRepresentativityPrev = totalRevenuePrev > 0 ? (totalSalesRevenuePrev / totalRevenuePrev) * 100 : 0;
 
     // --- Cálculos forecast mensal ---
     // Fórmula: forecastValue = monthlyTotalValue + (dailyAverageValue * remainingDays)
     let forecastValue = 0;
+    let forecastSalesRevenue = 0;
     let forecastSales = 0;
     let forecastRentals = 0;
+    let forecastRevenue = 0;
 
     if (daysElapsed > 0) {
       // Média diária baseada nos dados do mês atual
       const dailyAvgValue = monthlyTotalValue / daysElapsed;
-      const dailyAvgSales = monthlyTotalSales / daysElapsed;
+      const dailyAvgSalesRevenue = monthlyTotalSalesRevenue / daysElapsed;
+      const dailyAvgSales = monthlyTotalAllSales / daysElapsed;
       const dailyAvgRentals = monthlyTotalRentals / daysElapsed;
+      const dailyAvgRevenue = monthlyTotalRevenue / daysElapsed;
 
       // Projeção: valor atual do mês + (média diária * dias restantes)
       forecastValue = monthlyTotalValue + dailyAvgValue * remainingDays;
-      forecastSales = Math.round(monthlyTotalSales + dailyAvgSales * remainingDays);
+      forecastSalesRevenue = monthlyTotalSalesRevenue + dailyAvgSalesRevenue * remainingDays;
+      forecastSales = Math.round(monthlyTotalAllSales + dailyAvgSales * remainingDays);
       forecastRentals = Math.round(monthlyTotalRentals + dailyAvgRentals * remainingDays);
+      forecastRevenue = monthlyTotalRevenue + dailyAvgRevenue * remainingDays;
     }
 
     const forecastTicket = forecastSales > 0 ? forecastValue / forecastSales : 0;
     const forecastTicketByRentals = forecastRentals > 0 ? forecastValue / forecastRentals : 0;
+    const forecastAbRepresentativity = forecastRevenue > 0 ? (forecastValue / forecastRevenue) * 100 : 0;
+    const forecastSalesRepresentativity = forecastRevenue > 0 ? (forecastSalesRevenue / forecastRevenue) * 100 : 0;
 
     return {
       currentDate: {
         totalAllValue: Number(totalValue.toFixed(2)),
-        totalAllSales: totalSales,
+        totalAllSalesRevenue: Number(totalSalesRevenue.toFixed(2)),
+        totalAllSales: totalAllSales,
         totalAllTicketAverage: Number(avgTicket.toFixed(2)),
         totalAllTicketAverageByTotalRentals: Number(avgTicketByRentals.toFixed(2)),
+        abRepresentativity: Number(abRepresentativity.toFixed(2)),
+        salesRepresentativity: Number(salesRepresentativity.toFixed(2)),
       },
       previousDate: {
         totalAllValuePreviousData: Number(totalValuePrev.toFixed(2)),
-        totalAllSalesPreviousData: totalSalesPrev,
+        totalAllSalesRevenuePreviousData: Number(totalSalesRevenuePrev.toFixed(2)),
+        totalAllSalesPreviousData: totalAllSalesPrev,
         totalAllTicketAveragePreviousData: Number(avgTicketPrev.toFixed(2)),
         totalAllTicketAverageByTotalRentalsPreviousData: Number(avgTicketByRentalsPrev.toFixed(2)),
+        abRepresentativityPreviousData: Number(abRepresentativityPrev.toFixed(2)),
+        salesRepresentativityPreviousData: Number(salesRepresentativityPrev.toFixed(2)),
       },
       monthlyForecast: {
         totalAllValueForecast: Number(forecastValue.toFixed(2)),
+        totalAllSalesRevenueForecast: Number(forecastSalesRevenue.toFixed(2)),
         totalAllSalesForecast: forecastSales,
         totalAllTicketAverageForecast: Number(forecastTicket.toFixed(2)),
         totalAllTicketAverageByTotalRentalsForecast: Number(forecastTicketByRentals.toFixed(2)),
+        abRepresentativityForecast: Number(forecastAbRepresentativity.toFixed(2)),
+        salesRepresentativityForecast: Number(forecastSalesRepresentativity.toFixed(2)),
       },
     };
   }
 
   /**
-   * Calcula RevenueByCompany com agrupamento por mês
+   * Calcula RevenueByCompany - receita A&B total consolidada de cada unidade
+   * Retorna: categories = nomes das unidades, series = valores totais
    */
-  private calculateRevenueByCompanyGrouped(
+  private calculateRevenueByCompanyConsolidated(
     results: UnitRestaurantKpiData[],
-    categories: string[],
-    groupByMonth: boolean,
-  ): ApexChartsMultiSeriesData {
-    const series: Array<{ name: string; data: number[] }> = [];
+  ): ApexChartsData {
+    const categories: string[] = [];
+    const series: number[] = [];
 
     for (const r of results) {
-      const periodDataMap = this.aggregateDataByPeriod(r.revenueAbByDate, groupByMonth);
-      const data = categories.map((period) => Number((periodDataMap.get(period) || 0).toFixed(2)));
-      series.push({ name: r.unitName, data });
+      categories.push(r.unitName);
+      series.push(Number(r.bigNumbers.totalValue.toFixed(2)));
     }
 
     return { categories, series };
   }
 
   /**
-   * Calcula SalesByCompany com agrupamento por mês
+   * Calcula SalesByCompany - quantidade de vendas total consolidada de cada unidade
+   * Retorna: categories = nomes das unidades, series = valores totais
    */
-  private calculateSalesByCompanyGrouped(
+  private calculateSalesByCompanyConsolidated(
     results: UnitRestaurantKpiData[],
-    categories: string[],
-    groupByMonth: boolean,
-  ): ApexChartsMultiSeriesData {
-    const series: Array<{ name: string; data: number[] }> = [];
+  ): ApexChartsData {
+    const categories: string[] = [];
+    const series: number[] = [];
 
     for (const r of results) {
-      const periodDataMap = this.aggregateDataByPeriod(r.salesByDate, groupByMonth);
-      const data = categories.map((period) => periodDataMap.get(period) || 0);
-      series.push({ name: r.unitName, data });
+      categories.push(r.unitName);
+      series.push(r.bigNumbers.totalAllSales);
     }
 
     return { categories, series };
@@ -477,7 +535,7 @@ export class RestaurantMultitenantService {
       const data = categories.map((period) => {
         const revenueAb = revenueAbMap.get(period) || 0;
         const totalRevenue = totalRevenueMap.get(period) || 0;
-        const percent = totalRevenue > 0 ? revenueAb / totalRevenue : 0;
+        const percent = totalRevenue > 0 ? (revenueAb / totalRevenue) * 100 : 0;
         return Number(percent.toFixed(2));
       });
       series.push({ name: r.unitName, data });

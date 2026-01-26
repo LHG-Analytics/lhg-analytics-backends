@@ -47,6 +47,18 @@ export interface BookingsEcommerceBigNumbersData {
     totalAllTicketAverage: number;
     totalAllRepresentativeness: number;
   };
+  previousDate?: {
+    totalAllValuePreviousData: number;
+    totalAllBookingsPreviousData: number;
+    totalAllTicketAveragePreviousData: number;
+    totalAllRepresentativenessPreviousData: number;
+  };
+  monthlyForecast?: {
+    totalAllValueForecast: number;
+    totalAllBookingsForecast: number;
+    totalAllTicketAverageForecast: number;
+    totalAllRepresentativenessForecast: number;
+  };
 }
 
 // Dados processados de uma unidade
@@ -102,6 +114,8 @@ export interface UnitBookingsKpiData {
   bigNumbersPrevious?: UnitBookingsBigNumbers;
   bigNumbersMonthly?: UnitBookingsBigNumbers; // Dados do mês atual para forecast
   ecommerce: UnitBookingsEcommerce;
+  ecommercePrevious?: UnitBookingsEcommerce; // Dados de ecommerce do período anterior
+  ecommerceMonthly?: UnitBookingsEcommerce; // Dados de ecommerce do mês atual para forecast
   // Dados por data para séries
   billingByDate: Map<string, number>;
   bookingsByDate: Map<string, number>;
@@ -113,8 +127,8 @@ export interface UnitBookingsKpiData {
 export interface UnifiedBookingsKpiResponse {
   Company: string;
   BigNumbers: BookingsBigNumbersData[];
-  RevenueByCompany: ApexChartsMultiSeriesData; // Faturamento total de reservas por unidade por data
-  BookingsByCompany: ApexChartsMultiSeriesData; // Quantidade de reservas por unidade por data
+  RevenueByCompany: ApexChartsData; // Faturamento total de reservas de cada unidade (consolidado)
+  BookingsByCompany: ApexChartsData; // Quantidade de reservas de cada unidade (consolidado)
   BillingOfReservationsByPeriod: ApexChartsMultiSeriesData; // Faturamento de reservas por unidade por data (com total consolidado)
   RepresentativenessOfReservesByPeriod: ApexChartsMultiSeriesData; // Representatividade por unidade por data
   NumberOfReservationsPerPeriod: ApexChartsMultiSeriesData; // Número de reservas por unidade por data

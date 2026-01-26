@@ -603,8 +603,8 @@ FROM vendas_diretas vd, locacoes loc;
       // Calcula ticket médio
       const ticketAverage = count > 0 ? Number((revenue / count).toFixed(2)) : 0;
 
-      // Calcula representatividade
-      const representativeness = revenueTotal > 0 ? Number((revenue / revenueTotal).toFixed(4)) : 0;
+      // Calcula representatividade (multiplicada por 100 para mostrar como percentual)
+      const representativeness = revenueTotal > 0 ? Number(((revenue / revenueTotal) * 100).toFixed(2)) : 0;
 
       // Popula os dados
       kpiTableByChannelType.bookingsTotalRentalsByChannelType[channelName] = count;
@@ -628,7 +628,7 @@ FROM vendas_diretas vd, locacoes loc;
         ? Number((totalChannelRevenue / totalChannelBookings).toFixed(2))
         : 0;
     kpiTableByChannelType.bookingsRepresentativenessByChannelType['TOTALALLREPRESENTATIVENESS'] =
-      revenueTotal > 0 ? Number((totalChannelRevenue / revenueTotal).toFixed(4)) : 0;
+      revenueTotal > 0 ? Number(((totalChannelRevenue / revenueTotal) * 100).toFixed(2)) : 0;
 
     // Calcula BigNumbersEcommerce (soma WEBSITE_IMMEDIATE + WEBSITE_SCHEDULED)
     const ecommerceRevenueImediata =
@@ -646,7 +646,7 @@ FROM vendas_diretas vd, locacoes loc;
     const ecommerceTicketAverage =
       ecommerceBookings > 0 ? Number((ecommerceRevenue / ecommerceBookings).toFixed(2)) : 0;
     const ecommerceRepresentativeness =
-      revenueTotal > 0 ? Number((ecommerceRevenue / revenueTotal).toFixed(4)) : 0;
+      revenueTotal > 0 ? Number(((ecommerceRevenue / revenueTotal) * 100).toFixed(2)) : 0;
 
     const bigNumbersEcommerce = {
       currentDate: {
@@ -702,7 +702,7 @@ FROM vendas_diretas vd, locacoes loc;
       series: [...periodsArray].map((dateKey: string) => {
         const item = billingDataMap.get(dateKey);
         const dayRevenue = item ? Number(item.total_value) : 0;
-        return totalValue > 0 ? Number((dayRevenue / totalValue).toFixed(2)) : 0;
+        return totalValue > 0 ? Number(((dayRevenue / totalValue) * 100).toFixed(2)) : 0;
       }),
     };
 
@@ -734,7 +734,7 @@ FROM vendas_diretas vd, locacoes loc;
     const bigNumbersTicketAverage =
       totalChannelBookings > 0 ? Number((totalChannelRevenue / totalChannelBookings).toFixed(2)) : 0;
     const bigNumbersRepresentativeness =
-      revenueTotal > 0 ? Number((totalChannelRevenue / revenueTotal).toFixed(4)) : 0;
+      revenueTotal > 0 ? Number(((totalChannelRevenue / revenueTotal) * 100).toFixed(2)) : 0;
 
     const bigNumbers = {
       currentDate: {
