@@ -17,6 +17,17 @@ export interface ApexChartsMultiSeriesData {
   }>;
 }
 
+// Estrutura para ShiftCleaning por dia (séries por unidade com dados de turnos por dia)
+export interface ShiftCleaningByDayData {
+  categories: string[]; // Datas no formato DD/MM/YYYY
+  series: {
+    [unitName: string]: Array<{
+      name: string; // Nome do turno (Manhã, Tarde, Noite)
+      data: number[];
+    }>;
+  };
+}
+
 // BigNumbers do Governance
 export interface GovernanceBigNumbersData {
   currentDate: {
@@ -43,12 +54,20 @@ export interface UnitGovernanceBigNumbers {
   totalDays: number; // Para calcular média diária
 }
 
-// Dados de turno de uma unidade
+// Dados de turno de uma unidade (total por turno)
 export interface UnitShiftData {
   manha: number;
   tarde: number;
   noite: number;
   terceirizado: number;
+}
+
+// Dados de turno por dia de uma unidade
+export interface UnitShiftDataByDay {
+  date: string;
+  manha: number;
+  tarde: number;
+  noite: number;
 }
 
 // Dados de KPI de uma unidade processados
@@ -59,6 +78,7 @@ export interface UnitGovernanceKpiData {
   bigNumbersPrevious?: UnitGovernanceBigNumbers;
   bigNumbersMonthly?: UnitGovernanceBigNumbers;
   shiftData: UnitShiftData;
+  shiftDataByDay?: UnitShiftDataByDay[]; // Dados de turno por dia
 }
 
 // Resposta unificada do Governance (consolidada)
@@ -68,7 +88,7 @@ export interface UnifiedGovernanceKpiResponse {
   CleaningsByCompany: ApexChartsMultiSeriesData; // Total de limpezas por unidade
   AverageCleaningByCompany: ApexChartsMultiSeriesData; // Média de limpeza por unidade
   InspectionsByCompany: ApexChartsMultiSeriesData; // Total de vistorias por unidade
-  ShiftCleaning: ApexChartsMultiSeriesData; // Limpezas por turno com série nomeada por unidade
+  ShiftCleaning: ShiftCleaningByDayData; // Limpezas por turno por dia, com série nomeada por unidade
 }
 
 // Configuração de unidade

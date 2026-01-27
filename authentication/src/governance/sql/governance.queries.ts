@@ -79,7 +79,7 @@ export function getGovernanceBigNumbersSQL(
 }
 
 /**
- * Query para limpezas por turno
+ * Query para limpezas por turno (total por turno)
  */
 export function getShiftCleaningSQL(
   unit: UnitKey,
@@ -119,6 +119,59 @@ export function getShiftCleaningSQL(
         WHEN 'Tarde' THEN 2
         WHEN 'Noite' THEN 3
         WHEN 'Terceirizado' THEN 4
+      END
+  `;
+}
+
+/**
+ * Query para limpezas por turno agrupadas por dia
+ * Retorna os dados de limpeza por dia e turno para o período selecionado
+ */
+export function getShiftCleaningByDaySQL(
+  unit: UnitKey,
+  startDate: string,
+  endDate: string,
+): string {
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
+
+  return `
+    WITH shift_data AS (
+      SELECT
+        -- Determina o dia operacional (se horário < 06:00, conta como dia anterior)
+        CASE
+          WHEN EXTRACT(HOUR FROM l."datainicio") < 6
+          THEN (l."datainicio" - INTERVAL '1 hour')::DATE
+          ELSE l."datainicio"::DATE
+        END AS operational_date,
+        CASE
+          WHEN f."id" IN (998548, 1047691, 1047692) THEN 'Terceirizado'
+          WHEN f."horarioinicioexpediente" BETWEEN '06:00' AND '10:59' THEN 'Manhã'
+          WHEN f."horarioinicioexpediente" BETWEEN '11:00' AND '18:59' THEN 'Tarde'
+          WHEN f."horarioinicioexpediente" BETWEEN '19:00' AND '23:59' THEN 'Noite'
+          ELSE 'Terceirizado'
+        END AS shift
+      FROM "limpezaapartamento" l
+      JOIN "funcionario" f ON f."id" = l."id_funcionario"
+      WHERE l."datainicio" BETWEEN '${startTimestamp}' AND '${endTimestamp}'
+        AND l."datafim" IS NOT NULL
+        AND l."motivofim" = 'COMPLETA'
+        AND f."id_cargo" IN (4, 45, 7, 13)
+    )
+    SELECT
+      TO_CHAR(operational_date, 'DD/MM/YYYY') AS date,
+      shift,
+      COUNT(*)::INT AS value
+    FROM shift_data
+    WHERE shift IN ('Manhã', 'Tarde', 'Noite')
+    GROUP BY operational_date, shift
+    ORDER BY operational_date,
+      CASE shift
+        WHEN 'Manhã' THEN 1
+        WHEN 'Tarde' THEN 2
+        WHEN 'Noite' THEN 3
       END
   `;
 }

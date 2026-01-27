@@ -12,13 +12,16 @@ import {
   UnifiedGovernanceKpiResponse,
   GovernanceBigNumbersData,
   ApexChartsMultiSeriesData,
+  ShiftCleaningByDayData,
   UnitGovernanceBigNumbers,
   UnitShiftData,
+  UnitShiftDataByDay,
   UnitGovernanceKpiData,
 } from './governance.interfaces';
 import {
   getGovernanceBigNumbersSQL,
   getShiftCleaningSQL,
+  getShiftCleaningByDaySQL,
 } from './sql/governance.queries';
 
 @Injectable()
@@ -222,12 +225,13 @@ export class GovernanceMultitenantService {
     totalDaysInPeriod: number,
   ): Promise<UnitGovernanceKpiData | null> {
     try {
-      // Executa todas as queries em paralelo para a unidade (atual + anterior + mês atual)
+      // Executa todas as queries em paralelo para a unidade (atual + anterior + mês atual + por dia)
       const [
         bigNumbersResult,
         bigNumbersPrevResult,
         bigNumbersMonthlyResult,
         shiftCleaningResult,
+        shiftCleaningByDayResult,
       ] = await Promise.all([
         this.databaseService.query(
           unit,
@@ -244,6 +248,10 @@ export class GovernanceMultitenantService {
         this.databaseService.query(
           unit,
           getShiftCleaningSQL(unit, startDate, endDate),
+        ),
+        this.databaseService.query(
+          unit,
+          getShiftCleaningByDaySQL(unit, startDate, endDate),
         ),
       ]);
 
@@ -273,7 +281,7 @@ export class GovernanceMultitenantService {
         totalDays: monthlyDays,
       };
 
-      // Processa dados de turno
+      // Processa dados de turno (totais)
       const shiftData: UnitShiftData = {
         manha: 0,
         tarde: 0,
@@ -290,6 +298,39 @@ export class GovernanceMultitenantService {
         else if (shiftName === 'terceirizado') shiftData.terceirizado = value;
       }
 
+      // Processa dados de turno por dia
+      const shiftDataByDayMap = new Map<string, UnitShiftDataByDay>();
+
+      for (const row of shiftCleaningByDayResult.rows) {
+        const date = row.date || '';
+        const shift = (row.shift || '').toLowerCase();
+        const value = parseInt(row.value) || 0;
+
+        if (!shiftDataByDayMap.has(date)) {
+          shiftDataByDayMap.set(date, {
+            date,
+            manha: 0,
+            tarde: 0,
+            noite: 0,
+          });
+        }
+
+        const dayData = shiftDataByDayMap.get(date)!;
+        if (shift === 'manhã') dayData.manha = value;
+        else if (shift === 'tarde') dayData.tarde = value;
+        else if (shift === 'noite') dayData.noite = value;
+      }
+
+      const shiftDataByDay = Array.from(shiftDataByDayMap.values()).sort(
+        (a, b) => {
+          const [dayA, monthA, yearA] = a.date.split('/').map(Number);
+          const [dayB, monthB, yearB] = b.date.split('/').map(Number);
+          const dateA = new Date(yearA, monthA - 1, dayA).getTime();
+          const dateB = new Date(yearB, monthB - 1, dayB).getTime();
+          return dateA - dateB;
+        },
+      );
+
       this.logger.log(
         `KPIs de Governance de ${UNIT_CONFIGS[unit].name} obtidos com sucesso`,
       );
@@ -301,6 +342,7 @@ export class GovernanceMultitenantService {
         bigNumbersPrevious,
         bigNumbersMonthly,
         shiftData,
+        shiftDataByDay,
       };
     } catch (error) {
       this.logger.error(
@@ -330,12 +372,41 @@ export class GovernanceMultitenantService {
     }
 
     // Cria dados zerados para unidades que não retornaram dados
+    // Primeiro coleta todas as datas únicas das unidades que tiveram sucesso
+    const allDates = new Set<string>();
+    for (const r of results) {
+      if (r.shiftDataByDay) {
+        for (const dayData of r.shiftDataByDay) {
+          allDates.add(dayData.date);
+        }
+      }
+    }
+
+    // Ordena as datas
+    const sortedDates = Array.from(allDates).sort((a, b) => {
+      const [dayA, monthA, yearA] = a.split('/').map(Number);
+      const [dayB, monthB, yearB] = b.split('/').map(Number);
+      const dateA = new Date(yearA, monthA - 1, dayA).getTime();
+      const dateB = new Date(yearB, monthB - 1, dayB).getTime();
+      return dateA - dateB;
+    });
+
     const allUnitsData: UnitGovernanceKpiData[] = connectedUnits.map(
       (unit: UnitKey) => {
         if (resultsMap.has(unit)) {
           return resultsMap.get(unit)!;
         }
         // Retorna dados zerados para unidades que falharam
+        // Cria shiftDataByDay com zeros para todas as datas
+        const shiftDataByDayForFailed: UnitShiftDataByDay[] = sortedDates.map(
+          (date) => ({
+            date,
+            manha: 0,
+            tarde: 0,
+            noite: 0,
+          }),
+        );
+
         return {
           unit,
           unitName: UNIT_CONFIGS[unit].name,
@@ -360,6 +431,7 @@ export class GovernanceMultitenantService {
             noite: 0,
             terceirizado: 0,
           },
+          shiftDataByDay: shiftDataByDayForFailed,
         };
       },
     );
@@ -551,19 +623,67 @@ export class GovernanceMultitenantService {
   }
 
   /**
-   * Calcula ShiftCleaning - limpezas por turno com série nomeada por unidade
+   * Calcula ShiftCleaning - limpezas por turno por dia, com séries agrupadas por unidade
    */
   private calculateShiftCleaning(
     results: UnitGovernanceKpiData[],
-  ): ApexChartsMultiSeriesData {
-    const categories = ['Manhã', 'Tarde', 'Noite'];
-    const series: Array<{ name: string; data: number[] }> = [];
+  ): ShiftCleaningByDayData {
+    // Coleta todas as datas únicas de todas as unidades
+    const allDatesSet = new Set<string>();
+    for (const r of results) {
+      if (r.shiftDataByDay) {
+        for (const dayData of r.shiftDataByDay) {
+          allDatesSet.add(dayData.date);
+        }
+      }
+    }
+
+    // Ordena as datas
+    const categories = Array.from(allDatesSet).sort((a, b) => {
+      const [dayA, monthA, yearA] = a.split('/').map(Number);
+      const [dayB, monthB, yearB] = b.split('/').map(Number);
+      const dateA = new Date(yearA, monthA - 1, dayA).getTime();
+      const dateB = new Date(yearB, monthB - 1, dayB).getTime();
+      return dateA - dateB;
+    });
+
+    // Cria o objeto de séries agrupado por unidade
+    const series: {
+      [unitName: string]: Array<{ name: string; data: number[] }>;
+    } = {};
 
     for (const r of results) {
-      series.push({
-        name: r.unitName,
-        data: [r.shiftData.manha, r.shiftData.tarde, r.shiftData.noite],
-      });
+      // Cria um mapa de data -> dados para esta unidade
+      const dateMap = new Map<string, UnitShiftDataByDay>();
+      if (r.shiftDataByDay) {
+        for (const dayData of r.shiftDataByDay) {
+          dateMap.set(dayData.date, dayData);
+        }
+      }
+
+      // Prepara arrays para cada turno
+      const manhaData: number[] = [];
+      const tardeData: number[] = [];
+      const noiteData: number[] = [];
+
+      for (const date of categories) {
+        const dayData = dateMap.get(date);
+        if (dayData) {
+          manhaData.push(dayData.manha);
+          tardeData.push(dayData.tarde);
+          noiteData.push(dayData.noite);
+        } else {
+          manhaData.push(0);
+          tardeData.push(0);
+          noiteData.push(0);
+        }
+      }
+
+      series[r.unitName] = [
+        { name: 'Manhã', data: manhaData },
+        { name: 'Tarde', data: tardeData },
+        { name: 'Noite', data: noiteData },
+      ];
     }
 
     return { categories, series };
