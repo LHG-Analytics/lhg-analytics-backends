@@ -136,6 +136,9 @@ export function getShiftCleaningByDaySQL(
     startDate,
     endDate,
   );
+  // Converte endDate para YYYY-MM-DD para filtrar o operational_date
+  const [day, month, year] = endDate.split('/').map(Number);
+  const endDateISO = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 
   return `
     WITH shift_data AS (
@@ -166,6 +169,8 @@ export function getShiftCleaningByDaySQL(
       COUNT(*)::INT AS value
     FROM shift_data
     WHERE shift IN ('Manhã', 'Tarde', 'Noite')
+      -- Filtra operational_date para não incluir datas além do período selecionado
+      AND operational_date <= '${endDateISO}'::DATE
     GROUP BY operational_date, shift
     ORDER BY operational_date,
       CASE shift
