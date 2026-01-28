@@ -3,6 +3,7 @@
   "compilerOptions": {
     "baseUrl": "./",
     "rootDirs": ["src", "../authentication/src"],
+    "typeRoots": ["node_modules/@types", "../node_modules/@types"],
     "paths": {
       "@client-online": ["dist/generated/client-online"],
       "@client-local": ["dist/generated/client-local"],
