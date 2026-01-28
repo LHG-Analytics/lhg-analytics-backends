@@ -8,6 +8,11 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(public configService: ConfigService) {
+    const secret = configService.get<string>('JWT_SECRET');
+    if (!secret) {
+      throw new Error('JWT_SECRET não está definido nas variáveis de ambiente');
+    }
+
     super({
       // Extrai JWT tanto do cookie quanto do header Authorization (compatibilidade)
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -22,7 +27,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET'),
+      secretOrKey: secret,
     });
   }
 

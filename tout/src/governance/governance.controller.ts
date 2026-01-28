@@ -51,19 +51,21 @@ export class GovernanceController {
       const start = this.dateUtilsService.convertToDate(startDate, {
         useUTC: true,
         startHour: 6,
-      }); // Início às 06:00
+      })!; // Início às 06:00
       const end = this.dateUtilsService.convertToDate(endDate, {
         isEndDate: true,
         useUTC: true,
         endHour: 5,
         endMinute: 59,
         endSecond: 59,
-      }); // Fim, com ajuste de horário (D+1 às 05:59:59.999)
+      })!; // Fim, com ajuste de horário (D+1 às 05:59:59.999)
 
       // Chama o serviço com as datas e o período, se fornecidos
       return await this.governanceService.calculateKpibyDateRangeSQL(start, end);
     } catch (error) {
-      throw new BadRequestException(`Failed to fetch KPIs: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch KPIs: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 }

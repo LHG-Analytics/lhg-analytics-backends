@@ -588,13 +588,16 @@ ORDER BY
       categories: dateKeys.map((key: any) =>
         isMonthly ? moment(key, 'YYYY-MM').format('MM/YYYY') : moment(key).format('DD/MM/YYYY'),
       ),
-      series: Object.entries(shiftsMap).reduce((acc, [shift, employees]) => {
-        acc[shift] = Object.entries(employees).map(([employeeName, dateCounts]) => ({
-          name: employeeName,
-          data: dateKeys.map((dateKey: any) => dateCounts[dateKey] || 0),
-        }));
-        return acc;
-      }, {}),
+      series: Object.entries(shiftsMap).reduce(
+        (acc: Record<string, { name: string; data: number[] }[]>, [shift, employees]) => {
+          acc[shift] = Object.entries(employees).map(([employeeName, dateCounts]) => ({
+            name: employeeName,
+            data: dateKeys.map((dateKey: any) => dateCounts[dateKey] || 0),
+          }));
+          return acc;
+        },
+        {},
+      ),
     };
 
     const employeeReport: Record<string, any[]> = {};
@@ -611,7 +614,13 @@ ORDER BY
       });
     }
 
-    const totals = {
+    const totals: {
+      totalAverageDailyWeekCleaning: Record<string, number>;
+      totalIdealShiftMaid: number;
+      totalRealShiftMaid: number;
+      totalDifference: number;
+      totalAllAverageShiftCleaning: number;
+    } = {
       totalAverageDailyWeekCleaning: {},
       totalIdealShiftMaid: 0,
       totalRealShiftMaid: 0,

@@ -72,8 +72,7 @@ async function bootstrap() {
       process.exit(1); // Encerrar o processo caso o banco não esteja acessível
     }
 
-    // Configuração de CORS
-    // Sempre inclui as origens padrão + qualquer origem adicional do .env
+    // Configuração de CORS - Padronizada
     const port = process.env.PORT_ANDAR_DE_CIMA || 3004;
     const defaultOrigins = [
       'https://lhg-analytics.vercel.app', // Frontend em produção
@@ -84,45 +83,37 @@ async function bootstrap() {
       'http://localhost:3003', // Tout (Swagger)
       'http://localhost:3004', // Andar de Cima (Swagger)
     ];
-    const envOrigins =
-      process.env.ALLOWED_ORIGINS?.split(',')
-        .map((o) => o.trim())
-        .filter(Boolean) || [];
+    const envOrigins = process.env.ALLOWED_ORIGINS
+      ?.split(',')
+      .map((o) => o.trim())
+      .filter(Boolean) || [];
     const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
 
     const corsOptions: CorsOptions = {
       origin: (origin, callback) => {
-        console.log('CORS - Origin recebida:', origin);
-        console.log('CORS - Origens permitidas:', allowedOrigins);
-
-        // Permite requisições sem origin (ex: Postman, curl, Swagger)
+        // Permite requisições sem origin (Postman, curl, health checks)
         if (!origin) {
-          console.log('CORS - Permitindo requisição sem origin');
           callback(null, true);
           return;
         }
 
         // Verifica se a origin está na lista permitida
         if (allowedOrigins.includes(origin)) {
-          console.log('CORS - Origin permitida');
           callback(null, true);
           return;
         }
 
-        // Em produção, seja permissivo para health checks
-        if (process.env.NODE_ENV === 'production') {
-          console.log('CORS - Permitindo em produção');
-          callback(null, true);
-          return;
+        // Log apenas em desenvolvimento
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('CORS rejeitou origem:', origin);
         }
 
-        // Rejeita origem não permitida
-        console.log('CORS - REJEITANDO origem:', origin);
         callback(new Error('Not allowed by CORS'), false);
       },
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
       allowedHeaders: ['Authorization', 'Content-Type'],
       credentials: true,
+      maxAge: 86400, // 24 horas de cache para preflight
     };
 
     // Configuração global de validação

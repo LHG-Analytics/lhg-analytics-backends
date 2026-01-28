@@ -70,31 +70,46 @@ async function bootstrap() {
       process.exit(1);
     }
 
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
-      'http://lhg-analytics-backend-bmmd.onrender.com',
-      'http://localhost:3005',
-      'https://lhg-analytics.vercel.app',
+    // Origens padrão permitidas
+    const defaultOrigins = [
+      'https://lhg-analytics.vercel.app', // Frontend em produção
+      'http://localhost:3000', // Proxy/Frontend local
+      'http://localhost:3005', // Authentication service (Swagger local)
     ];
+
+    // Combina origens padrão com origens do ambiente
+    const envOrigins = process.env.ALLOWED_ORIGINS
+      ?.split(',')
+      .map((o) => o.trim())
+      .filter(Boolean) || [];
+
+    const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
 
     const corsOptions: CorsOptions = {
       origin: (origin, callback) => {
-        // Em produção, seja mais permissivo para evitar problemas com health checks e requests internos
-        if (
-          !origin ||
-          allowedOrigins.includes(origin) ||
-          origin.startsWith('https://lhg-analytics') ||
-          process.env.NODE_ENV === 'production'
-        ) {
+        // Permite requisições sem origin (Postman, curl, health checks)
+        if (!origin) {
           callback(null, true);
-        } else {
-          // Log da origem rejeitada para debug
-          console.log('CORS rejeitou origem:', origin);
-          callback(new Error('Not allowed by CORS'), false);
+          return;
         }
+
+        // Verifica se a origin está na lista permitida
+        if (allowedOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+
+        // Log apenas em desenvolvimento
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('CORS rejeitou origem:', origin);
+        }
+
+        callback(new Error('Not allowed by CORS'), false);
       },
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
       allowedHeaders: ['Authorization', 'Content-Type'],
       credentials: true,
+      maxAge: 86400, // 24 horas de cache para preflight
     };
 
     // Configuração global de validação

@@ -53,14 +53,14 @@ export class RestaurantController {
         startHour: 0,
         startMinute: 0,
         startSecond: 0,
-      });
+      })!;
       const end = this.dateUtilsService.convertToDate(endDate, {
         isEndDate: true,
         useUTC: true,
         endHour: 23,
         endMinute: 59,
         endSecond: 59,
-      });
+      })!;
 
       // Chama o serviço com as datas e o período, se fornecidos
       return await this.restaurantService.calculateKpisByDateRange(start, end);

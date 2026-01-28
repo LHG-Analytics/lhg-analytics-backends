@@ -106,7 +106,10 @@ export class CompanyService {
     const results = await Promise.all(unitPromises);
 
     // Filtra resultados válidos
-    const validResults = results.filter((r) => r.success && r.data);
+    const validResults = results.filter(
+      (r): r is { config: UnitConfig; data: UnitKpiResponse; success: boolean } =>
+        r.success && r.data !== null,
+    );
 
     if (validResults.length === 0) {
       throw new Error('Nenhuma unidade respondeu com dados válidos');

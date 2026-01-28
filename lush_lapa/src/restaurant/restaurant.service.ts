@@ -756,7 +756,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
           revenueGrouped.set(dateKey, { ALIMENTOS: 0, BEBIDAS: 0, OUTROS: 0 });
         }
 
-        const current = revenueGrouped.get(dateKey);
+        const current = revenueGrouped.get(dateKey)!;
         current.ALIMENTOS += Number(row.ALIMENTOS) || 0;
         current.BEBIDAS += Number(row.BEBIDAS) || 0;
         current.OUTROS += Number(row.OUTROS) || 0;
@@ -800,7 +800,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
             categoryMap.set(category, new Map());
           }
 
-          const categoryData = categoryMap.get(category);
+          const categoryData = categoryMap.get(category)!;
           const current = categoryData.get(dateKey) || 0;
           categoryData.set(dateKey, current + Number(item.totalValue));
         }

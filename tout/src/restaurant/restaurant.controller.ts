@@ -51,16 +51,18 @@ export class RestaurantController {
       const start = this.dateUtilsService.convertToDate(startDate, {
         useUTC: true,
         startHour: 0,
-      }); // Início às 00:00
+      })!; // Início às 00:00
       const end = this.dateUtilsService.convertToDate(endDate, {
         isEndDate: true,
         useUTC: true,
-      }); // Fim às 23:59:59.999
+      })!; // Fim às 23:59:59.999
 
       // Chama o serviço com as datas e o período, se fornecidos
       return await this.restaurantService.calculateKpisByDateRange(start, end);
     } catch (error) {
-      throw new BadRequestException(`Failed to fetch KPIs: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch KPIs: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 }
