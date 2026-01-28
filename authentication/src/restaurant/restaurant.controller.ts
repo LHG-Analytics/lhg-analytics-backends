@@ -27,6 +27,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { UnitsGuard } from '../auth/guards/units.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Units } from '../auth/decorators/units.decorator';
+import { ValidationService } from '@lhg/utils';
 
 @ApiTags('Restaurant')
 @ApiBearerAuth()
@@ -37,7 +38,10 @@ import { Units } from '../auth/decorators/units.decorator';
 export class RestaurantController {
   private readonly logger = new Logger(RestaurantController.name);
 
-  constructor(private readonly restaurantService: RestaurantMultitenantService) {}
+  constructor(
+    private readonly restaurantService: RestaurantMultitenantService,
+    private readonly validationService: ValidationService,
+  ) {}
 
   @Get('kpis/date-range')
   @ApiOperation({
@@ -73,22 +77,8 @@ export class RestaurantController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ): Promise<UnifiedRestaurantKpiResponse> {
-    // Valida parâmetros
-    if (!startDate || !endDate) {
-      throw new HttpException(
-        'startDate e endDate são obrigatórios',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    // Valida formato das datas (DD/MM/YYYY)
-    const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
-    if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
-      throw new HttpException(
-        'Formato de data inválido. Use DD/MM/YYYY',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+    // Valida formato e intervalo das datas
+    this.validationService.validateDateInterval(startDate, endDate);
 
     this.logger.log(`Buscando KPIs de Restaurant consolidados: ${startDate} - ${endDate}`);
 

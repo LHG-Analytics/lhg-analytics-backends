@@ -20,7 +20,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Units } from '../auth/units.decorator';
 import { UnitsGuard } from '../auth/units.guard';
 import { BookingsService } from './bookings.service';
-import { DateUtilsService } from '@lhg/utils';
+import { DateUtilsService, ValidationService } from '@lhg/utils';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
@@ -32,6 +32,7 @@ export class BookingsController {
   constructor(
     private readonly bookingsService: BookingsService,
     private readonly dateUtilsService: DateUtilsService,
+    private readonly validationService: ValidationService,
   ) {}
 
   @Get('bookings/date-range')
@@ -55,7 +56,10 @@ export class BookingsController {
     @Query('endDate') endDate: string,
   ): Promise<any> {
     try {
-      // Validação e conversão das datas passadas como string para Date
+      // Valida formato e intervalo das datas
+      this.validationService.validateDateInterval(startDate, endDate);
+
+      // Conversão das datas passadas como string para Date
       const start = this.dateUtilsService.convertToDate(startDate, {
         useUTC: true,
       });

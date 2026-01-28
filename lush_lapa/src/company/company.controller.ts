@@ -7,7 +7,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { UnitsGuard } from '../auth/units.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Units } from '../auth/units.decorator';
-import { DateUtilsService } from '@lhg/utils';
+import { DateUtilsService, ValidationService } from '@lhg/utils';
 
 @ApiTags('Company')
 @ApiBearerAuth()
@@ -19,6 +19,7 @@ export class CompanyController {
   constructor(
     private readonly companyService: CompanyService,
     private readonly dateUtilsService: DateUtilsService,
+    private readonly validationService: ValidationService,
   ) {}
 
 
@@ -43,7 +44,10 @@ export class CompanyController {
     @Query('endDate') endDate: string,
   ): Promise<any> {
     try {
-      // Validação e conversão das datas passadas como string para Date
+      // Valida formato e intervalo das datas
+      this.validationService.validateDateInterval(startDate, endDate);
+
+      // Conversão das datas passadas como string para Date
       const start = this.dateUtilsService.convertToDate(startDate, {
         useUTC: true,
         startHour: 6,
