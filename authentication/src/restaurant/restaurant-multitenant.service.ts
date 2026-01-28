@@ -8,6 +8,7 @@ import { DatabaseService } from '../database/database.service';
 import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { UnitKey, UNIT_CONFIGS } from '../database/database.interfaces';
+import { DateUtilsService } from '../utils/date-utils.service';
 import {
   UnifiedRestaurantKpiResponse,
   RestaurantBigNumbersData,
@@ -31,6 +32,7 @@ export class RestaurantMultitenantService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly kpiCacheService: KpiCacheService,
+    private readonly dateUtilsService: DateUtilsService,
   ) {}
 
   /**
@@ -41,8 +43,8 @@ export class RestaurantMultitenantService {
     endDate: string,
   ): Promise<UnifiedRestaurantKpiResponse> {
     const customDates = {
-      start: this.parseDate(startDate),
-      end: this.parseDate(endDate),
+      start: this.dateUtilsService.parseDate(startDate),
+      end: this.dateUtilsService.parseDate(endDate),
     };
 
     // Usa o cache service com TTL dinâmico
@@ -73,10 +75,10 @@ export class RestaurantMultitenantService {
     this.logger.log(`Buscando KPIs de Restaurant de ${connectedUnits.length} unidades...`);
 
     // Calcula período anterior (mesma duração, imediatamente antes)
-    const { previousStart, previousEnd } = this.calculatePreviousPeriod(startDate, endDate);
+    const { previousStart, previousEnd } = this.dateUtilsService.calculatePreviousPeriod(startDate, endDate);
 
     // Calcula período do mês atual para forecast (dia 1 às 06:00 até ontem às 05:59:59)
-    const { monthStart, monthEnd, daysElapsed, remainingDays, totalDaysInMonth } = this.calculateCurrentMonthPeriod();
+    const { monthStart, monthEnd, daysElapsed, remainingDays, totalDaysInMonth } = this.dateUtilsService.calculateCurrentMonthPeriod();
 
     // Executa queries em paralelo para cada unidade (período atual + anterior + mês atual para forecast)
     const unitDataPromises = connectedUnits.map((unit) =>
@@ -98,69 +100,6 @@ export class RestaurantMultitenantService {
     );
 
     return consolidated;
-  }
-
-  /**
-   * Calcula o período do mês atual para forecast
-   * Retorna: dia 1 às 06:00:00 até ontem às 05:59:59 (D+1)
-   */
-  private calculateCurrentMonthPeriod(): {
-    monthStart: string;
-    monthEnd: string;
-    daysElapsed: number;
-    remainingDays: number;
-    totalDaysInMonth: number;
-  } {
-    const now = new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const totalDaysInMonth = currentMonthEnd.getDate();
-
-    // Ontem (para calcular dias decorridos)
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const daysElapsed = yesterday.getDate();
-    const remainingDays = totalDaysInMonth - daysElapsed;
-
-    // Formata para DD/MM/YYYY
-    const monthStart = this.formatDateBR(currentMonthStart);
-    // O fim é ontem + 1 dia às 05:59:59, mas para a query usamos o dia seguinte a ontem
-    const dayAfterYesterday = new Date(yesterday);
-    dayAfterYesterday.setDate(dayAfterYesterday.getDate() + 1);
-    const monthEnd = this.formatDateBR(dayAfterYesterday);
-
-    return {
-      monthStart,
-      monthEnd,
-      daysElapsed,
-      remainingDays,
-      totalDaysInMonth,
-    };
-  }
-
-  /**
-   * Calcula o período anterior (mesma duração, imediatamente antes)
-   */
-  private calculatePreviousPeriod(startDate: string, endDate: string): { previousStart: string; previousEnd: string } {
-    const start = this.parseDate(startDate);
-    const end = this.parseDate(endDate);
-
-    // Duração em dias
-    const durationMs = end.getTime() - start.getTime();
-    const durationDays = Math.ceil(durationMs / (1000 * 60 * 60 * 24));
-
-    // Período anterior termina um dia antes do início atual
-    const previousEnd = new Date(start);
-    previousEnd.setDate(previousEnd.getDate() - 1);
-
-    // Período anterior começa (duração) dias antes do fim anterior
-    const previousStart = new Date(previousEnd);
-    previousStart.setDate(previousStart.getDate() - durationDays);
-
-    return {
-      previousStart: this.formatDateBR(previousStart),
-      previousEnd: this.formatDateBR(previousEnd),
-    };
   }
 
   /**
@@ -238,23 +177,23 @@ export class RestaurantMultitenantService {
       // Processa séries por data
       const revenueAbByDate = new Map<string, number>();
       for (const row of revenueAbResult.rows) {
-        revenueAbByDate.set(this.formatDateKey(row.date), parseFloat(row.total_ab_value) || 0);
+        revenueAbByDate.set(this.dateUtilsService.formatDateKey(row.date), parseFloat(row.total_ab_value) || 0);
       }
 
       const totalRevenueByDate = new Map<string, number>();
       for (const row of totalRevenueResult.rows) {
-        totalRevenueByDate.set(this.formatDateKey(row.date), parseFloat(row.total_revenue) || 0);
+        totalRevenueByDate.set(this.dateUtilsService.formatDateKey(row.date), parseFloat(row.total_revenue) || 0);
       }
 
       const salesByDate = new Map<string, number>();
       for (const row of salesWithAbResult.rows) {
-        salesByDate.set(this.formatDateKey(row.date), parseInt(row.rentals_with_ab) || 0);
+        salesByDate.set(this.dateUtilsService.formatDateKey(row.date), parseInt(row.rentals_with_ab) || 0);
       }
 
       // Contagem de locações com A&B por data (para ticket médio)
       const rentalsWithAbByDate = new Map<string, number>();
       for (const row of salesWithAbResult.rows) {
-        rentalsWithAbByDate.set(this.formatDateKey(row.date), parseInt(row.rentals_with_ab) || 0);
+        rentalsWithAbByDate.set(this.dateUtilsService.formatDateKey(row.date), parseInt(row.rentals_with_ab) || 0);
       }
 
       this.logger.log(`KPIs de Restaurant de ${UNIT_CONFIGS[unit].name} obtidos com sucesso`);
@@ -288,8 +227,8 @@ export class RestaurantMultitenantService {
     totalDaysInMonth: number,
   ): UnifiedRestaurantKpiResponse {
     // Calcula a diferença de dias para determinar se agrupa por mês ou por dia
-    const start = this.parseDate(startDate);
-    const end = this.parseDate(endDate);
+    const start = this.dateUtilsService.parseDate(startDate);
+    const end = this.dateUtilsService.parseDate(endDate);
     const rangeDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     const groupByMonth = rangeDays > 40;
 
@@ -581,8 +520,8 @@ export class RestaurantMultitenantService {
 
     for (const [dateKey, value] of dataMap.entries()) {
       const periodKey = groupByMonth
-        ? this.formatDateToMonth(dateKey)
-        : this.formatDateDisplay(dateKey);
+        ? this.dateUtilsService.formatDateToMonth(dateKey)
+        : this.dateUtilsService.formatDateDisplay(dateKey);
 
       const current = aggregated.get(periodKey) || 0;
       aggregated.set(periodKey, current + value);
@@ -597,8 +536,8 @@ export class RestaurantMultitenantService {
    */
   private generatePeriodRange(startDate: string, endDate: string, groupByMonth: boolean): string[] {
     const periods: string[] = [];
-    const start = this.parseDate(startDate);
-    const end = this.parseDate(endDate);
+    const start = this.dateUtilsService.parseDate(startDate);
+    const end = this.dateUtilsService.parseDate(endDate);
 
     if (groupByMonth) {
       // Agrupar por mês: gera array de meses no formato MM/YYYY
@@ -613,7 +552,7 @@ export class RestaurantMultitenantService {
       // Agrupar por dia: gera array de datas no formato DD/MM/YYYY
       const current = new Date(start);
       while (current <= end) {
-        periods.push(this.formatDateBR(current));
+        periods.push(this.dateUtilsService.formatDateBR(current));
         current.setDate(current.getDate() + 1);
       }
     }
@@ -626,65 +565,15 @@ export class RestaurantMultitenantService {
    */
   private generateDateRange(startDate: string, endDate: string): string[] {
     const dates: string[] = [];
-    const start = this.parseDate(startDate);
-    const end = this.parseDate(endDate);
+    const start = this.dateUtilsService.parseDate(startDate);
+    const end = this.dateUtilsService.parseDate(endDate);
 
     const current = new Date(start);
     while (current <= end) {
-      dates.push(this.formatDateKey(current));
+      dates.push(this.dateUtilsService.formatDateKey(current));
       current.setDate(current.getDate() + 1);
     }
 
     return dates;
-  }
-
-  /**
-   * Formata data para chave de mapa (YYYY-MM-DD)
-   */
-  private formatDateKey(date: Date | string): string {
-    if (typeof date === 'string') {
-      // Se já for string no formato correto
-      if (date.includes('-')) {
-        return date.split('T')[0];
-      }
-      // Se for DD/MM/YYYY
-      const [day, month, year] = date.split('/');
-      return `${year}-${month}-${day}`;
-    }
-    return date.toISOString().split('T')[0];
-  }
-
-  /**
-   * Formata data para exibição (DD/MM/YYYY)
-   */
-  private formatDateDisplay(dateKey: string): string {
-    const [year, month, day] = dateKey.split('-');
-    return `${day}/${month}/${year}`;
-  }
-
-  /**
-   * Formata data (YYYY-MM-DD) para mês (MM/YYYY)
-   */
-  private formatDateToMonth(dateKey: string): string {
-    const [year, month] = dateKey.split('-');
-    return `${month}/${year}`;
-  }
-
-  /**
-   * Formata Date para string DD/MM/YYYY
-   */
-  private formatDateBR(date: Date): string {
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  }
-
-  /**
-   * Converte string de data DD/MM/YYYY para Date
-   */
-  private parseDate(dateStr: string): Date {
-    const [day, month, year] = dateStr.split('/').map(Number);
-    return new Date(year, month - 1, day);
   }
 }

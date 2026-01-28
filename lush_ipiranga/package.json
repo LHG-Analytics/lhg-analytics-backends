@@ -24,6 +24,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@lhg/utils": "file:../lhg-utils",
     "@ljharb/through": "^2.3.14",
     "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^11.1.3",

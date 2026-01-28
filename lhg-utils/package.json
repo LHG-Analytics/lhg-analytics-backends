@@ -1,0 +1,32 @@
+{
+  "name": "@lhg/utils",
+  "version": "1.0.0",
+  "description": "Utilitários compartilhados para os backends do LHG Analytics",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "lhg",
+    "analytics",
+    "utils",
+    "date"
+  ],
+  "author": "LHG Analytics Team",
+  "license": "UNLICENSED",
+  "peerDependencies": {
+    "@nestjs/common": "^10.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}

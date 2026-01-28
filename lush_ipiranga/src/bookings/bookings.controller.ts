@@ -20,6 +20,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Units } from '../auth/units.decorator';
 import { UnitsGuard } from '../auth/units.guard';
 import { BookingsService } from './bookings.service';
+import { DateUtilsService } from '@lhg/utils';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
@@ -28,7 +29,10 @@ import { BookingsService } from './bookings.service';
 @Units('LHG', 'LUSH_IPIRANGA')
 @Controller('Bookings')
 export class BookingsController {
-  constructor(private readonly bookingsService: BookingsService) {}
+  constructor(
+    private readonly bookingsService: BookingsService,
+    private readonly dateUtilsService: DateUtilsService,
+  ) {}
 
   @Get('bookings/date-range')
   @ApiQuery({
@@ -52,8 +56,13 @@ export class BookingsController {
   ): Promise<any> {
     try {
       // Validação e conversão das datas passadas como string para Date
-      const start = this.convertToDate(startDate); // Início
-      const end = this.convertToDate(endDate, true); // Fim, com ajuste de horário
+      const start = this.dateUtilsService.convertToDate(startDate, {
+        useUTC: true,
+      });
+      const end = this.dateUtilsService.convertToDate(endDate, {
+        isEndDate: true,
+        useUTC: true,
+      });
 
       if (!start || !end) {
         throw new BadRequestException(
@@ -67,31 +76,5 @@ export class BookingsController {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(`Failed to fetch KPIs: ${errorMessage}`);
     }
-  }
-
-  private convertToDate(dateStr?: string, isEndDate: boolean = false): Date | undefined {
-    if (!dateStr) return undefined;
-
-    const [day, month, year] = dateStr.split('/').map(Number);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) {
-      throw new BadRequestException('Invalid date format. Please use DD/MM/YYYY.');
-    }
-
-    // Cria a nova data no formato YYYY-MM-DD
-    const date = new Date(year, month - 1, day);
-    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
-      throw new BadRequestException(
-        'Invalid date. Please ensure it is a valid date in the format DD/MM/YYYY.',
-      );
-    }
-
-    // Ajusta as horas conforme necessário (00:00:00 às 23:59:59 para reservas)
-    if (isEndDate) {
-      date.setUTCHours(23, 59, 59, 999); // Define o final às 23:59:59.999
-    } else {
-      date.setUTCHours(0, 0, 0, 0); // Define o início às 00:00
-    }
-
-    return date;
   }
 }

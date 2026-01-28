@@ -9,6 +9,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CacheModule } from './cache/cache.module';
 import { DatabaseModule } from './database/database.module';
+import { UtilsModule } from './utils/utils.module';
 import { CompanyModule } from './company/company.module';
 import { RestaurantModule } from './restaurant/restaurant.module';
 import { BookingsModule } from './bookings/bookings.module';
@@ -25,6 +26,7 @@ import { GovernanceModule } from './governance/governance.module';
     ]),
     CacheModule,
     DatabaseModule,
+    UtilsModule,
     CompanyModule,
     RestaurantModule,
     BookingsModule,

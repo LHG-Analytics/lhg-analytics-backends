@@ -11,9 +11,11 @@ import { BookingsModule } from './bookings/bookings.module';
 import { RestaurantModule } from './restaurant/restaurant.module';
 import { CacheModule } from './cache/cache.module';
 import { AuthModule } from './auth/auth.module';
+import { DateUtilsModule } from '@lhg/utils';
 
 @Module({
   imports: [
+    DateUtilsModule, // Utilitários compartilhados de data
     CacheModule, // Módulo de cache para KPIs real-time
     ThrottlerModule.forRoot([
       {

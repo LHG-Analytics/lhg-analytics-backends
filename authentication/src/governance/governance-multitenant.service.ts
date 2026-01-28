@@ -8,6 +8,7 @@ import { DatabaseService } from '../database/database.service';
 import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { UnitKey, UNIT_CONFIGS } from '../database/database.interfaces';
+import { DateUtilsService } from '../utils/date-utils.service';
 import {
   UnifiedGovernanceKpiResponse,
   GovernanceBigNumbersData,
@@ -31,6 +32,7 @@ export class GovernanceMultitenantService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly kpiCacheService: KpiCacheService,
+    private readonly dateUtilsService: DateUtilsService,
   ) {}
 
   /**
@@ -41,8 +43,8 @@ export class GovernanceMultitenantService {
     endDate: string,
   ): Promise<UnifiedGovernanceKpiResponse> {
     const customDates = {
-      start: this.parseDate(startDate),
-      end: this.parseDate(endDate),
+      start: this.dateUtilsService.parseDate(startDate),
+      end: this.dateUtilsService.parseDate(endDate),
     };
 
     // Usa o cache service com TTL dinâmico
@@ -77,7 +79,7 @@ export class GovernanceMultitenantService {
     );
 
     // Calcula período anterior (mesma duração, imediatamente antes)
-    const { previousStart, previousEnd } = this.calculatePreviousPeriod(
+    const { previousStart, previousEnd } = this.dateUtilsService.calculatePreviousPeriod(
       startDate,
       endDate,
     );
@@ -89,12 +91,12 @@ export class GovernanceMultitenantService {
       daysElapsed,
       remainingDays,
       totalDaysInMonth,
-    } = this.calculateCurrentMonthPeriod();
+    } = this.dateUtilsService.calculateCurrentMonthPeriod();
 
     // Calcula total de dias do período selecionado
-    const totalDaysInPeriod = this.calculateTotalDays(startDate, endDate);
-    const previousDays = this.calculateTotalDays(previousStart, previousEnd);
-    const monthlyDays = this.calculateTotalDays(monthStart, monthEnd);
+    const totalDaysInPeriod = this.dateUtilsService.calculateTotalDays(startDate, endDate);
+    const previousDays = this.dateUtilsService.calculateTotalDays(previousStart, previousEnd);
+    const monthlyDays = this.dateUtilsService.calculateTotalDays(monthStart, monthEnd);
 
     // Executa queries em paralelo para cada unidade (período atual + anterior + mês atual para forecast)
     const unitDataPromises = connectedUnits.map((unit) =>
@@ -136,79 +138,6 @@ export class GovernanceMultitenantService {
     );
 
     return consolidated;
-  }
-
-  /**
-   * Calcula total de dias do período
-   */
-  private calculateTotalDays(startDate: string, endDate: string): number {
-    const start = this.parseDate(startDate);
-    const end = this.parseDate(endDate);
-    const diffTime = end.getTime() - start.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  }
-
-  /**
-   * Calcula o período do mês atual para forecast
-   * Retorna: dia 1 às 06:00:00 até ontem às 05:59:59 (D+1)
-   */
-  private calculateCurrentMonthPeriod(): {
-    monthStart: string;
-    monthEnd: string;
-    daysElapsed: number;
-    remainingDays: number;
-    totalDaysInMonth: number;
-  } {
-    const now = new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const totalDaysInMonth = currentMonthEnd.getDate();
-
-    // Ontem (para calcular dias decorridos)
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const daysElapsed = yesterday.getDate();
-    const remainingDays = totalDaysInMonth - daysElapsed;
-
-    // Formata para DD/MM/YYYY
-    const monthStart = this.formatDateBR(currentMonthStart);
-    const monthEnd = this.formatDateBR(yesterday);
-
-    return {
-      monthStart,
-      monthEnd,
-      daysElapsed,
-      remainingDays,
-      totalDaysInMonth,
-    };
-  }
-
-  /**
-   * Calcula o período anterior (mesma duração, imediatamente antes)
-   */
-  private calculatePreviousPeriod(
-    startDate: string,
-    endDate: string,
-  ): { previousStart: string; previousEnd: string } {
-    const start = this.parseDate(startDate);
-    const end = this.parseDate(endDate);
-
-    // Duração em dias
-    const durationMs = end.getTime() - start.getTime();
-    const durationDays = Math.ceil(durationMs / (1000 * 60 * 60 * 24));
-
-    // Período anterior termina um dia antes do início atual
-    const previousEnd = new Date(start);
-    previousEnd.setDate(previousEnd.getDate() - 1);
-
-    // Período anterior começa (duração) dias antes do fim anterior
-    const previousStart = new Date(previousEnd);
-    previousStart.setDate(previousStart.getDate() - durationDays);
-
-    return {
-      previousStart: this.formatDateBR(previousStart),
-      previousEnd: this.formatDateBR(previousEnd),
-    };
   }
 
   /**
@@ -265,7 +194,7 @@ export class GovernanceMultitenantService {
 
       // Processa BigNumbers anterior
       const bnPrev = bigNumbersPrevResult.rows[0] || {};
-      const previousDays = this.calculateTotalDays(previousStart, previousEnd);
+      const previousDays = this.dateUtilsService.calculateTotalDays(previousStart, previousEnd);
       const bigNumbersPrevious: UnitGovernanceBigNumbers = {
         totalCleanings: parseInt(bnPrev.total_cleanings) || 0,
         totalInspections: parseInt(bnPrev.total_inspections) || 0,
@@ -274,7 +203,7 @@ export class GovernanceMultitenantService {
 
       // Processa BigNumbers do mês atual (para forecast)
       const bnMonthly = bigNumbersMonthlyResult.rows[0] || {};
-      const monthlyDays = this.calculateTotalDays(monthStart, monthEnd);
+      const monthlyDays = this.dateUtilsService.calculateTotalDays(monthStart, monthEnd);
       const bigNumbersMonthly: UnitGovernanceBigNumbers = {
         totalCleanings: parseInt(bnMonthly.total_cleanings) || 0,
         totalInspections: parseInt(bnMonthly.total_inspections) || 0,
@@ -689,23 +618,5 @@ export class GovernanceMultitenantService {
     }
 
     return { categories, series };
-  }
-
-  /**
-   * Formata Date para string DD/MM/YYYY
-   */
-  private formatDateBR(date: Date): string {
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  }
-
-  /**
-   * Converte string de data DD/MM/YYYY para Date
-   */
-  private parseDate(dateStr: string): Date {
-    const [day, month, year] = dateStr.split('/').map(Number);
-    return new Date(year, month - 1, day);
   }
 }

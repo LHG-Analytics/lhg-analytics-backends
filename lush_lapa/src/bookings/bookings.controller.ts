@@ -7,6 +7,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { UnitsGuard } from '../auth/units.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Units } from '../auth/units.decorator';
+import { DateUtilsService } from '@lhg/utils';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
@@ -15,7 +16,10 @@ import { Units } from '../auth/units.decorator';
 @Units('LHG', 'LUSH_LAPA')
 @Controller('Bookings')
 export class BookingsController {
-  constructor(private readonly bookingsService: BookingsService) {}
+  constructor(
+    private readonly bookingsService: BookingsService,
+    private readonly dateUtilsService: DateUtilsService,
+  ) {}
 
 
   @Get('bookings/date-range')
@@ -40,8 +44,19 @@ export class BookingsController {
   ): Promise<any> {
     try {
       // Validação e conversão das datas passadas como string para Date
-      const start = this.convertToDate(startDate); // Início
-      const end = this.convertToDate(endDate, true); // Fim, com ajuste de horário
+      const start = this.dateUtilsService.convertToDate(startDate, {
+        useUTC: true,
+        startHour: 6,
+        startMinute: 0,
+        startSecond: 0,
+      });
+      const end = this.dateUtilsService.convertToDate(endDate, {
+        isEndDate: true,
+        useUTC: true,
+        endHour: 5,
+        endMinute: 59,
+        endSecond: 59,
+      });
 
       if (!start || !end) {
         throw new BadRequestException(
@@ -55,31 +70,5 @@ export class BookingsController {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(`Failed to fetch KPIs: ${errorMessage}`);
     }
-  }
-
-  private convertToDate(dateStr?: string, isEndDate: boolean = false): Date | undefined {
-    if (!dateStr) return undefined;
-
-    const [day, month, year] = dateStr.split('/').map(Number);
-    if (isNaN(day) || isNaN(month) || isNaN(year)) {
-      throw new BadRequestException('Invalid date format. Please use DD/MM/YYYY.');
-    }
-
-    // Cria a nova data no formato YYYY-MM-DD
-    const date = new Date(year, month - 1, day);
-    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
-      throw new BadRequestException(
-        'Invalid date. Please ensure it is a valid date in the format DD/MM/YYYY.',
-      );
-    }
-
-    // Ajusta as horas conforme necessário
-    if (isEndDate) {
-      date.setUTCHours(5, 59, 59, 999); // Define o final às 05:59:59.999
-    } else {
-      date.setUTCHours(6, 0, 0, 0); // Define o início às 06:00
-    }
-
-    return date;
   }
 }
