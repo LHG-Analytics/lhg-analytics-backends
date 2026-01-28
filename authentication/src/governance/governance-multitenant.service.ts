@@ -9,6 +9,7 @@ import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { UnitKey, UNIT_CONFIGS } from '../database/database.interfaces';
 import { DateUtilsService } from '../utils/date-utils.service';
+import { ConcurrencyUtilsService } from '@lhg/utils';
 import {
   UnifiedGovernanceKpiResponse,
   GovernanceBigNumbersData,
@@ -33,6 +34,7 @@ export class GovernanceMultitenantService {
     private readonly databaseService: DatabaseService,
     private readonly kpiCacheService: KpiCacheService,
     private readonly dateUtilsService: DateUtilsService,
+    private readonly concurrencyUtils: ConcurrencyUtilsService,
   ) {}
 
   /**
@@ -99,8 +101,9 @@ export class GovernanceMultitenantService {
     const monthlyDays = this.dateUtilsService.calculateTotalDays(monthStart, monthEnd);
 
     // Executa queries em paralelo para cada unidade (período atual + anterior + mês atual para forecast)
-    const unitDataPromises = connectedUnits.map((unit) =>
-      this.fetchUnitKpis(
+    // Limita a 2 unidades simultâneas para evitar sobrecarga do banco de dados
+    const unitDataTasks = connectedUnits.map((unit) =>
+      () => this.fetchUnitKpis(
         unit,
         startDate,
         endDate,
@@ -112,7 +115,7 @@ export class GovernanceMultitenantService {
       ),
     );
 
-    const unitResults = await Promise.all(unitDataPromises);
+    const unitResults = await this.concurrencyUtils.executeWithLimit(unitDataTasks, 2);
     const validResults = unitResults.filter(
       (r) => r !== null,
     ) as UnitGovernanceKpiData[];
@@ -155,34 +158,37 @@ export class GovernanceMultitenantService {
   ): Promise<UnitGovernanceKpiData | null> {
     try {
       // Executa todas as queries em paralelo para a unidade (atual + anterior + mês atual + por dia)
+      // Governance tem menos queries, então pode usar limite maior
+      const queryTasks = [
+        () => this.databaseService.query(
+          unit,
+          getGovernanceBigNumbersSQL(unit, startDate, endDate),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getGovernanceBigNumbersSQL(unit, previousStart, previousEnd),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getGovernanceBigNumbersSQL(unit, monthStart, monthEnd),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getShiftCleaningSQL(unit, startDate, endDate),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getShiftCleaningByDaySQL(unit, startDate, endDate),
+        ),
+      ];
+
       const [
         bigNumbersResult,
         bigNumbersPrevResult,
         bigNumbersMonthlyResult,
         shiftCleaningResult,
         shiftCleaningByDayResult,
-      ] = await Promise.all([
-        this.databaseService.query(
-          unit,
-          getGovernanceBigNumbersSQL(unit, startDate, endDate),
-        ),
-        this.databaseService.query(
-          unit,
-          getGovernanceBigNumbersSQL(unit, previousStart, previousEnd),
-        ),
-        this.databaseService.query(
-          unit,
-          getGovernanceBigNumbersSQL(unit, monthStart, monthEnd),
-        ),
-        this.databaseService.query(
-          unit,
-          getShiftCleaningSQL(unit, startDate, endDate),
-        ),
-        this.databaseService.query(
-          unit,
-          getShiftCleaningByDaySQL(unit, startDate, endDate),
-        ),
-      ]);
+      ] = await this.concurrencyUtils.executeWithLimit(queryTasks, 5);
 
       // Processa BigNumbers atual
       const bn = bigNumbersResult.rows[0] || {};

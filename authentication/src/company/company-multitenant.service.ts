@@ -9,6 +9,7 @@ import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { UnitKey, UNIT_CONFIGS } from '../database/database.interfaces';
 import { DateUtilsService } from '../utils/date-utils.service';
+import { ConcurrencyUtilsService } from '@lhg/utils';
 import {
   UnifiedCompanyKpiResponse,
   BigNumbersDataSQL,
@@ -54,6 +55,7 @@ export class CompanyMultitenantService {
     private readonly databaseService: DatabaseService,
     private readonly kpiCacheService: KpiCacheService,
     private readonly dateUtilsService: DateUtilsService,
+    private readonly concurrencyUtils: ConcurrencyUtilsService,
   ) {}
 
   /**
@@ -113,8 +115,9 @@ export class CompanyMultitenantService {
     } = this.dateUtilsService.calculateCurrentMonthPeriod();
 
     // Executa queries em paralelo para cada unidade (período atual + anterior + mês atual para forecast)
-    const unitDataPromises = connectedUnits.map((unit) =>
-      this.fetchUnitKpis(
+    // Limita a 2 unidades simultâneas para evitar sobrecarga do banco de dados
+    const unitDataTasks = connectedUnits.map((unit) =>
+      () => this.fetchUnitKpis(
         unit,
         startDate,
         endDate,
@@ -125,7 +128,10 @@ export class CompanyMultitenantService {
       ),
     );
 
-    const unitResults = await Promise.all(unitDataPromises);
+    const unitResults = await this.concurrencyUtils.executeWithLimit(
+      unitDataTasks,
+      2, // Máx 2 unidades simultâneas (cada unidade executa ~12 queries internamente)
+    );
     const validResults = unitResults.filter((r) => r !== null) as UnitKpiData[];
 
     if (validResults.length === 0) {
@@ -163,6 +169,55 @@ export class CompanyMultitenantService {
   ): Promise<UnitKpiData | null> {
     try {
       // Executa todas as queries em paralelo para a unidade (atual + anterior + mês atual + vendas diretas)
+      // Limita a 5 queries simultâneas por unidade para evitar sobrecarga
+      const queryTasks = [
+        () => this.databaseService.query(
+          unit,
+          getBigNumbersSQL(unit, startDate, endDate),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getBigNumbersSQL(unit, previousStart, previousEnd),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getBigNumbersSQL(unit, monthStart, monthEnd),
+        ),
+        // Vendas diretas para cada período (igual ao individual)
+        () => this.databaseService.query(
+          unit,
+          getSaleDirectSQL(unit, startDate, endDate),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getSaleDirectSQL(unit, previousStart, previousEnd),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getSaleDirectSQL(unit, monthStart, monthEnd),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getRevenueByDateSQL(unit, startDate, endDate),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getRentalsByDateSQL(unit, startDate, endDate),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getTrevparByDateSQL(unit, startDate, endDate),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getOccupancyRateByDateSQL(unit, startDate, endDate),
+        ),
+        () => this.databaseService.query(
+          unit,
+          getGiroByDateSQL(unit, startDate, endDate),
+        ),
+      ];
+
       const [
         bigNumbersResult,
         bigNumbersPrevResult,
@@ -175,53 +230,7 @@ export class CompanyMultitenantService {
         trevparResult,
         occupancyResult,
         giroResult,
-      ] = await Promise.all([
-        this.databaseService.query(
-          unit,
-          getBigNumbersSQL(unit, startDate, endDate),
-        ),
-        this.databaseService.query(
-          unit,
-          getBigNumbersSQL(unit, previousStart, previousEnd),
-        ),
-        this.databaseService.query(
-          unit,
-          getBigNumbersSQL(unit, monthStart, monthEnd),
-        ),
-        // Vendas diretas para cada período (igual ao individual)
-        this.databaseService.query(
-          unit,
-          getSaleDirectSQL(unit, startDate, endDate),
-        ),
-        this.databaseService.query(
-          unit,
-          getSaleDirectSQL(unit, previousStart, previousEnd),
-        ),
-        this.databaseService.query(
-          unit,
-          getSaleDirectSQL(unit, monthStart, monthEnd),
-        ),
-        this.databaseService.query(
-          unit,
-          getRevenueByDateSQL(unit, startDate, endDate),
-        ),
-        this.databaseService.query(
-          unit,
-          getRentalsByDateSQL(unit, startDate, endDate),
-        ),
-        this.databaseService.query(
-          unit,
-          getTrevparByDateSQL(unit, startDate, endDate),
-        ),
-        this.databaseService.query(
-          unit,
-          getOccupancyRateByDateSQL(unit, startDate, endDate),
-        ),
-        this.databaseService.query(
-          unit,
-          getGiroByDateSQL(unit, startDate, endDate),
-        ),
-      ]);
+      ] = await this.concurrencyUtils.executeWithLimit(queryTasks, 5);
 
       // Processa vendas diretas (igual ao individual: totalAllValue = locação + vendas diretas)
       const sd = saleDirectResult.rows[0] || {};

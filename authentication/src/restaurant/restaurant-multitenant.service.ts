@@ -9,6 +9,7 @@ import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { UnitKey, UNIT_CONFIGS } from '../database/database.interfaces';
 import { DateUtilsService } from '../utils/date-utils.service';
+import { ConcurrencyUtilsService } from '@lhg/utils';
 import {
   UnifiedRestaurantKpiResponse,
   RestaurantBigNumbersData,
@@ -33,6 +34,7 @@ export class RestaurantMultitenantService {
     private readonly databaseService: DatabaseService,
     private readonly kpiCacheService: KpiCacheService,
     private readonly dateUtilsService: DateUtilsService,
+    private readonly concurrencyUtils: ConcurrencyUtilsService,
   ) {}
 
   /**
@@ -81,11 +83,12 @@ export class RestaurantMultitenantService {
     const { monthStart, monthEnd, daysElapsed, remainingDays, totalDaysInMonth } = this.dateUtilsService.calculateCurrentMonthPeriod();
 
     // Executa queries em paralelo para cada unidade (período atual + anterior + mês atual para forecast)
-    const unitDataPromises = connectedUnits.map((unit) =>
-      this.fetchUnitKpis(unit, startDate, endDate, previousStart, previousEnd, monthStart, monthEnd),
+    // Limita a 2 unidades simultâneas para evitar sobrecarga do banco de dados
+    const unitDataTasks = connectedUnits.map((unit) =>
+      () => this.fetchUnitKpis(unit, startDate, endDate, previousStart, previousEnd, monthStart, monthEnd),
     );
 
-    const unitResults = await Promise.all(unitDataPromises);
+    const unitResults = await this.concurrencyUtils.executeWithLimit(unitDataTasks, 2);
     const validResults = unitResults.filter((r) => r !== null) as UnitRestaurantKpiData[];
 
     if (validResults.length === 0) {
@@ -116,6 +119,19 @@ export class RestaurantMultitenantService {
   ): Promise<UnitRestaurantKpiData | null> {
     try {
       // Executa todas as queries em paralelo para a unidade (atual + anterior + mês atual)
+      // Limita a 5 queries simultâneas por unidade para evitar sobrecarga
+      const queryTasks = [
+        () => this.databaseService.query(unit, getRestaurantBigNumbersSQL(unit, startDate, endDate)),
+        () => this.databaseService.query(unit, getRestaurantBigNumbersSQL(unit, previousStart, previousEnd)),
+        () => this.databaseService.query(unit, getRestaurantBigNumbersSQL(unit, monthStart, monthEnd)),
+        () => this.databaseService.query(unit, getTotalSalesAndRevenueSQL(unit, startDate, endDate)),
+        () => this.databaseService.query(unit, getTotalSalesAndRevenueSQL(unit, previousStart, previousEnd)),
+        () => this.databaseService.query(unit, getTotalSalesAndRevenueSQL(unit, monthStart, monthEnd)),
+        () => this.databaseService.query(unit, getRevenueAbByDateSQL(unit, startDate, endDate)),
+        () => this.databaseService.query(unit, getTotalRevenueByDateSQL(unit, startDate, endDate)),
+        () => this.databaseService.query(unit, getSalesWithAbByDateSQL(unit, startDate, endDate)),
+      ];
+
       const [
         bigNumbersResult,
         bigNumbersPrevResult,
@@ -126,17 +142,7 @@ export class RestaurantMultitenantService {
         revenueAbResult,
         totalRevenueResult,
         salesWithAbResult,
-      ] = await Promise.all([
-        this.databaseService.query(unit, getRestaurantBigNumbersSQL(unit, startDate, endDate)),
-        this.databaseService.query(unit, getRestaurantBigNumbersSQL(unit, previousStart, previousEnd)),
-        this.databaseService.query(unit, getRestaurantBigNumbersSQL(unit, monthStart, monthEnd)),
-        this.databaseService.query(unit, getTotalSalesAndRevenueSQL(unit, startDate, endDate)),
-        this.databaseService.query(unit, getTotalSalesAndRevenueSQL(unit, previousStart, previousEnd)),
-        this.databaseService.query(unit, getTotalSalesAndRevenueSQL(unit, monthStart, monthEnd)),
-        this.databaseService.query(unit, getRevenueAbByDateSQL(unit, startDate, endDate)),
-        this.databaseService.query(unit, getTotalRevenueByDateSQL(unit, startDate, endDate)),
-        this.databaseService.query(unit, getSalesWithAbByDateSQL(unit, startDate, endDate)),
-      ]);
+      ] = await this.concurrencyUtils.executeWithLimit(queryTasks, 5);
 
       // Processa BigNumbers atual
       const bn = bigNumbersResult.rows[0] || {};

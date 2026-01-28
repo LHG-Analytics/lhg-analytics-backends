@@ -11,13 +11,14 @@ import { BookingsModule } from './bookings/bookings.module';
 import { RestaurantModule } from './restaurant/restaurant.module';
 import { CacheModule } from './cache/cache.module';
 import { AuthModule } from './auth/auth.module';
-import { DateUtilsModule, ValidationModule, QueryUtilsModule } from '@lhg/utils';
+import { DateUtilsModule, ValidationModule, QueryUtilsModule, ConcurrencyUtilsModule } from '@lhg/utils';
 
 @Module({
   imports: [
     DateUtilsModule, // Utilitários compartilhados de data
     ValidationModule, // Utilitários compartilhados de validação
     QueryUtilsModule, // Utilitários compartilhados de query
+    ConcurrencyUtilsModule, // Utilitários de controle de concorrência
     CacheModule, // Módulo de cache para KPIs real-time
     ThrottlerModule.forRoot([
       {

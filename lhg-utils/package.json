@@ -23,10 +23,14 @@
   "devDependencies": {
     "@nestjs/common": "^10.0.0",
     "@types/node": "^20.0.0",
+    "@types/p-limit": "^2.1.0",
     "typescript": "^5.0.0"
   },
   "files": [
     "dist",
     "README.md"
-  ]
+  ],
+  "dependencies": {
+    "p-limit": "^7.2.0"
+  }
 }
