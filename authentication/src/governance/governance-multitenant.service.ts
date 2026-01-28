@@ -513,10 +513,12 @@ export class GovernanceMultitenantService {
 
     // --- Cálculos período atual ---
     const avgDailyCleaning = totalDays > 0 ? totalCleanings / totalDays : 0;
+    const avgDailyCleaningRounded = Math.round(avgDailyCleaning);
 
     // --- Cálculos período anterior ---
     const avgDailyCleaningPrev =
       totalDaysPrev > 0 ? totalCleaningsPrev / totalDaysPrev : 0;
+    const avgDailyCleaningPrevRounded = Math.round(avgDailyCleaningPrev);
 
     // --- Cálculos forecast mensal ---
     let forecastCleanings = 0;
@@ -538,24 +540,24 @@ export class GovernanceMultitenantService {
       forecastAvgDailyCleaning = forecastCleanings / totalDaysInMonth;
     }
 
+    const forecastAvgDailyCleaningRounded = Math.round(
+      forecastAvgDailyCleaning,
+    );
+
     return {
       currentDate: {
         totalAllSuitesCleanings: totalCleanings,
-        totalAllAverageDailyCleaning: Number(avgDailyCleaning.toFixed(2)),
+        totalAllAverageDailyCleaning: avgDailyCleaningRounded,
         totalAllInspections: totalInspections,
       },
       previousDate: {
         totalAllSuitesCleaningsPreviousData: totalCleaningsPrev,
-        totalAllAverageDailyCleaningPreviousData: Number(
-          avgDailyCleaningPrev.toFixed(2),
-        ),
+        totalAllAverageDailyCleaningPreviousData: avgDailyCleaningPrevRounded,
         totalAllInspectionsPreviousData: totalInspectionsPrev,
       },
       monthlyForecast: {
         totalAllSuitesCleaningsForecast: forecastCleanings,
-        totalAllAverageDailyCleaningForecast: Number(
-          forecastAvgDailyCleaning.toFixed(2),
-        ),
+        totalAllAverageDailyCleaningForecast: forecastAvgDailyCleaningRounded,
         totalAllInspectionsForecast: forecastInspections,
       },
     };

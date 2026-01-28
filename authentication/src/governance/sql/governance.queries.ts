@@ -69,7 +69,7 @@ export function getGovernanceBigNumbersSQL(
       JOIN "funcionario" f ON f."id" = u."id_funcionario"
       WHERE va."datainicio" BETWEEN '${startTimestamp}' AND '${endTimestamp}'
         AND va."motivofim" = 'APROVADA'
-        AND f."id_cargo" IN (24, 6)
+        AND f."id_cargo" IN (24, 6, 19, 2)
     )
     SELECT
       c.total_cleanings,
