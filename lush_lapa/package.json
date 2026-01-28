@@ -9,7 +9,7 @@
     "clean": "rimraf dist",
     "generate": "npx prisma generate --schema=./prisma-schemas/lush_lapa_local/schema.local1.prisma",
     "postinstall": "npm run generate",
-    "build": "cd ../lhg-utils && npm run build && cd ../lush_lapa && npm run generate && tsc -p tsconfig.build.json && cp -r dist/generated dist/lush_lapa/src/generated 2>/dev/null || xcopy /E /I /Y dist\\generated dist\\lush_lapa\\src\\generated",
+    "build": "cd ../lhg-utils && npm run build && cd ../lush_lapa && npm run generate && tsc -p tsconfig.build.json && mkdir -p dist/lush_lapa/src && cp -r dist/generated dist/lush_lapa/src/generated",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node -r module-alias/register dist/main.js",
     "start:dev": "nodemon --exec ts-node -r tsconfig-paths/register src/main.ts",
