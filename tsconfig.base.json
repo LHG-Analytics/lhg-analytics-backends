@@ -16,6 +16,7 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
+      "@lhg/*": ["lhg-utils/src/*"],
       "@auth/*": ["authentication/src/*"],
       "@/*": ["./*"]
     }

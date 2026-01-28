@@ -4,6 +4,7 @@
   "description": "Backend services for LHG Analytics",
   "private": true,
   "workspaces": [
+    "lhg-utils",
     "lush_ipiranga",
     "lush_lapa",
     "tout",
@@ -48,7 +49,9 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.7",
+    "@nx/js": "^22.4.2",
     "@types/passport-jwt": "^4.0.1",
+    "nx": "22.4.2",
     "prisma": "^6.7.0",
     "rimraf": "^6.0.1"
   }

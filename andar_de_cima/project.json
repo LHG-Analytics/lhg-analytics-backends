@@ -1,0 +1,24 @@
+{
+  "name": "andar-de-cima",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "andar_de_cima/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run build",
+        "cwd": "andar_de_cima"
+      },
+      "dependsOn": ["@lhg/utils:build"]
+    },
+    "start:dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run start:dev",
+        "cwd": "andar_de_cima"
+      }
+    }
+  },
+  "tags": ["app", "backend"]
+}

@@ -39,3 +39,7 @@ node_modules
 tsconfig.tsbuildinfo
 .claude
 audit
+
+
+.nx/cache
+.nx/workspace-data
