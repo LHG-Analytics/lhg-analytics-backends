@@ -7,6 +7,7 @@
  */
 
 import { UnitKey } from '../../database/database.interfaces';
+import { QueryUtilsService } from '@lhg/utils';
 
 // Configuração de tipos de produtos A&B por unidade
 export interface UnitABConfig {
@@ -39,45 +40,37 @@ export const UNIT_AB_CONFIGS: Record<UnitKey, UnitABConfig> = {
 };
 
 /**
- * Formata data DD/MM/YYYY para YYYY-MM-DD
+ * Formata data DD/MM/YYYY para YYYY-MM-DD usando QueryUtilsService
  */
 export function formatDateForSQL(dateStr: string): string {
-  const [day, month, year] = dateStr.split('/');
-  return `${year}-${month}-${day}`;
+  return QueryUtilsService.formatDateStrToSQLDate(dateStr);
 }
 
 /**
  * Calcula os timestamps de início e fim considerando o corte das 6h
- * startDate 06:00:00 até endDate+1 05:59:59
- * CORRIGIDO: Usa Date.UTC para evitar problemas de timezone
+ * startDate 06:00:00 até endDate+1 05:59:59 usando QueryUtilsService
  */
 export function getDateRangeWithCutoff(
   startDate: string,
   endDate: string,
 ): { startTimestamp: string; endTimestamp: string } {
-  const formattedStart = formatDateForSQL(startDate);
+  const formattedStart = QueryUtilsService.formatDateStrToSQLDate(startDate);
+  const formattedEnd = QueryUtilsService.formatDateStrToSQLDate(endDate);
 
-  // Parse endDate para calcular D+1 usando UTC para evitar problemas de timezone
-  const [day, month, year] = endDate.split('/').map(Number);
-  const endDateUTC = new Date(Date.UTC(year, month - 1, day));
-  endDateUTC.setUTCDate(endDateUTC.getUTCDate() + 1); // D+1 em UTC
-
-  // Formata manualmente para evitar conversão de timezone
-  const nextYear = endDateUTC.getUTCFullYear();
-  const nextMonth = String(endDateUTC.getUTCMonth() + 1).padStart(2, '0');
-  const nextDay = String(endDateUTC.getUTCDate()).padStart(2, '0');
+  // Calcula D+1 usando QueryUtilsService
+  const nextDay = QueryUtilsService.getNextDay(formattedEnd);
 
   return {
-    startTimestamp: `${formattedStart} 06:00:00`,
-    endTimestamp: `${nextYear}-${nextMonth}-${nextDay} 05:59:59`,
+    startTimestamp: QueryUtilsService.createSQLTimestamp(formattedStart, '06:00:00'),
+    endTimestamp: QueryUtilsService.createSQLTimestamp(nextDay, '05:59:59'),
   };
 }
 
 /**
- * Obtém os IDs de produtos A&B formatados para SQL IN clause
+ * Obtém os IDs de produtos A&B formatados para SQL IN clause usando QueryUtilsService
  */
 export function getAbProductIds(unit: UnitKey): string {
-  return UNIT_AB_CONFIGS[unit].abProductTypes.join(',');
+  return QueryUtilsService.sanitizeIdList(UNIT_AB_CONFIGS[unit].abProductTypes);
 }
 
 

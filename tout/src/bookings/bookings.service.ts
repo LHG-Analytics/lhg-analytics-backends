@@ -4,12 +4,14 @@ import * as moment from 'moment-timezone';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { KpiCacheService } from '../cache/kpi-cache.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { QueryUtilsService } from '@lhg/utils';
 
 @Injectable()
 export class BookingsService {
   constructor(
     private prisma: PrismaService,
     private kpiCacheService: KpiCacheService,
+    private queryUtils: QueryUtilsService,
   ) {}
 
   async calculateKpibyDateRangeSQL(startDate: Date, endDate: Date): Promise<any> {
@@ -181,15 +183,12 @@ export class BookingsService {
    * Chamado pelo cache service quando há cache miss
    */
   private async _calculateKpibyDateRangeSQLInternal(startDate: Date, endDate: Date): Promise<any> {
-    const formattedStart = moment
-      .utc(startDate)
-      .set({ hour: 0, minute: 0, second: 0 })
-      .format('YYYY-MM-DD HH:mm:ss');
+    // Formatação segura de datas usando QueryUtilsService
+    const startForDate = moment.utc(startDate).set({ hour: 0, minute: 0, second: 0 }).toDate();
+    const endForDate = moment.utc(endDate).set({ hour: 23, minute: 59, second: 59 }).toDate();
 
-    const formattedEnd = moment
-      .utc(endDate)
-      .set({ hour: 23, minute: 59, second: 59 })
-      .format('YYYY-MM-DD HH:mm:ss');
+    const formattedStart = this.queryUtils.formatDateToSQL(startForDate);
+    const formattedEnd = this.queryUtils.formatDateToSQL(endForDate);
 
     const totalBookingRevenueSQL = `
   SELECT

@@ -4,12 +4,14 @@ import * as moment from 'moment-timezone';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { KpiCacheService } from '../cache/kpi-cache.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { QueryUtilsService } from '@lhg/utils';
 
 @Injectable()
 export class RestaurantService {
   constructor(
     private prisma: PrismaService,
     private kpiCacheService: KpiCacheService,
+    private queryUtils: QueryUtilsService,
   ) {}
 
   async calculateKpisByDateRange(startDate: Date, endDate: Date) {
@@ -163,21 +165,18 @@ export class RestaurantService {
 
     const othersList = [71, 72, 69, 68, 70];
 
-    const formattedStart = moment
-      .utc(startDate)
-      .set({ hour: 6, minute: 0, second: 0 })
-      .format('YYYY-MM-DD HH:mm:ss');
+    // Formatação segura de datas usando QueryUtilsService
+    const startForDate = moment.utc(startDate).set({ hour: 6, minute: 0, second: 0 }).toDate();
+    const endForDate = moment.utc(endDate).add(1, 'day').set({ hour: 5, minute: 59, second: 59 }).toDate();
 
-    const formattedEnd = moment
-      .utc(endDate)
-      .add(1, 'day') // importante para pegar o último dia completo
-      .set({ hour: 5, minute: 59, second: 59 })
-      .format('YYYY-MM-DD HH:mm:ss');
+    const formattedStart = this.queryUtils.formatDateToSQL(startForDate);
+    const formattedEnd = this.queryUtils.formatDateToSQL(endForDate);
 
-    const abProductTypesSqlList = abProductTypes.join(', ');
-    const aProductTypesSqlList = aProductTypes.join(', ');
-    const bProductTypesSqlList = bProductTypes.join(', ');
-    const othersProductTypesSqlList = othersList.join(', ');
+    // Sanitização segura de listas de IDs usando QueryUtilsService
+    const abProductTypesSqlList = this.queryUtils.sanitizeIdList(abProductTypes);
+    const aProductTypesSqlList = this.queryUtils.sanitizeIdList(aProductTypes);
+    const bProductTypesSqlList = this.queryUtils.sanitizeIdList(bProductTypes);
+    const othersProductTypesSqlList = this.queryUtils.sanitizeIdList(othersList);
 
     // Safe parameterized query - convert concatenated arrays to Prisma.join
     const abProductTypesParam = Prisma.join(abProductTypes);

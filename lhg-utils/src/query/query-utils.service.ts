@@ -158,4 +158,100 @@ export class QueryUtilsService {
 
     return `${columnName} BETWEEN '${formattedStart}' AND '${formattedEnd}'`;
   }
+
+  // ========== MÉTODOS ESTÁTICOS ==========
+  // Para uso em arquivos que não suportam injeção de dependência (arquivos de funções puras)
+
+  /**
+   * Formata string de data DD/MM/YYYY para YYYY-MM-DD (estático)
+   * Valida o formato antes de converter
+   */
+  static formatDateStrToSQLDate(dateStr: string): string {
+    // Valida formato DD/MM/YYYY
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    const match = dateStr.match(regex);
+
+    if (!match) {
+      throw new Error(`Data inválida: ${dateStr}. Formato esperado: DD/MM/YYYY`);
+    }
+
+    const [, day, month, year] = match;
+
+    // Valida se a data é válida
+    const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (
+      dateObj.getFullYear() !== parseInt(year) ||
+      dateObj.getMonth() !== parseInt(month) - 1 ||
+      dateObj.getDate() !== parseInt(day)
+    ) {
+      throw new Error(`Data inválida: ${dateStr}`);
+    }
+
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Cria timestamp completo para SQL (estático)
+   * Combina data YYYY-MM-DD com hora HH:mm:ss
+   */
+  static createSQLTimestamp(datePart: string, timePart: string): string {
+    // Valida formato da data
+    const dateRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
+    if (!dateRegex.test(datePart)) {
+      throw new Error(`Data inválida: ${datePart}. Formato esperado: YYYY-MM-DD`);
+    }
+
+    // Valida formato da hora
+    const timeRegex = /^(\d{2}):(\d{2}):(\d{2})$/;
+    if (!timeRegex.test(timePart)) {
+      throw new Error(`Hora inválida: ${timePart}. Formato esperado: HH:mm:ss`);
+    }
+
+    return `${datePart} ${timePart}`;
+  }
+
+  /**
+   * Calcula próximo dia (estático)
+   * Recebe data no formato YYYY-MM-DD e retorna YYYY-MM-DD do dia seguinte
+   */
+  static getNextDay(dateStr: string): string {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    dateObj.setDate(dateObj.getDate() + 1);
+
+    const nextYear = dateObj.getFullYear();
+    const nextMonth = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const nextDay = String(dateObj.getDate()).padStart(2, '0');
+
+    return `${nextYear}-${nextMonth}-${nextDay}`;
+  }
+
+  /**
+   * Sanitiza uma lista de IDs para uso em cláusulas SQL IN (estático)
+   */
+  static sanitizeIdList(ids: (number | string)[]): string {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new Error('Lista de IDs deve ser um array não vazio');
+    }
+
+    const sanitized = ids.map((id, index) => {
+      let num: number;
+
+      if (typeof id === 'string') {
+        num = parseInt(id, 10);
+      } else if (typeof id === 'number') {
+        num = id;
+      } else {
+        throw new Error(`ID inválido no índice ${index}: tipo não suportado`);
+      }
+
+      if (isNaN(num) || !Number.isInteger(num) || num < 0) {
+        throw new Error(`ID inválido no índice ${index}: ${id} (deve ser inteiro >= 0)`);
+      }
+
+      return num;
+    });
+
+    return sanitized.join(', ');
+  }
 }
