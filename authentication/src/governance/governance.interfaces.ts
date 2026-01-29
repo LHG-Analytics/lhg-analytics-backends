@@ -20,12 +20,17 @@ export interface ApexChartsMultiSeriesData {
 // Estrutura para ShiftCleaning por dia (séries agrupadas por turno com dados de cada unidade)
 export interface ShiftCleaningByDayData {
   categories: string[]; // Datas no formato DD/MM/YYYY
-  series: Array<{
-    name: string; // Nome do turno (Manhã, Tarde, Noite)
-    series: Array<{
-      name: string; // Nome da unidade
-      data: number[];
-    }>;
+  Manhã: Array<{
+    name: string; // Nome da unidade
+    data: number[];
+  }>;
+  Tarde: Array<{
+    name: string; // Nome da unidade
+    data: number[];
+  }>;
+  Noite: Array<{
+    name: string; // Nome da unidade
+    data: number[];
   }>;
 }
 
