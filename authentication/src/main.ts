@@ -81,9 +81,18 @@ async function bootstrap() {
     const envOrigins = process.env.ALLOWED_ORIGINS
       ?.split(',')
       .map((o) => o.trim())
-      .filter(Boolean) || [];
+      .filter(Boolean)
+      .map((o) => {
+        // Adiciona https:// se não tiver protocolo
+        if (!o.match(/^https?:\/\//)) {
+          return `https://${o}`;
+        }
+        return o;
+      }) || [];
 
-    const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
+    // Adiciona URL do próprio servidor (para Swagger funcionar no Render)
+    const serverUrl = process.env.RENDER_EXTERNAL_URL;
+    const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins, ...(serverUrl ? [serverUrl] : [])])];
 
     const corsOptions: CorsOptions = {
       origin: (origin, callback) => {
