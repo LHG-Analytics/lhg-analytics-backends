@@ -17,15 +17,16 @@ export interface ApexChartsMultiSeriesData {
   }>;
 }
 
-// Estrutura para ShiftCleaning por dia (séries por unidade com dados de turnos por dia)
+// Estrutura para ShiftCleaning por dia (séries agrupadas por turno com dados de cada unidade)
 export interface ShiftCleaningByDayData {
   categories: string[]; // Datas no formato DD/MM/YYYY
-  series: {
-    [unitName: string]: Array<{
-      name: string; // Nome do turno (Manhã, Tarde, Noite)
+  series: Array<{
+    name: string; // Nome do turno (Manhã, Tarde, Noite)
+    series: Array<{
+      name: string; // Nome da unidade
       data: number[];
     }>;
-  };
+  }>;
 }
 
 // BigNumbers do Governance

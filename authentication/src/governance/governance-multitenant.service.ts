@@ -560,7 +560,7 @@ export class GovernanceMultitenantService {
   }
 
   /**
-   * Calcula ShiftCleaning - limpezas por turno por dia, com séries agrupadas por unidade
+   * Calcula ShiftCleaning - limpezas por turno por dia, com séries agrupadas por turno
    */
   private calculateShiftCleaning(
     results: UnitGovernanceKpiData[],
@@ -584,43 +584,49 @@ export class GovernanceMultitenantService {
       return dateA - dateB;
     });
 
-    // Cria o objeto de séries agrupado por unidade
-    const series: {
-      [unitName: string]: Array<{ name: string; data: number[] }>;
-    } = {};
+    // Cria o objeto de séries agrupado por turno (Manhã, Tarde, Noite)
+    const shifts = ['Manhã', 'Tarde', 'Noite'] as const;
+    const series: Array<{
+      name: string;
+      series: Array<{ name: string; data: number[] }>;
+    }> = [];
 
-    for (const r of results) {
-      // Cria um mapa de data -> dados para esta unidade
-      const dateMap = new Map<string, UnitShiftDataByDay>();
-      if (r.shiftDataByDay) {
-        for (const dayData of r.shiftDataByDay) {
-          dateMap.set(dayData.date, dayData);
+    for (const shift of shifts) {
+      const unitSeries: Array<{ name: string; data: number[] }> = [];
+
+      for (const r of results) {
+        // Cria um mapa de data -> dados para esta unidade
+        const dateMap = new Map<string, UnitShiftDataByDay>();
+        if (r.shiftDataByDay) {
+          for (const dayData of r.shiftDataByDay) {
+            dateMap.set(dayData.date, dayData);
+          }
         }
+
+        // Prepara array para este turno
+        const shiftData: number[] = [];
+        for (const date of categories) {
+          const dayData = dateMap.get(date);
+          if (dayData) {
+            // Busca o valor do turno correto
+            if (shift === 'Manhã') shiftData.push(dayData.manha);
+            else if (shift === 'Tarde') shiftData.push(dayData.tarde);
+            else shiftData.push(dayData.noite);
+          } else {
+            shiftData.push(0);
+          }
+        }
+
+        unitSeries.push({
+          name: r.unitName,
+          data: shiftData,
+        });
       }
 
-      // Prepara arrays para cada turno
-      const manhaData: number[] = [];
-      const tardeData: number[] = [];
-      const noiteData: number[] = [];
-
-      for (const date of categories) {
-        const dayData = dateMap.get(date);
-        if (dayData) {
-          manhaData.push(dayData.manha);
-          tardeData.push(dayData.tarde);
-          noiteData.push(dayData.noite);
-        } else {
-          manhaData.push(0);
-          tardeData.push(0);
-          noiteData.push(0);
-        }
-      }
-
-      series[r.unitName] = [
-        { name: 'Manhã', data: manhaData },
-        { name: 'Tarde', data: tardeData },
-        { name: 'Noite', data: noiteData },
-      ];
+      series.push({
+        name: shift,
+        series: unitSeries,
+      });
     }
 
     return { categories, series };
