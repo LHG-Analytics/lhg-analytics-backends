@@ -108,10 +108,10 @@ async function bootstrap() {
           return;
         }
 
-        // Log apenas em desenvolvimento
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('CORS rejeitou origem:', origin);
-        }
+        // Log para debug - mostra qual origin foi rejeitada e a lista permitida
+        console.warn('⚠️ CORS rejeitou origem:', origin);
+        console.warn('Origens permitidas:', allowedOrigins);
+        console.warn('RENDER_EXTERNAL_URL:', process.env.RENDER_EXTERNAL_URL);
 
         callback(new Error('Not allowed by CORS'), false);
       },
