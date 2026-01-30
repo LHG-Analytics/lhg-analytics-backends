@@ -1118,10 +1118,20 @@ export class CompanyService {
       'OVERNIGHT',
     ];
 
+    // Mapeamento para exibição em português
+    const rentalTypeLabels: Record<string, string> = {
+      THREE_HOURS: '3 Horas',
+      SIX_HOURS: '6 Horas',
+      TWELVE_HOURS: '12 Horas',
+      DAY_USE: 'Dayuse',
+      DAILY: 'Diária',
+      OVERNIGHT: 'Pernoite',
+    };
+
     const billingRentalType: ApexChartsSeriesData = {
       categories: [...periodsArray],
       series: allRentalTypes.map((rentalType) => ({
-        name: rentalType,
+        name: rentalTypeLabels[rentalType] || rentalType,
         data: [...periodsArray].map((periodKey: string) => {
           const item = billingDataMap.get(periodKey);
           return item && item[rentalType] ? item[rentalType] : 0;
