@@ -578,28 +578,6 @@ export class CompanyService {
       }
     }
 
-    // Função SQL para calcular receita completa (locação + vendas diretas)
-    const getTotalRevenueSQL = () => `(
-      COALESCE(CAST(la.valorliquidolocacao AS DECIMAL), 0) +
-      COALESCE(
-        CASE
-          WHEN vd.stockoutid IS NOT NULL THEN (
-            SELECT COALESCE(SUM(
-              (CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))) -
-              COALESCE((CAST(v.desconto AS DECIMAL(15,4)) /
-                NULLIF((SELECT COUNT(*) FROM saidaestoqueitem sei2 WHERE sei2.id_saidaestoque = sei.id_saidaestoque AND sei2.cancelado IS NULL), 0)
-              ), 0)
-            ), 0)
-            FROM saidaestoqueitem sei
-            LEFT JOIN venda v ON sei.id_saidaestoque = v.id_saidaestoque
-            WHERE sei.id_saidaestoque = vd.stockoutid
-              AND sei.cancelado IS NULL
-          )
-          ELSE 0
-        END, 0
-      )
-    )`;
-
     // SQL BigNumbers - CORRIGIDO para não duplicar desconto
     const bigNumbersSQL = `
       WITH receita_consumo AS (
@@ -692,32 +670,121 @@ export class CompanyService {
         AND a.dataexclusao IS NULL
     `;
 
+    // RevenueByDate - CORRIGIDO para incluir: locação + ocupadicional + consumo + venda direta
     const revenueByDateSQL = `
-      SELECT
-        CASE
+      WITH receita_consumo_por_data AS (
+        -- Calcula receita de consumo agrupada por data do dia de ocupação
+        SELECT
+          CASE
+            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+            ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          END as date,
+          COALESCE(SUM(
+            CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
+          ), 0) as valor_consumo_bruto
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca_apt ON a.id_categoriaapartamento = ca_apt.id
+        INNER JOIN vendalocacao vl ON la.id_apartamentostate = vl.id_locacaoapartamento
+        INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
+        INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'
+          AND la.datainicialdaocupacao <= '${formattedEnd}'
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND sei.cancelado IS NULL
+          AND ca_apt.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
-        END as date,
-        COALESCE(SUM(${getTotalRevenueSQL()}), 0) as daily_revenue
-      FROM locacaoapartamento la
-      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-      LEFT JOIN (
-        SELECT se.id as stockoutid, sd.id_saidaestoque
+        END
+      ),
+      receita_locacao_por_data AS (
+        -- Calcula receita de locação (permanencia + ocupadicional - desconto) por data
+        SELECT
+          CASE
+            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+            ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          END as date,
+          COALESCE(SUM(
+            COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
+            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+          ), 0) as daily_revenue
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'
+          AND la.datainicialdaocupacao <= '${formattedEnd}'
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND ca.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY CASE
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        END
+      ),
+      vendas_diretas_por_data AS (
+        -- Calcula receita de vendas diretas por data (usando datasaidaitem)
+        SELECT
+          CASE
+            WHEN EXTRACT(HOUR FROM sei.datasaidaitem) >= 6 THEN DATE(sei.datasaidaitem)
+            ELSE DATE(sei.datasaidaitem - INTERVAL '1 day')
+          END as date,
+          COALESCE(SUM(
+            (CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))) -
+            COALESCE((CAST(v.desconto AS DECIMAL(15,4)) /
+              NULLIF((SELECT COUNT(*) FROM saidaestoqueitem sei2
+                      WHERE sei2.id_saidaestoque = se.id
+                      AND sei2.cancelado IS NULL), 0)
+            ), 0)
+          ), 0) as daily_sale_direct
         FROM saidaestoque se
-        INNER JOIN vendadireta sd ON se.id = sd.id_saidaestoque
-        WHERE sd.venda_completa = true
-      ) vd ON FALSE
-      WHERE la.datainicialdaocupacao >= '${formattedStart}'
-        AND la.datainicialdaocupacao <= '${formattedEnd}'
-        AND la.fimocupacaotipo = 'FINALIZADA'
-      GROUP BY CASE
-        WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
-      END
+        INNER JOIN vendadireta vd ON se.id = vd.id_saidaestoque
+        INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+        LEFT JOIN venda v ON se.id = v.id_saidaestoque
+        WHERE vd.venda_completa = true
+          AND sei.cancelado IS NULL
+          AND sei.datasaidaitem >= '${formattedStart}'
+          AND sei.datasaidaitem <= '${formattedEnd}'
+        GROUP BY CASE
+          WHEN EXTRACT(HOUR FROM sei.datasaidaitem) >= 6 THEN DATE(sei.datasaidaitem)
+          ELSE DATE(sei.datasaidaitem - INTERVAL '1 day')
+        END
+      )
+      -- Combina tudo: locação + consumo + venda direta
+      SELECT
+        COALESCE(rl.date, rc.date, vd.date) as date,
+        COALESCE(rl.daily_revenue, 0) + COALESCE(rc.valor_consumo_bruto, 0) + COALESCE(vd.daily_sale_direct, 0) as daily_revenue
+      FROM receita_locacao_por_data rl
+      FULL OUTER JOIN receita_consumo_por_data rc ON rl.date = rc.date
+      FULL OUTER JOIN vendas_diretas_por_data vd ON COALESCE(rl.date, rc.date) = vd.date
       ORDER BY date
     `;
 
+    // BillingRentalType - CORRIGIDO para incluir: locação + ocupadicional + consumo
     const billingRentalTypeSQL = `
+      WITH receita_consumo_locacao AS (
+        -- Calcula receita de consumo por locação
+        SELECT
+          la.id_apartamentostate as id_locacao,
+          COALESCE(SUM(
+            CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
+          ), 0) as valor_consumo_bruto
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca_apt ON a.id_categoriaapartamento = ca_apt.id
+        INNER JOIN vendalocacao vl ON la.id_apartamentostate = vl.id_locacaoapartamento
+        INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
+        INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'
+          AND la.datainicialdaocupacao <= '${formattedEnd}'
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND sei.cancelado IS NULL
+          AND ca_apt.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY la.id_apartamentostate
+      )
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
@@ -731,15 +798,15 @@ export class CompanyService {
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 20 THEN 'OVERNIGHT'
           ELSE 'THREE_HOURS'
         END as rental_type,
-        COALESCE(SUM(${getTotalRevenueSQL()}), 0) as total_revenue
+        COALESCE(SUM(
+          COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+          COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
+          COALESCE(rc.valor_consumo_bruto, 0) -
+          COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+        ), 0) as total_revenue
       FROM locacaoapartamento la
       INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-      LEFT JOIN (
-        SELECT se.id as stockoutid, sd.id_saidaestoque
-        FROM saidaestoque se
-        INNER JOIN vendadireta sd ON se.id = sd.id_saidaestoque
-        WHERE sd.venda_completa = true
-      ) vd ON FALSE
+      LEFT JOIN receita_consumo_locacao rc ON la.id_apartamentostate = rc.id_locacao
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
@@ -759,21 +826,42 @@ export class CompanyService {
       ORDER BY date, rental_type
     `;
 
-    // Define consultas SQL adicionais para incluir no Promise.all
+    // RevenueBySuiteCategory - CORRIGIDO para incluir: locação + ocupadicional + consumo
     const revenueBySuiteCategorySQL = `
+      WITH receita_consumo_locacao AS (
+        -- Calcula receita de consumo por locação
+        SELECT
+          la.id_apartamentostate as id_locacao,
+          COALESCE(SUM(
+            CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
+          ), 0) as valor_consumo_bruto
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca_apt ON a.id_categoriaapartamento = ca_apt.id
+        INNER JOIN vendalocacao vl ON la.id_apartamentostate = vl.id_locacaoapartamento
+        INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
+        INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'
+          AND la.datainicialdaocupacao <= '${formattedEnd}'
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND sei.cancelado IS NULL
+          AND ca_apt.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY la.id_apartamentostate
+      )
       SELECT
         ca.descricao as suite_category,
-        COALESCE(SUM(${getTotalRevenueSQL()}), 0) as category_revenue
+        COALESCE(SUM(
+          COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+          COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
+          COALESCE(rc.valor_consumo_bruto, 0) -
+          COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+        ), 0) as category_revenue
       FROM locacaoapartamento la
       INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
       INNER JOIN apartamento a ON aps.id_apartamento = a.id
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      LEFT JOIN (
-        SELECT se.id as stockoutid, sd.id_saidaestoque
-        FROM saidaestoque se
-        INNER JOIN vendadireta sd ON se.id = sd.id_saidaestoque
-        WHERE sd.venda_completa = true
-      ) vd ON FALSE
+      LEFT JOIN receita_consumo_locacao rc ON la.id_apartamentostate = rc.id_locacao
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
@@ -823,21 +911,44 @@ export class CompanyService {
       ORDER BY date
     `;
 
+    // TRevPAR por data - CORRIGIDO para incluir: locação + ocupadicional + consumo + gorjeta
     const trevparByDateSQL = `
+      WITH receita_consumo_locacao AS (
+        -- Calcula receita de consumo por locação
+        SELECT
+          la.id_apartamentostate as id_locacao,
+          COALESCE(SUM(
+            CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
+          ), 0) as valor_consumo_bruto
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca_apt ON a.id_categoriaapartamento = ca_apt.id
+        INNER JOIN vendalocacao vl ON la.id_apartamentostate = vl.id_locacaoapartamento
+        INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
+        INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'
+          AND la.datainicialdaocupacao <= '${formattedEnd}'
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND sei.cancelado IS NULL
+          AND ca_apt.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY la.id_apartamentostate
+      )
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END as date,
-        COALESCE(SUM(${getTotalRevenueSQL()} + CAST(la.gorjeta AS DECIMAL)), 0) as total_revenue
+        COALESCE(SUM(
+          COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+          COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
+          COALESCE(rc.valor_consumo_bruto, 0) -
+          COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0) +
+          COALESCE(CAST(la.gorjeta AS DECIMAL(15,4)), 0)
+        ), 0) as total_revenue
       FROM locacaoapartamento la
       INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-      LEFT JOIN (
-        SELECT se.id as stockoutid, sd.id_saidaestoque
-        FROM saidaestoque se
-        INNER JOIN vendadireta sd ON se.id = sd.id_saidaestoque
-        WHERE sd.venda_completa = true
-      ) vd ON FALSE
+      LEFT JOIN receita_consumo_locacao rc ON la.id_apartamentostate = rc.id_locacao
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
