@@ -1,15 +1,14 @@
-import { Prisma } from '@client-local';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { KpiCacheService } from '../cache/kpi-cache.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { PgPoolService } from '../database/database.service';
 import { QueryUtilsService } from '@lhg/utils';
 
 @Injectable()
 export class RestaurantService {
   constructor(
-    private prisma: PrismaService,
+    private pgPool: PgPoolService,
     private kpiCacheService: KpiCacheService,
     private queryUtils: QueryUtilsService,
   ) {}
@@ -569,59 +568,59 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
         companyTotalRevenueResult,
         totalSalesRevenueResult,
       ] = await Promise.all([
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([kpisRawSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueAbPeriodSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalRevenueByPeriodSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([abTicketCountByPeriodSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([bestSellingFoodSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([leastSellingFoodSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([bestSellingDrinksSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([leastSellingDrinksSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueGroupByPeriodSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueAPeriodSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueBPeriodSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([reportByFoodSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([reportByDrinkSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([reportByOthersSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([companyTotalRevenueSql])),
-        this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalSalesRevenueSql])),
+        this.pgPool.query<any>(kpisRawSql),
+        this.pgPool.query<any>(revenueAbPeriodSql),
+        this.pgPool.query<any>(totalRevenueByPeriodSql),
+        this.pgPool.query<any>(abTicketCountByPeriodSql),
+        this.pgPool.query<any>(bestSellingFoodSql),
+        this.pgPool.query<any>(leastSellingFoodSql),
+        this.pgPool.query<any>(bestSellingDrinksSql),
+        this.pgPool.query<any>(leastSellingDrinksSql),
+        this.pgPool.query<any>(revenueGroupByPeriodSql),
+        this.pgPool.query<any>(revenueAPeriodSql),
+        this.pgPool.query<any>(revenueBPeriodSql),
+        this.pgPool.query<any>(reportByFoodSql),
+        this.pgPool.query<any>(reportByDrinkSql),
+        this.pgPool.query<any>(reportByOthersSql),
+        this.pgPool.query<any>(companyTotalRevenueSql),
+        this.pgPool.query<any>(totalSalesRevenueSql),
       ]);
 
       // --- BigNumbers ---
-      let totalGrossRevenue = new Prisma.Decimal(0);
-      let totalDiscount = new Prisma.Decimal(0);
-      let totalABNetRevenue = new Prisma.Decimal(0);
+      let totalGrossRevenue = 0;
+      let totalDiscount = 0;
+      let totalABNetRevenue = 0;
       let rentalsWithABCount = 0;
       let totalAllSales = 0;
 
       for (const row of rawResult) {
-        const gross = new Prisma.Decimal(row.totalGross);
-        const discount = new Prisma.Decimal(row.desconto);
-        const abTotal = new Prisma.Decimal(row.abTotal);
-        const discountProportion = gross.gt(0)
-          ? discount.mul(abTotal).div(gross)
-          : new Prisma.Decimal(0);
-        const netAB = abTotal.minus(discountProportion);
+        const gross = Number(row.totalGross) || 0;
+        const discount = Number(row.desconto) || 0;
+        const abTotal = Number(row.abTotal) || 0;
+        const discountProportion = gross > 0
+          ? (discount * abTotal) / gross
+          : 0;
+        const netAB = abTotal - discountProportion;
 
-        totalGrossRevenue = totalGrossRevenue.plus(gross);
-        totalDiscount = totalDiscount.plus(discount);
+        totalGrossRevenue += gross;
+        totalDiscount += discount;
 
-        if (abTotal.gt(0)) {
-          totalABNetRevenue = totalABNetRevenue.plus(netAB);
+        if (abTotal > 0) {
+          totalABNetRevenue += netAB;
           rentalsWithABCount++;
         }
 
-        if (gross.gt(0)) {
+        if (gross > 0) {
           totalAllSales++;
         }
       }
 
-      const totalNetRevenue = totalGrossRevenue.minus(totalDiscount);
+      const totalNetRevenue = totalGrossRevenue - totalDiscount;
       const totalRentals = rawResult.length;
       const totalAllTicketAverage =
-        rentalsWithABCount > 0 ? totalABNetRevenue.div(rentalsWithABCount) : new Prisma.Decimal(0);
+        rentalsWithABCount > 0 ? totalABNetRevenue / rentalsWithABCount : 0;
       const totalAllTicketAverageByTotalRentals =
-        totalRentals > 0 ? totalABNetRevenue.div(totalRentals) : new Prisma.Decimal(0);
+        totalRentals > 0 ? totalABNetRevenue / totalRentals : 0;
 
       // Faturamento total da empresa e receita total de vendas
       const companyTotalRevenue = Number(companyTotalRevenueResult[0]?.totalCompanyRevenue || 0);

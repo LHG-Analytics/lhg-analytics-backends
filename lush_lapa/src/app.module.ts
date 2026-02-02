@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
+import { DatabaseModule } from './database/database.module';
 import { CompanyModule } from './company/company.module';
 import { GovernanceModule } from './governance/governance.module';
 import { BookingsModule } from './bookings/bookings.module';
@@ -20,6 +21,7 @@ import { DateUtilsModule, ValidationModule, QueryUtilsModule, ConcurrencyUtilsMo
     QueryUtilsModule, // Utilitários compartilhados de query
     ConcurrencyUtilsModule, // Utilitários de controle de concorrência
     CacheModule, // Módulo de cache para KPIs real-time
+    DatabaseModule, // Módulo de conexão direta com PostgreSQL (pg)
     ThrottlerModule.forRoot([
       {
         ttl: 60000, // 1 minute

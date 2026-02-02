@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@client-local';
 import { PeriodEnum, RentalTypeEnum } from '../common/enums';
-import { PrismaService } from '../prisma/prisma.service';
+import { PgPoolService } from '../database/database.service';
 import * as moment from 'moment-timezone';
 import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
@@ -181,9 +180,9 @@ interface CategoryTotalsMap {
     totalOccupiedTime: number;
     unavailableTime: number;
     availableTime: number;
-    totalValue: Prisma.Decimal;
-    categoryTotalSale: Prisma.Decimal;
-    categoryTotalRental: Prisma.Decimal;
+    totalValue: number;
+    categoryTotalSale: number;
+    categoryTotalRental: number;
     categoryTotalRentals: number;
   };
 }
@@ -241,7 +240,7 @@ export interface CompanyKpiApexChartsResponse {
 @Injectable()
 export class CompanyService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly pgPool: PgPoolService,
     private kpiCacheService: KpiCacheService,
   ) {}
 
@@ -260,124 +259,6 @@ export class CompanyService {
   private formatPercentageUpdate(value: number): string {
     const percentageValue = value * 100;
     return `${percentageValue.toFixed(2)}%`;
-  }
-
-  private async fetchKpiData(
-    startDate: Date,
-    endDate: Date,
-  ): Promise<[any[], any[], any[], any[], any[]]> {
-    return await Promise.all([
-      this.prisma.prismaLocal.rentalApartment.findMany({
-        where: {
-          checkIn: {
-            gte: startDate,
-            lte: endDate,
-          },
-          endOccupationType: 'FINALIZADA',
-        },
-        include: {
-          suiteStates: {
-            include: {
-              suite: {
-                include: {
-                  suiteCategories: true,
-                },
-              },
-            },
-          },
-          saleLease: {
-            include: {
-              stockOut: {
-                include: {
-                  stockOutItem: {
-                    where: { canceled: null },
-                    select: { priceSale: true, quantity: true },
-                  },
-                  sale: { select: { discount: true } },
-                },
-              },
-            },
-          },
-          Booking: true,
-        },
-      }),
-      this.prisma.prismaLocal.suiteCategory.findMany({
-        where: {
-          id: {
-            in: [2, 3, 4, 5, 6, 7],
-          },
-        },
-        include: {
-          suites: true,
-        },
-      }),
-      this.prisma.prismaLocal.apartmentCleaning.findMany({
-        where: {
-          startDate: {
-            gte: startDate,
-            lte: endDate,
-          },
-          endDate: {
-            not: null,
-          },
-        },
-        include: {
-          suiteState: {
-            include: {
-              suite: true,
-            },
-          },
-        },
-      }),
-      this.prisma.prismaLocal.blockedMaintenanceDefect.findMany({
-        where: {
-          defect: {
-            startDate: {
-              gte: startDate,
-              lte: endDate,
-            },
-            endDate: {
-              not: null,
-            },
-          },
-        },
-        include: {
-          defect: {
-            include: {
-              suite: true,
-            },
-          },
-          suiteState: {
-            include: {
-              suite: true,
-            },
-          },
-        },
-      }),
-      this.prisma.prismaLocal.stockOutItem.findMany({
-        where: {
-          stockOuts: {
-            createdDate: {
-              gte: startDate,
-              lte: endDate,
-            },
-          },
-          canceled: null,
-        },
-        include: {
-          stockOuts: {
-            include: {
-              saleDirect: true,
-              sale: {
-                select: {
-                  discount: true,
-                },
-              },
-            },
-          },
-        },
-      }),
-    ]);
   }
 
   private calculateOccupationTime(checkIn: Date, checkOut: Date): number {
@@ -479,8 +360,8 @@ export class CompanyService {
         WHERE ca.id IN (2,3,4,5,6,7,12)
           AND a.dataexclusao IS NULL
       `;
-      const totalSuitesResult: any[] = await this.prisma.prismaLocal.$queryRaw<any[]>(
-        Prisma.sql([totalSuitesSQL]),
+      const totalSuitesResult: any[] = await this.pgPool.query<any>(
+        totalSuitesSQL,
       );
       const totalSuitesCount = Number(totalSuitesResult[0]?.total_suites) || 1;
 
@@ -664,7 +545,7 @@ export class CompanyService {
         SELECT
           CASE
             WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-            ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+            ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
           END as date,
           COALESCE(SUM(
             CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
@@ -683,7 +564,7 @@ export class CompanyService {
           AND ca_apt.id IN (2,3,4,5,6,7,12)
         GROUP BY CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
         END
       ),
       receita_locacao_por_data AS (
@@ -691,7 +572,7 @@ export class CompanyService {
         SELECT
           CASE
             WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-            ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+            ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
           END as date,
           COALESCE(SUM(
             COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
@@ -708,7 +589,7 @@ export class CompanyService {
           AND ca.id IN (2,3,4,5,6,7,12)
         GROUP BY CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
         END
       ),
       vendas_diretas_por_data AS (
@@ -716,7 +597,7 @@ export class CompanyService {
         SELECT
           CASE
             WHEN EXTRACT(HOUR FROM sei.datasaidaitem) >= 6 THEN DATE(sei.datasaidaitem)
-            ELSE DATE(sei.datasaidaitem - INTERVAL '1 day')
+            ELSE DATE(sei.datasaidaitem - INTERVAL "1 day")
           END as date,
           COALESCE(SUM(
             (CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))) -
@@ -736,7 +617,7 @@ export class CompanyService {
           AND sei.datasaidaitem <= '${formattedEnd}'
         GROUP BY CASE
           WHEN EXTRACT(HOUR FROM sei.datasaidaitem) >= 6 THEN DATE(sei.datasaidaitem)
-          ELSE DATE(sei.datasaidaitem - INTERVAL '1 day')
+          ELSE DATE(sei.datasaidaitem - INTERVAL "1 day")
         END
       )
       -- Combina tudo: locação + consumo + venda direta
@@ -775,7 +656,7 @@ export class CompanyService {
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
         END as date,
         CASE
           WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
@@ -803,7 +684,7 @@ export class CompanyService {
       GROUP BY
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
         END,
         CASE
           WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
@@ -864,7 +745,7 @@ export class CompanyService {
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
         END as date,
         COUNT(*) as total_rentals
       FROM locacaoapartamento la
@@ -877,7 +758,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
       END
       ORDER BY date
     `;
@@ -886,7 +767,7 @@ export class CompanyService {
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
         END as date,
         COALESCE(AVG(CAST(la.valortotal AS DECIMAL)), 0) as avg_ticket
       FROM locacaoapartamento la
@@ -899,7 +780,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
       END
       ORDER BY date
     `;
@@ -930,7 +811,7 @@ export class CompanyService {
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
         END as date,
         COALESCE(SUM(
           COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
@@ -950,7 +831,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
       END
       ORDER BY date
     `;
@@ -962,7 +843,7 @@ export class CompanyService {
         ca.descricao as suite_category,
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
         END as rental_date,
         SUM(EXTRACT(EPOCH FROM (la.datafinaldaocupacao - la.datainicialdaocupacao))) as total_occupied_time
       FROM locacaoapartamento la
@@ -975,7 +856,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
       GROUP BY ca.descricao, CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
         END
       ORDER BY rental_date, ca.descricao
     `;
@@ -996,7 +877,7 @@ export class CompanyService {
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
         END as date,
         COUNT(*) as total_rentals
       FROM locacaoapartamento la
@@ -1009,7 +890,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
       END
       ORDER BY date
     `;
@@ -1019,7 +900,7 @@ export class CompanyService {
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
         END as date,
         SUM(EXTRACT(EPOCH FROM (la.datafinaldaocupacao - la.datainicialdaocupacao))) as total_occupied_time
       FROM locacaoapartamento la
@@ -1032,7 +913,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
       END
       ORDER BY date
     `;
@@ -1053,19 +934,19 @@ export class CompanyService {
       giroByDateResult,
       occupancyTimeByDateResult,
     ] = await Promise.all([
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([bigNumbersSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalSaleDirectSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalSuitesSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueByDateSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([billingRentalTypeSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([revenueBySuiteCategorySQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([rentalsByDateSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([ticketAverageByDateSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([trevparByDateSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([occupancyRateBySuiteCategorySQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([suitesByCategorySQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([giroByDateSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([occupancyTimeByDateSQL])),
+      this.pgPool.query<any>(bigNumbersSQL),
+      this.pgPool.query<any>(totalSaleDirectSQL),
+      this.pgPool.query<any>(totalSuitesSQL),
+      this.pgPool.query<any>(revenueByDateSQL),
+      this.pgPool.query<any>(billingRentalTypeSQL),
+      this.pgPool.query<any>(revenueBySuiteCategorySQL),
+      this.pgPool.query<any>(rentalsByDateSQL),
+      this.pgPool.query<any>(ticketAverageByDateSQL),
+      this.pgPool.query<any>(trevparByDateSQL),
+      this.pgPool.query<any>(occupancyRateBySuiteCategorySQL),
+      this.pgPool.query<any>(suitesByCategorySQL),
+      this.pgPool.query<any>(giroByDateSQL),
+      this.pgPool.query<any>(occupancyTimeByDateSQL),
     ]);
 
     // Processa BigNumbers
@@ -1100,7 +981,7 @@ export class CompanyService {
 
       // Executar a query investigativa
       try {
-        const investigationResult = await this.prisma.prismaLocal.$queryRaw`
+        const investigationResult = await this.pgPool.query<any>(`
           SELECT
             se.id as venda_id,
             vd.venda_completa,
@@ -1117,10 +998,10 @@ export class CompanyService {
           LEFT JOIN venda v ON se.id = v.id_saidaestoque
           WHERE vd.venda_completa = true
             AND sei.cancelado IS NULL
-            AND sei.datasaidaitem >= ${formattedStart}::timestamp
-            AND sei.datasaidaitem <= ${formattedEnd}::timestamp
+            AND sei.datasaidaitem >= '${formattedStart}'::timestamp
+            AND sei.datasaidaitem <= '${formattedEnd}'::timestamp
           ORDER BY se.id, sei.id
-        `;
+        `);
 
         // Agrupar por venda para análise
         const vendasDetalhadas: any = {};
@@ -1472,7 +1353,7 @@ export class CompanyService {
 
     // === IMPLEMENTAÇÃO DO DATATABLESUITEACATEGORY ===
     // Consulta SQL para KPIs por categoria de suíte usando campos corretos do schema
-    const suiteCategoryKpisResult: any[] = await this.prisma.prismaLocal.$queryRaw`
+    const suiteCategoryKpisResult: any[] = await this.pgPool.query<any>(`
       WITH suite_category_data AS (
         SELECT
           ca.descricao as suite_category_name,
@@ -1510,8 +1391,8 @@ export class CompanyService {
         INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
         INNER JOIN apartamento a ON aps.id_apartamento = a.id
         INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
-          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
+          AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.id IN (2,3,4,5,6,7,12)
           GROUP BY ca.id, ca.descricao
@@ -1532,14 +1413,14 @@ export class CompanyService {
         SELECT
           ca.descricao as suite_category_name,
           a.id as apartamento_id,
-          GREATEST(la.datainicio, ${formattedStart}::timestamp) as period_start,
-          LEAST(la.datafim, ${formattedEnd}::timestamp) as period_end
+          GREATEST(la.datainicio, '${formattedStart}'::timestamp) as period_start,
+          LEAST(la.datafim, '${formattedEnd}'::timestamp) as period_end
         FROM limpezaapartamento la
         INNER JOIN apartamentostate aps ON la.id_sujoapartamento = aps.id
         INNER JOIN apartamento a ON aps.id_apartamento = a.id
         INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-        WHERE la.datainicio < ${formattedEnd}::timestamp
-          AND la.datafim > ${formattedStart}::timestamp
+        WHERE la.datainicio < '${formattedEnd}'::timestamp
+          AND la.datafim > '${formattedStart}'::timestamp
           AND la.datafim IS NOT NULL
           AND ca.id IN (2,3,4,5,6,7,12)
 
@@ -1549,13 +1430,13 @@ export class CompanyService {
         SELECT
           ca.descricao as suite_category_name,
           a.id as apartamento_id,
-          GREATEST(d.datainicio, ${formattedStart}::timestamp) as period_start,
-          LEAST(d.datafim, ${formattedEnd}::timestamp) as period_end
+          GREATEST(d.datainicio, '${formattedStart}'::timestamp) as period_start,
+          LEAST(d.datafim, '${formattedEnd}'::timestamp) as period_end
         FROM defeito d
         INNER JOIN apartamento a ON d.id_apartamento = a.id
         INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-        WHERE d.datainicio < ${formattedEnd}::timestamp
-          AND d.datafim > ${formattedStart}::timestamp
+        WHERE d.datainicio < '${formattedEnd}'::timestamp
+          AND d.datafim > '${formattedStart}'::timestamp
           AND d.datafim IS NOT NULL
           AND ca.id IN (2,3,4,5,6,7,12)
       ),
@@ -1619,7 +1500,7 @@ export class CompanyService {
       INNER JOIN suite_counts sc ON scd.suite_category_name = sc.suite_category_name
       LEFT JOIN total_unavailable tu ON scd.suite_category_name = tu.suite_category_name
       ORDER BY scd.suite_category_name
-    `;
+    `);
 
     // Calcular período em dias (igual ao BigNumbers)
     const periodDays = moment(endDate).diff(moment(startDate), 'days') + 1;
@@ -1673,7 +1554,7 @@ export class CompanyService {
     // Solução otimizada com 3 queries simples + processamento TypeScript
 
     // Query 1: Buscar todas as ocupações
-    const rentalsData: any[] = await this.prisma.prismaLocal.$queryRaw`
+    const rentalsData: any[] = await this.pgPool.query<any>(`
       SELECT
         ca.descricao as category_name,
         la.datainicialdaocupacao as check_in,
@@ -1682,14 +1563,14 @@ export class CompanyService {
       INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
       INNER JOIN apartamento a ON aps.id_apartamento = a.id
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
-        AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+      WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
+        AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
         AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.id IN (2,3,4,5,6,7,12)
-    `;
+    `);
 
     // Query 2: Buscar tempos indisponíveis (COM suite_id para filtrar depois)
-    const unavailableTimesData: any[] = await this.prisma.prismaLocal.$queryRaw`
+    const unavailableTimesData: any[] = await this.pgPool.query<any>(`
       SELECT
         ca.descricao as category_name,
         a.id as suite_id,
@@ -1699,8 +1580,8 @@ export class CompanyService {
       INNER JOIN apartamentostate aps ON la.id_sujoapartamento = aps.id
       INNER JOIN apartamento a ON aps.id_apartamento = a.id
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE la.datainicio >= ${formattedStart}::timestamp
-        AND la.datainicio <= ${formattedEnd}::timestamp
+      WHERE la.datainicio >= '${formattedStart}'::timestamp
+        AND la.datainicio <= '${formattedEnd}'::timestamp
         AND la.datafim IS NOT NULL
         AND ca.id IN (2,3,4,5,6,7,12)
 
@@ -1716,14 +1597,14 @@ export class CompanyService {
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
       LEFT JOIN col_bloqueadomanutencao_defeito bmd ON bmd.id_defeito = d.id
       LEFT JOIN apartamentostate aps_manut ON bmd.id_bloqueadomanutencao = aps_manut.id
-      WHERE d.datainicio >= ${formattedStart}::timestamp
-        AND d.datainicio <= ${formattedEnd}::timestamp
+      WHERE d.datainicio >= '${formattedStart}'::timestamp
+        AND d.datainicio <= '${formattedEnd}'::timestamp
         AND d.datafim IS NOT NULL
         AND ca.id IN (2,3,4,5,6,7,12)
-    `;
+    `);
 
     // Query 3: Metadados (suítes por categoria + primeira suíte de cada categoria)
-    const metadataResult: any[] = await this.prisma.prismaLocal.$queryRaw`
+    const metadataResult: any[] = await this.pgPool.query<any>(`
       WITH first_suite_per_category AS (
         SELECT DISTINCT ON (ca.id)
           ca.descricao as category_name,
@@ -1742,7 +1623,7 @@ export class CompanyService {
       INNER JOIN first_suite_per_category fs ON ca.descricao = fs.category_name
       WHERE ca.id IN (2,3,4,5,6,7,12)
       GROUP BY ca.descricao, fs.first_suite_id
-    `;
+    `);
 
     // Processar dados no TypeScript
     const timezone = 'America/Sao_Paulo';
@@ -1937,19 +1818,19 @@ export class CompanyService {
 
     // === IMPLEMENTAÇÃO DO DATATABLEGIROBYWEEK ===
     // Consulta SQL para giro semanal por categoria
-    const giroByWeekResult: any[] = await this.prisma.prismaLocal.$queryRaw`
+    const giroByWeekResult: any[] = await this.pgPool.query<any>(`
       WITH weekly_giro AS (
         SELECT
           ca.descricao as suite_category_name,
           EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
               ELSE la.datainicialdaocupacao
             END
           ) as day_of_week_num,
           CASE EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
               ELSE la.datainicialdaocupacao
             END
           )
@@ -1966,13 +1847,13 @@ export class CompanyService {
         INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
         INNER JOIN apartamento a ON aps.id_apartamento = a.id
         INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
-          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
+          AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.id IN (2,3,4,5,6,7,12)
           GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
               ELSE la.datainicialdaocupacao
             END
           )
@@ -2000,20 +1881,20 @@ export class CompanyService {
             WHEN 6 THEN 'sábado'
           END as day_of_week,
           COUNT(*) as days_count
-        FROM generate_series(${formattedStart}::timestamp, ${formattedEnd}::timestamp, '1 day'::interval) d
+        FROM generate_series('${formattedStart}'::timestamp, '${formattedEnd}'::timestamp, "1 day"::interval) d
         GROUP BY EXTRACT(DOW FROM d::date)
       ),
       total_rentals_by_day AS (
         SELECT
           EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
               ELSE la.datainicialdaocupacao
             END
           ) as day_of_week_num,
           CASE EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
               ELSE la.datainicialdaocupacao
             END
           )
@@ -2030,13 +1911,13 @@ export class CompanyService {
         INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
         INNER JOIN apartamento a ON aps.id_apartamento = a.id
         INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
-          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
+          AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
         AND ca.id IN (2,3,4,5,6,7,12)
           GROUP BY EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
               ELSE la.datainicialdaocupacao
             END
           )
@@ -2065,7 +1946,7 @@ export class CompanyService {
       INNER JOIN days_in_period dp ON wg.day_of_week_num = dp.day_of_week_num
       INNER JOIN total_rentals_by_day tr ON wg.day_of_week_num = tr.day_of_week_num
       ORDER BY wg.suite_category_name, wg.day_of_week_num
-    `;
+    `);
 
     // Transformar os resultados no formato esperado (WeeklyGiroData[])
     const giroByCategory: { [category: string]: { [day: string]: any } } = {};
@@ -2120,19 +2001,19 @@ export class CompanyService {
     // === IMPLEMENTAÇÃO DO DATATABLEREVPARBYWEEK ===
     // Consulta SQL para RevPAR semanal por categoria
     // RevPAR = (receita de locação) / total de suítes / dias
-    const revparByWeekResult: any[] = await this.prisma.prismaLocal.$queryRaw`
+    const revparByWeekResult: any[] = await this.pgPool.query<any>(`
       WITH weekly_revenue AS (
         SELECT
           ca.descricao as suite_category_name,
           EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
               ELSE la.datainicialdaocupacao
             END
           ) as day_of_week_num,
           CASE EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
               ELSE la.datainicialdaocupacao
             END
           )
@@ -2154,13 +2035,13 @@ export class CompanyService {
         INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
         INNER JOIN apartamento a ON aps.id_apartamento = a.id
         INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
-          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
+          AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND ca.id IN (2,3,4,5,6,7,12)
         GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM
           CASE
-            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
             ELSE la.datainicialdaocupacao
           END
         )
@@ -2188,20 +2069,20 @@ export class CompanyService {
             WHEN 6 THEN 'sábado'
           END as day_of_week,
           COUNT(*) as days_count
-        FROM generate_series(${formattedStart}::timestamp, ${formattedEnd}::timestamp, '1 day'::interval) d
+        FROM generate_series('${formattedStart}'::timestamp, '${formattedEnd}'::timestamp, "1 day"::interval) d
         GROUP BY EXTRACT(DOW FROM d::date)
       ),
       total_revenue_by_day AS (
         SELECT
           EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
               ELSE la.datainicialdaocupacao
             END
           ) as day_of_week_num,
           CASE EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
               ELSE la.datainicialdaocupacao
             END
           )
@@ -2223,13 +2104,13 @@ export class CompanyService {
         INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
         INNER JOIN apartamento a ON aps.id_apartamento = a.id
         INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
-          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
+          AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND ca.id IN (2,3,4,5,6,7,12)
         GROUP BY EXTRACT(DOW FROM
           CASE
-            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
             ELSE la.datainicialdaocupacao
           END
         )
@@ -2258,7 +2139,7 @@ export class CompanyService {
       INNER JOIN days_in_period dp ON wr.day_of_week_num = dp.day_of_week_num
       INNER JOIN total_revenue_by_day tr ON wr.day_of_week_num = tr.day_of_week_num
       ORDER BY wr.suite_category_name, wr.day_of_week_num
-    `;
+    `);
 
     // Transformar os resultados no formato esperado (WeeklyRevparData[])
     const revparByCategory: { [category: string]: { [day: string]: any } } = {};

@@ -1,9 +1,8 @@
-import { Prisma } from '@client-local';
 import { Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { KpiCacheService } from '../cache/kpi-cache.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { PgPoolService } from '../database/database.service';
 
 interface EmployeeData {
   name: string;
@@ -28,7 +27,7 @@ export interface EmployeeReportByShift {
 @Injectable()
 export class GovernanceService {
   constructor(
-    private prisma: PrismaService,
+    private pgPool: PgPoolService,
     private kpiCacheService: KpiCacheService,
   ) {}
 
@@ -486,22 +485,14 @@ ORDER BY
       employeeReportRaw,
       teamSizingResult,
     ] = await Promise.all([
-      this.prisma.prismaLocal.$queryRaw<{ totalSuitesCleaned: number }[]>(
-        Prisma.sql([totalSuitesCleanedSql]),
-      ),
-      this.prisma.prismaLocal.$queryRaw<{ totalInspections: number }[]>(
-        Prisma.sql([totalInspectionsSql]),
-      ),
-      this.prisma.prismaLocal.$queryRaw<{ name: string; value: number }[]>(
-        Prisma.sql([supervisorPerformanceSQL]),
-      ),
-      this.prisma.prismaLocal.$queryRaw<{ name: string; value: number }[]>(
-        Prisma.sql([shiftCleaningSQL]),
-      ),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([cleaningsByPeriodSql])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([cleaningsByPeriodShiftSql])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([employeeReportSql])),
-      this.prisma.prismaLocal.$queryRaw<TeamSizingRow[]>(Prisma.sql([teamSizingSQL])),
+      this.pgPool.query<{ totalSuitesCleaned: number }>(totalSuitesCleanedSql),
+      this.pgPool.query<{ totalInspections: number }>(totalInspectionsSql),
+      this.pgPool.query<{ name: string; value: number }>(supervisorPerformanceSQL),
+      this.pgPool.query<{ name: string; value: number }>(shiftCleaningSQL),
+      this.pgPool.query<any>(cleaningsByPeriodSql),
+      this.pgPool.query<any>(cleaningsByPeriodShiftSql),
+      this.pgPool.query<any>(employeeReportSql),
+      this.pgPool.query<TeamSizingRow>(teamSizingSQL),
     ]);
 
     const orderedWeekdays = ['domingo', 'sabado', 'sexta', 'quinta', 'quarta', 'terca', 'segunda'];
