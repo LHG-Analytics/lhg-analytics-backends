@@ -1,15 +1,14 @@
-import { Prisma } from '@client-local';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { KpiCacheService } from '../cache/kpi-cache.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { PgPoolService } from '../database/database.service';
 import { QueryUtilsService } from '@lhg/utils';
 
 @Injectable()
 export class RestaurantService {
   constructor(
-    private prisma: PrismaService,
+    private pgPool: PgPoolService,
     private kpiCacheService: KpiCacheService,
     private queryUtils: QueryUtilsService,
   ) {}
@@ -178,14 +177,14 @@ export class RestaurantService {
     const bProductTypesSqlList = this.queryUtils.sanitizeIdList(bProductTypes);
     const othersProductTypesSqlList = this.queryUtils.sanitizeIdList(othersList);
 
-    // Safe parameterized query - convert concatenated arrays to Prisma.join
-    const abProductTypesParam = Prisma.join(abProductTypes);
-    const aProductTypesForRankingParam = Prisma.join(aProductTypesForRanking);
-    const bProductTypesForRankingParam = Prisma.join(bProductTypesForRanking);
-    const aProductTypesForLeastRankingParam = Prisma.join(aProductTypesForLeastRanking);
-    const bProductTypesForLeastRankingParam = Prisma.join(bProductTypesForLeastRanking);
+    // Convert arrays to comma-separated strings for SQL IN clauses
+    const abProductTypesParam = abProductTypes.join(',');
+    const aProductTypesForRankingParam = aProductTypesForRanking.join(',');
+    const bProductTypesForRankingParam = bProductTypesForRanking.join(',');
+    const aProductTypesForLeastRankingParam = aProductTypesForLeastRanking.join(',');
+    const bProductTypesForLeastRankingParam = bProductTypesForLeastRanking.join(',');
 
-    const kpisRawSql = Prisma.sql`
+    const kpisRawSql = `
   SELECT
     ra."id_apartamentostate",
     so.id AS "id_saidaestoque",
@@ -207,18 +206,18 @@ export class RestaurantService {
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
   LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
   GROUP BY ra."id_apartamentostate", so.id, s."desconto", ra."datainicialdaocupacao"
 `;
 
-    const revenueAbPeriodSql = Prisma.sql`
+    const revenueAbPeriodSql = `
   SELECT
     TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
     COALESCE(SUM(
       CASE
         WHEN tp.id IN (${abProductTypesParam}) THEN
-          (soi."precovenda" * soi."quantidade") * 
+          (soi."precovenda" * soi."quantidade") *
           (
             1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0)
           )
@@ -234,20 +233,20 @@ export class RestaurantService {
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
   LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
   LEFT JOIN (
-    SELECT 
-      soi."id_saidaestoque", 
+    SELECT
+      soi."id_saidaestoque",
       SUM(soi."precovenda" * soi."quantidade") AS total_bruto
     FROM "saidaestoqueitem" soi
     WHERE soi."cancelado" IS NULL
     GROUP BY soi."id_saidaestoque"
   ) AS so_total ON so_total."id_saidaestoque" = so.id
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
   GROUP BY "date"
   ORDER BY "date" DESC
 `;
 
-    const totalRevenueByPeriodSql = Prisma.sql`
+    const totalRevenueByPeriodSql = `
   SELECT
     "date",
     SUM("valor") AS "totalRevenue"
@@ -257,7 +256,7 @@ export class RestaurantService {
       TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
       ra."valortotal" AS "valor"
     FROM "locacaoapartamento" ra
-    WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+    WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
       AND ra."fimocupacaotipo" = 'FINALIZADA'
 
     UNION ALL
@@ -270,14 +269,14 @@ export class RestaurantService {
     INNER JOIN "saidaestoque" so ON so.id = vd."id_saidaestoque"
     LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
     LEFT JOIN "venda" v ON v."id_saidaestoque" = so.id
-    WHERE so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+    WHERE so."datasaida" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
     GROUP BY TO_CHAR(so."datasaida" - INTERVAL '6 hours', 'YYYY-MM-DD'), v."desconto"
   ) AS all_revenues
   GROUP BY "date"
   ORDER BY "date" DESC;
 `;
 
-    const abTicketCountByPeriodSql = Prisma.sql`
+    const abTicketCountByPeriodSql = `
   SELECT
     TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
     COUNT(DISTINCT ra."id_apartamentostate") AS "rentalsWithAB"
@@ -288,7 +287,7 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${abProductTypesParam})
   GROUP BY "date"
@@ -296,7 +295,7 @@ export class RestaurantService {
 `;
 
     // Consultas separadas para ALIMENTOS
-    const bestSellingFoodSql = Prisma.sql`
+    const bestSellingFoodSql = `
   SELECT
     p."descricao" AS "productName",
     SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
@@ -307,13 +306,13 @@ export class RestaurantService {
   JOIN "produto" p ON p.id = pe."id_produto"
   JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
   WHERE tp.id IN (${aProductTypesForRankingParam})
-    AND so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+    AND so."datasaida" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
   GROUP BY p."descricao"
   ORDER BY "totalRevenue" DESC
   LIMIT 10;
 `;
 
-    const leastSellingFoodSql = Prisma.sql`
+    const leastSellingFoodSql = `
   SELECT
     p."descricao" AS "productName",
     SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
@@ -324,7 +323,7 @@ export class RestaurantService {
   JOIN "produto" p ON p.id = pe."id_produto"
   JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
   WHERE tp.id IN (${aProductTypesForLeastRankingParam})
-    AND so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+    AND so."datasaida" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
   GROUP BY p."descricao"
   HAVING SUM(soi."precovenda" * soi."quantidade") > 0
   ORDER BY "totalRevenue" ASC
@@ -332,7 +331,7 @@ export class RestaurantService {
 `;
 
     // Consultas separadas para BEBIDAS
-    const bestSellingDrinksSql = Prisma.sql`
+    const bestSellingDrinksSql = `
   SELECT
     p."descricao" AS "productName",
     SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
@@ -343,13 +342,13 @@ export class RestaurantService {
   JOIN "produto" p ON p.id = pe."id_produto"
   JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
   WHERE tp.id IN (${bProductTypesForRankingParam})
-    AND so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+    AND so."datasaida" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
   GROUP BY p."descricao"
   ORDER BY "totalRevenue" DESC
   LIMIT 10;
 `;
 
-    const leastSellingDrinksSql = Prisma.sql`
+    const leastSellingDrinksSql = `
   SELECT
     p."descricao" AS "productName",
     SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
@@ -360,17 +359,17 @@ export class RestaurantService {
   JOIN "produto" p ON p.id = pe."id_produto"
   JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
   WHERE tp.id IN (${bProductTypesForLeastRankingParam})
-    AND so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+    AND so."datasaida" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
   GROUP BY p."descricao"
   HAVING SUM(soi."precovenda" * soi."quantidade") > 0
   ORDER BY "totalRevenue" ASC
   LIMIT 10;
 `;
 
-    const aProductTypesParam = Prisma.join(aProductTypes);
-    const bProductTypesParam = Prisma.join(bProductTypes);
+    const aProductTypesParam = aProductTypes.join(',');
+    const bProductTypesParam = bProductTypes.join(',');
 
-    const revenueGroupByPeriodSql = Prisma.sql`
+    const revenueGroupByPeriodSql = `
   SELECT
     TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
 
@@ -406,14 +405,14 @@ export class RestaurantService {
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
 
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
 
   GROUP BY "date"
   ORDER BY "date" DESC;
 `;
 
-    const revenueAPeriodSql = Prisma.sql`
+    const revenueAPeriodSql = `
   SELECT
     TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
     tp."descricao" AS "category",
@@ -425,14 +424,14 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${aProductTypesParam})
   GROUP BY "date", tp."descricao"
   ORDER BY "date" DESC;
 `;
 
-    const revenueBPeriodSql = Prisma.sql`
+    const revenueBPeriodSql = `
   SELECT
     TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
     tp."descricao" AS "category",
@@ -444,14 +443,14 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${bProductTypesParam})
   GROUP BY "date", tp."descricao"
   ORDER BY "date" DESC;
 `;
 
-    const reportByFoodSql = Prisma.sql`
+    const reportByFoodSql = `
   SELECT
     tp."descricao" AS "category",
     COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "revenue",
@@ -463,14 +462,14 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${aProductTypesParam})
   GROUP BY tp."descricao"
   ORDER BY revenue DESC
 `;
 
-    const reportByDrinkSql = Prisma.sql`
+    const reportByDrinkSql = `
   SELECT
     tp."descricao" AS "category",
     COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "revenue",
@@ -482,24 +481,24 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${bProductTypesParam})
   GROUP BY tp."descricao"
   ORDER BY revenue DESC
 `;
 
-    const othersProductTypesParam = Prisma.join(othersList);
+    const othersProductTypesParam = othersList.join(',');
 
     // Query para faturamento total da empresa (locações + vendas diretas)
-    const companyTotalRevenueSql = Prisma.sql`
+    const companyTotalRevenueSql = `
   SELECT
     COALESCE(SUM("valor"), 0) AS "totalCompanyRevenue"
   FROM (
     -- Receita de locações (valortotal já inclui consumo)
     SELECT ra."valortotal" AS "valor"
     FROM "locacaoapartamento" ra
-    WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+    WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
       AND ra."fimocupacaotipo" = 'FINALIZADA'
 
     UNION ALL
@@ -510,13 +509,13 @@ export class RestaurantService {
     INNER JOIN "saidaestoque" so ON so.id = vd."id_saidaestoque"
     LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
     LEFT JOIN "venda" v ON v."id_saidaestoque" = so.id
-    WHERE so."datasaida" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+    WHERE so."datasaida" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
     GROUP BY v."desconto"
   ) AS all_revenues
 `;
 
     // Query para receita total de vendas/consumo (todos os produtos, não só A&B)
-    const totalSalesRevenueSql = Prisma.sql`
+    const totalSalesRevenueSql = `
   SELECT
     COALESCE(SUM(
       (soi."precovenda" * soi."quantidade") *
@@ -535,11 +534,11 @@ export class RestaurantService {
     WHERE soi."cancelado" IS NULL
     GROUP BY soi."id_saidaestoque"
   ) AS so_total ON so_total."id_saidaestoque" = so.id
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
 `;
 
-    const reportByOthersSql = Prisma.sql`
+    const reportByOthersSql = `
   SELECT
     tp."descricao" AS "category",
     COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "revenue",
@@ -551,7 +550,7 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE ra."datainicialdaocupacao" BETWEEN ${formattedStart}::timestamp AND ${formattedEnd}::timestamp
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}'::timestamp AND '${formattedEnd}'::timestamp
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${othersProductTypesParam})
   GROUP BY tp."descricao"
@@ -577,59 +576,59 @@ export class RestaurantService {
         companyTotalRevenueResult,
         totalSalesRevenueResult,
       ] = await Promise.all([
-        this.prisma.prismaLocal.$queryRaw<any[]>(kpisRawSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(revenueAbPeriodSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(totalRevenueByPeriodSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(abTicketCountByPeriodSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(bestSellingFoodSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(leastSellingFoodSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(bestSellingDrinksSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(leastSellingDrinksSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(revenueGroupByPeriodSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(revenueAPeriodSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(revenueBPeriodSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(reportByFoodSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(reportByDrinkSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(reportByOthersSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(companyTotalRevenueSql),
-        this.prisma.prismaLocal.$queryRaw<any[]>(totalSalesRevenueSql),
+        this.pgPool.query<any>(kpisRawSql),
+        this.pgPool.query<any>(revenueAbPeriodSql),
+        this.pgPool.query<any>(totalRevenueByPeriodSql),
+        this.pgPool.query<any>(abTicketCountByPeriodSql),
+        this.pgPool.query<any>(bestSellingFoodSql),
+        this.pgPool.query<any>(leastSellingFoodSql),
+        this.pgPool.query<any>(bestSellingDrinksSql),
+        this.pgPool.query<any>(leastSellingDrinksSql),
+        this.pgPool.query<any>(revenueGroupByPeriodSql),
+        this.pgPool.query<any>(revenueAPeriodSql),
+        this.pgPool.query<any>(revenueBPeriodSql),
+        this.pgPool.query<any>(reportByFoodSql),
+        this.pgPool.query<any>(reportByDrinkSql),
+        this.pgPool.query<any>(reportByOthersSql),
+        this.pgPool.query<any>(companyTotalRevenueSql),
+        this.pgPool.query<any>(totalSalesRevenueSql),
       ]);
 
       // --- BigNumbers ---
-      let totalGrossRevenue = new Prisma.Decimal(0);
-      let totalDiscount = new Prisma.Decimal(0);
-      let totalABNetRevenue = new Prisma.Decimal(0);
+      let totalGrossRevenue = 0;
+      let totalDiscount = 0;
+      let totalABNetRevenue = 0;
       let rentalsWithABCount = 0;
       let totalAllSales = 0;
 
       for (const row of rawResult) {
-        const gross = new Prisma.Decimal(row.totalGross);
-        const discount = new Prisma.Decimal(row.desconto);
-        const abTotal = new Prisma.Decimal(row.abTotal);
-        const discountProportion = gross.gt(0)
-          ? discount.mul(abTotal).div(gross)
-          : new Prisma.Decimal(0);
-        const netAB = abTotal.minus(discountProportion);
+        const gross = Number(row.totalGross) || 0;
+        const discount = Number(row.desconto) || 0;
+        const abTotal = Number(row.abTotal) || 0;
+        const discountProportion = gross > 0
+          ? (discount * abTotal) / gross
+          : 0;
+        const netAB = abTotal - discountProportion;
 
-        totalGrossRevenue = totalGrossRevenue.plus(gross);
-        totalDiscount = totalDiscount.plus(discount);
+        totalGrossRevenue += gross;
+        totalDiscount += discount;
 
-        if (abTotal.gt(0)) {
-          totalABNetRevenue = totalABNetRevenue.plus(netAB);
+        if (abTotal > 0) {
+          totalABNetRevenue += netAB;
           rentalsWithABCount++;
         }
 
-        if (gross.gt(0)) {
+        if (gross > 0) {
           totalAllSales++;
         }
       }
 
-      const totalNetRevenue = totalGrossRevenue.minus(totalDiscount);
+      const totalNetRevenue = totalGrossRevenue - totalDiscount;
       const totalRentals = rawResult.length;
       const totalAllTicketAverage =
-        rentalsWithABCount > 0 ? totalABNetRevenue.div(rentalsWithABCount) : new Prisma.Decimal(0);
+        rentalsWithABCount > 0 ? totalABNetRevenue / rentalsWithABCount : 0;
       const totalAllTicketAverageByTotalRentals =
-        totalRentals > 0 ? totalABNetRevenue.div(totalRentals) : new Prisma.Decimal(0);
+        totalRentals > 0 ? totalABNetRevenue / totalRentals : 0;
 
       // Faturamento total da empresa e receita total de vendas
       const companyTotalRevenue = Number(companyTotalRevenueResult[0]?.totalCompanyRevenue || 0);
@@ -638,7 +637,7 @@ export class RestaurantService {
       // Representatividades (em percentual)
       const abRepresentativity =
         companyTotalRevenue > 0
-          ? Number(((Number(totalABNetRevenue) / companyTotalRevenue) * 100).toFixed(2))
+          ? Number(((totalABNetRevenue / companyTotalRevenue) * 100).toFixed(2))
           : 0;
       const salesRepresentativity =
         companyTotalRevenue > 0
