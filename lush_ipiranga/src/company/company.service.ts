@@ -3,7 +3,7 @@ import { Prisma } from '@client-local';
 import { PeriodEnum, RentalTypeEnum } from '../common/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import * as moment from 'moment-timezone';
-import { KpiCacheService, SuiteMetadataCacheService } from '../cache';
+import { KpiCacheService } from '../cache';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 
 // Type definitions for better type safety - Numeric versions for SQL function
@@ -243,7 +243,6 @@ export class CompanyService {
   constructor(
     private readonly prisma: PrismaService,
     private kpiCacheService: KpiCacheService,
-    private readonly suiteMetadataCache: SuiteMetadataCacheService,
   ) {}
 
   private formatCurrency(value: number): string {

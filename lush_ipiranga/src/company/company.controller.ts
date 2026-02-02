@@ -1,8 +1,7 @@
-import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiBearerAuth, ApiNotFoundResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PeriodEnum } from '../common/enums';
 import { CompanyService } from './company.service';
-import { SuiteMetadataCacheService } from '../cache';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { UnitsGuard } from '../auth/units.guard';
@@ -21,7 +20,6 @@ export class CompanyController {
     private readonly companyService: CompanyService,
     private readonly dateUtilsService: DateUtilsService,
     private readonly validationService: ValidationService,
-    private readonly suiteMetadataCache: SuiteMetadataCacheService,
   ) {}
 
 
@@ -75,32 +73,5 @@ export class CompanyController {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException(`Failed to fetch KPIs: ${errorMessage}`);
     }
-  }
-
-  /**
-   * Invalida o cache de metadados de suítes
-   * Use este endpoint quando houver mudança nas suítes (adicionar/remover)
-   */
-  @Post('cache/invalidate-metadata')
-  @HttpCode(HttpStatus.OK)
-  @ApiOkResponse({ description: 'Cache de metadados invalidado com sucesso.' })
-  async invalidateMetadataCache(): Promise<{ success: boolean; message: string; status: any }> {
-    this.suiteMetadataCache.invalidate();
-    const status = this.suiteMetadataCache.getStatus();
-    return {
-      success: true,
-      message: 'Cache de metadados de suítes invalidado. Próxima requisição buscará dados atualizados.',
-      status,
-    };
-  }
-
-  /**
-   * Retorna o status atual do cache de metadados
-   */
-  @Get('cache/metadata-status')
-  @HttpCode(HttpStatus.OK)
-  @ApiOkResponse({ description: 'Status do cache de metadados.' })
-  getMetadataCacheStatus(): any {
-    return this.suiteMetadataCache.getStatus();
   }
 }
