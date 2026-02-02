@@ -1,10 +1,10 @@
 /**
- * Serviço de conexão PostgreSQL usando pg (node-postgres)
- * Conexão direta sem Prisma para melhor performance
+ * Serviço de conexão com banco de dados usando node-postgres (pg)
+ * Para queries diretas sem Prisma - melhor performance
  */
 
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Pool, PoolClient } from 'pg';
+import { Pool, PoolConfig } from 'pg';
 
 @Injectable()
 export class PgPoolService implements OnModuleInit, OnModuleDestroy {
@@ -20,32 +20,33 @@ export class PgPoolService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Inicializa pool de conexão PostgreSQL
+   * Inicializa o pool de conexão
    */
   private async initializePool(): Promise<void> {
     const connectionString = process.env.DATABASE_URL_LOCAL_IPIRANGA;
 
     if (!connectionString) {
-      throw new Error('DATABASE_URL_LOCAL_IPIRANGA não configurado nas variáveis de ambiente');
+      throw new Error('DATABASE_URL_LOCAL_IPIRANGA não configurada');
     }
 
     try {
-      this.pool = new Pool({
+      const config: PoolConfig = {
         connectionString,
-        max: 5, // Máximo de conexões no pool
-        idleTimeoutMillis: 30000, // Timeout de conexões ociosas
-        connectionTimeoutMillis: 10000, // Timeout para estabelecer conexão
-      });
+        max: 10,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+      };
+
+      this.pool = new Pool(config);
 
       // Testa a conexão
       const client = await this.pool.connect();
       await client.query('SELECT 1');
       client.release();
 
-      this.logger.log('Pool de conexão PostgreSQL inicializado para Lush Ipiranga');
+      this.logger.log('Pool de conexão inicializado');
     } catch (error) {
-      const err = error as Error;
-      this.logger.error(`Erro ao conectar ao PostgreSQL: ${err.message}`);
+      this.logger.error(`Erro ao conectar: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -55,51 +56,43 @@ export class PgPoolService implements OnModuleInit, OnModuleDestroy {
    */
   private async closePool(): Promise<void> {
     if (this.pool) {
-      try {
-        await this.pool.end();
-        this.logger.log('Pool de conexão PostgreSQL fechado');
-      } catch (error) {
-        const err = error as Error;
-        this.logger.error(`Erro ao fechar pool: ${err.message}`);
-      }
+      await this.pool.end();
+      this.pool = null;
+      this.logger.log('Pool de conexão fechado');
     }
   }
 
   /**
-   * Executa uma query SQL direta
-   * @param sql Query SQL (pode usar interpolação de string)
-   * @returns Resultado da query com rows
+   * Executa uma query SQL
    */
   async query<T = any>(sql: string): Promise<T[]> {
     if (!this.pool) {
-      throw new Error('Pool de conexão não inicializado');
+      throw new Error('Pool de conexão não disponível');
     }
 
     try {
       const result = await this.pool.query(sql);
       return result.rows as T[];
     } catch (error) {
-      const err = error as Error;
-      this.logger.error(`Erro na query SQL: ${err.message}`);
-      this.logger.error(`SQL: ${sql.substring(0, 200)}...`);
+      this.logger.error(`Erro na query: ${(error as Error).message}`);
       throw error;
     }
   }
 
   /**
-   * Verifica se o pool está conectado
+   * Executa uma query SQL com parâmetros
    */
-  isConnected(): boolean {
-    return this.pool !== null;
-  }
-
-  /**
-   * Obtém o pool para uso direto (se necessário)
-   */
-  getPool(): Pool {
+  async queryWithParams<T = any>(sql: string, params: any[]): Promise<T[]> {
     if (!this.pool) {
-      throw new Error('Pool de conexão não inicializado');
+      throw new Error('Pool de conexão não disponível');
     }
-    return this.pool;
+
+    try {
+      const result = await this.pool.query(sql, params);
+      return result.rows as T[];
+    } catch (error) {
+      this.logger.error(`Erro na query: ${(error as Error).message}`);
+      throw error;
+    }
   }
 }
