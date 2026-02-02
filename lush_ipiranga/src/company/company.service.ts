@@ -3,7 +3,7 @@ import { Prisma } from '@client-local';
 import { PeriodEnum, RentalTypeEnum } from '../common/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import * as moment from 'moment-timezone';
-import { KpiCacheService } from '../cache/kpi-cache.service';
+import { KpiCacheService, SuiteMetadataCacheService } from '../cache';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 
 // Type definitions for better type safety - Numeric versions for SQL function
@@ -243,6 +243,7 @@ export class CompanyService {
   constructor(
     private readonly prisma: PrismaService,
     private kpiCacheService: KpiCacheService,
+    private readonly suiteMetadataCache: SuiteMetadataCacheService,
   ) {}
 
   private formatCurrency(value: number): string {
@@ -1476,29 +1477,32 @@ export class CompanyService {
     };
 
     // === IMPLEMENTAÇÃO DO DATATABLESUITEACATEGORY ===
-    // Consulta SQL para KPIs por categoria de suíte usando campos corretos do schema
+    // OTIMIZAÇÃO: Removida subquery correlata, usando JOIN com CTE de consumo
+    // Isso melhora drasticamente a performance pois a subquery era executada PARA CADA linha
     const suiteCategoryKpisResult: any[] = await this.prisma.prismaLocal.$queryRaw`
-      WITH suite_category_data AS (
+      WITH consumo_por_locacao AS (
+        -- Primeiro calcula o consumo por locação (uma vez só)
+        SELECT
+          vl.id_locacaoapartamento,
+          COALESCE(SUM(
+            CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
+          ), 0) as valor_consumo
+        FROM vendalocacao vl
+        INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
+        INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
+        WHERE sei.cancelado IS NULL
+        GROUP BY vl.id_locacaoapartamento
+      ),
+      suite_category_data AS (
         SELECT
           ca.descricao as suite_category_name,
           COUNT(*) as total_rentals,
           -- Receita total: (permanencia + ocupadicional + consumo) - desconto
-          -- Importante: la.desconto já contém desconto de locação + desconto de consumo
+          -- Agora usando JOIN em vez de subquery correlata!
           COALESCE(SUM(
             COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
             COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
-            COALESCE(
-              (
-                SELECT COALESCE(SUM(
-                  CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
-                ), 0)
-                FROM vendalocacao vl
-                INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
-                INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
-                WHERE vl.id_locacaoapartamento = la.id_apartamentostate
-                  AND sei.cancelado IS NULL
-              ), 0
-            ) -
+            COALESCE(cpl.valor_consumo, 0) -
             COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
           ), 0) as total_value,
           -- Receita apenas de locação: (permanencia + ocupadicional) - desconto
@@ -1515,11 +1519,12 @@ export class CompanyService {
         INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
         INNER JOIN apartamento a ON aps.id_apartamento = a.id
         INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        LEFT JOIN consumo_por_locacao cpl ON la.id_apartamentostate = cpl.id_locacaoapartamento
         WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
           AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND ca.id IN (10,11,12,15,16,17,18,19,24)
-          GROUP BY ca.id, ca.descricao
+        GROUP BY ca.id, ca.descricao
       ),
       suite_counts AS (
         SELECT
@@ -2033,7 +2038,7 @@ export class CompanyService {
             WHEN 6 THEN 'sábado'
           END as day_of_week,
           COUNT(*) as days_count
-        FROM generate_series(${formattedStart}::timestamp, ${formattedEnd}::timestamp, '1 day'::interval) d
+        FROM generate_series(${formattedStart}::timestamp, ${formattedEnd}::timestamp, INTERVAL '1 day') d
         GROUP BY EXTRACT(DOW FROM d::date)
       ),
       total_rentals_by_day AS (
@@ -2222,7 +2227,7 @@ export class CompanyService {
             WHEN 6 THEN 'sábado'
           END as day_of_week,
           COUNT(*) as days_count
-        FROM generate_series(${formattedStart}::timestamp, ${formattedEnd}::timestamp, '1 day'::interval) d
+        FROM generate_series(${formattedStart}::timestamp, ${formattedEnd}::timestamp, INTERVAL '1 day') d
         GROUP BY EXTRACT(DOW FROM d::date)
       ),
       total_revenue_by_day AS (
@@ -2467,5 +2472,221 @@ export class CompanyService {
 
     // Caso nenhuma condição acima seja satisfeita, retorna 12 horas como padrão
     return 'TWELVE_HOURS';
+  }
+
+  /**
+   * OTIMIZAÇÃO: Query consolidada para DataTableGiroByWeek e DataTableRevparByWeek
+   * Retorna ambos os resultados em UMA única query em vez de duas separadas
+   *
+   * Reduz de ~2 queries para 1 query, economizando um round-trip de rede
+   */
+  private async getWeeklyMetricsConsolidated(
+    formattedStart: string,
+    formattedEnd: string,
+    totalSuites: number,
+  ): Promise<{
+    giroByWeek: WeeklyGiroData[];
+    revparByWeek: WeeklyRevparData[];
+  }> {
+    const result: any[] = await this.prisma.prismaLocal.$queryRaw`
+      WITH commercial_day_calculation AS (
+        -- CTE auxiliar para calcular o dia comercial (lógica das 6h)
+        SELECT
+          ca.descricao as suite_category_name,
+          -- Dia comercial para agrupamento
+          CASE
+            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+            ELSE la.datainicialdaocupacao
+          END as commercial_date,
+          -- Métricas de GIRO: contagem de locações
+          COUNT(*) as rental_count,
+          -- Métricas de REVPAR: soma da receita de locação (permanência + ocupacional - desconto)
+          SUM(
+            COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
+            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+          ) as rental_revenue
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
+          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND ca.id IN (10,11,12,15,16,17,18,19,24)
+        GROUP BY
+          ca.id,
+          ca.descricao,
+          CASE
+            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+            ELSE la.datainicialdaocupacao
+          END
+      ),
+      day_of_week_mapping AS (
+        -- Converte data comercial para dia da semana
+        SELECT
+          suite_category_name,
+          rental_count,
+          rental_revenue,
+          EXTRACT(DOW FROM commercial_date) as day_of_week_num,
+          CASE EXTRACT(DOW FROM commercial_date)
+            WHEN 0 THEN 'domingo'
+            WHEN 1 THEN 'segunda-feira'
+            WHEN 2 THEN 'terça-feira'
+            WHEN 3 THEN 'quarta-feira'
+            WHEN 4 THEN 'quinta-feira'
+            WHEN 5 THEN 'sexta-feira'
+            WHEN 6 THEN 'sábado'
+          END as day_of_week
+        FROM commercial_day_calculation
+      ),
+      aggregated_by_category_day AS (
+        -- Agrega por categoria e dia da semana
+        SELECT
+          suite_category_name,
+          day_of_week,
+          day_of_week_num,
+          SUM(rental_count) as total_rentals,
+          SUM(rental_revenue) as total_revenue
+        FROM day_of_week_mapping
+        GROUP BY suite_category_name, day_of_week, day_of_week_num
+      ),
+      total_by_day AS (
+        -- Total por dia da semana (todas as categorias)
+        SELECT
+          day_of_week,
+          day_of_week_num,
+          SUM(total_rentals) as grand_total_rentals,
+          SUM(total_revenue) as grand_total_revenue
+        FROM aggregated_by_category_day
+        GROUP BY day_of_week, day_of_week_num
+      ),
+      days_count_in_period AS (
+        -- Conta quantos dias de cada dia da semana existem no período
+        SELECT
+          EXTRACT(DOW FROM d::date) as day_of_week_num,
+          CASE EXTRACT(DOW FROM d::date)
+            WHEN 0 THEN 'domingo'
+            WHEN 1 THEN 'segunda-feira'
+            WHEN 2 THEN 'terça-feira'
+            WHEN 3 THEN 'quarta-feira'
+            WHEN 4 THEN 'quinta-feira'
+            WHEN 5 THEN 'sexta-feira'
+            WHEN 6 THEN 'sábado'
+          END as day_of_week,
+          COUNT(*) as days_count
+        FROM generate_series(${formattedStart}::timestamp, ${formattedEnd}::timestamp, INTERVAL '1 day') d
+        GROUP BY EXTRACT(DOW FROM d::date)
+      ),
+      suite_counts AS (
+        SELECT
+          ca.descricao as suite_category_name,
+          COUNT(DISTINCT a.id) as total_suites_in_category
+        FROM categoriaapartamento ca
+        INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
+        WHERE ca.id IN (10,11,12,15,16,17,18,19,24)
+          AND a.dataexclusao IS NULL
+        GROUP BY ca.id, ca.descricao
+      )
+      SELECT
+        acd.suite_category_name,
+        acd.day_of_week,
+        acd.total_rentals,
+        acd.total_revenue,
+        sc.total_suites_in_category,
+        dc.days_count,
+        td.grand_total_rentals,
+        td.grand_total_revenue,
+        -- Cálculos para GIRO por categoria
+        CASE
+          WHEN sc.total_suites_in_category > 0 AND dc.days_count > 0 THEN
+            (acd.total_rentals::DECIMAL / (sc.total_suites_in_category * dc.days_count))
+          ELSE 0
+        END as category_giro,
+        -- Cálculos para GIRO total
+        CASE
+          WHEN ${totalSuites}::DECIMAL > 0 AND dc.days_count > 0 THEN
+            (td.grand_total_rentals::DECIMAL / (${totalSuites}::DECIMAL * dc.days_count))
+          ELSE 0
+        END as total_giro,
+        -- Cálculos para REVPAR por categoria
+        CASE
+          WHEN sc.total_suites_in_category > 0 AND dc.days_count > 0 THEN
+            (acd.total_revenue::DECIMAL / (sc.total_suites_in_category * dc.days_count))
+          ELSE 0
+        END as category_revpar,
+        -- Cálculos para REVPAR total
+        CASE
+          WHEN ${totalSuites}::DECIMAL > 0 AND dc.days_count > 0 THEN
+            (td.grand_total_revenue::DECIMAL / (${totalSuites}::DECIMAL * dc.days_count))
+          ELSE 0
+        END as total_revpar
+      FROM aggregated_by_category_day acd
+      INNER JOIN suite_counts sc ON acd.suite_category_name = sc.suite_category_name
+      INNER JOIN days_count_in_period dc ON acd.day_of_week_num = dc.day_of_week_num
+      INNER JOIN total_by_day td ON acd.day_of_week_num = td.day_of_week_num
+      ORDER BY acd.suite_category_name, acd.day_of_week_num
+    `;
+
+    // Processar resultados
+    const giroByCategory: { [category: string]: { [day: string]: any } } = {};
+    const revparByCategory: { [category: string]: { [day: string]: any } } = {};
+    const allDaysOfWeek = [
+      'domingo',
+      'segunda-feira',
+      'terça-feira',
+      'quarta-feira',
+      'quinta-feira',
+      'sexta-feira',
+      'sábado',
+    ];
+
+    // Primeira passagem: preencher dados existentes
+    result.forEach((item) => {
+      const categoryName = item.suite_category_name;
+      const dayName = item.day_of_week;
+
+      if (!giroByCategory[categoryName]) {
+        giroByCategory[categoryName] = {};
+        revparByCategory[categoryName] = {};
+      }
+
+      giroByCategory[categoryName][dayName] = {
+        giro: Number(Number(item.category_giro).toFixed(2)),
+        totalGiro: Number(Number(item.total_giro).toFixed(2)),
+      };
+
+      revparByCategory[categoryName][dayName] = {
+        revpar: Number(Number(item.category_revpar).toFixed(2)),
+        totalRevpar: Number(Number(item.total_revpar).toFixed(2)),
+      };
+    });
+
+    // Segunda passagem: preencher dias ausentes com zero
+    Object.keys(giroByCategory).forEach((categoryName) => {
+      const existingGiroDay = Object.values(giroByCategory[categoryName])[0];
+      const totalGiroReference = existingGiroDay ? existingGiroDay.totalGiro : 0;
+
+      const existingRevparDay = Object.values(revparByCategory[categoryName])[0];
+      const totalRevparReference = existingRevparDay ? existingRevparDay.totalRevpar : 0;
+
+      allDaysOfWeek.forEach((day) => {
+        if (!giroByCategory[categoryName][day]) {
+          giroByCategory[categoryName][day] = { giro: 0, totalGiro: totalGiroReference };
+        }
+        if (!revparByCategory[categoryName][day]) {
+          revparByCategory[categoryName][day] = { revpar: 0, totalRevpar: totalRevparReference };
+        }
+      });
+    });
+
+    return {
+      giroByWeek: Object.entries(giroByCategory).map(([categoryName, dayData]) => ({
+        [categoryName]: dayData,
+      })),
+      revparByWeek: Object.entries(revparByCategory).map(([categoryName, dayData]) => ({
+        [categoryName]: dayData,
+      })),
+    };
   }
 }

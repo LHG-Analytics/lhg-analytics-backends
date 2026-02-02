@@ -1881,7 +1881,7 @@ export class CompanyService {
             WHEN 6 THEN 'sábado'
           END as day_of_week,
           COUNT(*) as days_count
-        FROM generate_series('${formattedStart}'::timestamp, '${formattedEnd}'::timestamp, "1 day"::interval) d
+        FROM generate_series('${formattedStart}'::timestamp, '${formattedEnd}'::timestamp, INTERVAL '1 day') d
         GROUP BY EXTRACT(DOW FROM d::date)
       ),
       total_rentals_by_day AS (
@@ -2069,7 +2069,7 @@ export class CompanyService {
             WHEN 6 THEN 'sábado'
           END as day_of_week,
           COUNT(*) as days_count
-        FROM generate_series('${formattedStart}'::timestamp, '${formattedEnd}'::timestamp, "1 day"::interval) d
+        FROM generate_series('${formattedStart}'::timestamp, '${formattedEnd}'::timestamp, INTERVAL '1 day') d
         GROUP BY EXTRACT(DOW FROM d::date)
       ),
       total_revenue_by_day AS (
