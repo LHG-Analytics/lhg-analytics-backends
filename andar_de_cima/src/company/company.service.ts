@@ -545,7 +545,7 @@ export class CompanyService {
         SELECT
           CASE
             WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-            ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+            ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
           END as date,
           COALESCE(SUM(
             CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
@@ -564,7 +564,7 @@ export class CompanyService {
           AND ca_apt.id IN (2,3,4,5,6,7,12)
         GROUP BY CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END
       ),
       receita_locacao_por_data AS (
@@ -572,7 +572,7 @@ export class CompanyService {
         SELECT
           CASE
             WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-            ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+            ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
           END as date,
           COALESCE(SUM(
             COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
@@ -589,7 +589,7 @@ export class CompanyService {
           AND ca.id IN (2,3,4,5,6,7,12)
         GROUP BY CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END
       ),
       vendas_diretas_por_data AS (
@@ -597,7 +597,7 @@ export class CompanyService {
         SELECT
           CASE
             WHEN EXTRACT(HOUR FROM sei.datasaidaitem) >= 6 THEN DATE(sei.datasaidaitem)
-            ELSE DATE(sei.datasaidaitem - INTERVAL "1 day")
+            ELSE DATE(sei.datasaidaitem - INTERVAL '1 day')
           END as date,
           COALESCE(SUM(
             (CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))) -
@@ -617,7 +617,7 @@ export class CompanyService {
           AND sei.datasaidaitem <= '${formattedEnd}'
         GROUP BY CASE
           WHEN EXTRACT(HOUR FROM sei.datasaidaitem) >= 6 THEN DATE(sei.datasaidaitem)
-          ELSE DATE(sei.datasaidaitem - INTERVAL "1 day")
+          ELSE DATE(sei.datasaidaitem - INTERVAL '1 day')
         END
       )
       -- Combina tudo: locação + consumo + venda direta
@@ -656,7 +656,7 @@ export class CompanyService {
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END as date,
         CASE
           WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
@@ -684,7 +684,7 @@ export class CompanyService {
       GROUP BY
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END,
         CASE
           WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
@@ -745,7 +745,7 @@ export class CompanyService {
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END as date,
         COUNT(*) as total_rentals
       FROM locacaoapartamento la
@@ -758,7 +758,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
       END
       ORDER BY date
     `;
@@ -767,7 +767,7 @@ export class CompanyService {
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END as date,
         COALESCE(AVG(CAST(la.valortotal AS DECIMAL)), 0) as avg_ticket
       FROM locacaoapartamento la
@@ -780,7 +780,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
       END
       ORDER BY date
     `;
@@ -811,7 +811,7 @@ export class CompanyService {
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END as date,
         COALESCE(SUM(
           COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
@@ -831,7 +831,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
       END
       ORDER BY date
     `;
@@ -843,7 +843,7 @@ export class CompanyService {
         ca.descricao as suite_category,
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END as rental_date,
         SUM(EXTRACT(EPOCH FROM (la.datafinaldaocupacao - la.datainicialdaocupacao))) as total_occupied_time
       FROM locacaoapartamento la
@@ -856,7 +856,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
       GROUP BY ca.descricao, CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END
       ORDER BY rental_date, ca.descricao
     `;
@@ -877,7 +877,7 @@ export class CompanyService {
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END as date,
         COUNT(*) as total_rentals
       FROM locacaoapartamento la
@@ -890,7 +890,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
       END
       ORDER BY date
     `;
@@ -900,7 +900,7 @@ export class CompanyService {
       SELECT
         CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END as date,
         SUM(EXTRACT(EPOCH FROM (la.datafinaldaocupacao - la.datainicialdaocupacao))) as total_occupied_time
       FROM locacaoapartamento la
@@ -913,7 +913,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL "1 day")
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
       END
       ORDER BY date
     `;
@@ -1824,13 +1824,13 @@ export class CompanyService {
           ca.descricao as suite_category_name,
           EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
               ELSE la.datainicialdaocupacao
             END
           ) as day_of_week_num,
           CASE EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
               ELSE la.datainicialdaocupacao
             END
           )
@@ -1853,7 +1853,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
           GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
               ELSE la.datainicialdaocupacao
             END
           )
@@ -1888,13 +1888,13 @@ export class CompanyService {
         SELECT
           EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
               ELSE la.datainicialdaocupacao
             END
           ) as day_of_week_num,
           CASE EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
               ELSE la.datainicialdaocupacao
             END
           )
@@ -1917,7 +1917,7 @@ export class CompanyService {
         AND ca.id IN (2,3,4,5,6,7,12)
           GROUP BY EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
               ELSE la.datainicialdaocupacao
             END
           )
@@ -2007,13 +2007,13 @@ export class CompanyService {
           ca.descricao as suite_category_name,
           EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
               ELSE la.datainicialdaocupacao
             END
           ) as day_of_week_num,
           CASE EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
               ELSE la.datainicialdaocupacao
             END
           )
@@ -2041,7 +2041,7 @@ export class CompanyService {
           AND ca.id IN (2,3,4,5,6,7,12)
         GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM
           CASE
-            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
+            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
             ELSE la.datainicialdaocupacao
           END
         )
@@ -2076,13 +2076,13 @@ export class CompanyService {
         SELECT
           EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
               ELSE la.datainicialdaocupacao
             END
           ) as day_of_week_num,
           CASE EXTRACT(DOW FROM
             CASE
-              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
               ELSE la.datainicialdaocupacao
             END
           )
@@ -2110,7 +2110,7 @@ export class CompanyService {
           AND ca.id IN (2,3,4,5,6,7,12)
         GROUP BY EXTRACT(DOW FROM
           CASE
-            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL "1 day"
+            WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
             ELSE la.datainicialdaocupacao
           END
         )
