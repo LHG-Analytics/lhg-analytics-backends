@@ -1,14 +1,13 @@
-import { Prisma } from '@client-local';
 import { Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { KpiCacheService } from '../cache/kpi-cache.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { PgPoolService } from '../database/database.service';
 
 @Injectable()
 export class BookingsService {
   constructor(
-    private prisma: PrismaService,
+    private pgPool: PgPoolService,
     private kpiCacheService: KpiCacheService,
   ) {}
 
@@ -503,14 +502,14 @@ FROM vendas_diretas vd, locacoes loc;
       billingByDateData,
       ecommerceByDateData,
     ] = await Promise.all([
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalBookingRevenueSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalBookingCountSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([totalRevenueSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([paymentMethodsSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([rentalTypeSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([billingPerChannelSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([billingByDateSQL])),
-      this.prisma.prismaLocal.$queryRaw<any[]>(Prisma.sql([ecommerceByDateSQL])),
+      this.pgPool.query<any>(totalBookingRevenueSQL),
+      this.pgPool.query<any>(totalBookingCountSQL),
+      this.pgPool.query<any>(totalRevenueSQL),
+      this.pgPool.query<any>(paymentMethodsSQL),
+      this.pgPool.query<any>(rentalTypeSQL),
+      this.pgPool.query<any>(billingPerChannelSQL),
+      this.pgPool.query<any>(billingByDateSQL),
+      this.pgPool.query<any>(ecommerceByDateSQL),
     ]);
 
     const totalLineRevenue = bookingRevenue.find(
