@@ -11,6 +11,8 @@ import { BookingsModule } from './bookings/bookings.module';
 import { AuthModule } from './auth/auth.module';
 import { RestaurantModule } from './restaurant/restaurant.module';
 import { CacheModule } from './cache/cache.module';
+import { DatabaseModule } from './database/database.module';
+import { PgPoolService } from './database/database.service';
 import { DateUtilsModule, ValidationModule, QueryUtilsModule, ConcurrencyUtilsModule } from '@lhg/utils';
 
 @Module({
@@ -20,13 +22,14 @@ import { DateUtilsModule, ValidationModule, QueryUtilsModule, ConcurrencyUtilsMo
     QueryUtilsModule, // Utilitários compartilhados de query
     ConcurrencyUtilsModule, // Utilitários de controle de concorrência
     CacheModule, // Módulo de cache para KPIs real-time
+    DatabaseModule, // Pool de conexão PostgreSQL para queries diretas
     ThrottlerModule.forRoot([
       {
         ttl: 60000, // 1 minute
         limit: 100, // 100 requests per minute
       },
     ]),
-    PrismaModule,
+    PrismaModule, // Mantido para outros módulos que ainda usam
     AuthModule,
     CompanyModule,
     GovernanceModule,
@@ -36,7 +39,8 @@ import { DateUtilsModule, ValidationModule, QueryUtilsModule, ConcurrencyUtilsMo
   controllers: [AppController],
   providers: [
     AppService,
-    PrismaService,
+    PrismaService, // Mantido para outros módulos que ainda usam
+    PgPoolService, // Pool de conexão PostgreSQL
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
