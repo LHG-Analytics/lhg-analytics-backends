@@ -16,33 +16,33 @@ jobs:
         run: |
           curl -X POST "${{ secrets.LUSH_IPIRANGA_URL }}/cache/warmup" \
             -H "Content-Type: application/json" \
-            --max-time 60 \
+            --max-time 180 \
             --fail
 
       - name: Warmup Lush Lapa
         run: |
           curl -X POST "${{ secrets.LUSH_LAPA_URL }}/cache/warmup" \
             -H "Content-Type: application/json" \
-            --max-time 60 \
+            --max-time 180 \
             --fail
 
       - name: Warmup Andar de Cima
         run: |
           curl -X POST "${{ secrets.ANDAR_DE_CIMA_URL }}/cache/warmup" \
             -H "Content-Type: application/json" \
-            --max-time 60 \
+            --max-time 180 \
             --fail
 
       - name: Warmup Tout
         run: |
           curl -X POST "${{ secrets.TOUT_URL }}/cache/warmup" \
             -H "Content-Type: application/json" \
-            --max-time 60 \
+            --max-time 180 \
             --fail
 
       - name: Warmup Authentication
         run: |
           curl -X POST "${{ secrets.AUTHENTICATION_URL }}/cache/warmup" \
             -H "Content-Type: application/json" \
-            --max-time 60 \
+            --max-time 180 \
             --fail
