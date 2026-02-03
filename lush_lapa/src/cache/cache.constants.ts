@@ -14,21 +14,22 @@ export const SERVICE_PREFIXES: Record<ServiceType, string> = {
 };
 
 // Estratégia de TTL por período (em segundos)
+// Otimizado para cache warmup diário às 6h via GitHub Actions
 export const CACHE_STRATEGY: CacheConfig = {
   LAST_7_D: {
-    ttl: 1800, // 30 minutos - dados mudam frequentemente
+    ttl: 21600, // 6 horas - últimos 7 dias (até ontem)
     description: 'Últimos 7 dias',
   },
   LAST_MONTH: {
-    ttl: 3600, // 1 hora - mês fechado, mais estável
+    ttl: 86400, // 24 horas - mês fechado, dados estáveis
     description: 'Último mês fechado',
   },
   YEAR_TO_DATE: {
-    ttl: 7200, // 2 horas - dados históricos consolidados
+    ttl: 86400, // 24 horas - dados históricos consolidados
     description: 'Acumulado do ano',
   },
   CUSTOM: {
-    ttl: 600, // 10 minutos - consultas específicas
+    ttl: 600, // 10 minutos - consultas específicas (mantido curto)
     description: 'Período customizado',
   },
 };
