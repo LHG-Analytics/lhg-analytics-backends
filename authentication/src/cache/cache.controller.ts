@@ -136,8 +136,8 @@ export class CacheController {
             svcConfig.serviceName,
             period.period,
             () => (service as any)[svcConfig.method](
-              moment(period.start).format('YYYY-MM-DD'),
-              moment(period.end).format('YYYY-MM-DD'),
+              moment(period.start).format('DD/MM/YYYY'),
+              moment(period.end).format('DD/MM/YYYY'),
             ),
             period.period === CachePeriodEnum.CUSTOM ? { start: period.start, end: period.end } : undefined,
           );

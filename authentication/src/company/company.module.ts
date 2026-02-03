@@ -6,12 +6,13 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { CompanyController } from './company.controller';
 import { CompanyMultitenantService } from './company-multitenant.service';
+import { CompanyService } from './company.service';
 import { CacheModule } from '../cache/cache.module';
 
 @Module({
   imports: [forwardRef(() => CacheModule)],
   controllers: [CompanyController],
-  providers: [CompanyMultitenantService],
-  exports: [CompanyMultitenantService],
+  providers: [CompanyMultitenantService, CompanyService],
+  exports: [CompanyMultitenantService, CompanyService],
 })
 export class CompanyModule {}
