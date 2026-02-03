@@ -37,9 +37,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       try {
         const pool = new Pool({
           connectionString,
-          max: 5, // Máximo de conexões no pool
-          idleTimeoutMillis: 30000, // Timeout de conexões ociosas
+          max: 20, // Máximo de conexões no pool (aumentado para warmup)
+          idleTimeoutMillis: 60000, // Timeout de conexões ociosas (aumentado para 60s)
           connectionTimeoutMillis: 10000, // Timeout para estabelecer conexão
+          statement_timeout: 120000, // Timeout de queries (2 minutos)
         });
 
         // Testa a conexão

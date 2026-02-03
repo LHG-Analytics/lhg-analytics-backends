@@ -32,9 +32,10 @@ export class PgPoolService implements OnModuleInit, OnModuleDestroy {
     try {
       const config: PoolConfig = {
         connectionString,
-        max: 10,
-        idleTimeoutMillis: 30000,
+        max: 20, // Aumentado para warmup
+        idleTimeoutMillis: 60000, // 60 segundos
         connectionTimeoutMillis: 10000,
+        statement_timeout: 120000, // 2 minutos por query
       };
 
       this.pool = new Pool(config);
