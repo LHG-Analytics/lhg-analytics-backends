@@ -4,8 +4,9 @@
  * Usa ModuleRef para lazy loading e evitar dependência circular
  */
 
-import { Controller, Post, HttpCode, HttpStatus, Logger, Header, Inject } from '@nestjs/common';
+import { Controller, Post, HttpCode, HttpStatus, Logger, Header } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Public } from '../auth/decorators/public.decorator';
 import { ModuleRef } from '@nestjs/core';
 import * as moment from 'moment-timezone';
 import { KpiCacheService } from './kpi-cache.service';
@@ -68,6 +69,7 @@ export class CacheController {
    * - Acumulado do ano (até ontem)
    */
   @Post('warmup')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @Header('Content-Type', 'application/json')
   @ApiOperation({
