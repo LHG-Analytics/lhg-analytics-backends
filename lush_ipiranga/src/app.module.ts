@@ -13,7 +13,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { AuthModule } from './auth/auth.module';
 import { RestaurantModule } from './restaurant/restaurant.module';
 import { CacheModule } from './cache/cache.module';
-import { DateUtilsModule, ValidationModule, QueryUtilsModule, ConcurrencyUtilsModule } from '@lhg/utils';
+import { DateUtilsModule, ValidationModule, QueryUtilsModule, ConcurrencyUtilsModule, CompressionUtilsModule } from '@lhg/utils';
 
 @Module({
   imports: [
@@ -21,6 +21,7 @@ import { DateUtilsModule, ValidationModule, QueryUtilsModule, ConcurrencyUtilsMo
     ValidationModule, // Utilitários compartilhados de validação
     QueryUtilsModule, // Utilitários compartilhados de query
     ConcurrencyUtilsModule, // Utilitários de controle de concorrência
+    CompressionUtilsModule, // Utilitários de compressão HTTP
     CacheModule, // Módulo de cache para KPIs real-time
     DatabaseModule, // Módulo de conexão direta com PostgreSQL (pg)
     ThrottlerModule.forRoot([
