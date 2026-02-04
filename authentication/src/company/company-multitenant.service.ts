@@ -21,6 +21,7 @@ import {
   getBigNumbersSQL,
   getRevenueByDateSQL,
   getRentalsByDateSQL,
+  getRevparByDateSQL,
   getTrevparByDateSQL,
   getOccupancyRateByDateSQL,
   getGiroByDateSQL,
@@ -42,6 +43,7 @@ interface UnitKpiData {
   bigNumbersMonthly?: UnitBigNumbers; // Dados do mês atual para forecast
   revenueByDate: Map<string, number>;
   rentalsByDate: Map<string, number>;
+  revparByDate: Map<string, number>;
   trevparByDate: Map<string, number>;
   occupancyRateByDate: Map<string, number>;
   giroByDate: Map<string, number>;
@@ -206,6 +208,10 @@ export class CompanyMultitenantService {
         ),
         () => this.databaseService.query(
           unit,
+          getRevparByDateSQL(unit, startDate, endDate),
+        ),
+        () => this.databaseService.query(
+          unit,
           getTrevparByDateSQL(unit, startDate, endDate),
         ),
         () => this.databaseService.query(
@@ -227,6 +233,7 @@ export class CompanyMultitenantService {
         saleDirectMonthlyResult,
         revenueResult,
         rentalsResult,
+        revparResult,
         trevparResult,
         occupancyResult,
         giroResult,
@@ -286,6 +293,14 @@ export class CompanyMultitenantService {
         );
       }
 
+      const revparByDate = new Map<string, number>();
+      for (const row of revparResult.rows) {
+        revparByDate.set(
+          this.dateUtilsService.formatDateKey(row.date),
+          parseFloat(row.revpar) || 0,
+        );
+      }
+
       const trevparByDate = new Map<string, number>();
       for (const row of trevparResult.rows) {
         trevparByDate.set(
@@ -317,6 +332,7 @@ export class CompanyMultitenantService {
         bigNumbersMonthly,
         revenueByDate,
         rentalsByDate,
+        revparByDate,
         trevparByDate,
         occupancyRateByDate,
         giroByDate,
@@ -383,6 +399,12 @@ export class CompanyMultitenantService {
       allPeriods,
       groupByMonth,
     );
+    const revparByDate = this.consolidateSeriesByUnit(
+      results,
+      'revparByDate',
+      allPeriods,
+      groupByMonth,
+    );
     const trevparByDate = this.consolidateSeriesByUnit(
       results,
       'trevparByDate',
@@ -408,6 +430,7 @@ export class CompanyMultitenantService {
       RevenueByCompany: revenueByCompany,
       RevenueByDate: revenueByDate,
       RentalsByDate: rentalsByDate,
+      RevparByDate: revparByDate,
       TicketAverageByDate: ticketAverageByDate,
       TrevparByDate: trevparByDate,
       OccupancyRateByDate: occupancyRateByDate,
@@ -589,6 +612,7 @@ export class CompanyMultitenantService {
       UnitKpiData,
       | 'revenueByDate'
       | 'rentalsByDate'
+      | 'revparByDate'
       | 'trevparByDate'
       | 'occupancyRateByDate'
       | 'giroByDate'
