@@ -7,12 +7,16 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
+import * as compression from 'compression';
 
 config();
 
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
+
+    // Configuração de compressão HTTP
+    app.use(compression());
 
     // Configuração do cookie-parser para ler cookies httpOnly
     app.use(cookieParser());

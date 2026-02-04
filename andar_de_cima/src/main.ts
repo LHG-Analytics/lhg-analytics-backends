@@ -26,6 +26,7 @@ import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.int
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
+import * as compression from 'compression';
 
 // Carregar variáveis de ambiente do arquivo .env
 config();
@@ -33,6 +34,9 @@ config();
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
+
+    // Configuração de compressão HTTP
+    app.use(compression());
 
     // Configuração de segurança com Helmet
     app.use(helmet());
