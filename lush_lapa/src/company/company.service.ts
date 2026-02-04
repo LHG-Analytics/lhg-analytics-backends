@@ -632,6 +632,34 @@ export class CompanyService {
       ORDER BY date
     `;
 
+    // RentalRevenueByDate - SOMENTE receita de locação (permanencia + ocupadicional - desconto)
+    // Usado para calcular RevparByDate corretamente
+    const rentalRevenueByDateSQL = `
+      SELECT
+        CASE
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+        END as date,
+        COALESCE(SUM(
+          COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+          COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
+          COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+        ), 0) as daily_rental_revenue
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      INNER JOIN apartamento a ON aps.id_apartamento = a.id
+      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+      WHERE la.datainicialdaocupacao >= '${formattedStart}'
+        AND la.datainicialdaocupacao <= '${formattedEnd}'
+        AND la.fimocupacaotipo = 'FINALIZADA'
+        AND ca.id IN (7,8,9,10,11,12)
+      GROUP BY CASE
+        WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+      END
+      ORDER BY date
+    `;
+
     // BillingRentalType - CORRIGIDO para incluir: locação + ocupadicional + consumo
     const billingRentalTypeSQL = `
       WITH receita_consumo_locacao AS (
@@ -917,6 +945,7 @@ export class CompanyService {
       totalSaleDirectResult,
       totalSuitesResult,
       revenueByDateResult,
+      rentalRevenueByDateResult,
       billingRentalTypeResult,
       revenueBySuiteCategoryResult,
       rentalsByDateResult,
@@ -931,6 +960,7 @@ export class CompanyService {
       this.pgPool.query<any>(totalSaleDirectSQL),
       this.pgPool.query<any>(totalSuitesSQL),
       this.pgPool.query<any>(revenueByDateSQL),
+      this.pgPool.query<any>(rentalRevenueByDateSQL),
       this.pgPool.query<any>(billingRentalTypeSQL),
       this.pgPool.query<any>(revenueBySuiteCategorySQL),
       this.pgPool.query<any>(rentalsByDateSQL),
@@ -1153,10 +1183,23 @@ export class CompanyService {
     const totalSuites =
       totalSuitesResult.length > 0 ? Number(totalSuitesResult[0].total_suites) || 1 : 1;
 
-    // Calcular REVPAR usando a receita já calculada e o número de suítes
+    // Criar mapeamento para receita de locação por data (para Revpar correto)
+    const rentalRevenueDataMap = new Map<string, number>();
+    rentalRevenueByDateResult.rows.forEach((item: any) => {
+      const dateKey = groupByMonth
+        ? moment.utc(item.date).format('MM/YYYY')
+        : moment.utc(item.date).format('DD/MM/YYYY');
+      const currentValue = rentalRevenueDataMap.get(dateKey) || 0;
+      rentalRevenueDataMap.set(dateKey, currentValue + Number(item.daily_rental_revenue || 0));
+    });
+
+    // Calcular REVPAR usando APENAS receita de locação (sem consumo e vendas diretas)
     const revparByDate: ApexChartsData = {
-      categories: revenueByDate.categories,
-      series: revenueByDate.series.map((revenue) => Number((revenue / totalSuites).toFixed(2))),
+      categories: [...periodsArray],
+      series: [...periodsArray].map((periodKey: string) => {
+        const rentalRevenue = rentalRevenueDataMap.get(periodKey) || 0;
+        return Number((rentalRevenue / totalSuites).toFixed(2));
+      }),
     };
 
     // Criar mapeamento de dados para TicketAverageByDate (agrupando por mês se necessário)

@@ -220,6 +220,46 @@ export function getTrevparByDateSQL(
 }
 
 /**
+ * Query para Revpar por data
+ * Revpar = SOMENTE receita de locação (permanencia + ocupadicional - desconto) / total de suítes
+ * NÃO inclui consumo, vendas diretas ou gorjetas
+ */
+export function getRevparByDateSQL(
+  unit: UnitKey,
+  startDate: string,
+  endDate: string,
+): string {
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
+  const totalSuites = UNIT_CONFIGS[unit].suiteConfig.totalSuites;
+
+  return `
+    SELECT
+      CASE
+        WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+      END as date,
+      COALESCE(SUM(
+        COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
+        COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
+        COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+      ), 0) / ${totalSuites} as revpar
+    FROM locacaoapartamento la
+    INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+    WHERE la.datainicialdaocupacao >= '${startTimestamp}'
+      AND la.datainicialdaocupacao <= '${endTimestamp}'
+      AND la.fimocupacaotipo = 'FINALIZADA'
+    GROUP BY CASE
+      WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
+      ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
+    END
+    ORDER BY date
+  `;
+}
+
+/**
  * Query para Taxa de Ocupação por data
  */
 export function getOccupancyRateByDateSQL(
