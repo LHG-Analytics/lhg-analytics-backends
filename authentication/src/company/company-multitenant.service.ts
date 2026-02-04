@@ -62,22 +62,37 @@ export class CompanyMultitenantService {
 
   /**
    * Busca KPIs de todas as unidades e consolida
+   * Se o usuário for de uma unidade específica, usa cache específico da unidade
+   * Se for ADMIN/LHG, usa cache consolidado
    */
   async getUnifiedKpis(
     startDate: string,
     endDate: string,
+    user?: any,
   ): Promise<UnifiedCompanyKpiResponse> {
     const customDates = {
       start: this.dateUtilsService.parseDate(startDate),
       end: this.dateUtilsService.parseDate(endDate),
     };
 
-    // Usa o cache service com TTL dinâmico
+    // Determina se deve usar cache por unidade ou consolidado
+    // ADMIN ou LHG = cache consolidado (todas as unidades)
+    // Unidade específica = cache só daquela unidade
+    let unitKey: string | undefined;
+    if (user && user.unit !== 'LHG' && user.role !== 'ADMIN') {
+      // Mapeia UserUnit para UnitKey (LUSH_IPIRANGA -> lush_ipiranga)
+      unitKey = user.unit.toLowerCase().replace('LUSH_', 'lush_').replace(' ', '_');
+    }
+
+    this.logger.log(`Cache strategy: ${unitKey ? `unit-specific (${unitKey})` : 'consolidated (all units)'}`);
+
+    // Usa o cache service com TTL dinâmico e opcionalmente unitKey
     const result = await this.kpiCacheService.getOrCalculate(
       'company',
       CachePeriodEnum.CUSTOM,
-      () => this.fetchAndConsolidateKpis(startDate, endDate),
+      () => this.fetchAndConsolidateKpis(startDate, endDate, unitKey),
       customDates,
+      unitKey,
     );
 
     return result.data;
@@ -85,17 +100,27 @@ export class CompanyMultitenantService {
 
   /**
    * Executa queries em paralelo para todas as unidades e consolida
+   * Se unitKey for fornecido, busca apenas dados daquela unidade
    */
   private async fetchAndConsolidateKpis(
     startDate: string,
     endDate: string,
+    unitKey?: string,
   ): Promise<UnifiedCompanyKpiResponse> {
     const startTime = Date.now();
-    const connectedUnits = this.databaseService.getConnectedUnits();
+    let connectedUnits = this.databaseService.getConnectedUnits();
+
+    // Se unitKey especificado, filtra apenas aquela unidade
+    if (unitKey) {
+      connectedUnits = connectedUnits.filter(unit => unit === unitKey);
+      this.logger.log(`Filtrando para unidade específica: ${unitKey} (${connectedUnits.length} unidades encontradas)`);
+    }
 
     if (connectedUnits.length === 0) {
       throw new Error(
-        'Nenhuma unidade conectada. Verifique as variáveis de ambiente.',
+        unitKey
+          ? `Unidade ${unitKey} não encontrada ou não configurada. Verifique as variáveis de ambiente.`
+          : 'Nenhuma unidade conectada. Verifique as variáveis de ambiente.',
       );
     }
 

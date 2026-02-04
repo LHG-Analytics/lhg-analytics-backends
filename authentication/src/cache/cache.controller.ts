@@ -15,6 +15,7 @@ import { CompanyService } from '../company/company.service';
 import { BookingsMultitenantService } from '../bookings/bookings-multitenant.service';
 import { RestaurantMultitenantService } from '../restaurant/restaurant-multitenant.service';
 import { GovernanceMultitenantService } from '../governance/governance-multitenant.service';
+import { UnitKey } from '../database/database.interfaces';
 
 interface WarmupResult {
   timestamp: string;
@@ -22,6 +23,7 @@ interface WarmupResult {
   results: {
     service: string;
     period: string;
+    unit: string;
     dateRange: string;
     fromCache: boolean;
     calculationTime?: number;
@@ -120,7 +122,10 @@ export class CacheController {
       { name: 'governance', serviceName: 'governance' as const, token: GovernanceMultitenantService, method: 'getUnifiedKpis' },
     ];
 
-    // Executa warmup para cada combinação de serviço x período
+    // Unidades para popular cache específico (além do consolidado)
+    const unitKeys: UnitKey[] = ['lush_ipiranga', 'lush_lapa', 'tout', 'andar_de_cima'];
+
+    // Executa warmup para cada combinação de serviço x período x unidade
     for (const svcConfig of servicesConfig) {
       const service = this.getService(svcConfig.token);
       if (!service) {
@@ -129,9 +134,9 @@ export class CacheController {
       }
 
       for (const period of periods) {
-        const resultKey = `${svcConfig.name}:${period.name}`;
+        // Primeiro: cache consolidado (para ADMIN/LHG)
         try {
-          // Usa getOrCalculate para forçar o cálculo e salvar em cache
+          const resultKey = `${svcConfig.name}:${period.name}:consolidated`;
           const result = await this.cacheService.getOrCalculate(
             svcConfig.serviceName,
             period.period,
@@ -140,11 +145,13 @@ export class CacheController {
               moment(period.end).format('DD/MM/YYYY'),
             ),
             period.period === CachePeriodEnum.CUSTOM ? { start: period.start, end: period.end } : undefined,
+            undefined, // Sem unitKey = cache consolidado
           );
 
           results.push({
             service: svcConfig.name,
             period: period.name,
+            unit: 'consolidated',
             dateRange: `${moment(period.start).format('DD/MM/YYYY')} - ${moment(period.end).format('DD/MM/YYYY')}`,
             fromCache: result.fromCache,
             calculationTime: result.calculationTime,
@@ -155,14 +162,56 @@ export class CacheController {
           );
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          this.logger.error(`${resultKey}: ERROR - ${errorMsg}`);
+          this.logger.error(`${svcConfig.name}:${period.name}:consolidated - ERROR - ${errorMsg}`);
           results.push({
             service: svcConfig.name,
             period: period.name,
+            unit: 'consolidated',
             dateRange: `${moment(period.start).format('DD/MM/YYYY')} - ${moment(period.end).format('DD/MM/YYYY')}`,
             fromCache: false,
             error: errorMsg,
           });
+        }
+
+        // Segundo: cache específico de cada unidade (para gerentes)
+        for (const unitKey of unitKeys) {
+          try {
+            const resultKey = `${svcConfig.name}:${period.name}:${unitKey}`;
+            const result = await this.cacheService.getOrCalculate(
+              svcConfig.serviceName,
+              period.period,
+              () => (service as any)[svcConfig.method](
+                moment(period.start).format('DD/MM/YYYY'),
+                moment(period.end).format('DD/MM/YYYY'),
+              ),
+              period.period === CachePeriodEnum.CUSTOM ? { start: period.start, end: period.end } : undefined,
+              unitKey, // Cache específico da unidade
+            );
+
+            results.push({
+              service: svcConfig.name,
+              period: period.name,
+              unit: unitKey,
+              dateRange: `${moment(period.start).format('DD/MM/YYYY')} - ${moment(period.end).format('DD/MM/YYYY')}`,
+              fromCache: result.fromCache,
+              calculationTime: result.calculationTime,
+            });
+
+            this.logger.log(
+              `${resultKey}: ${result.fromCache ? 'CACHE HIT' : `CALCULATED (${result.calculationTime}ms)`}`,
+            );
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(`${svcConfig.name}:${period.name}:${unitKey} - ERROR - ${errorMsg}`);
+            results.push({
+              service: svcConfig.name,
+              period: period.name,
+              unit: unitKey,
+              dateRange: `${moment(period.start).format('DD/MM/YYYY')} - ${moment(period.end).format('DD/MM/YYYY')}`,
+              fromCache: false,
+              error: errorMsg,
+            });
+          }
         }
       }
     }

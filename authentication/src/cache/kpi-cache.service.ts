@@ -43,21 +43,24 @@ export class KpiCacheService {
 
   /**
    * Constrói a chave de cache baseada no serviço e período
+   * Opcionalmente inclui unidade para cache específico por unidade
    */
   buildCacheKey(
     service: ServiceType,
     period: CachePeriodEnum,
     customDates?: DateRange,
+    unitKey?: string,
   ): string {
     const prefix = SERVICE_PREFIXES[service];
+    const unitSuffix = unitKey ? `:unit:${unitKey}` : '';
 
     if (period === CachePeriodEnum.CUSTOM && customDates) {
       const start = moment(customDates.start).format('YYYY-MM-DD');
       const end = moment(customDates.end).format('YYYY-MM-DD');
-      return `${CACHE_KEY_PREFIX}:${prefix}:custom:${start}:${end}`;
+      return `${CACHE_KEY_PREFIX}:${prefix}:custom:${start}:${end}${unitSuffix}`;
     }
 
-    return `${CACHE_KEY_PREFIX}:${prefix}:${period.toLowerCase()}`;
+    return `${CACHE_KEY_PREFIX}:${prefix}:${period.toLowerCase()}${unitSuffix}`;
   }
 
   /**
@@ -67,8 +70,9 @@ export class KpiCacheService {
     service: ServiceType,
     period: CachePeriodEnum,
     customDates?: DateRange,
+    unitKey?: string,
   ): Promise<T | null> {
-    const key = this.buildCacheKey(service, period, customDates);
+    const key = this.buildCacheKey(service, period, customDates, unitKey);
 
     try {
       const cached = this.cache.get(key);
@@ -104,8 +108,9 @@ export class KpiCacheService {
     period: CachePeriodEnum,
     data: T,
     customDates?: DateRange,
+    unitKey?: string,
   ): Promise<void> {
-    const key = this.buildCacheKey(service, period, customDates);
+    const key = this.buildCacheKey(service, period, customDates, unitKey);
     const ttl = this.getTTL(period, customDates);
 
     try {
@@ -140,11 +145,12 @@ export class KpiCacheService {
     period: CachePeriodEnum,
     calculateFn: () => Promise<T>,
     customDates?: DateRange,
+    unitKey?: string,
   ): Promise<CacheResult<T>> {
-    const key = this.buildCacheKey(service, period, customDates);
+    const key = this.buildCacheKey(service, period, customDates, unitKey);
 
     // Tenta buscar do cache
-    const cached = await this.get<T>(service, period, customDates);
+    const cached = await this.get<T>(service, period, customDates, unitKey);
     if (cached) {
       return {
         data: cached,
@@ -164,7 +170,7 @@ export class KpiCacheService {
     this.logger.log(`Unified ${service} KPIs calculados em ${calculationTime}ms`);
 
     // Salva no cache
-    await this.set(service, period, data, customDates);
+    await this.set(service, period, data, customDates, unitKey);
 
     return {
       data,

@@ -12,6 +12,7 @@ import {
   HttpStatus,
   Logger,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -76,12 +77,17 @@ export class CompanyController {
   async getKpisByDateRange(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @Request() req: any,
   ): Promise<UnifiedCompanyKpiResponse> {
     // Valida formato e intervalo das datas
     this.validationService.validateDateInterval(startDate, endDate);
 
-    this.logger.log(`Buscando KPIs consolidados: ${startDate} - ${endDate}`);
+    const user = req?.user;
+    const userUnit = user?.unit;
+    const userRole = user?.role;
 
-    return this.companyService.getUnifiedKpis(startDate, endDate);
+    this.logger.log(`Buscando KPIs consolidados: ${startDate} - ${endDate} (user: ${user?.email}, unit: ${userUnit}, role: ${userRole})`);
+
+    return this.companyService.getUnifiedKpis(startDate, endDate, user);
   }
 }
