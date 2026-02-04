@@ -66,7 +66,19 @@ async function bootstrap() {
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup('ipiranga/api', app, document);
+    SwaggerModule.setup('ipiranga/api', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        docExpansion: 'none',
+        filter: true,
+        showRequestDuration: true,
+        syntaxHighlight: {
+          activate: true,
+          theme: 'monokai'
+        }
+      },
+      customSiteTitle: 'LHG Analytics - Lush Ipiranga',
+    });
     console.log('Swagger UI disponível em: /ipiranga/api');
 
     // Inicialize o PrismaService com tratamento de erro
@@ -89,6 +101,7 @@ async function bootstrap() {
       'http://localhost:3002', // Lush Lapa (Swagger)
       'http://localhost:3003', // Tout (Swagger)
       'http://localhost:3004', // Andar de Cima (Swagger)
+      'http://localhost:3006', // Liv (Swagger)
     ];
     const envOrigins = process.env.ALLOWED_ORIGINS
       ?.split(',')

@@ -2,7 +2,7 @@
  * Interfaces para conexões multi-tenant com bancos de dados das unidades
  */
 
-export type UnitKey = 'lush_ipiranga' | 'lush_lapa' | 'tout' | 'andar_de_cima';
+export type UnitKey = 'lush_ipiranga' | 'lush_lapa' | 'tout' | 'andar_de_cima' | 'liv';
 
 export interface UnitDatabaseConfig {
   key: UnitKey;
@@ -95,6 +95,26 @@ export const UNIT_CONFIGS: Record<
         'CUBO',
       ],
       totalSuites: 16,
+    },
+  },
+  liv: {
+    name: 'Liv',
+    envVar: 'DATABASE_URL_LOCAL_LIV',
+    suiteConfig: {
+      categoryIds: [1, 2, 3, 4, 5, 7, 8, 9, 10, 11],
+      categoryNames: [
+        'HIDRO + SAUNA',
+        'HIDRO SEXY',
+        'LOUNGE ACQUA',
+        'VIP',
+        'HIDRO PROMO',
+        'LOUNGE',
+        'LOUNGE-HIDRO',
+        'DIAMOND',
+        'LOUNGE SPA',
+        'LOUNGE SPA 50 SOMBRAS',
+      ],
+      totalSuites: null, // Preencher com valor correto depois
     },
   },
 };

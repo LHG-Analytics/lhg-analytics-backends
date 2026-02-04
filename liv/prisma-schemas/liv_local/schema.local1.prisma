@@ -1,0 +1,634 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../../dist/generated/client-local"
+  binaryTargets = ["native", "windows"]
+  engineType    = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_LOCAL_LIV")
+}
+
+model Company {
+  id                         Int       @id @default(autoincrement()) @map("id")
+  version                    Int       @map("versao")
+  name                       String    @map("nome")
+  adress                     String    @map("logradouro")
+  neighborhood               String    @map("bairro")
+  cnpj                       String    @map("cnpj")
+  idCity                     Int       @map("id_cidade")
+  telephone1                 String?   @map("telefone1")
+  telephone2                 String?   @map("telefone2")
+  fax                        String?   @map("fax")
+  message                    String?   @map("mensagem")
+  locale                     String    @map("locale")
+  cep                        String    @map("cep")
+  IbgeMunicipalCode          Int       @map("codigomunicipioibge")
+  numberAdress               Int       @map("numeroendereco")
+  stateRegistration          Int       @map("inscricaoestadual")
+  taxRegimeCode              Int       @map("codigoregimetributario")
+  municipalRegistration      Int       @map("inscricaomunicipal")
+  fantasyName                String    @map("nomefantasia")
+  typeAdress                 Int       @map("tipoendereco")
+  complement                 String?   @map("complemento")
+  messageSatisfactionSurvey  String?   @map("mensagemagradecimentopesquisasatisfacao")
+  lastSyncSatisfactionSurvey DateTime? @map("ultimadatasincronizacaopesquisasatisfacao")
+  userId                     Int?      @ignore
+
+  @@map("motel")
+}
+
+model Suite {
+  id                    Int           @id @default(autoincrement()) @map("id")
+  version               Int           @map("versao")
+  number                Int           @unique @map("numero")
+  suiteCategoryId       Int           @map("id_categoriaapartamento")
+  suiteCategories       SuiteCategory @relation(fields: [suiteCategoryId], references: [id])
+  ramal                 String?       @map("ramal") @db.Char(10)
+  processBpm            String?       @map("processobpm")
+  name                  String?       @map("nome")
+  createNewProcess      Boolean       @map("criarnovoprocesso")
+  IntegrateAutomation   Boolean       @map("integrarautomacao")
+  tokenApartment        String?       @map("tokenapartamento")
+  deletionDate          DateTime?     @map("dataexclusao")
+  idResponsibleDeletion Int?          @map("id_responsavelexclusao")
+  reasonExclusion       String?       @map("motivoexclusao")
+  createdDate           DateTime?     @map("datacriacao")
+  description           String?       @map("descricao")
+  suiteStates           SuiteState[]
+  booking               Booking[]
+  defect                Defect[]
+
+  @@map("apartamento")
+}
+
+model SuiteCategory {
+  id                              Int       @id @default(autoincrement()) @map("id")
+  version                         Int       @map("versao")
+  acronym                         String    @map("sigla")
+  description                     String    @map("descricao")
+  numberOccupants                 Int       @map("numeroocupantes")
+  ipPrinter                       String?   @map("ipimpressora")
+  namePrinter                     String?   @map("nomeimpressora")
+  minimumTime                     Int       @map("tempo_minimo")
+  maximumTime                     Int       @map("tempo_maximo")
+  maximumTimeCleaning             Int       @map("tempo_maximo_faxina")
+  minimumTimeCleaning             Int       @map("tempo_minimo_faxina")
+  deletionDate                    DateTime? @map("dataexclusao")
+  idResponsibleDeletion           Int?      @map("id_responsavelexclusao")
+  activeDisplay                   Boolean   @map("exibicaoativa")
+  nameDisplay                     String?   @map("nomeexibicao")
+  blockTimeBeforeBooking          Int       @map("tempo_bloqueio_antes_reserva")
+  timeToleranceCheckInReservation Int       @map("tempo_tolerancia_check_in_reserva")
+  enableBusinessIntelligence      Boolean   @map("habilitarinteligencianegocio")
+  about                           String?   @map("sobre")
+  idGuiaMoteis                    Int?      @map("id_guiamoteis")
+  enableOnlineBooking             Boolean   @map("habilitarreservaonline")
+  idFlexMoteis                    Int?      @map("id_flexmoteis")
+  order                           Int?      @map("ordem")
+  qtdMinReleaseOnlineReservation  Int?      @map("qtd_min_libera_reserva_online")
+  suites                          Suite[]
+
+  @@map("categoriaapartamento")
+}
+
+model SuiteState {
+  id                       Int                       @id @default(autoincrement()) @map("id")
+  version                  Int                       @map("versao")
+  startDate                DateTime                  @map("datainicio")
+  endDate                  DateTime?                 @map("datafim")
+  idEmployeeStart          Int                       @map("id_funcionarioinicio")
+  idEmployeeEnd            Int?                      @map("id_funcionariofim")
+  suiteId                  Int                       @map("id_apartamento")
+  suite                    Suite                     @relation(fields: [suiteId], references: [id])
+  rentalApartments         RentalApartment?
+  apartmentCleaning        ApartmentCleaning?
+  blockedMaintenanceDefect BlockedMaintenanceDefect?
+
+  @@map("apartamentostate")
+}
+
+model RentalApartment {
+  numberOccupants                 Int          @map("numerodeocupantes")
+  discount                        Decimal?     @map("desconto") @db.Decimal(10, 2)
+  reasonDiscount                  String?      @map("motivodesconto")
+  observation                     String?      @map("observacao")
+  checkOut                        DateTime?    @map("datafinaldaocupacao")
+  permanenceValueTotal            Decimal?     @map("valortotalpermanencia") @db.Decimal(10, 2)
+  occupantAddValueTotal           Decimal?     @map("valortotalocupadicional") @db.Decimal(10, 2)
+  totalValue                      Int?         @map("valortotal")
+  qtdPeriod                       Int?         @map("qtdperiodo")
+  qtdPeriodAddicional             Int?         @map("qtdperiodosadicionais")
+  qtdHoursAddicional              Int?         @map("qtdhorasadicionais")
+  qtdOvernights                   Int?         @map("qtdpernoites")
+  idOriginRental                  Int?         @map("id_locacaoorigem")
+  idReasonEndRental               Int?         @map("id_motivofimlocacao")
+  suiteStateId                    Int          @unique @map("id_apartamentostate")
+  suiteStates                     SuiteState   @relation(fields: [suiteStateId], references: [id])
+  checkIn                         DateTime     @map("datainicialdaocupacao")
+  endOccupationType               String?      @map("fimocupacaotipo")
+  idEmployeeDiscount              Int?         @map("id_funcionariodesconto")
+  valueDiscountRealRental         Decimal?     @map("valordescontoreallocacao") @db.Decimal(10, 2)
+  permanenceValueLiquid           Decimal?     @map("valorliquidolocacao") @db.Decimal(10, 2)
+  idCarInGarage                   Int?         @map("id_carronagaragem")
+  tokenRental                     String       @map("tokenlocacao")
+  sendSatisfactionSurvey          Boolean      @map("envioupesquisasatisfacao")
+  beerMoney                       Decimal      @map("gorjeta") @db.Decimal(10, 2)
+  basisCalculationDiscount        Decimal?     @map("basecalculodesconto") @db.Decimal(10, 2)
+  basisCalculationDiscountType    String?      @map("basecalculodescontotipo")
+  idLoyaltCard                    Int?         @map("id_cartaofidelidade")
+  closingCompleted                Boolean      @map("fechamentoconcluido")
+  idGiftCard                      Int?         @map("id_giftcard")
+  discountTotalRentalValue        Boolean      @map("desconto_sob_valor_total_locacao")
+  discountRentalType              String?      @map("tipodescontolocacao")
+  idGroupDiscount                 Int?         @map("id_grupodedesconto")
+  applyDiscountOnlyFirstPeriod    Boolean      @map("aplicar_desconto_apenas_no_primeiro_periodo")
+  idTablePriceRentalSpecific      Int?         @map("id_tabelaprecolocacaoespecifica")
+  idClientDiscount                Int?         @map("id_clientedesconto")
+  idDifferentiatedPeriodUsed      Int?         @map("id_periododiferenciadoutilizado")
+  roudingRental                   Decimal?     @map("arredondamento_locacao") @db.Decimal(10, 2)
+  discountEnd                     Decimal?     @map("desconto_final") @db.Decimal(10, 2)
+  basisCalculationDiscountEnd     Decimal?     @map("basecalculodesconto_final") @db.Decimal(10, 2)
+  basisCalculationDiscountEndType String?      @map("basecalculodescontotipo_final")
+  IdGroupDiscountEnd              Int?         @map("id_grupodedescontofinal")
+  idEmployeeDiscountEnd           Int?         @map("id_funcionariodescontofinal")
+  reasonDiscountEnd               String?      @map("motivodesconto_final")
+  autoAnswering                   Boolean      @map("autoatendimento")
+  saleLease                       SaleLease?
+  Booking                         Booking[]
+  NewRelease                      NewRelease[]
+
+  @@map("locacaoapartamento")
+}
+
+model SaleLease {
+  stockOutId        Int             @unique @map("id_saidaestoque")
+  stockOut          StockOut        @relation(fields: [stockOutId], references: [id])
+  rentalApartmentId Int             @unique @map("id_locacaoapartamento")
+  rentalApartment   RentalApartment @relation(fields: [rentalApartmentId], references: [suiteStateId])
+
+  @@map("vendalocacao")
+}
+
+model Sale {
+  stockOutId                   Int      @id @default(autoincrement()) @map("id_saidaestoque")
+  stockOut                     StockOut @relation(fields: [stockOutId], references: [id])
+  discount                     Decimal  @map("desconto") @db.Decimal(10, 2)
+  idEmployeeDiscount           Int?     @map("id_funcionariodesconto")
+  reasonDiscount               String?  @map("motivodesconto")
+  basisCalculationDiscount     Decimal? @map("basecalculodesconto") @db.Decimal(10, 2)
+  basisCalculationDiscountType String?  @map("basecalculodescontotipo")
+  typeDiscountSale             String?  @map("tipodescontovenda")
+  orders                       Order[]
+
+  @@map("venda")
+}
+
+model StockOut {
+  id            Int            @id @default(autoincrement()) @map("id")
+  version       Int            @map("versao")
+  description   String?        @map("descricao")
+  observation   String?        @map("observacao")
+  createdDate   DateTime       @map("datasaida")
+  stockOutItem  StockOutItem[]
+  saleLease     SaleLease?
+  sale          Sale?
+  idResponsible Int?           @map("id_responsavel")
+  saleDirect    SaleDirect?
+
+  @@map("saidaestoque")
+}
+
+model StockOutItem {
+  id                      Int          @id @default(autoincrement()) @map("id")
+  version                 Int          @map("versao")
+  stockOutId              Int          @map("id_saidaestoque")
+  stockOuts               StockOut     @relation(fields: [stockOutId], references: [id])
+  productStockId          Int          @unique @map("id_produtoestoque")
+  productStock            ProductStock @relation(fields: [productStockId], references: [id])
+  quantity                Decimal      @map("quantidade") @db.Decimal(10, 2)
+  typePriceSale           String?      @map("tipoprecovenda")
+  priceSale               Decimal      @map("precovenda") @db.Decimal(10, 2)
+  reason                  String?      @map("motivo")
+  canceled                DateTime?    @map("cancelado")
+  idStockOutGenerated     Int?         @map("id_saidaestoquegerada")
+  idEmployeeCancellation  Int?         @map("id_funcionariocancelamento")
+  createdDate             DateTime     @map("datasaidaitem")
+  observation             String?      @map("observacao")
+  idStockOutItemDad       Int?         @map("id_saidaestoqueitempai")
+  madeAtConference        Boolean      @map("feitonaconferencia")
+  idProductPromoPack      Int?         @map("id_produtopromopack")
+  snapshotPriceSaleNormal Decimal?     @map("snapshot_precovendanormal") @db.Decimal(10, 2)
+  idPackProductUsed       Int?         @map("id_pacoteprodutoutilizado")
+  exitOrigin              String       @map("origemsaida")
+  OrderItem               OrderItem?
+
+  @@map("saidaestoqueitem")
+}
+
+model ProductStock {
+  id           Int           @id @default(autoincrement()) @map("id")
+  version      Int           @map("versao")
+  minimum      Decimal?      @map("minimo") @db.Decimal(10, 2)
+  maximum      Decimal?      @map("maximo") @db.Decimal(10, 2)
+  idStock      Int           @map("id_estoque")
+  stockOutItem StockOutItem?
+  productId    Int           @map("id_produto")
+  quantity     Decimal       @map("quantidade") @db.Decimal(10, 2)
+  product      Product       @relation(fields: [productId], references: [id])
+
+  @@map("produtoestoque")
+}
+
+model Product {
+  id                        Int            @id @default(autoincrement()) @map("id")
+  version                   Int            @map("versao")
+  description               String         @map("descricao")
+  code                      Int            @map("codigo")
+  idTypeProduct             Int            @map("id_tipoproduto")
+  typeProduct               TypeProduct    @relation(fields: [idTypeProduct], references: [id])
+  priceSale                 Int            @map("precovenda")
+  idUnitInputMeasurement    Int            @map("id_unidademedidaentrada")
+  idUnitOutputMeasurement   Int            @map("id_unidademedidasaida")
+  quantityInputxOutput      Int            @map("quantidadeentradaxsaida")
+  priceSalePromotion        Decimal        @map("precovendapromocao") @db.Decimal(10, 2)
+  barCode                   String?        @map("codigobarras")
+  typeStock                 String         @map("tipoestoque")
+  goal                      String         @map("finalidade")
+  observation               String?        @map("observacoes")
+  idStockStandardWithdrawal Int?           @map("id_estoqueretiradapadrao")
+  deletionDate              DateTime?      @map("dataexclusao")
+  idResponsibleDeletion     Int?           @map("id_responsavelexclusao")
+  typeDestiny               String         @map("tipodestino")
+  nameDisplay               String?        @map("nomeexibicao")
+  detailedDescription       String?        @map("descricaodetalhada")
+  idSectionProduct          Int?           @map("id_secaoproduto")
+  idStockEntryStandard      Int?           @map("id_estoqueentradapadrao")
+  stockDecimal              Boolean        @map("estoquedecimal")
+  variation                 String         @map("variacao")
+  stockNegative             Boolean        @map("estoquenegativo")
+  productStock              ProductStock[]
+  packProducts              PackProducts[]
+
+  @@map("produto")
+}
+
+model TypeProduct {
+  id                    Int       @id @default(autoincrement()) @map("id")
+  version               Int       @map("versao")
+  description           String    @map("descricao")
+  consumable            Boolean   @map("consumivel")
+  idPrintConfiguration  Int?      @map("id_configuracaoimpressao")
+  deletionDate          DateTime? @map("dataexclusao")
+  idResponsibleDeletion Int?      @map("id_responsavelexclusao")
+  nameDisplay           String?   @map("nomeexibicao")
+  simultaneousPrinting  Boolean   @map("impressaosimultanea")
+  product               Product[]
+
+  @@map("tipoproduto")
+}
+
+model PackProducts {
+  idProduct             Int       @unique @map("id_produto")
+  product               Product   @relation(fields: [idProduct], references: [id])
+  name                  String    @map("nome")
+  value                 Decimal   @map("valor") @db.Decimal(10, 2)
+  information           String?   @map("informacao")
+  deletionDate          DateTime? @map("dataexclusao")
+  idResponsibleDeletion Int?      @map("id_responsavelexclusao")
+  registrationProgress  String    @map("progressocadastro")
+
+  @@map("pacotedeprodutos")
+}
+
+model Stock {
+  id                    Int       @id @default(autoincrement()) @map("id")
+  version               Int       @map("versao")
+  name                  String    @map("nome")
+  idStockDad            Int?      @map("id_estoquepai")
+  typeStock             String    @map("tipoestoque")
+  observation           String?   @map("observacao")
+  deletionDate          DateTime? @map("dataexclusao")
+  idResponsibleDeletion Int?      @map("id_responsavelexclusao")
+
+  @@map("estoque")
+}
+
+model Order {
+  id                    Int         @id @default(autoincrement()) @map("id")
+  version               Int         @map("versao")
+  dateOrder             DateTime    @map("datapedido")
+  saleId                Int         @map("id_venda")
+  sale                  Sale        @relation(fields: [saleId], references: [stockOutId])
+  dateDelivery          DateTime?   @map("dataentrega")
+  idResponsibleDelivery Int?        @map("id_responsavelentrega")
+  deletionDate          DateTime?   @map("dataexclusao")
+  idResponsibleDeletion Int?        @map("id_responsavelexclusao")
+  reasonChange          String?     @map("motivoalteracao")
+  idResponsibleChange   Int?        @map("id_responsavelalteracao")
+  madeByCustomer        Boolean     @map("feitopelocliente")
+  orderItem             OrderItem[]
+
+  @@map("pedido")
+}
+
+model OrderItem {
+  version                Int          @map("versao")
+  stockOutItemId         Int          @unique @map("id_saidaestoqueitem")
+  stockOutItem           StockOutItem @relation(fields: [stockOutItemId], references: [id])
+  orderId                Int          @map("id_pedido")
+  order                  Order        @relation(fields: [orderId], references: [id])
+  canceledDate           DateTime?    @map("datacancelado")
+  idEmployeeCancellation Int?         @map("id_responsavelcancelamento")
+  dateExecution          DateTime?    @map("dataexecucao")
+  idEmployeeExecution    Int?         @map("id_responsavelexecucao")
+  dateCompleted          DateTime?    @map("dataconclusao")
+  idEmployeeCompleted    Int?         @map("id_responsavelconclusao")
+  dateDelivery           DateTime?    @map("dataentrega")
+  idResponsibleDelivery  Int?         @map("id_responsavelentrega")
+
+  @@map("pedidoitem")
+}
+
+model Booking {
+  id                         Int              @id @default(autoincrement()) @map("id")
+  version                    Int              @map("versao")
+  dateService                DateTime         @map("dataatendimento")
+  idEmployeeService          Int              @map("id_funcionarioatendimento")
+  idClient                   Int              @map("id_cliente")
+  startDate                  DateTime         @map("datainicio")
+  idApartmentBooking         Int?             @map("id_apartamentoreserva")
+  suites                     Suite?           @relation(fields: [idApartmentBooking], references: [id])
+  rentalApartmentId          Int?             @map("id_locacaoapartamento")
+  rentalApartment            RentalApartment? @relation(fields: [rentalApartmentId], references: [suiteStateId])
+  idCategoryBooking          Int?             @map("id_categoriareserva")
+  canceled                   DateTime?        @map("cancelada")
+  idResponsibleCancellation  Int?             @map("id_responsavelcancelamento")
+  observation                String?          @map("observacao")
+  discountBooking            Decimal?         @map("desconto_reserva") @db.Decimal(8, 2)
+  discountBookingType        String?          @map("tipo_desconto_reserva")
+  periodRental               String?          @map("periodocontratado")
+  priceRental                Int?             @map("valorcontratado")
+  idBookingGuiaMoteis        Int?             @map("id_reservaguiamoteis")
+  idBookingMobee             Int?             @map("id_reservamobee")
+  noShow                     Boolean          @map("no_show")
+  justifyCancellation        String?          @map("justificativa_cancelamento")
+  idDifferentiatedPeriodUsed Int?             @map("id_periododiferenciadoutilizado")
+  printedReceiptOnBlock      Boolean          @map("comprovante_impresso_em_bloqueio")
+  expectedCheckout           DateTime?        @map("encerramento_previsto")
+  problemReport              Boolean          @map("problema_reportado")
+  typePeriodBookingOnline    String?          @map("tipo_periodo_reserva_online")
+  typeMapBilling             String           @map("tipo_mapa_cobranca")
+  convenienceFee             Decimal          @map("taxa_conveniencia") @db.Decimal(10, 2)
+  idTablePriceRentalSpecific Int?             @map("id_tabelaprecolocacaoespecifica")
+  hideDeposit                Boolean          @map("ocultar_deposito")
+  qtdGuests                  Int?             @map("qtd_hospedes")
+  idTypeOriginBooking        Int              @map("id_tipoorigemreserva")
+  originBooking              OriginBooking?   @relation(fields: [idTypeOriginBooking], references: [id])
+  idCarInGarage              Int?             @map("id_carronagaragem")
+  bookingProgram             Boolean          @map("reserva_programada_guia")
+
+  @@map("reserva")
+}
+
+model OriginBooking {
+  id                    Int       @id @default(autoincrement()) @map("id")
+  version               Int       @map("versao")
+  typeOrigin            String    @map("tipo_origem")
+  deletionDate          DateTime? @map("dataexclusao")
+  idResponsibleDeletion Int?      @map("id_responsavelexclusao")
+  booking               Booking[]
+
+  @@map("tipo_origem_reserva")
+}
+
+model NewRelease {
+  id                         Int              @id @default(autoincrement()) @map("id")
+  version                    Int              @map("versao")
+  value                      Decimal          @map("valor") @db.Decimal(10, 2)
+  originalsId                Int?             @map("id_originado")
+  rentalApartment            RentalApartment? @relation(fields: [originalsId], references: [suiteStateId])
+  description                String?          @map("descricao")
+  releaseType                String?          @map("tipolancamento")
+  halfPaymentId              Int              @map("id_meiopagamento")
+  halfPayment                HalfPayment      @relation(fields: [halfPaymentId], references: [id])
+  maturity                   DateTime?        @map("vencimento")
+  accountPayReceiveId        Int?             @map("id_contapagarreceber")
+  increase                   Decimal          @map("acrescimo") @db.Decimal(10, 2)
+  discount                   Decimal          @map("desconto") @db.Decimal(10, 2)
+  receiptAccountId           Int?             @map("id_contarecebimento")
+  debtorCreditorId           Int?             @map("id_devedorcredor")
+  documentNumber             String?          @map("numerodocumento")
+  documentTypeId             Int?             @map("id_tipodocumento")
+  descriptionParcelNumbering String?          @map("descricaonumeracaoparcela")
+  parcelOpen                 Boolean          @map("parcelaemaberto")
+  discountFeePaymentTerms    Decimal          @map("descontotaxacondicaopagamento")
+  parcelRefundObservation    String?          @map("observacaoestornoparcela")
+  deletionDate               DateTime?        @map("dataexclusao")
+  idResponsibleDeletion      Int?             @map("id_responsavelexclusao")
+  schedulingId               Int?             @map("id_agendamento")
+  rentalDeposit              Boolean          @map("depositolocacao")
+  pledgeId                   Int?             @map("id_penhor")
+  tefPaymentCode             String?          @map("codigopagamentotef")
+  nsuAcquirer                String?          @map("nsu_adquirente")
+  originType                 String           @map("tipo_origem")
+  networkControlNumber       String?          @map("numero_autorizacao")
+
+  @@map("novo_lancamento")
+}
+
+model HalfPayment {
+  id                    Int          @id @default(autoincrement()) @map("id")
+  version               Int          @map("versao")
+  name                  String       @map("nome")
+  deletionDate          DateTime?    @map("dataexclusao")
+  idResponsibleDeletion Int?         @map("id_responsavelexclusao")
+  type                  String       @map("tipo")
+  flagTypeCard          String?      @map("tipobandeiracartao")
+  configurationTefId    Int?         @map("id_configuracaotef")
+  enableIntegrationTef  Boolean      @map("habilitar_integracao_tef")
+  newRelease            NewRelease[]
+
+  @@map("meiopagamento")
+}
+
+model SaleDirect {
+  stockOutId    Int      @unique @map("id_saidaestoque")
+  stockOut      StockOut @relation(fields: [stockOutId], references: [id])
+  clientId      Int?     @map("id_cliente")
+  client        Client?  @relation(fields: [clientId], references: [id])
+  saleCompleted Boolean  @map("venda_completa")
+
+  @@map("vendadireta")
+}
+
+model Client {
+  id          Int          @id @default(autoincrement()) @map("id")
+  preference  String?      @map("preferencia")
+  createdDate DateTime     @map("datacadastro")
+  SaleDirect  SaleDirect[]
+
+  @@map("cliente")
+}
+
+model ApartmentCleaning {
+  id                  Int                  @id @default(autoincrement()) @map("id")
+  version             Int                  @map("versao")
+  idDirtyApartment    Int                  @unique @map("id_sujoapartamento")
+  suiteState          SuiteState           @relation(fields: [idDirtyApartment], references: [id])
+  employeeId          Int                  @map("id_funcionario")
+  startDate           DateTime             @map("datainicio")
+  endDate             DateTime?            @map("datafim")
+  reasonEnd           String?              @map("motivofim")
+  typeCleaning        String               @map("tipo")
+  timeLimit           Int                  @map("tempolimite")
+  apartmentInspection ApartmentInspection?
+  employee            Employee?            @relation(fields: [employeeId], references: [id])
+
+  @@map("limpezaapartamento")
+}
+
+model Defect {
+  id                       Int                       @id @default(autoincrement()) @map("id")
+  version                  Int                       @map("versao")
+  startDate                DateTime                  @map("datainicio")
+  endDate                  DateTime?                 @map("datafim")
+  observation              String?                   @map("observacao")
+  idEmployeeStart          Int                       @map("id_funcionarioinicio")
+  idEmployeeEnd            Int?                      @map("id_funcionariofim")
+  suiteId                  Int                       @map("id_apartamento")
+  suite                    Suite                     @relation(fields: [suiteId], references: [id])
+  idDefectType             Int                       @map("id_defeitotipo")
+  defectType               DefectType                @relation(fields: [idDefectType], references: [id])
+  generatedSystem          Boolean                   @map("gerado_pelo_sistema")
+  blockedMaintenanceDefect BlockedMaintenanceDefect?
+
+  @@map("defeito")
+}
+
+model DefectType {
+  id      Int      @id @default(autoincrement()) @map("id")
+  version Int      @map("versao")
+  name    String   @map("nome")
+  defect  Defect[]
+
+  @@map("defeitotipo")
+}
+
+model BlockedMaintenanceDefect {
+  suiteStateId Int        @unique @map("id_bloqueadomanutencao")
+  suiteState   SuiteState @relation(fields: [suiteStateId], references: [id])
+  defectId     Int        @unique @map("id_defeito")
+  defect       Defect     @relation(fields: [defectId], references: [id])
+
+  @@map("col_bloqueadomanutencao_defeito")
+}
+
+model Person {
+  id                         Int           @id @default(autoincrement()) @map("id")
+  version                    Int           @map("versao")
+  name                       String?       @map("nome")
+  identifier                 String?       @map("identificador")
+  personType                 String        @map("pessoatipo")
+  birth                      DateTime?     @map("nascimento")
+  address                    String?       @map("endereco")
+  neighborhood               String?       @map("bairro")
+  zipCode                    String?       @map("cep")
+  cityId                     Int?          @map("id_cidade")
+  phone1                     String?       @map("telefone1")
+  phone2                     String?       @map("telefone2")
+  cellPhone                  String?       @map("celular")
+  email                      String?       @map("email")
+  observation                String?       @map("observacao")
+  rg                         String?       @map("rg")
+  gender                     String?       @map("sexo")
+  corporateReason            String?       @map("razao_social")
+  stateRegistration          String?       @map("inscricao_estadual")
+  municipalRegistration      String?       @map("inscricao_municipal")
+  indicatorStateRegistration String?       @map("indicador_inscricao_estadual")
+  municipalCode              String?       @map("codigo_municipio")
+  number                     String?       @map("numero")
+  complement                 String?       @map("complemento")
+  outOfState                 Boolean?      @map("fora_estado")
+  personPaper                PersonPaper[]
+
+  @@map("pessoa")
+}
+
+model ApartmentInspection {
+  id                  Int                @id @default(autoincrement()) @map("id")
+  version             Int                @map("versao")
+  apartmentCleaningId Int                @unique @map("id_limpezaapartamento")
+  apartmentCleaning   ApartmentCleaning? @relation(fields: [apartmentCleaningId], references: [id])
+  idResponsible       Int?               @map("id_responsavel")
+  startDate           DateTime?          @map("datainicio")
+  endDate             DateTime?          @map("datafim")
+  reasonEnd           String?            @map("motivofim")
+  timeLimit           Int                @map("tempolimite")
+  observation         String?            @map("observacao")
+  user                User?              @relation(fields: [idResponsible], references: [id])
+
+  @@map("vistoriaapartamento")
+}
+
+model Employee {
+  id                    Int                 @id @default(autoincrement()) @map("id")
+  admission             DateTime?           @map("admissao")
+  zipCode               String?             @map("cep")
+  idRole                Int                 @map("id_cargo")
+  demission             DateTime?           @map("demissao")
+  pis                   String?             @map("pis")
+  ctps                  String?             @map("ctps")
+  pay                   Decimal?            @map("salario")
+  businessStartTime     String?             @map("horarioinicioexpediente")
+  businessEndTime       String?             @map("horariofimexpediente")
+  deletionDate          DateTime?           @map("dataexclusao")
+  idResponsibleDeletion Int?                @map("id_responsavelexclusao")
+  apartmentCleanings    ApartmentCleaning[]
+  role                  Role?               @relation(fields: [idRole], references: [id])
+  personPaper           PersonPaper?
+  user                  User?
+
+  @@map("funcionario")
+}
+
+model PersonPaper {
+  idEmployee            Int       @unique @map("id")
+  employee              Employee? @relation(fields: [idEmployee], references: [id])
+  version               Int       @map("versao")
+  idPerson              Int       @map("id_pessoa")
+  person                Person    @relation(fields: [idPerson], references: [id])
+  deletionDate          DateTime? @map("dataexclusao")
+  idResponsibleDeletion Int?      @map("id_responsavelexclusao")
+  responsibility        String    @map("papel")
+
+  @@map("pessoapapel")
+}
+
+model Role {
+  id                    Int        @id @default(autoincrement()) @map("id")
+  version               Int        @map("versao")
+  descricao             String     @map("descricao")
+  deletionDate          DateTime?  @map("dataexclusao")
+  idResponsibleDeletion Int?       @map("id_responsavelexclusao")
+  employee              Employee[]
+
+  @@map("cargo")
+}
+
+model User {
+  id                  Int                   @id @default(autoincrement()) @map("id")
+  version             Int                   @map("versao")
+  employeeId          Int                   @unique @map("id_funcionario")
+  profileId           Int                   @map("id_perfil")
+  password            String                @map("senha")
+  login               String                @map("login")
+  beepsActivated      Boolean               @map("sinaissonorosativados")
+  alarmClockActivated Boolean               @map("despertadorativado")
+  activeNotifications Boolean               @map("notificacoesativas")
+  apartmentInspection ApartmentInspection[]
+  employee            Employee              @relation(fields: [employeeId], references: [id])
+
+  @@map("usuario")
+}

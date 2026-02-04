@@ -2,7 +2,7 @@ export interface JwtPayload {
   id: number;
   email: string;
   name: string;
-  unit: 'LHG' | 'LUSH_LAPA' | 'LUSH_IPIRANGA' | 'TOUT' | 'ANDAR_DE_CIMA'; // Tipos de unidades
+  unit: 'LHG' | 'LUSH_LAPA' | 'LUSH_IPIRANGA' | 'TOUT' | 'ANDAR_DE_CIMA' | 'LIV'; // Tipos de unidades
   role:
     | 'ADMIN'
     | 'GERENTE_GERAL'

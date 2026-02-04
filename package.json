@@ -9,6 +9,7 @@
     "lush_lapa",
     "tout",
     "andar_de_cima",
+    "liv",
     "authentication"
   ],
   "scripts": {
@@ -17,11 +18,13 @@
     "build:lapa": "cd lush_lapa && npm run build",
     "build:tout": "cd tout && npm run build",
     "build:andar": "cd andar_de_cima && npm run build",
+    "build:liv": "cd liv && npm run build",
     "build:auth": "cd authentication && npm run build",
     "dev:ipiranga": "cd lush_ipiranga && npm run start:dev",
     "dev:lapa": "cd lush_lapa && npm run start:dev",
     "dev:tout": "cd tout && npm run start:dev",
     "dev:adc": "cd andar_de_cima && npm run start:dev",
+    "dev:liv": "cd liv && npm run start:dev",
     "dev:auth": "cd authentication && npm run start:dev"
   },
   "dependencies": {

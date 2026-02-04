@@ -42,6 +42,12 @@ const UNITS: UnitConfig[] = [
     name: 'Andar de Cima',
     key: 'andar_de_cima',
   },
+  {
+    url: process.env.LIV_URL || 'http://localhost:3006',
+    prefix: '/liv/api',
+    name: 'Liv',
+    key: 'liv',
+  },
 ];
 
 @Injectable()

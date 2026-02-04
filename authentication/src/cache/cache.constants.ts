@@ -64,6 +64,11 @@ export const UNIT_BACKENDS = {
     prefix: '/andar_de_cima/api',
     name: 'Andar de Cima',
   },
+  liv: {
+    url: process.env.LIV_URL || 'http://localhost:3006',
+    prefix: '/liv/api',
+    name: 'Liv',
+  },
 };
 
 export type UnitKey = keyof typeof UNIT_BACKENDS;

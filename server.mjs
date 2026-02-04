@@ -43,6 +43,10 @@ app.use(
   "/andar_de_cima",
   createProxyMiddleware({ target: "http://localhost:3004", changeOrigin: true })
 );
+app.use(
+  "/liv",
+  createProxyMiddleware({ target: "http://localhost:3006", changeOrigin: true })
+);
 
 const port = process.env.PORT || 3000;
 app.listen(port, "0.0.0.0", () => {

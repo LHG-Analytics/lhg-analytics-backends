@@ -123,7 +123,7 @@ export class CacheController {
     ];
 
     // Unidades para popular cache específico (além do consolidado)
-    const unitKeys: UnitKey[] = ['lush_ipiranga', 'lush_lapa', 'tout', 'andar_de_cima'];
+    const unitKeys: UnitKey[] = ['lush_ipiranga', 'lush_lapa', 'tout', 'andar_de_cima', 'liv'];
 
     // Executa warmup para cada combinação de serviço x período x unidade
     for (const svcConfig of servicesConfig) {

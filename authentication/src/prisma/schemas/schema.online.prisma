@@ -49,4 +49,5 @@ enum UserUnit {
     TOUT
     ANDAR_DE_CIMA
     LHG
+    LIV
 }

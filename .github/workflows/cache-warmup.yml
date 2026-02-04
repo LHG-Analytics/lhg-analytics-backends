@@ -41,6 +41,13 @@ jobs:
             --max-time 180 \
             --fail
 
+      - name: Warmup Liv
+        run: |
+          curl -X POST "${{ secrets.LIV_URL }}/cache/warmup" \
+            -H "Content-Type: application/json" \
+            --max-time 180 \
+            --fail
+
       - name: Warmup Authentication
         run: |
           curl -X POST "${{ secrets.AUTHENTICATION_URL }}/cache/warmup" \

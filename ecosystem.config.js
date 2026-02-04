@@ -88,6 +88,21 @@ module.exports = {
         PORT: 3004,
       },
     },
+    {
+      name: "liv",
+      script: "./dist/liv/src/main.js",
+      cwd: "./liv",
+      node_args: "-r module-alias/register",
+      env: {
+        NODE_ENV: "production",
+        DATABASE_URL_LOCAL_LIV: process.env.DATABASE_URL_LOCAL_LIV,
+        SERVICE_PREFIX: "liv",
+        PORT: 3006,
+      },
+      env_production: {
+        PORT: 3006,
+      },
+    },
   ],
   deploy: {
     production: {
