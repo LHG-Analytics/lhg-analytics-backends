@@ -1185,7 +1185,7 @@ export class CompanyService {
 
     // Criar mapeamento para receita de locação por data (para Revpar correto)
     const rentalRevenueDataMap = new Map<string, number>();
-    rentalRevenueByDateResult.rows.forEach((item: any) => {
+    rentalRevenueByDateResult.forEach((item: any) => {
       const dateKey = groupByMonth
         ? moment.utc(item.date).format('MM/YYYY')
         : moment.utc(item.date).format('DD/MM/YYYY');
