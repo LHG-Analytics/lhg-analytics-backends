@@ -13,7 +13,7 @@ export const SERVICE_PREFIXES: Record<ServiceType, string> = {
 };
 
 // Estratégia de TTL por período (em segundos)
-// Otimizado para cache warmup diário às 6h via GitHub Actions
+// Otimizado para cache warmup a cada 6 horas via GitHub Actions
 export const CACHE_STRATEGY: CacheConfig = {
   LAST_7_D: {
     ttl: 21600, // 6 horas - últimos 7 dias (até ontem)
@@ -28,7 +28,7 @@ export const CACHE_STRATEGY: CacheConfig = {
     description: 'Acumulado do ano',
   },
   CUSTOM: {
-    ttl: 600, // 10 minutos - consultas específicas (mantido curto)
+    ttl: 21600, // 6 horas - consultas específicas (igual ao LAST_7_D)
     description: 'Período customizado',
   },
 };

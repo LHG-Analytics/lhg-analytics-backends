@@ -29,7 +29,7 @@ export const CACHE_STRATEGY: CacheConfig = {
     description: 'Acumulado do ano',
   },
   CUSTOM: {
-    ttl: 600, // 10 minutos - consultas específicas (mantido curto)
+    ttl: 21600, // 6 horas - consultas específicas (igual ao LAST_7_D)
     description: 'Período customizado',
   },
 };
