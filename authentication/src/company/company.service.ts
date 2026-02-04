@@ -204,6 +204,11 @@ export class CompanyService {
       'RentalsByDate',
       categories,
     );
+    const revparByDate = this.consolidateSeriesByUnit(
+      results,
+      'RevparByDate',
+      categories,
+    );
     const trevparByDate = this.consolidateSeriesByUnit(
       results,
       'TrevparByDate',
@@ -227,6 +232,7 @@ export class CompanyService {
       RevenueByCompany: revenueByCompany,
       RevenueByDate: revenueByDate,
       RentalsByDate: rentalsByDate,
+      RevparByDate: revparByDate,
       TicketAverageByDate: ticketAverageByDate,
       TrevparByDate: trevparByDate,
       OccupancyRateByDate: occupancyRateByDate,

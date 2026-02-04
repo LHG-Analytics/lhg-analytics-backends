@@ -60,6 +60,10 @@ export interface UnitKpiResponse {
     categories: string[];
     series: number[];
   };
+  RevparByDate: {
+    categories: string[];
+    series: number[];
+  };
   TicketAverageByDate: {
     categories: string[];
     series: number[];
@@ -86,6 +90,7 @@ export interface UnifiedCompanyKpiResponse {
   RevenueByCompany: ApexChartsData; // Faturamento total de cada unidade
   RevenueByDate: ApexChartsSeriesData; // Faturamento por unidade por data
   RentalsByDate: ApexChartsSeriesData; // Locações por unidade por data
+  RevparByDate: ApexChartsSeriesData; // RevPAR por unidade por data
   TicketAverageByDate: ApexChartsSeriesData; // Ticket médio por unidade por data
   TrevparByDate: ApexChartsSeriesData; // TRevPAR por unidade por data
   OccupancyRateByDate: ApexChartsSeriesData; // Taxa de ocupação por unidade por data
