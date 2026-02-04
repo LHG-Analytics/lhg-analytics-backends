@@ -52,7 +52,7 @@ export const UNIT_CONFIGS: Record<
         'LUSH SPA SPLASH',
         'CASA LUSH',
       ],
-      totalSuites: 33,
+      totalSuites: 61,
     },
   },
   lush_lapa: {
@@ -68,7 +68,7 @@ export const UNIT_CONFIGS: Record<
         'LUSH SPLASH',
         'LUSH SPA SPLASH',
       ],
-      totalSuites: 18,
+      totalSuites: 39,
     },
   },
   tout: {
@@ -77,7 +77,7 @@ export const UNIT_CONFIGS: Record<
     suiteConfig: {
       categoryIds: [6, 7, 8, 9, 10, 12],
       categoryNames: ['A', 'HIDRO', 'RELAX', 'SUBLIME', 'CLUB', 'GLAM'],
-      totalSuites: 24,
+      totalSuites: 55,
     },
   },
   andar_de_cima: {
@@ -94,7 +94,7 @@ export const UNIT_CONFIGS: Record<
         'ESPUMA COPAN',
         'CUBO',
       ],
-      totalSuites: 16,
+      totalSuites: 28,
     },
   },
   liv: {
@@ -114,7 +114,7 @@ export const UNIT_CONFIGS: Record<
         'LOUNGE SPA',
         'LOUNGE SPA 50 SOMBRAS',
       ],
-      totalSuites: 27, // TODO: Confirmar valor correto
+      totalSuites: 61,
     },
   },
 };
