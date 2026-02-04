@@ -114,7 +114,7 @@ export const UNIT_CONFIGS: Record<
         'LOUNGE SPA',
         'LOUNGE SPA 50 SOMBRAS',
       ],
-      totalSuites: null, // Preencher com valor correto depois
+      totalSuites: 27, // TODO: Confirmar valor correto
     },
   },
 };

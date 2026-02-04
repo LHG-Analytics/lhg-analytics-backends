@@ -37,6 +37,11 @@ export const UNIT_AB_CONFIGS: Record<UnitKey, UnitABConfig> = {
     aProductTypes: [14, 16, 18, 7, 15, 17],
     bProductTypes: [6, 13, 2, 4, 5, 3, 20],
   },
+  liv: {
+    abProductTypes: [26, 23, 24, 6, 7, 2, 22, 5, 31, 15, 12, 16, 9],
+    aProductTypes: [26, 23, 24, 6, 7, 2, 22, 5],
+    bProductTypes: [31, 15, 12, 16, 9],
+  },
 };
 
 /**
