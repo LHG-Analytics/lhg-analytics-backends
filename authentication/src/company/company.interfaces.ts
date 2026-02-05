@@ -94,6 +94,7 @@ export interface UnifiedCompanyKpiResponse {
   TicketAverageByDate: ApexChartsSeriesData; // Ticket médio por unidade por data
   TrevparByDate: ApexChartsSeriesData; // TRevPAR por unidade por data
   OccupancyRateByDate: ApexChartsSeriesData; // Taxa de ocupação por unidade por data
+  GiroByDate: ApexChartsSeriesData; // Giro por unidade por data
 }
 
 // Configuração de unidade
