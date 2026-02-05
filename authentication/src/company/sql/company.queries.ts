@@ -311,6 +311,9 @@ export function getTrevparByDateSQL(
  * Query para Revpar por data
  * Revpar = SOMENTE receita de locação (permanencia + ocupadicional - desconto) / total de suítes
  * NÃO inclui consumo, vendas diretas ou gorjetas
+ *
+ * IMPORTANTE: Retorna daily_rental_revenue (BRUTO) para permitir consolidação multi-unidade
+ * A divisão por suítes é feita no TypeScript após somar todas as unidades
  */
 export function getRevparByDateSQL(
   unit: UnitKey,
@@ -321,7 +324,6 @@ export function getRevparByDateSQL(
     startDate,
     endDate,
   );
-  const totalSuites = UNIT_CONFIGS[unit].suiteConfig.totalSuites;
 
   return `
     SELECT
@@ -333,7 +335,7 @@ export function getRevparByDateSQL(
         COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
         COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
         COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
-      ), 0) / ${totalSuites} as revpar
+      ), 0) as daily_rental_revenue
     FROM locacaoapartamento la
     INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
     WHERE la.datainicialdaocupacao >= '${startTimestamp}'
@@ -349,6 +351,9 @@ export function getRevparByDateSQL(
 
 /**
  * Query para Taxa de Ocupação por data
+ *
+ * IMPORTANTE: Retorna total_occupied_seconds (BRUTO) para permitir consolidação multi-unidade
+ * O cálculo da taxa de ocupação é feito no TypeScript após somar todas as unidades
  */
 export function getOccupancyRateByDateSQL(
   unit: UnitKey,
@@ -360,9 +365,6 @@ export function getOccupancyRateByDateSQL(
     startDate,
     endDate,
   );
-  const totalSuites = UNIT_CONFIGS[unit].suiteConfig.totalSuites;
-  // 18 horas úteis por dia em segundos (6h às 24h = 18h)
-  const availableSecondsPerDay = 18 * 3600;
 
   return `
     SELECT
@@ -372,14 +374,7 @@ export function getOccupancyRateByDateSQL(
       END as date,
       COALESCE(SUM(
         EXTRACT(EPOCH FROM (la.datafinaldaocupacao - la.datainicialdaocupacao))
-      ), 0) as total_occupied_seconds,
-      (${totalSuites} * ${availableSecondsPerDay}) as available_seconds,
-      CASE
-        WHEN (${totalSuites} * ${availableSecondsPerDay}) > 0 THEN
-          (COALESCE(SUM(EXTRACT(EPOCH FROM (la.datafinaldaocupacao - la.datainicialdaocupacao))), 0) * 100.0) /
-          (${totalSuites} * ${availableSecondsPerDay})
-        ELSE 0
-      END as occupancy_rate
+      ), 0) as total_occupied_seconds
     FROM locacaoapartamento la
     INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
     INNER JOIN apartamento a ON aps.id_apartamento = a.id
@@ -398,6 +393,9 @@ export function getOccupancyRateByDateSQL(
 
 /**
  * Query para Giro por data (locações por suíte)
+ *
+ * IMPORTANTE: Retorna total_rentals (BRUTO) para permitir consolidação multi-unidade
+ * O cálculo do giro (locações / suítes) é feito no TypeScript após somar todas as unidades
  */
 export function getGiroByDateSQL(
   unit: UnitKey,
@@ -409,7 +407,6 @@ export function getGiroByDateSQL(
     startDate,
     endDate,
   );
-  const totalSuites = UNIT_CONFIGS[unit].suiteConfig.totalSuites;
 
   return `
     SELECT
@@ -417,7 +414,7 @@ export function getGiroByDateSQL(
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
       END as date,
-      COUNT(*)::DECIMAL / ${totalSuites} as giro
+      COUNT(*) as total_rentals
     FROM locacaoapartamento la
     INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
     INNER JOIN apartamento a ON aps.id_apartamento = a.id

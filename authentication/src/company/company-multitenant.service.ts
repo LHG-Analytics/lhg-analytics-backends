@@ -322,7 +322,7 @@ export class CompanyMultitenantService {
       for (const row of revparResult.rows) {
         revparByDate.set(
           this.dateUtilsService.formatDateKey(row.date),
-          parseFloat(row.revpar) || 0,
+          parseFloat(row.daily_rental_revenue) || 0,
         );
       }
 
@@ -330,7 +330,7 @@ export class CompanyMultitenantService {
       for (const row of trevparResult.rows) {
         trevparByDate.set(
           this.dateUtilsService.formatDateKey(row.date),
-          parseFloat(row.trevpar) || 0,
+          parseFloat(row.total_revenue) || 0,
         );
       }
 
@@ -338,13 +338,16 @@ export class CompanyMultitenantService {
       for (const row of occupancyResult.rows) {
         occupancyRateByDate.set(
           this.dateUtilsService.formatDateKey(row.date),
-          parseFloat(row.occupancy_rate) || 0,
+          parseFloat(row.total_occupied_seconds) || 0,
         );
       }
 
       const giroByDate = new Map<string, number>();
       for (const row of giroResult.rows) {
-        giroByDate.set(this.dateUtilsService.formatDateKey(row.date), parseFloat(row.giro) || 0);
+        giroByDate.set(
+          this.dateUtilsService.formatDateKey(row.date),
+          parseInt(row.total_rentals) || 0,
+        );
       }
 
       this.logger.log(`KPIs de ${UNIT_CONFIGS[unit].name} obtidos com sucesso`);
@@ -424,23 +427,42 @@ export class CompanyMultitenantService {
       allPeriods,
       groupByMonth,
     );
-    const revparByDate = this.consolidateSeriesByUnit(
+
+    // Calcula total de suítes consolidadas para métricas de média
+    const totalSuites = results.reduce(
+      (sum, r) => sum + UNIT_CONFIGS[r.unit].suiteConfig.totalSuites,
+      0,
+    );
+
+    // Métricas de MÉDIA (Revpar, Trevpar, Ocupação, Giro) precisam de tratamento especial
+    // SOMAR componentes primeiro, depois calcular média
+    const revparByDate = this.consolidateAverageMetricsByUnit(
       results,
       'revparByDate',
       allPeriods,
       groupByMonth,
+      totalSuites,
     );
-    const trevparByDate = this.consolidateSeriesByUnit(
+    const trevparByDate = this.consolidateAverageMetricsByUnit(
       results,
       'trevparByDate',
       allPeriods,
       groupByMonth,
+      totalSuites,
     );
-    const occupancyRateByDate = this.consolidateSeriesByUnit(
+    const occupancyRateByDate = this.consolidateAverageMetricsByUnit(
       results,
       'occupancyRateByDate',
       allPeriods,
       groupByMonth,
+      totalSuites,
+    );
+    const giroByDate = this.consolidateAverageMetricsByUnit(
+      results,
+      'giroByDate',
+      allPeriods,
+      groupByMonth,
+      totalSuites,
     );
 
     // Ticket médio por unidade = faturamento / locações de cada unidade (por data/mês)
@@ -459,6 +481,7 @@ export class CompanyMultitenantService {
       TicketAverageByDate: ticketAverageByDate,
       TrevparByDate: trevparByDate,
       OccupancyRateByDate: occupancyRateByDate,
+      GiroByDate: giroByDate,
     };
   }
 
@@ -667,6 +690,82 @@ export class CompanyMultitenantService {
       for (const periodKey of periods) {
         const value = unitPeriodMap.get(periodKey) || 0;
         unitData.push(Number(value.toFixed(2)));
+      }
+
+      series.push({
+        name: r.unitName,
+        data: unitData,
+      });
+    }
+
+    return { categories: periods, series };
+  }
+
+  /**
+   * Consolida métricas de MÉDIA por unidade (Revpar, Trevpar, Ocupação, Giro)
+   * Diferente de consolidateSeriesByUnit, este método:
+   * 1. SOMA os componentes de cada unidade (receita, locações, etc.)
+   * 2. Calcula a média consolidada no final
+   *
+   * IMPORTANTE: Métricas de média NÃO podem ser somadas diretamente!
+   * - Errado: soma(Revpar_unidade1 + Revpar_unidade2)
+   * - Certo: soma(Receita_unidade1 + Receita_unidade2) / total_suites
+   */
+  private consolidateAverageMetricsByUnit(
+    results: UnitKpiData[],
+    field: keyof Pick<
+      UnitKpiData,
+      | 'revparByDate'
+      | 'trevparByDate'
+      | 'occupancyRateByDate'
+      | 'giroByDate'
+    >,
+    periods: string[],
+    groupByMonth: boolean,
+    totalSuites: number,
+  ): ApexChartsSeriesData {
+    const series: NamedSeries[] = [];
+
+    // Para cada unidade, soma os componentes BRUTOS por período
+    for (const r of results) {
+      const unitData: number[] = [];
+
+      // Mapa para acumular os componentes por período
+      const periodComponentMap = new Map<string, number>();
+
+      // Soma os valores por período (agrupa se necessário)
+      for (const [dateKey, value] of r[field].entries()) {
+        const periodKey = groupByMonth
+          ? this.dateUtilsService.formatDateToMonth(dateKey)
+          : this.dateUtilsService.formatDateDisplay(dateKey);
+
+        // IMPORTANTE: Somar os componentes BRUTOS (não a média já calculada)
+        // O SQL já retorna o valor bruto (total_revenue, total_rentals, etc.)
+        const current = periodComponentMap.get(periodKey) || 0;
+        periodComponentMap.set(periodKey, current + value);
+      }
+
+      // Agora calcula a média para cada período
+      for (const periodKey of periods) {
+        const componentSum = periodComponentMap.get(periodKey) || 0;
+        let averageValue = 0;
+
+        // Cada métrica tem sua fórmula específica
+        if (field === 'trevparByDate' || field === 'revparByDate') {
+          // Trevpar e Revpar: soma_receita / total_suites
+          averageValue = componentSum / totalSuites;
+        } else if (field === 'giroByDate') {
+          // Giro: soma_locacoes / total_suites
+          averageValue = componentSum / totalSuites;
+        } else if (field === 'occupancyRateByDate') {
+          // Ocupação: mais complexa, precisa considerar tempo disponível
+          // 18 horas úteis por dia = 18 * 3600 = 64800 segundos
+          const availableSecondsPerDay = 18 * 3600;
+          const totalAvailableSeconds = totalSuites * availableSecondsPerDay;
+          averageValue = (componentSum / totalAvailableSeconds) * 100; // taxa em %
+        }
+
+        unitData.push(Number(averageValue.toFixed(2)));
       }
 
       series.push({
