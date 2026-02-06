@@ -225,6 +225,11 @@ export class CompanyService {
       'OccupancyRateByDate',
       categories,
     );
+    const giroByDate = this.consolidateSeriesByUnit(
+      results,
+      'GiroByDate',
+      categories,
+    );
 
     // Ticket médio por unidade = faturamento / locações (por unidade)
     const ticketAverageByDate = this.calculateTicketAverageByUnit(
@@ -242,6 +247,7 @@ export class CompanyService {
       TicketAverageByDate: ticketAverageByDate,
       TrevparByDate: trevparByDate,
       OccupancyRateByDate: occupancyRateByDate,
+      GiroByDate: giroByDate,
     };
   }
 
