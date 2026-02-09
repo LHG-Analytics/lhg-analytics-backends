@@ -80,6 +80,10 @@ export class PgPoolService implements OnModuleDestroy {
   async query<T = any>(sql: string): Promise<T[]> {
     await this.ensureInitialized();
 
+    if (!this.pool) {
+      throw new Error('Pool de conexão não disponível');
+    }
+
     try {
       const result = await this.pool.query(sql);
       return result.rows as T[];
@@ -94,6 +98,10 @@ export class PgPoolService implements OnModuleDestroy {
    */
   async queryWithParams<T = any>(sql: string, params: any[]): Promise<T[]> {
     await this.ensureInitialized();
+
+    if (!this.pool) {
+      throw new Error('Pool de conexão não disponível');
+    }
 
     try {
       const result = await this.pool.query(sql, params);
