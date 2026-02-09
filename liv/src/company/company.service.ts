@@ -1973,10 +1973,10 @@ export class CompanyService {
       totalOccupancyByDay[day] = { occupied: 0, available: 0 };
     });
 
-    const dataTableOccupancyRateByWeek: any[] = metadataResult.map((meta) => {
-      const category = meta.category_name;
+    // Função para criar objeto de ocupação com dias em ordem garantida
+    const createOrderedOccupancyObject = (category: string, meta: any) => {
       const totalSuites = Number(meta.total_suites);
-      const dayData: any = {};
+      const orderedDayData: any = {};
 
       dayNames.forEach((day) => {
         const daysCount = dayCountMap[day] || 0;
@@ -1986,7 +1986,7 @@ export class CompanyService {
 
         const occupancyRate = availableTime > 0 ? (occupiedTime / availableTime) * 100 : 0;
 
-        dayData[day] = {
+        orderedDayData[day] = {
           occupancyRate: Number(occupancyRate.toFixed(2)),
           totalOccupancyRate: 0, // será calculado depois
         };
@@ -1996,8 +1996,12 @@ export class CompanyService {
         totalOccupancyByDay[day].available += availableTime;
       });
 
-      return { [category]: dayData };
-    });
+      return { [category]: orderedDayData };
+    };
+
+    const dataTableOccupancyRateByWeek: any[] = metadataResult.map((meta) =>
+      createOrderedOccupancyObject(meta.category_name, meta),
+    );
 
     // Calcular e preencher totalOccupancyRate
     dataTableOccupancyRateByWeek.forEach((item) => {
@@ -2187,9 +2191,18 @@ export class CompanyService {
       });
     });
 
+    // Função para criar objeto de giro com dias em ordem garantida
+    const createOrderedGiroData = (data: { [day: string]: any }) => {
+      const ordered: { [day: string]: any } = {};
+      allDaysOfWeekSQL.forEach((day) => {
+        ordered[day] = data[day];
+      });
+      return ordered;
+    };
+
     const dataTableGiroByWeek: any[] = Object.entries(giroByCategory).map(
       ([categoryName, dayData]) => ({
-        [categoryName]: dayData,
+        [categoryName]: createOrderedGiroData(dayData),
       }),
     );
 
@@ -2366,9 +2379,18 @@ export class CompanyService {
       });
     });
 
+    // Função para criar objeto de revpar com dias em ordem garantida
+    const createOrderedRevparData = (data: { [day: string]: any }) => {
+      const ordered: { [day: string]: any } = {};
+      allDaysOfWeekSQL.forEach((day) => {
+        ordered[day] = data[day];
+      });
+      return ordered;
+    };
+
     const dataTableRevparByWeek: any[] = Object.entries(revparByCategory).map(
       ([categoryName, dayData]) => ({
-        [categoryName]: dayData,
+        [categoryName]: createOrderedRevparData(dayData),
       }),
     );
 

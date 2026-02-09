@@ -1805,32 +1805,33 @@ export class CompanyService {
       totalOccupancyByDay[day] = { occupied: 0, available: 0 };
     });
 
+    // Função para criar objeto com ordem garantida das chaves
+    const createOrderedOccupancyObject = (data: { [key: string]: any }, category: string, totalSuites: number, dayCountMap: any) => {
+      const ordered: { [key: string]: any } = {};
+      dayNames.forEach((day) => {
+        const daysCount = dayCountMap[day] || 1;
+        const occupiedTime = data[day]?.occupied || 0;
+        const unavailableTime = data[day]?.unavailable || 0;
+        const availableTime = daysCount * totalSuites * 86400 - unavailableTime;
+        const occupancyRate = availableTime > 0 ? (occupiedTime / availableTime) * 100 : 0;
+
+        ordered[day] = {
+          occupancyRate: Number(occupancyRate.toFixed(2)),
+          totalOccupancyRate: 0, // Será preenchido depois
+        };
+
+        // Acumular para totalOccupancyRate
+        totalOccupancyByDay[day].occupied += occupiedTime;
+        totalOccupancyByDay[day].available += availableTime;
+      });
+      return ordered;
+    };
+
     const dataTableOccupancyRateByWeek: any[] = Object.entries(occupancyByCategory).map(
       ([category, dayData]) => {
         const totalSuites = metadataByCategory[category]?.totalSuites || 1;
-
         const result: any = {};
-        result[category] = {};
-
-        dayNames.forEach((day) => {
-          const daysCount = dayCountMap[day] || 1;
-          const occupiedTime = dayData[day].occupied;
-          const unavailableTime = dayData[day].unavailable;
-
-          // Tempo disponível = (dias × suites × 86400) - tempo_indisponível
-          const availableTime = daysCount * totalSuites * 86400 - unavailableTime;
-          const occupancyRate = availableTime > 0 ? (occupiedTime / availableTime) * 100 : 0;
-
-          result[category][day] = {
-            occupancyRate: Number(occupancyRate.toFixed(2)),
-            totalOccupancyRate: 0, // Será preenchido depois
-          };
-
-          // Acumular para totalOccupancyRate
-          totalOccupancyByDay[day].occupied += occupiedTime;
-          totalOccupancyByDay[day].available += availableTime;
-        });
-
+        result[category] = createOrderedOccupancyObject(dayData, category, totalSuites, dayCountMap);
         return result;
       },
     );
@@ -2034,9 +2035,18 @@ export class CompanyService {
       });
     });
 
+    // Criar objetos com ordem garantida de dias da semana
+    const createOrderedGiroData = (data: { [day: string]: any }) => {
+      const ordered: { [day: string]: any } = {};
+      allDaysOfWeekSQL.forEach((day) => {
+        ordered[day] = data[day] || { giro: 0, totalGiro: totalGiroByDay[day] ?? 0 };
+      });
+      return ordered;
+    };
+
     const dataTableGiroByWeek: any[] = Object.entries(giroByCategory).map(
       ([categoryName, dayData]) => ({
-        [categoryName]: dayData,
+        [categoryName]: createOrderedGiroData(dayData),
       }),
     );
 
@@ -2225,9 +2235,18 @@ export class CompanyService {
       });
     });
 
+    // Criar objetos com ordem garantida de dias da semana
+    const createOrderedRevparData = (data: { [day: string]: any }) => {
+      const ordered: { [day: string]: any } = {};
+      allDaysOfWeekSQL.forEach((day) => {
+        ordered[day] = data[day] || { revpar: 0, totalRevpar: totalRevparByDay[day] ?? 0 };
+      });
+      return ordered;
+    };
+
     const dataTableRevparByWeek: any[] = Object.entries(revparByCategory).map(
       ([categoryName, dayData]) => ({
-        [categoryName]: dayData,
+        [categoryName]: createOrderedRevparData(dayData),
       }),
     );
 
