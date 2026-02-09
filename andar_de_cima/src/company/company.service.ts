@@ -2020,12 +2020,15 @@ export class CompanyService {
     // Criar mapa de totalGiro por dia da semana (valores globais, independente de categoria)
     const totalGiroByDay: { [day: string]: number } = {};
 
+    // Inicializa todos os dias com zero
+    allDaysOfWeekSQL.forEach((day) => {
+      totalGiroByDay[day] = 0;
+    });
+
     // Extrair os valores totais de cada dia da semana (são os mesmos para todas as categorias)
     giroByWeekResult.forEach((item) => {
       const dayName = item.day_of_week;
-      if (!totalGiroByDay[dayName]) {
-        totalGiroByDay[dayName] = Number(Number(item.total_giro).toFixed(2));
-      }
+      totalGiroByDay[dayName] = Number(Number(item.total_giro).toFixed(2));
     });
 
     // Preencher dias ausentes com giro 0 e usar os totais corretos do dia
@@ -2034,7 +2037,7 @@ export class CompanyService {
         if (!giroByCategory[categoryName][day]) {
           giroByCategory[categoryName][day] = {
             giro: 0,
-            totalGiro: totalGiroByDay[day] || 0,
+            totalGiro: totalGiroByDay[day] ?? 0,
           };
         }
       });
@@ -2205,12 +2208,15 @@ export class CompanyService {
     // Criar mapa de totalRevpar por dia da semana (valores globais, independente de categoria)
     const totalRevparByDay: { [day: string]: number } = {};
 
+    // Inicializa todos os dias com zero
+    allDaysOfWeekSQL.forEach((day) => {
+      totalRevparByDay[day] = 0;
+    });
+
     // Extrair os valores totais de cada dia da semana (são os mesmos para todas as categorias)
     revparByWeekResult.forEach((item) => {
       const dayName = item.day_of_week;
-      if (!totalRevparByDay[dayName]) {
-        totalRevparByDay[dayName] = Number(Number(item.total_revpar).toFixed(2));
-      }
+      totalRevparByDay[dayName] = Number(Number(item.total_revpar).toFixed(2));
     });
 
     // Preencher dias ausentes com revpar 0 e usar os totais corretos do dia
@@ -2219,7 +2225,7 @@ export class CompanyService {
         if (!revparByCategory[categoryName][day]) {
           revparByCategory[categoryName][day] = {
             revpar: 0,
-            totalRevpar: totalRevparByDay[day] || 0,
+            totalRevpar: totalRevparByDay[day] ?? 0,
           };
         }
       });

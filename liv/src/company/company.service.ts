@@ -2698,13 +2698,17 @@ export class CompanyService {
     const totalGiroByDay: { [day: string]: number } = {};
     const totalRevparByDay: { [day: string]: number } = {};
 
+    // Inicializa todos os dias com zero
+    allDaysOfWeek.forEach((day) => {
+      totalGiroByDay[day] = 0;
+      totalRevparByDay[day] = 0;
+    });
+
     // Extrair os valores totais de cada dia da semana (são os mesmos para todas as categorias)
     result.forEach((item) => {
       const dayName = item.day_of_week;
-      if (!totalGiroByDay[dayName]) {
-        totalGiroByDay[dayName] = Number(Number(item.total_giro).toFixed(2));
-        totalRevparByDay[dayName] = Number(Number(item.total_revpar).toFixed(2));
-      }
+      totalGiroByDay[dayName] = Number(Number(item.total_giro).toFixed(2));
+      totalRevparByDay[dayName] = Number(Number(item.total_revpar).toFixed(2));
     });
 
     // Segunda passagem: preencher dias ausentes com zero e usar os totais corretos do dia
@@ -2713,13 +2717,13 @@ export class CompanyService {
         if (!giroByCategory[categoryName][day]) {
           giroByCategory[categoryName][day] = {
             giro: 0,
-            totalGiro: totalGiroByDay[day] || 0,
+            totalGiro: totalGiroByDay[day] ?? 0,
           };
         }
         if (!revparByCategory[categoryName][day]) {
           revparByCategory[categoryName][day] = {
             revpar: 0,
-            totalRevpar: totalRevparByDay[day] || 0,
+            totalRevpar: totalRevparByDay[day] ?? 0,
           };
         }
       });
