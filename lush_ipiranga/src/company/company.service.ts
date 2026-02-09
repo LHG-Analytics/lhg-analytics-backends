@@ -2180,17 +2180,27 @@ export class CompanyService {
       'sábado',
     ];
 
-    // Preencher dias ausentes com giro 0 para cada categoria de suíte
-    Object.keys(giroByCategory).forEach((categoryName) => {
-      // Pegar o totalGiro de qualquer dia existente para usar como referência
-      const existingDay = Object.values(giroByCategory[categoryName])[0];
-      const totalGiroReference = existingDay ? existingDay.totalGiro : 0;
+    // Criar mapa de totalGiro por dia da semana (valores globais, independente de categoria)
+    const totalGiroByDay: { [day: string]: number } = {};
 
+    // Inicializa todos os dias com zero
+    allDaysOfWeekSQL.forEach((day) => {
+      totalGiroByDay[day] = 0;
+    });
+
+    // Extrair os valores totais de cada dia da semana (são os mesmos para todas as categorias)
+    giroByWeekResult.forEach((item) => {
+      const dayName = item.day_of_week;
+      totalGiroByDay[dayName] = Number(Number(item.total_giro).toFixed(2));
+    });
+
+    // Preencher dias ausentes com giro 0 e usar os totais corretos do dia
+    Object.keys(giroByCategory).forEach((categoryName) => {
       allDaysOfWeekSQL.forEach((day) => {
         if (!giroByCategory[categoryName][day]) {
           giroByCategory[categoryName][day] = {
             giro: 0,
-            totalGiro: totalGiroReference,
+            totalGiro: totalGiroByDay[day] ?? 0,
           };
         }
       });
@@ -2200,7 +2210,7 @@ export class CompanyService {
     const createOrderedGiroData = (data: { [day: string]: any }) => {
       const ordered: { [day: string]: any } = {};
       allDaysOfWeekSQL.forEach((day) => {
-        ordered[day] = data[day] || { giro: 0, totalGiro: 0 };
+        ordered[day] = data[day] || { giro: 0, totalGiro: totalGiroByDay[day] ?? 0 };
       });
       return ordered;
     };
