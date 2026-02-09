@@ -6,7 +6,6 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
 import { DatabaseModule } from './database/database.module';
-import { PgPoolService } from './database/database.service';
 import { CompanyModule } from './company/company.module';
 import { GovernanceModule } from './governance/governance.module';
 import { BookingsModule } from './bookings/bookings.module';
@@ -41,7 +40,6 @@ import { DateUtilsModule, ValidationModule, QueryUtilsModule, ConcurrencyUtilsMo
   providers: [
     AppService,
     PrismaService, // Mantido para outros módulos que ainda usam
-    PgPoolService, // Pool de conexão PostgreSQL
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
