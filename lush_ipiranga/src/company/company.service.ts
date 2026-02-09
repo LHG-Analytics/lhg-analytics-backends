@@ -2358,17 +2358,27 @@ export class CompanyService {
       };
     });
 
-    // Preencher dias ausentes com revpar 0 para cada categoria de suíte
-    Object.keys(revparByCategory).forEach((categoryName) => {
-      // Pegar o totalRevpar de qualquer dia existente para usar como referência
-      const existingDay = Object.values(revparByCategory[categoryName])[0];
-      const totalRevparReference = existingDay ? existingDay.totalRevpar : 0;
+    // Criar mapa de totalRevpar por dia da semana (valores globais, independente de categoria)
+    const totalRevparByDay: { [day: string]: number } = {};
 
+    // Inicializa todos os dias com zero
+    allDaysOfWeekSQL.forEach((day) => {
+      totalRevparByDay[day] = 0;
+    });
+
+    // Extrair os valores totais de cada dia da semana (são os mesmos para todas as categorias)
+    revparByWeekResult.forEach((item) => {
+      const dayName = item.day_of_week;
+      totalRevparByDay[dayName] = Number(Number(item.total_revpar).toFixed(2));
+    });
+
+    // Preencher dias ausentes com revpar 0 e usar os totais corretos do dia
+    Object.keys(revparByCategory).forEach((categoryName) => {
       allDaysOfWeekSQL.forEach((day) => {
         if (!revparByCategory[categoryName][day]) {
           revparByCategory[categoryName][day] = {
             revpar: 0,
-            totalRevpar: totalRevparReference,
+            totalRevpar: totalRevparByDay[day] ?? 0,
           };
         }
       });
