@@ -1,29 +1,18 @@
 /**
  * Serviço de conexão com banco de dados usando node-postgres (pg)
  * Para queries diretas sem Prisma - melhor performance
- * Inicialização preguiçosa (lazy) para não travar o bootstrap
  */
 
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Pool, PoolConfig } from 'pg';
 
 @Injectable()
-export class PgPoolService implements OnModuleDestroy {
+export class PgPoolService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PgPoolService.name);
   private pool: Pool | null = null;
-  private initialized = false;
 
-  /**
-   * Inicializa o pool de conexão de forma preguiçosa (lazy)
-   * Só conecta quando realmente precisar usar
-   */
-  private async ensureInitialized(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
-
+  async onModuleInit() {
     await this.initializePool();
-    this.initialized = true;
   }
 
   async onModuleDestroy() {
@@ -43,7 +32,7 @@ export class PgPoolService implements OnModuleDestroy {
     try {
       const config: PoolConfig = {
         connectionString,
-        max: 5, // Reduzido para evitar estourar limite de conexões no Render
+        max: 5, // Reduzido para evitar estourar limite de conexões
         idleTimeoutMillis: 30000, // 30 segundos - libera conexões mais rápido
         connectionTimeoutMillis: 10000,
         statement_timeout: 120000, // 2 minutos por query
@@ -78,8 +67,6 @@ export class PgPoolService implements OnModuleDestroy {
    * Executa uma query SQL
    */
   async query<T = any>(sql: string): Promise<T[]> {
-    await this.ensureInitialized();
-
     if (!this.pool) {
       throw new Error('Pool de conexão não disponível');
     }
@@ -97,8 +84,6 @@ export class PgPoolService implements OnModuleDestroy {
    * Executa uma query SQL com parâmetros
    */
   async queryWithParams<T = any>(sql: string, params: any[]): Promise<T[]> {
-    await this.ensureInitialized();
-
     if (!this.pool) {
       throw new Error('Pool de conexão não disponível');
     }
