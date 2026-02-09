@@ -9,6 +9,7 @@ import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { UnitKey, UNIT_CONFIGS } from '../database/database.interfaces';
 import { DateUtilsService } from '../utils/date-utils.service';
+import { CurrencyConversionService } from '../utils/currency-conversion.service';
 import { ConcurrencyUtilsService } from '@lhg/utils';
 import {
   UnifiedCompanyKpiResponse,
@@ -57,6 +58,7 @@ export class CompanyMultitenantService {
     private readonly databaseService: DatabaseService,
     private readonly kpiCacheService: KpiCacheService,
     private readonly dateUtilsService: DateUtilsService,
+    private readonly currencyConversionService: CurrencyConversionService,
     private readonly concurrencyUtils: ConcurrencyUtilsService,
   ) {}
 
@@ -266,47 +268,93 @@ export class CompanyMultitenantService {
 
       // Processa vendas diretas (igual ao individual: totalAllValue = locação + vendas diretas)
       const sd = saleDirectResult.rows[0] || {};
-      const totalSaleDirect = parseFloat(sd.total_sale_direct) || 0;
+      let totalSaleDirect = parseFloat(sd.total_sale_direct) || 0;
 
       const sdPrev = saleDirectPrevResult.rows[0] || {};
-      const totalSaleDirectPrev = parseFloat(sdPrev.total_sale_direct) || 0;
+      let totalSaleDirectPrev = parseFloat(sdPrev.total_sale_direct) || 0;
 
       const sdMonthly = saleDirectMonthlyResult.rows[0] || {};
-      const totalSaleDirectMonthly = parseFloat(sdMonthly.total_sale_direct) || 0;
+      let totalSaleDirectMonthly = parseFloat(sdMonthly.total_sale_direct) || 0;
+
+      // Converte valores de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const endDateObj = this.dateUtilsService.parseDate(endDate);
+        const previousEndObj = this.dateUtilsService.parseDate(previousEnd);
+        const monthEndObj = this.dateUtilsService.parseDate(monthEnd);
+
+        totalSaleDirect = await this.currencyConversionService.convertUsdToBrl(totalSaleDirect, unit, endDateObj);
+        totalSaleDirectPrev = await this.currencyConversionService.convertUsdToBrl(totalSaleDirectPrev, unit, previousEndObj);
+        totalSaleDirectMonthly = await this.currencyConversionService.convertUsdToBrl(totalSaleDirectMonthly, unit, monthEndObj);
+      }
 
       // Processa BigNumbers atual (locação + vendas diretas)
       const bn = bigNumbersResult.rows[0] || {};
+      let totalValue = (parseFloat(bn.total_all_value) || 0) + totalSaleDirect;
+      let totalTips = parseFloat(bn.total_tips) || 0;
+
+      // Converte valores monetários de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const endDateObj = this.dateUtilsService.parseDate(endDate);
+        totalValue = await this.currencyConversionService.convertUsdToBrl(parseFloat(bn.total_all_value) || 0, unit, endDateObj) + totalSaleDirect;
+        totalTips = await this.currencyConversionService.convertUsdToBrl(totalTips, unit, endDateObj);
+      }
+
       const bigNumbers: UnitBigNumbers = {
         totalRentals: parseInt(bn.total_rentals) || 0,
-        totalValue: (parseFloat(bn.total_all_value) || 0) + totalSaleDirect,
+        totalValue,
         totalOccupiedTime: parseFloat(bn.total_occupied_time) || 0,
-        totalTips: parseFloat(bn.total_tips) || 0,
+        totalTips,
       };
 
       // Processa BigNumbers anterior (locação + vendas diretas)
       const bnPrev = bigNumbersPrevResult.rows[0] || {};
+      let totalValuePrev = (parseFloat(bnPrev.total_all_value) || 0) + totalSaleDirectPrev;
+      let totalTipsPrev = parseFloat(bnPrev.total_tips) || 0;
+
+      // Converte valores monetários de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const previousEndObj = this.dateUtilsService.parseDate(previousEnd);
+        totalValuePrev = await this.currencyConversionService.convertUsdToBrl(parseFloat(bnPrev.total_all_value) || 0, unit, previousEndObj) + totalSaleDirectPrev;
+        totalTipsPrev = await this.currencyConversionService.convertUsdToBrl(totalTipsPrev, unit, previousEndObj);
+      }
+
       const bigNumbersPrevious: UnitBigNumbers = {
         totalRentals: parseInt(bnPrev.total_rentals) || 0,
-        totalValue: (parseFloat(bnPrev.total_all_value) || 0) + totalSaleDirectPrev,
+        totalValue: totalValuePrev,
         totalOccupiedTime: parseFloat(bnPrev.total_occupied_time) || 0,
-        totalTips: parseFloat(bnPrev.total_tips) || 0,
+        totalTips: totalTipsPrev,
       };
 
       // Processa BigNumbers do mês atual para forecast (locação + vendas diretas)
       const bnMonthly = bigNumbersMonthlyResult.rows[0] || {};
+      let totalValueMonthly = (parseFloat(bnMonthly.total_all_value) || 0) + totalSaleDirectMonthly;
+      let totalTipsMonthly = parseFloat(bnMonthly.total_tips) || 0;
+
+      // Converte valores monetários de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const monthEndObj = this.dateUtilsService.parseDate(monthEnd);
+        totalValueMonthly = await this.currencyConversionService.convertUsdToBrl(parseFloat(bnMonthly.total_all_value) || 0, unit, monthEndObj) + totalSaleDirectMonthly;
+        totalTipsMonthly = await this.currencyConversionService.convertUsdToBrl(totalTipsMonthly, unit, monthEndObj);
+      }
+
       const bigNumbersMonthly: UnitBigNumbers = {
         totalRentals: parseInt(bnMonthly.total_rentals) || 0,
-        totalValue: (parseFloat(bnMonthly.total_all_value) || 0) + totalSaleDirectMonthly,
+        totalValue: totalValueMonthly,
         totalOccupiedTime: parseFloat(bnMonthly.total_occupied_time) || 0,
-        totalTips: parseFloat(bnMonthly.total_tips) || 0,
+        totalTips: totalTipsMonthly,
       };
 
       // Processa séries por data
       const revenueByDate = new Map<string, number>();
       for (const row of revenueResult.rows) {
+        let value = parseFloat(row.daily_revenue) || 0;
+        if (unit === 'liv') {
+          const rowDate = new Date(row.date);
+          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+        }
         revenueByDate.set(
           this.dateUtilsService.formatDateKey(row.date),
-          parseFloat(row.daily_revenue) || 0,
+          value,
         );
       }
 
@@ -320,17 +368,27 @@ export class CompanyMultitenantService {
 
       const revparByDate = new Map<string, number>();
       for (const row of revparResult.rows) {
+        let value = parseFloat(row.daily_rental_revenue) || 0;
+        if (unit === 'liv') {
+          const rowDate = new Date(row.date);
+          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+        }
         revparByDate.set(
           this.dateUtilsService.formatDateKey(row.date),
-          parseFloat(row.daily_rental_revenue) || 0,
+          value,
         );
       }
 
       const trevparByDate = new Map<string, number>();
       for (const row of trevparResult.rows) {
+        let value = parseFloat(row.total_revenue) || 0;
+        if (unit === 'liv') {
+          const rowDate = new Date(row.date);
+          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+        }
         trevparByDate.set(
           this.dateUtilsService.formatDateKey(row.date),
-          parseFloat(row.total_revenue) || 0,
+          value,
         );
       }
 

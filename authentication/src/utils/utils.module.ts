@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { DateUtilsService } from './date-utils.service';
+import { CurrencyConversionService } from './currency-conversion.service';
 
 /**
  * Módulo de utilitários compartilhados.
@@ -7,7 +8,7 @@ import { DateUtilsService } from './date-utils.service';
  */
 @Global()
 @Module({
-  providers: [DateUtilsService],
-  exports: [DateUtilsService],
+  providers: [DateUtilsService, CurrencyConversionService],
+  exports: [DateUtilsService, CurrencyConversionService],
 })
 export class UtilsModule {}

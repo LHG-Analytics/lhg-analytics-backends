@@ -9,6 +9,7 @@ import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { UnitKey, UNIT_CONFIGS } from '../database/database.interfaces';
 import { DateUtilsService } from '../utils/date-utils.service';
+import { CurrencyConversionService } from '../utils/currency-conversion.service';
 import { ConcurrencyUtilsService } from '@lhg/utils';
 import {
   UnifiedBookingsKpiResponse,
@@ -35,6 +36,7 @@ export class BookingsMultitenantService {
     private readonly databaseService: DatabaseService,
     private readonly kpiCacheService: KpiCacheService,
     private readonly dateUtilsService: DateUtilsService,
+    private readonly currencyConversionService: CurrencyConversionService,
     private readonly concurrencyUtils: ConcurrencyUtilsService,
   ) {}
 
@@ -145,46 +147,106 @@ export class BookingsMultitenantService {
 
       // Processa BigNumbers atual
       const bn = bigNumbersResult.rows[0] || {};
+
+      let totalValue = parseFloat(bn.total_booking_value) || 0;
+      let totalRevenue = parseFloat(bn.total_revenue) || 0;
+
+      // Converte valores monetários de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const endDateObj = this.dateUtilsService.parseDate(endDate);
+        totalValue = await this.currencyConversionService.convertUsdToBrl(totalValue, unit, endDateObj);
+        totalRevenue = await this.currencyConversionService.convertUsdToBrl(totalRevenue, unit, endDateObj);
+      }
+
       const bigNumbers: UnitBookingsBigNumbers = {
-        totalValue: parseFloat(bn.total_booking_value) || 0,
+        totalValue,
         totalBookings: parseInt(bn.total_bookings) || 0,
-        totalRevenue: parseFloat(bn.total_revenue) || 0,
+        totalRevenue,
       };
 
       // Processa BigNumbers anterior
       const bnPrev = bigNumbersPrevResult.rows[0] || {};
+
+      let totalValuePrev = parseFloat(bnPrev.total_booking_value) || 0;
+      let totalRevenuePrev = parseFloat(bnPrev.total_revenue) || 0;
+
+      // Converte valores monetários de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const previousEndObj = this.dateUtilsService.parseDate(previousEnd);
+        totalValuePrev = await this.currencyConversionService.convertUsdToBrl(totalValuePrev, unit, previousEndObj);
+        totalRevenuePrev = await this.currencyConversionService.convertUsdToBrl(totalRevenuePrev, unit, previousEndObj);
+      }
+
       const bigNumbersPrevious: UnitBookingsBigNumbers = {
-        totalValue: parseFloat(bnPrev.total_booking_value) || 0,
+        totalValue: totalValuePrev,
         totalBookings: parseInt(bnPrev.total_bookings) || 0,
-        totalRevenue: parseFloat(bnPrev.total_revenue) || 0,
+        totalRevenue: totalRevenuePrev,
       };
 
       // Processa BigNumbers do mês atual (para forecast)
       const bnMonthly = bigNumbersMonthlyResult.rows[0] || {};
+
+      let totalValueMonthly = parseFloat(bnMonthly.total_booking_value) || 0;
+      let totalRevenueMonthly = parseFloat(bnMonthly.total_revenue) || 0;
+
+      // Converte valores monetários de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const monthEndObj = this.dateUtilsService.parseDate(monthEnd);
+        totalValueMonthly = await this.currencyConversionService.convertUsdToBrl(totalValueMonthly, unit, monthEndObj);
+        totalRevenueMonthly = await this.currencyConversionService.convertUsdToBrl(totalRevenueMonthly, unit, monthEndObj);
+      }
+
       const bigNumbersMonthly: UnitBookingsBigNumbers = {
-        totalValue: parseFloat(bnMonthly.total_booking_value) || 0,
+        totalValue: totalValueMonthly,
         totalBookings: parseInt(bnMonthly.total_bookings) || 0,
-        totalRevenue: parseFloat(bnMonthly.total_revenue) || 0,
+        totalRevenue: totalRevenueMonthly,
       };
 
       // Processa Ecommerce atual
       const ecom = ecommerceBigNumbersResult.rows[0] || {};
+
+      let ecommerceValue = parseFloat(ecom.total_ecommerce_value) || 0;
+
+      // Converte valores monetários de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const endDateObj = this.dateUtilsService.parseDate(endDate);
+        ecommerceValue = await this.currencyConversionService.convertUsdToBrl(ecommerceValue, unit, endDateObj);
+      }
+
       const ecommerce: UnitBookingsEcommerce = {
-        totalValue: parseFloat(ecom.total_ecommerce_value) || 0,
+        totalValue: ecommerceValue,
         totalBookings: parseInt(ecom.total_ecommerce_bookings) || 0,
       };
 
       // Processa Ecommerce anterior
       const ecomPrev = ecommerceBigNumbersPrevResult.rows[0] || {};
+
+      let ecommerceValuePrev = parseFloat(ecomPrev.total_ecommerce_value) || 0;
+
+      // Converte valores monetários de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const previousEndObj = this.dateUtilsService.parseDate(previousEnd);
+        ecommerceValuePrev = await this.currencyConversionService.convertUsdToBrl(ecommerceValuePrev, unit, previousEndObj);
+      }
+
       const ecommercePrevious: UnitBookingsEcommerce = {
-        totalValue: parseFloat(ecomPrev.total_ecommerce_value) || 0,
+        totalValue: ecommerceValuePrev,
         totalBookings: parseInt(ecomPrev.total_ecommerce_bookings) || 0,
       };
 
       // Processa Ecommerce do mês atual (para forecast)
       const ecomMonthly = ecommerceBigNumbersMonthlyResult.rows[0] || {};
+
+      let ecommerceValueMonthly = parseFloat(ecomMonthly.total_ecommerce_value) || 0;
+
+      // Converte valores monetários de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const monthEndObj = this.dateUtilsService.parseDate(monthEnd);
+        ecommerceValueMonthly = await this.currencyConversionService.convertUsdToBrl(ecommerceValueMonthly, unit, monthEndObj);
+      }
+
       const ecommerceMonthly: UnitBookingsEcommerce = {
-        totalValue: parseFloat(ecomMonthly.total_ecommerce_value) || 0,
+        totalValue: ecommerceValueMonthly,
         totalBookings: parseInt(ecomMonthly.total_ecommerce_bookings) || 0,
       };
 
@@ -193,7 +255,12 @@ export class BookingsMultitenantService {
       const bookingsByDate = new Map<string, number>();
       for (const row of billingByDateResult.rows) {
         const dateKey = this.dateUtilsService.formatDateKey(row.date);
-        billingByDate.set(dateKey, parseFloat(row.total_value) || 0);
+        let value = parseFloat(row.total_value) || 0;
+        if (unit === 'liv') {
+          const rowDate = new Date(row.date);
+          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+        }
+        billingByDate.set(dateKey, value);
         bookingsByDate.set(dateKey, parseInt(row.total_bookings) || 0);
       }
 
@@ -201,7 +268,12 @@ export class BookingsMultitenantService {
       const ecommerceBookingsByDate = new Map<string, number>();
       for (const row of ecommerceByDateResult.rows) {
         const dateKey = this.dateUtilsService.formatDateKey(row.date);
-        ecommerceBillingByDate.set(dateKey, parseFloat(row.total_value) || 0);
+        let value = parseFloat(row.total_value) || 0;
+        if (unit === 'liv') {
+          const rowDate = new Date(row.date);
+          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+        }
+        ecommerceBillingByDate.set(dateKey, value);
         ecommerceBookingsByDate.set(dateKey, parseInt(row.total_bookings) || 0);
       }
 

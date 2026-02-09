@@ -9,6 +9,7 @@ import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { UnitKey, UNIT_CONFIGS } from '../database/database.interfaces';
 import { DateUtilsService } from '../utils/date-utils.service';
+import { CurrencyConversionService } from '../utils/currency-conversion.service';
 import { ConcurrencyUtilsService } from '@lhg/utils';
 import {
   UnifiedRestaurantKpiResponse,
@@ -34,6 +35,7 @@ export class RestaurantMultitenantService {
     private readonly databaseService: DatabaseService,
     private readonly kpiCacheService: KpiCacheService,
     private readonly dateUtilsService: DateUtilsService,
+    private readonly currencyConversionService: CurrencyConversionService,
     private readonly concurrencyUtils: ConcurrencyUtilsService,
   ) {}
 
@@ -147,48 +149,97 @@ export class RestaurantMultitenantService {
       // Processa BigNumbers atual
       const bn = bigNumbersResult.rows[0] || {};
       const sr = salesRevenueResult.rows[0] || {};
+
+      let totalValue = parseFloat(bn.total_ab_value) || 0;
+      let totalSalesRevenue = parseFloat(sr.total_sales_revenue) || 0;
+      let totalRevenue = parseFloat(sr.total_revenue) || 0;
+
+      // Converte valores monetários de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const endDateObj = this.dateUtilsService.parseDate(endDate);
+        totalValue = await this.currencyConversionService.convertUsdToBrl(totalValue, unit, endDateObj);
+        totalSalesRevenue = await this.currencyConversionService.convertUsdToBrl(totalSalesRevenue, unit, endDateObj);
+        totalRevenue = await this.currencyConversionService.convertUsdToBrl(totalRevenue, unit, endDateObj);
+      }
+
       const bigNumbers: UnitRestaurantBigNumbers = {
-        totalValue: parseFloat(bn.total_ab_value) || 0,
-        totalSalesRevenue: parseFloat(sr.total_sales_revenue) || 0,
+        totalValue,
+        totalSalesRevenue,
         totalSalesWithAb: parseInt(bn.total_sales_with_ab) || 0,
         totalAllSales: parseInt(bn.total_all_sales) || 0,
         totalRentals: parseInt(bn.total_rentals) || 0,
-        totalRevenue: parseFloat(sr.total_revenue) || 0,
+        totalRevenue,
       };
 
       // Processa BigNumbers anterior
       const bnPrev = bigNumbersPrevResult.rows[0] || {};
       const srPrev = salesRevenuePrevResult.rows[0] || {};
+
+      let totalValuePrev = parseFloat(bnPrev.total_ab_value) || 0;
+      let totalSalesRevenuePrev = parseFloat(srPrev.total_sales_revenue) || 0;
+      let totalRevenuePrev = parseFloat(srPrev.total_revenue) || 0;
+
+      // Converte valores monetários de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const previousEndObj = this.dateUtilsService.parseDate(previousEnd);
+        totalValuePrev = await this.currencyConversionService.convertUsdToBrl(totalValuePrev, unit, previousEndObj);
+        totalSalesRevenuePrev = await this.currencyConversionService.convertUsdToBrl(totalSalesRevenuePrev, unit, previousEndObj);
+        totalRevenuePrev = await this.currencyConversionService.convertUsdToBrl(totalRevenuePrev, unit, previousEndObj);
+      }
+
       const bigNumbersPrevious: UnitRestaurantBigNumbers = {
-        totalValue: parseFloat(bnPrev.total_ab_value) || 0,
-        totalSalesRevenue: parseFloat(srPrev.total_sales_revenue) || 0,
+        totalValue: totalValuePrev,
+        totalSalesRevenue: totalSalesRevenuePrev,
         totalSalesWithAb: parseInt(bnPrev.total_sales_with_ab) || 0,
         totalAllSales: parseInt(bnPrev.total_all_sales) || 0,
         totalRentals: parseInt(bnPrev.total_rentals) || 0,
-        totalRevenue: parseFloat(srPrev.total_revenue) || 0,
+        totalRevenue: totalRevenuePrev,
       };
 
       // Processa BigNumbers do mês atual (para forecast)
       const bnMonthly = bigNumbersMonthlyResult.rows[0] || {};
       const srMonthly = salesRevenueMonthlyResult.rows[0] || {};
+
+      let totalValueMonthly = parseFloat(bnMonthly.total_ab_value) || 0;
+      let totalSalesRevenueMonthly = parseFloat(srMonthly.total_sales_revenue) || 0;
+      let totalRevenueMonthly = parseFloat(srMonthly.total_revenue) || 0;
+
+      // Converte valores monetários de USD para BRL se for LIV
+      if (unit === 'liv') {
+        const monthEndObj = this.dateUtilsService.parseDate(monthEnd);
+        totalValueMonthly = await this.currencyConversionService.convertUsdToBrl(totalValueMonthly, unit, monthEndObj);
+        totalSalesRevenueMonthly = await this.currencyConversionService.convertUsdToBrl(totalSalesRevenueMonthly, unit, monthEndObj);
+        totalRevenueMonthly = await this.currencyConversionService.convertUsdToBrl(totalRevenueMonthly, unit, monthEndObj);
+      }
+
       const bigNumbersMonthly: UnitRestaurantBigNumbers = {
-        totalValue: parseFloat(bnMonthly.total_ab_value) || 0,
-        totalSalesRevenue: parseFloat(srMonthly.total_sales_revenue) || 0,
+        totalValue: totalValueMonthly,
+        totalSalesRevenue: totalSalesRevenueMonthly,
         totalSalesWithAb: parseInt(bnMonthly.total_sales_with_ab) || 0,
         totalAllSales: parseInt(bnMonthly.total_all_sales) || 0,
         totalRentals: parseInt(bnMonthly.total_rentals) || 0,
-        totalRevenue: parseFloat(srMonthly.total_revenue) || 0,
+        totalRevenue: totalRevenueMonthly,
       };
 
       // Processa séries por data
       const revenueAbByDate = new Map<string, number>();
       for (const row of revenueAbResult.rows) {
-        revenueAbByDate.set(this.dateUtilsService.formatDateKey(row.date), parseFloat(row.total_ab_value) || 0);
+        let value = parseFloat(row.total_ab_value) || 0;
+        if (unit === 'liv') {
+          const rowDate = new Date(row.date);
+          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+        }
+        revenueAbByDate.set(this.dateUtilsService.formatDateKey(row.date), value);
       }
 
       const totalRevenueByDate = new Map<string, number>();
       for (const row of totalRevenueResult.rows) {
-        totalRevenueByDate.set(this.dateUtilsService.formatDateKey(row.date), parseFloat(row.total_revenue) || 0);
+        let value = parseFloat(row.total_revenue) || 0;
+        if (unit === 'liv') {
+          const rowDate = new Date(row.date);
+          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+        }
+        totalRevenueByDate.set(this.dateUtilsService.formatDateKey(row.date), value);
       }
 
       const salesByDate = new Map<string, number>();
