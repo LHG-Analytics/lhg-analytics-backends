@@ -1,18 +1,29 @@
 /**
  * Serviço de conexão com banco de dados usando node-postgres (pg)
  * Para queries diretas sem Prisma - melhor performance
+ * Inicialização preguiçosa (lazy) para não travar o bootstrap
  */
 
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Pool, PoolConfig } from 'pg';
 
 @Injectable()
-export class PgPoolService implements OnModuleInit, OnModuleDestroy {
+export class PgPoolService implements OnModuleDestroy {
   private readonly logger = new Logger(PgPoolService.name);
   private pool: Pool | null = null;
+  private initialized = false;
 
-  async onModuleInit() {
+  /**
+   * Inicializa o pool de conexão de forma preguiçosa (lazy)
+   * Só conecta quando realmente precisar usar
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
     await this.initializePool();
+    this.initialized = true;
   }
 
   async onModuleDestroy() {
@@ -67,9 +78,7 @@ export class PgPoolService implements OnModuleInit, OnModuleDestroy {
    * Executa uma query SQL
    */
   async query<T = any>(sql: string): Promise<T[]> {
-    if (!this.pool) {
-      throw new Error('Pool de conexão não disponível');
-    }
+    await this.ensureInitialized();
 
     try {
       const result = await this.pool.query(sql);
@@ -84,9 +93,7 @@ export class PgPoolService implements OnModuleInit, OnModuleDestroy {
    * Executa uma query SQL com parâmetros
    */
   async queryWithParams<T = any>(sql: string, params: any[]): Promise<T[]> {
-    if (!this.pool) {
-      throw new Error('Pool de conexão não disponível');
-    }
+    await this.ensureInitialized();
 
     try {
       const result = await this.pool.query(sql, params);
