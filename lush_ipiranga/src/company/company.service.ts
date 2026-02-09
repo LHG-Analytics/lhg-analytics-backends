@@ -762,7 +762,7 @@ export class CompanyService {
       ORDER BY date
     `;
 
-    // RentalRevenueByDate - SOMENTE receita de locação (permanencia + ocupadicional - desconto)
+    // RentalRevenueByDate - SOMENTE receita de locação líquida (valorliquidolocacao)
     // Usado para calcular RevparByDate corretamente
     const rentalRevenueByDateSQL = `
       SELECT
@@ -771,9 +771,7 @@ export class CompanyService {
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END as date,
         COALESCE(SUM(
-          COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-          COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
-          COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+          COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)
         ), 0) as daily_rental_revenue
       FROM locacaoapartamento la
       INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
@@ -1547,11 +1545,9 @@ export class CompanyService {
             COALESCE(cpl.valor_consumo, 0) -
             COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
           ), 0) as total_value,
-          -- Receita apenas de locação: (permanencia + ocupadicional) - desconto
+          -- Receita apenas de locação líquida (valorliquidolocacao já contém desconto aplicado)
           COALESCE(SUM(
-            COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
-            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+            COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)
           ), 0) as rental_revenue,
           -- Tempo total de ocupação em segundos
           COALESCE(SUM(
@@ -2542,11 +2538,9 @@ export class CompanyService {
           END as commercial_date,
           -- Métricas de GIRO: contagem de locações
           COUNT(*) as rental_count,
-          -- Métricas de REVPAR: soma da receita de locação (permanência + ocupacional - desconto)
+          -- Métricas de REVPAR: soma da receita de locação líquida (valorliquidolocacao já contém desconto aplicado)
           SUM(
-            COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
-            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+            COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)
           ) as rental_revenue
         FROM locacaoapartamento la
         INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
@@ -2704,20 +2698,33 @@ export class CompanyService {
       };
     });
 
-    // Segunda passagem: preencher dias ausentes com zero
+    // Criar mapa de totalGiro e totalRevpar por dia da semana (valores globais, independente de categoria)
+    const totalGiroByDay: { [day: string]: number } = {};
+    const totalRevparByDay: { [day: string]: number } = {};
+
+    // Extrair os valores totais de cada dia da semana (são os mesmos para todas as categorias)
+    result.forEach((item) => {
+      const dayName = item.day_of_week;
+      if (!totalGiroByDay[dayName]) {
+        totalGiroByDay[dayName] = Number(Number(item.total_giro).toFixed(2));
+        totalRevparByDay[dayName] = Number(Number(item.total_revpar).toFixed(2));
+      }
+    });
+
+    // Segunda passagem: preencher dias ausentes com zero e usar os totais corretos do dia
     Object.keys(giroByCategory).forEach((categoryName) => {
-      const existingGiroDay = Object.values(giroByCategory[categoryName])[0];
-      const totalGiroReference = existingGiroDay ? existingGiroDay.totalGiro : 0;
-
-      const existingRevparDay = Object.values(revparByCategory[categoryName])[0];
-      const totalRevparReference = existingRevparDay ? existingRevparDay.totalRevpar : 0;
-
       allDaysOfWeek.forEach((day) => {
         if (!giroByCategory[categoryName][day]) {
-          giroByCategory[categoryName][day] = { giro: 0, totalGiro: totalGiroReference };
+          giroByCategory[categoryName][day] = {
+            giro: 0,
+            totalGiro: totalGiroByDay[day] || 0
+          };
         }
         if (!revparByCategory[categoryName][day]) {
-          revparByCategory[categoryName][day] = { revpar: 0, totalRevpar: totalRevparReference };
+          revparByCategory[categoryName][day] = {
+            revpar: 0,
+            totalRevpar: totalRevparByDay[day] || 0
+          };
         }
       });
     });

@@ -631,7 +631,7 @@ export class CompanyService {
       ORDER BY date
     `;
 
-    // RentalRevenueByDate - SOMENTE receita de locação (permanencia + ocupadicional - desconto)
+    // RentalRevenueByDate - SOMENTE receita de locação líquida (valorliquidolocacao)
     // Usado para calcular RevparByDate corretamente
     const rentalRevenueByDateSQL = `
       SELECT
@@ -640,9 +640,7 @@ export class CompanyService {
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END as date,
         COALESCE(SUM(
-          COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-          COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
-          COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+          COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)
         ), 0) as daily_rental_revenue
       FROM locacaoapartamento la
       INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
@@ -1416,11 +1414,9 @@ export class CompanyService {
             ) -
             COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
           ), 0) as total_value,
-          -- Receita apenas de locação: (permanencia + ocupadicional) - desconto
+          -- Receita apenas de locação líquida (valorliquidolocacao já contém desconto aplicado)
           COALESCE(SUM(
-            COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
-            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+            COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)
           ), 0) as rental_revenue,
           -- Tempo total de ocupação em segundos
           COALESCE(SUM(
@@ -2012,17 +2008,24 @@ export class CompanyService {
       'sábado',
     ];
 
-    // Preencher dias ausentes com giro 0 para cada categoria de suíte
-    Object.keys(giroByCategory).forEach((categoryName) => {
-      // Pegar o totalGiro de qualquer dia existente para usar como referência
-      const existingDay = Object.values(giroByCategory[categoryName])[0];
-      const totalGiroReference = existingDay ? existingDay.totalGiro : 0;
+    // Criar mapa de totalGiro por dia da semana (valores globais, independente de categoria)
+    const totalGiroByDay: { [day: string]: number } = {};
 
+    // Extrair os valores totais de cada dia da semana (são os mesmos para todas as categorias)
+    giroByWeekResult.forEach((item) => {
+      const dayName = item.day_of_week;
+      if (!totalGiroByDay[dayName]) {
+        totalGiroByDay[dayName] = Number(Number(item.total_giro).toFixed(2));
+      }
+    });
+
+    // Preencher dias ausentes com giro 0 e usar os totais corretos do dia
+    Object.keys(giroByCategory).forEach((categoryName) => {
       allDaysOfWeekSQL.forEach((day) => {
         if (!giroByCategory[categoryName][day]) {
           giroByCategory[categoryName][day] = {
             giro: 0,
-            totalGiro: totalGiroReference,
+            totalGiro: totalGiroByDay[day] || 0,
           };
         }
       });
@@ -2037,7 +2040,7 @@ export class CompanyService {
     // === IMPLEMENTAÇÃO DO DATATABLEREVPARBYWEEK ===
     // Consulta SQL para RevPAR semanal por categoria
     // RevPAR = (receita de locação) / total de suítes / dias
-    // Receita de locação = permanência + ocupacional - desconto (SEM consumo e SEM gorjeta)
+    // Receita de locação = valorliquidolocacao (já contém desconto de locação aplicado, SEM consumo e SEM gorjeta)
     const revparByWeekSQL = `
       WITH weekly_revenue AS (
         SELECT
@@ -2062,11 +2065,9 @@ export class CompanyService {
             WHEN 5 THEN 'sexta-feira'
             WHEN 6 THEN 'sábado'
           END as day_of_week,
-          -- Receita de locação (permanência + ocupacional - desconto) SEM consumo e SEM gorjeta
+          -- Receita de locação líquida (valorliquidolocacao já contém desconto aplicado)
           SUM(
-            COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
-            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+            COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)
           ) as day_revenue
         FROM locacaoapartamento la
         INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
@@ -2131,11 +2132,9 @@ export class CompanyService {
             WHEN 5 THEN 'sexta-feira'
             WHEN 6 THEN 'sábado'
           END as day_of_week,
-          -- Receita de locação (permanência + ocupacional - desconto) SEM consumo e SEM gorjeta
+          -- Receita de locação líquida (valorliquidolocacao já contém desconto aplicado)
           SUM(
-            COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) -
-            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
+            COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)
           ) as total_day_revenue
         FROM locacaoapartamento la
         INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
@@ -2198,15 +2197,23 @@ export class CompanyService {
 
     // Preencher dias ausentes com revpar 0 para cada categoria de suíte
     Object.keys(revparByCategory).forEach((categoryName) => {
-      // Pegar o totalRevpar de qualquer dia existente para usar como referência
-      const existingDay = Object.values(revparByCategory[categoryName])[0];
-      const totalRevparReference = existingDay ? existingDay.totalRevpar : 0;
+      // Criar mapa de totalRevpar por dia da semana (valores globais, independente de categoria)
+      const totalRevparByDay: { [day: string]: number } = {};
 
+      // Extrair os valores totais de cada dia da semana (são os mesmos para todas as categorias)
+      revparByWeekResult.forEach((item) => {
+        const dayName = item.day_of_week;
+        if (!totalRevparByDay[dayName]) {
+          totalRevparByDay[dayName] = Number(Number(item.total_revpar).toFixed(2));
+        }
+      });
+
+      // Preencher dias ausentes com revpar 0 e usar os totais corretos do dia
       allDaysOfWeekSQL.forEach((day) => {
         if (!revparByCategory[categoryName][day]) {
           revparByCategory[categoryName][day] = {
             revpar: 0,
-            totalRevpar: totalRevparReference,
+            totalRevpar: totalRevparByDay[day] || 0,
           };
         }
       });
