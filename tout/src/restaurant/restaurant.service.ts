@@ -17,11 +17,9 @@ export class RestaurantService {
     const endMoment = moment(endDate);
     const daysDiff = endMoment.diff(startMoment, 'days') + 1; // +1 porque inclui ambos os dias
 
-    // Período anterior: mesmo número de dias, terminando no dia anterior ao startDate
-    const previousEndDate = startMoment.clone().subtract(1, 'day').toDate();
-    const previousStartDate = moment(previousEndDate)
-      .subtract(daysDiff - 1, 'days')
-      .toDate();
+    // Período anterior: mesmo período do ano anterior
+    const previousStartDate = startMoment.clone().subtract(1, 'year').toDate();
+    const previousEndDate = endMoment.clone().subtract(1, 'year').toDate();
 
     // Busca período atual com cache
     const currentResult = await this.kpiCacheService.getOrCalculate(
