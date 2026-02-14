@@ -11,7 +11,7 @@ import { ModuleRef } from '@nestjs/core';
 import * as moment from 'moment-timezone';
 import { KpiCacheService } from './kpi-cache.service';
 import { CachePeriodEnum } from './cache.interfaces';
-import { CompanyService } from '../company/company.service';
+import { CompanyMultitenantService } from '../company/company-multitenant.service';
 import { BookingsMultitenantService } from '../bookings/bookings-multitenant.service';
 import { RestaurantMultitenantService } from '../restaurant/restaurant-multitenant.service';
 import { GovernanceMultitenantService } from '../governance/governance-multitenant.service';
@@ -116,7 +116,7 @@ export class CacheController {
 
     // Configuração dos serviços para warmup
     const servicesConfig = [
-      { name: 'company', serviceName: 'company' as const, token: CompanyService, method: 'getUnifiedKpis' },
+      { name: 'company', serviceName: 'company' as const, token: CompanyMultitenantService, method: 'getUnifiedKpis' },
       { name: 'bookings', serviceName: 'bookings' as const, token: BookingsMultitenantService, method: 'getUnifiedKpis' },
       { name: 'restaurant', serviceName: 'restaurant' as const, token: RestaurantMultitenantService, method: 'getUnifiedKpis' },
       { name: 'governance', serviceName: 'governance' as const, token: GovernanceMultitenantService, method: 'getUnifiedKpis' },
