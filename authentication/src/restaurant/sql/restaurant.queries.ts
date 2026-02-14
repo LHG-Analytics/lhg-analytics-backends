@@ -18,12 +18,16 @@ export interface UnitABConfig {
 
 export const UNIT_AB_CONFIGS: Record<UnitKey, UnitABConfig> = {
   lush_ipiranga: {
-    abProductTypes: [78, 64, 77, 57, 56, 79, 54, 55, 80, 53, 62, 59, 61, 58, 63],
+    abProductTypes: [
+      78, 64, 77, 57, 56, 79, 54, 55, 80, 53, 62, 59, 61, 58, 63,
+    ],
     aProductTypes: [78, 64, 77, 57, 62, 59, 61, 58, 63],
     bProductTypes: [56, 79, 54, 55, 80, 53],
   },
   lush_lapa: {
-    abProductTypes: [40, 47, 33, 34, 32, 15, 13, 44, 10, 11, 31, 41, 27, 26, 25, 35],
+    abProductTypes: [
+      40, 47, 33, 34, 32, 15, 13, 44, 10, 11, 31, 41, 27, 26, 25, 35,
+    ],
     aProductTypes: [47, 32, 13, 44, 10, 11, 31, 41, 27],
     bProductTypes: [40, 34, 15, 26, 25, 35],
   },
@@ -66,7 +70,10 @@ export function getDateRangeWithCutoff(
   const nextDay = QueryUtilsService.getNextDay(formattedEnd);
 
   return {
-    startTimestamp: QueryUtilsService.createSQLTimestamp(formattedStart, '06:00:00'),
+    startTimestamp: QueryUtilsService.createSQLTimestamp(
+      formattedStart,
+      '06:00:00',
+    ),
     endTimestamp: QueryUtilsService.createSQLTimestamp(nextDay, '05:59:59'),
   };
 }
@@ -77,7 +84,6 @@ export function getDateRangeWithCutoff(
 export function getAbProductIds(unit: UnitKey): string {
   return QueryUtilsService.sanitizeIdList(UNIT_AB_CONFIGS[unit].abProductTypes);
 }
-
 
 /**
  * Query para BigNumbers do Restaurant - totais do período
@@ -91,7 +97,10 @@ export function getRestaurantBigNumbersSQL(
   endDate: string,
 ): string {
   const abProductIds = getAbProductIds(unit);
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
 
   return `
     WITH vendas_por_locacao AS (
@@ -146,7 +155,10 @@ export function getTotalSalesAndRevenueSQL(
   startDate: string,
   endDate: string,
 ): string {
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
 
   return `
     WITH vendas_em_locacoes AS (
@@ -218,7 +230,10 @@ export function getRevenueAbByDateSQL(
   endDate: string,
 ): string {
   const abProductIds = getAbProductIds(unit);
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
 
   return `
     SELECT
@@ -268,7 +283,10 @@ export function getTotalRevenueByDateSQL(
   startDate: string,
   endDate: string,
 ): string {
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
 
   return `
     SELECT
@@ -323,7 +341,10 @@ export function getSalesWithAbByDateSQL(
   endDate: string,
 ): string {
   const abProductIds = getAbProductIds(unit);
-  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(startDate, endDate);
+  const { startTimestamp, endTimestamp } = getDateRangeWithCutoff(
+    startDate,
+    endDate,
+  );
 
   return `
     SELECT

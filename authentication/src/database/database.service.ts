@@ -3,9 +3,19 @@
  * Usa node-postgres (pg) para conexões diretas sem Prisma
  */
 
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { Pool, PoolClient } from 'pg';
-import { UnitKey, UNIT_CONFIGS, QueryResult, UnitQueryResult } from './database.interfaces';
+import {
+  UnitKey,
+  UNIT_CONFIGS,
+  QueryResult,
+  UnitQueryResult,
+} from './database.interfaces';
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
@@ -24,13 +34,18 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
    * Inicializa pools de conexão para todas as unidades configuradas
    */
   private async initializePools(): Promise<void> {
-    const units = Object.entries(UNIT_CONFIGS) as [UnitKey, typeof UNIT_CONFIGS[UnitKey]][];
+    const units = Object.entries(UNIT_CONFIGS) as [
+      UnitKey,
+      (typeof UNIT_CONFIGS)[UnitKey],
+    ][];
 
     for (const [key, config] of units) {
       const connectionString = process.env[config.envVar];
 
       if (!connectionString) {
-        this.logger.warn(`Variável de ambiente ${config.envVar} não configurada para ${config.name}`);
+        this.logger.warn(
+          `Variável de ambiente ${config.envVar} não configurada para ${config.name}`,
+        );
         continue;
       }
 
@@ -51,7 +66,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         this.pools.set(key, pool);
         this.logger.log(`Pool de conexão inicializado para ${config.name}`);
       } catch (error) {
-        this.logger.error(`Erro ao conectar em ${config.name}: ${error.message}`);
+        this.logger.error(
+          `Erro ao conectar em ${config.name}: ${error.message}`,
+        );
       }
     }
 
@@ -65,9 +82,13 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     for (const [key, pool] of this.pools) {
       try {
         await pool.end();
-        this.logger.log(`Pool de conexão fechado para ${UNIT_CONFIGS[key].name}`);
+        this.logger.log(
+          `Pool de conexão fechado para ${UNIT_CONFIGS[key].name}`,
+        );
       } catch (error) {
-        this.logger.error(`Erro ao fechar pool de ${UNIT_CONFIGS[key].name}: ${error.message}`);
+        this.logger.error(
+          `Erro ao fechar pool de ${UNIT_CONFIGS[key].name}: ${error.message}`,
+        );
       }
     }
     this.pools.clear();
@@ -76,11 +97,17 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   /**
    * Executa uma query em uma unidade específica
    */
-  async query<T = any>(unit: UnitKey, sql: string, params?: any[]): Promise<QueryResult<T>> {
+  async query<T = any>(
+    unit: UnitKey,
+    sql: string,
+    params?: any[],
+  ): Promise<QueryResult<T>> {
     const pool = this.pools.get(unit);
 
     if (!pool) {
-      throw new Error(`Pool de conexão não disponível para ${UNIT_CONFIGS[unit]?.name || unit}`);
+      throw new Error(
+        `Pool de conexão não disponível para ${UNIT_CONFIGS[unit]?.name || unit}`,
+      );
     }
 
     try {
@@ -90,7 +117,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         rowCount: result.rowCount || 0,
       };
     } catch (error) {
-      this.logger.error(`Erro na query para ${UNIT_CONFIGS[unit].name}: ${error.message}`);
+      this.logger.error(
+        `Erro na query para ${UNIT_CONFIGS[unit].name}: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -98,7 +127,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   /**
    * Executa uma query em todas as unidades em paralelo
    */
-  async queryAll<T = any>(sql: string | ((unit: UnitKey) => string), params?: any[]): Promise<UnitQueryResult<T>[]> {
+  async queryAll<T = any>(
+    sql: string | ((unit: UnitKey) => string),
+    params?: any[],
+  ): Promise<UnitQueryResult<T>[]> {
     const units = Array.from(this.pools.keys());
 
     const promises = units.map(async (unit): Promise<UnitQueryResult<T>> => {

@@ -28,12 +28,19 @@ export class KpiCacheService {
   private cache = new Map<string, CacheItem>();
 
   // Métricas por serviço
-  private metrics: Map<ServiceType, { hits: number; misses: number; calculationTimes: number[] }> =
-    new Map();
+  private metrics: Map<
+    ServiceType,
+    { hits: number; misses: number; calculationTimes: number[] }
+  > = new Map();
 
   constructor() {
     // Inicializa métricas para cada serviço
-    const services: ServiceType[] = ['bookings', 'company', 'restaurant', 'governance'];
+    const services: ServiceType[] = [
+      'bookings',
+      'company',
+      'restaurant',
+      'governance',
+    ];
     services.forEach((service) => {
       this.metrics.set(service, { hits: 0, misses: 0, calculationTimes: [] });
     });
@@ -131,7 +138,9 @@ export class KpiCacheService {
       };
 
       this.cache.set(key, cacheItem);
-      this.logger.debug(`Cache SET: ${key} (TTL: ${ttl}s, expira em: ${expiresAt.toISOString()})`);
+      this.logger.debug(
+        `Cache SET: ${key} (TTL: ${ttl}s, expira em: ${expiresAt.toISOString()})`,
+      );
     } catch (error) {
       this.logger.error(`Erro ao salvar cache ${key}:`, error);
     }
@@ -167,7 +176,9 @@ export class KpiCacheService {
     // Registra tempo de cálculo
     this.recordCalculationTime(service, calculationTime);
 
-    this.logger.log(`Unified ${service} KPIs calculados em ${calculationTime}ms`);
+    this.logger.log(
+      `Unified ${service} KPIs calculados em ${calculationTime}ms`,
+    );
 
     // Salva no cache
     await this.set(service, period, data, customDates, unitKey);
@@ -281,14 +292,19 @@ export class KpiCacheService {
       }
     }
 
-    this.logger.log(`Invalidados ${count} itens de cache com padrão: ${pattern}`);
+    this.logger.log(
+      `Invalidados ${count} itens de cache com padrão: ${pattern}`,
+    );
     return count;
   }
 
   /**
    * Invalida cache de um serviço específico
    */
-  async invalidateService(service: ServiceType, period?: CachePeriodEnum): Promise<number> {
+  async invalidateService(
+    service: ServiceType,
+    period?: CachePeriodEnum,
+  ): Promise<number> {
     const prefix = SERVICE_PREFIXES[service];
     const pattern = period
       ? `${CACHE_KEY_PREFIX}:${prefix}:${period.toLowerCase()}`
@@ -317,7 +333,8 @@ export class KpiCacheService {
     const total = metric.hits + metric.misses;
     const avgTime =
       metric.calculationTimes.length > 0
-        ? metric.calculationTimes.reduce((a, b) => a + b, 0) / metric.calculationTimes.length
+        ? metric.calculationTimes.reduce((a, b) => a + b, 0) /
+          metric.calculationTimes.length
         : 0;
 
     return {
@@ -335,7 +352,12 @@ export class KpiCacheService {
    * Obtém métricas de todos os serviços
    */
   getAllMetrics(): CacheMetrics[] {
-    const services: ServiceType[] = ['bookings', 'company', 'restaurant', 'governance'];
+    const services: ServiceType[] = [
+      'bookings',
+      'company',
+      'restaurant',
+      'governance',
+    ];
     return services.map((service) => this.getServiceMetrics(service));
   }
 

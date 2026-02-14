@@ -2752,13 +2752,13 @@ export class CompanyService {
         if (!giroByCategory[categoryName][day]) {
           giroByCategory[categoryName][day] = {
             giro: 0,
-            totalGiro: totalGiroByDay[day] ?? 0
+            totalGiro: totalGiroByDay[day] ?? 0,
           };
         }
         if (!revparByCategory[categoryName][day]) {
           revparByCategory[categoryName][day] = {
             revpar: 0,
-            totalRevpar: totalRevparByDay[day] ?? 0
+            totalRevpar: totalRevparByDay[day] ?? 0,
           };
         }
       });

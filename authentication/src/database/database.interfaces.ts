@@ -2,7 +2,12 @@
  * Interfaces para conexões multi-tenant com bancos de dados das unidades
  */
 
-export type UnitKey = 'lush_ipiranga' | 'lush_lapa' | 'tout' | 'andar_de_cima' | 'liv';
+export type UnitKey =
+  | 'lush_ipiranga'
+  | 'lush_lapa'
+  | 'tout'
+  | 'andar_de_cima'
+  | 'liv';
 
 export interface UnitDatabaseConfig {
   key: UnitKey;

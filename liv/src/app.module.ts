@@ -13,7 +13,13 @@ import { BookingsModule } from './bookings/bookings.module';
 import { AuthModule } from './auth/auth.module';
 import { RestaurantModule } from './restaurant/restaurant.module';
 import { CacheModule } from './cache/cache.module';
-import { DateUtilsModule, ValidationModule, QueryUtilsModule, ConcurrencyUtilsModule, CompressionUtilsModule } from '@lhg/utils';
+import {
+  DateUtilsModule,
+  ValidationModule,
+  QueryUtilsModule,
+  ConcurrencyUtilsModule,
+  CompressionUtilsModule,
+} from '@lhg/utils';
 
 @Module({
   imports: [

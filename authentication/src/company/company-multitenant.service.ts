@@ -83,10 +83,15 @@ export class CompanyMultitenantService {
     let unitKey: string | undefined;
     if (user && user.unit !== 'LHG' && user.role !== 'ADMIN') {
       // Mapeia UserUnit para UnitKey (LUSH_IPIRANGA -> lush_ipiranga)
-      unitKey = user.unit.toLowerCase().replace('LUSH_', 'lush_').replace(' ', '_');
+      unitKey = user.unit
+        .toLowerCase()
+        .replace('LUSH_', 'lush_')
+        .replace(' ', '_');
     }
 
-    this.logger.log(`Cache strategy: ${unitKey ? `unit-specific (${unitKey})` : 'consolidated (all units)'}`);
+    this.logger.log(
+      `Cache strategy: ${unitKey ? `unit-specific (${unitKey})` : 'consolidated (all units)'}`,
+    );
 
     // Usa o cache service com TTL dinâmico e opcionalmente unitKey
     const result = await this.kpiCacheService.getOrCalculate(
@@ -114,8 +119,10 @@ export class CompanyMultitenantService {
 
     // Se unitKey especificado, filtra apenas aquela unidade
     if (unitKey) {
-      connectedUnits = connectedUnits.filter(unit => unit === unitKey);
-      this.logger.log(`Filtrando para unidade específica: ${unitKey} (${connectedUnits.length} unidades encontradas)`);
+      connectedUnits = connectedUnits.filter((unit) => unit === unitKey);
+      this.logger.log(
+        `Filtrando para unidade específica: ${unitKey} (${connectedUnits.length} unidades encontradas)`,
+      );
     }
 
     if (connectedUnits.length === 0) {
@@ -129,10 +136,8 @@ export class CompanyMultitenantService {
     this.logger.log(`Buscando KPIs de ${connectedUnits.length} unidades...`);
 
     // Calcula período anterior (mesma duração, imediatamente antes)
-    const { previousStart, previousEnd } = this.dateUtilsService.calculatePreviousPeriod(
-      startDate,
-      endDate,
-    );
+    const { previousStart, previousEnd } =
+      this.dateUtilsService.calculatePreviousPeriod(startDate, endDate);
 
     // Calcula período do mês atual para forecast (dia 1 às 06:00 até ontem às 05:59:59)
     const {
@@ -145,16 +150,17 @@ export class CompanyMultitenantService {
 
     // Executa queries em paralelo para cada unidade (período atual + anterior + mês atual para forecast)
     // Limita a 2 unidades simultâneas para evitar sobrecarga do banco de dados
-    const unitDataTasks = connectedUnits.map((unit) =>
-      () => this.fetchUnitKpis(
-        unit,
-        startDate,
-        endDate,
-        previousStart,
-        previousEnd,
-        monthStart,
-        monthEnd,
-      ),
+    const unitDataTasks = connectedUnits.map(
+      (unit) => () =>
+        this.fetchUnitKpis(
+          unit,
+          startDate,
+          endDate,
+          previousStart,
+          previousEnd,
+          monthStart,
+          monthEnd,
+        ),
     );
 
     const unitResults = await this.concurrencyUtils.executeWithLimit(
@@ -200,55 +206,67 @@ export class CompanyMultitenantService {
       // Executa todas as queries em paralelo para a unidade (atual + anterior + mês atual + vendas diretas)
       // Limita a 5 queries simultâneas por unidade para evitar sobrecarga
       const queryTasks = [
-        () => this.databaseService.query(
-          unit,
-          getBigNumbersSQL(unit, startDate, endDate),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getBigNumbersSQL(unit, previousStart, previousEnd),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getBigNumbersSQL(unit, monthStart, monthEnd),
-        ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getBigNumbersSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getBigNumbersSQL(unit, previousStart, previousEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getBigNumbersSQL(unit, monthStart, monthEnd),
+          ),
         // Vendas diretas para cada período (igual ao individual)
-        () => this.databaseService.query(
-          unit,
-          getSaleDirectSQL(unit, startDate, endDate),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getSaleDirectSQL(unit, previousStart, previousEnd),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getSaleDirectSQL(unit, monthStart, monthEnd),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getRevenueByDateSQL(unit, startDate, endDate),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getRentalsByDateSQL(unit, startDate, endDate),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getRevparByDateSQL(unit, startDate, endDate),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getTrevparByDateSQL(unit, startDate, endDate),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getOccupancyRateByDateSQL(unit, startDate, endDate),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getGiroByDateSQL(unit, startDate, endDate),
-        ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getSaleDirectSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getSaleDirectSQL(unit, previousStart, previousEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getSaleDirectSQL(unit, monthStart, monthEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getRevenueByDateSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getRentalsByDateSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getRevparByDateSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getTrevparByDateSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getOccupancyRateByDateSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getGiroByDateSQL(unit, startDate, endDate),
+          ),
       ];
 
       const [
@@ -282,9 +300,23 @@ export class CompanyMultitenantService {
         const previousEndObj = this.dateUtilsService.parseDate(previousEnd);
         const monthEndObj = this.dateUtilsService.parseDate(monthEnd);
 
-        totalSaleDirect = await this.currencyConversionService.convertUsdToBrl(totalSaleDirect, unit, endDateObj);
-        totalSaleDirectPrev = await this.currencyConversionService.convertUsdToBrl(totalSaleDirectPrev, unit, previousEndObj);
-        totalSaleDirectMonthly = await this.currencyConversionService.convertUsdToBrl(totalSaleDirectMonthly, unit, monthEndObj);
+        totalSaleDirect = await this.currencyConversionService.convertUsdToBrl(
+          totalSaleDirect,
+          unit,
+          endDateObj,
+        );
+        totalSaleDirectPrev =
+          await this.currencyConversionService.convertUsdToBrl(
+            totalSaleDirectPrev,
+            unit,
+            previousEndObj,
+          );
+        totalSaleDirectMonthly =
+          await this.currencyConversionService.convertUsdToBrl(
+            totalSaleDirectMonthly,
+            unit,
+            monthEndObj,
+          );
       }
 
       // Processa BigNumbers atual (locação + vendas diretas)
@@ -295,8 +327,17 @@ export class CompanyMultitenantService {
       // Converte valores monetários de USD para BRL se for LIV
       if (unit === 'liv') {
         const endDateObj = this.dateUtilsService.parseDate(endDate);
-        totalValue = await this.currencyConversionService.convertUsdToBrl(parseFloat(bn.total_all_value) || 0, unit, endDateObj) + totalSaleDirect;
-        totalTips = await this.currencyConversionService.convertUsdToBrl(totalTips, unit, endDateObj);
+        totalValue =
+          (await this.currencyConversionService.convertUsdToBrl(
+            parseFloat(bn.total_all_value) || 0,
+            unit,
+            endDateObj,
+          )) + totalSaleDirect;
+        totalTips = await this.currencyConversionService.convertUsdToBrl(
+          totalTips,
+          unit,
+          endDateObj,
+        );
       }
 
       const bigNumbers: UnitBigNumbers = {
@@ -308,14 +349,24 @@ export class CompanyMultitenantService {
 
       // Processa BigNumbers anterior (locação + vendas diretas)
       const bnPrev = bigNumbersPrevResult.rows[0] || {};
-      let totalValuePrev = (parseFloat(bnPrev.total_all_value) || 0) + totalSaleDirectPrev;
+      let totalValuePrev =
+        (parseFloat(bnPrev.total_all_value) || 0) + totalSaleDirectPrev;
       let totalTipsPrev = parseFloat(bnPrev.total_tips) || 0;
 
       // Converte valores monetários de USD para BRL se for LIV
       if (unit === 'liv') {
         const previousEndObj = this.dateUtilsService.parseDate(previousEnd);
-        totalValuePrev = await this.currencyConversionService.convertUsdToBrl(parseFloat(bnPrev.total_all_value) || 0, unit, previousEndObj) + totalSaleDirectPrev;
-        totalTipsPrev = await this.currencyConversionService.convertUsdToBrl(totalTipsPrev, unit, previousEndObj);
+        totalValuePrev =
+          (await this.currencyConversionService.convertUsdToBrl(
+            parseFloat(bnPrev.total_all_value) || 0,
+            unit,
+            previousEndObj,
+          )) + totalSaleDirectPrev;
+        totalTipsPrev = await this.currencyConversionService.convertUsdToBrl(
+          totalTipsPrev,
+          unit,
+          previousEndObj,
+        );
       }
 
       const bigNumbersPrevious: UnitBigNumbers = {
@@ -327,14 +378,24 @@ export class CompanyMultitenantService {
 
       // Processa BigNumbers do mês atual para forecast (locação + vendas diretas)
       const bnMonthly = bigNumbersMonthlyResult.rows[0] || {};
-      let totalValueMonthly = (parseFloat(bnMonthly.total_all_value) || 0) + totalSaleDirectMonthly;
+      let totalValueMonthly =
+        (parseFloat(bnMonthly.total_all_value) || 0) + totalSaleDirectMonthly;
       let totalTipsMonthly = parseFloat(bnMonthly.total_tips) || 0;
 
       // Converte valores monetários de USD para BRL se for LIV
       if (unit === 'liv') {
         const monthEndObj = this.dateUtilsService.parseDate(monthEnd);
-        totalValueMonthly = await this.currencyConversionService.convertUsdToBrl(parseFloat(bnMonthly.total_all_value) || 0, unit, monthEndObj) + totalSaleDirectMonthly;
-        totalTipsMonthly = await this.currencyConversionService.convertUsdToBrl(totalTipsMonthly, unit, monthEndObj);
+        totalValueMonthly =
+          (await this.currencyConversionService.convertUsdToBrl(
+            parseFloat(bnMonthly.total_all_value) || 0,
+            unit,
+            monthEndObj,
+          )) + totalSaleDirectMonthly;
+        totalTipsMonthly = await this.currencyConversionService.convertUsdToBrl(
+          totalTipsMonthly,
+          unit,
+          monthEndObj,
+        );
       }
 
       const bigNumbersMonthly: UnitBigNumbers = {
@@ -350,12 +411,13 @@ export class CompanyMultitenantService {
         let value = parseFloat(row.daily_revenue) || 0;
         if (unit === 'liv') {
           const rowDate = new Date(row.date);
-          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+          value = await this.currencyConversionService.convertUsdToBrl(
+            value,
+            unit,
+            rowDate,
+          );
         }
-        revenueByDate.set(
-          this.dateUtilsService.formatDateKey(row.date),
-          value,
-        );
+        revenueByDate.set(this.dateUtilsService.formatDateKey(row.date), value);
       }
 
       const rentalsByDate = new Map<string, number>();
@@ -371,12 +433,13 @@ export class CompanyMultitenantService {
         let value = parseFloat(row.daily_rental_revenue) || 0;
         if (unit === 'liv') {
           const rowDate = new Date(row.date);
-          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+          value = await this.currencyConversionService.convertUsdToBrl(
+            value,
+            unit,
+            rowDate,
+          );
         }
-        revparByDate.set(
-          this.dateUtilsService.formatDateKey(row.date),
-          value,
-        );
+        revparByDate.set(this.dateUtilsService.formatDateKey(row.date), value);
       }
 
       const trevparByDate = new Map<string, number>();
@@ -384,12 +447,13 @@ export class CompanyMultitenantService {
         let value = parseFloat(row.total_revenue) || 0;
         if (unit === 'liv') {
           const rowDate = new Date(row.date);
-          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+          value = await this.currencyConversionService.convertUsdToBrl(
+            value,
+            unit,
+            rowDate,
+          );
         }
-        trevparByDate.set(
-          this.dateUtilsService.formatDateKey(row.date),
-          value,
-        );
+        trevparByDate.set(this.dateUtilsService.formatDateKey(row.date), value);
       }
 
       const occupancyRateByDate = new Map<string, number>();
@@ -773,10 +837,7 @@ export class CompanyMultitenantService {
     results: UnitKpiData[],
     field: keyof Pick<
       UnitKpiData,
-      | 'revparByDate'
-      | 'trevparByDate'
-      | 'occupancyRateByDate'
-      | 'giroByDate'
+      'revparByDate' | 'trevparByDate' | 'occupancyRateByDate' | 'giroByDate'
     >,
     periods: string[],
     groupByMonth: boolean,

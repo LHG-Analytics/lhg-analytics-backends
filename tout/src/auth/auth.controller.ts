@@ -31,10 +31,7 @@ export class AuthController {
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Login realizado com sucesso' })
   @ApiResponse({ status: 401, description: 'Credenciais inválidas' })
-  async login(
-    @Body() loginDto: LoginDto,
-    @Res({ passthrough: true }) response: Response,
-  ) {
+  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
     try {
       // Validar usuário
       const user = await this.authService.validateUser(loginDto.email, loginDto.password);
@@ -81,10 +78,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Renovar tokens de autenticação' })
   @ApiResponse({ status: 200, description: 'Tokens renovados com sucesso' })
   @ApiResponse({ status: 401, description: 'Refresh token inválido ou expirado' })
-  async refresh(
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
-  ) {
+  async refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const refreshToken = (request as any).cookies?.refresh_token;
 
     if (!refreshToken) {
@@ -130,10 +124,7 @@ export class AuthController {
   @Post('logout')
   @ApiOperation({ summary: 'Fazer logout do sistema' })
   @ApiResponse({ status: 200, description: 'Logout realizado com sucesso' })
-  async logout(
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
-  ) {
+  async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const refreshToken = (request as any).cookies?.refresh_token;
     const cookieConfig = this.getCookieConfig();
 

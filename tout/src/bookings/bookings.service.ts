@@ -149,8 +149,7 @@ export class BookingsService {
         totalAllValueForecast: Number(forecastEcommerceValue.toFixed(2)),
         totalAllBookingsForecast: Math.round(forecastEcommerceBookings),
         totalAllTicketAverageForecast: forecastEcommerceTicketAverage,
-        totalAllRepresentativenessForecast:
-          monthlyEcommerce.currentDate.totalAllRepresentativeness,
+        totalAllRepresentativenessForecast: monthlyEcommerce.currentDate.totalAllRepresentativeness,
       };
     }
 
@@ -600,7 +599,8 @@ FROM vendas_diretas vd, locacoes loc;
       const ticketAverage = count > 0 ? Number((revenue / count).toFixed(2)) : 0;
 
       // Calcula representatividade (multiplicada por 100 para mostrar como percentual)
-      const representativeness = revenueTotal > 0 ? Number(((revenue / revenueTotal) * 100).toFixed(2)) : 0;
+      const representativeness =
+        revenueTotal > 0 ? Number(((revenue / revenueTotal) * 100).toFixed(2)) : 0;
 
       // Popula os dados
       kpiTableByChannelType.bookingsTotalRentalsByChannelType[channelName] = count;
@@ -728,7 +728,9 @@ FROM vendas_diretas vd, locacoes loc;
 
     // BigNumbers usa os totais do billingPerChannelData para consistência com KpiTableByChannelType
     const bigNumbersTicketAverage =
-      totalChannelBookings > 0 ? Number((totalChannelRevenue / totalChannelBookings).toFixed(2)) : 0;
+      totalChannelBookings > 0
+        ? Number((totalChannelRevenue / totalChannelBookings).toFixed(2))
+        : 0;
     const bigNumbersRepresentativeness =
       revenueTotal > 0 ? Number(((totalChannelRevenue / revenueTotal) * 100).toFixed(2)) : 0;
 

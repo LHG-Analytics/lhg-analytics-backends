@@ -29,6 +29,13 @@ import { UnitsGuard } from './guards/units.guard';
   ],
   providers: [AuthService, JwtStrategy, RolesGuard, UnitsGuard],
   controllers: [AuthController],
-  exports: [AuthService, JwtStrategy, PassportModule, JwtModule, RolesGuard, UnitsGuard],
+  exports: [
+    AuthService,
+    JwtStrategy,
+    PassportModule,
+    JwtModule,
+    RolesGuard,
+    UnitsGuard,
+  ],
 })
 export class AuthModule {}

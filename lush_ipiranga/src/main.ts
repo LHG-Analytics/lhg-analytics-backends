@@ -74,8 +74,8 @@ async function bootstrap() {
         showRequestDuration: true,
         syntaxHighlight: {
           activate: true,
-          theme: 'monokai'
-        }
+          theme: 'monokai',
+        },
       },
       customSiteTitle: 'LHG Analytics - Lush Ipiranga',
     });
@@ -103,20 +103,22 @@ async function bootstrap() {
       'http://localhost:3004', // Andar de Cima (Swagger)
       'http://localhost:3006', // Liv (Swagger)
     ];
-    const envOrigins = process.env.ALLOWED_ORIGINS
-      ?.split(',')
-      .map((o) => o.trim())
-      .filter(Boolean)
-      .map((o) => {
-        // Adiciona https:// se não tiver protocolo
-        if (!o.match(/^https?:\/\//)) {
-          return `https://${o}`;
-        }
-        return o;
-      }) || [];
+    const envOrigins =
+      process.env.ALLOWED_ORIGINS?.split(',')
+        .map((o) => o.trim())
+        .filter(Boolean)
+        .map((o) => {
+          // Adiciona https:// se não tiver protocolo
+          if (!o.match(/^https?:\/\//)) {
+            return `https://${o}`;
+          }
+          return o;
+        }) || [];
     // Adiciona URL do próprio servidor (para Swagger funcionar no Render)
     const serverUrl = process.env.RENDER_EXTERNAL_URL;
-    const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins, ...(serverUrl ? [serverUrl] : [])])];
+    const allowedOrigins = [
+      ...new Set([...defaultOrigins, ...envOrigins, ...(serverUrl ? [serverUrl] : [])]),
+    ];
 
     const corsOptions: CorsOptions = {
       origin: (origin, callback) => {

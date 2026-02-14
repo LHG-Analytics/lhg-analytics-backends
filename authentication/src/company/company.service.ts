@@ -113,7 +113,9 @@ export class CompanyService {
 
     // Filtra resultados válidos
     const validResults = results.filter(
-      (r): r is { config: UnitConfig; data: UnitKpiResponse; success: boolean } =>
+      (
+        r,
+      ): r is { config: UnitConfig; data: UnitKpiResponse; success: boolean } =>
         r.success && r.data !== null,
     );
 

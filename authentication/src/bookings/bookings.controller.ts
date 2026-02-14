@@ -80,7 +80,9 @@ export class BookingsController {
     // Valida formato e intervalo das datas
     this.validationService.validateDateInterval(startDate, endDate);
 
-    this.logger.log(`Buscando KPIs de Bookings consolidados: ${startDate} - ${endDate}`);
+    this.logger.log(
+      `Buscando KPIs de Bookings consolidados: ${startDate} - ${endDate}`,
+    );
 
     return this.bookingsService.getUnifiedKpis(startDate, endDate);
   }

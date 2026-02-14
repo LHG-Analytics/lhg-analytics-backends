@@ -1,5 +1,19 @@
-import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiBearerAuth, ApiNotFoundResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiNotFoundResponse,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { GovernanceService } from './governance.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -21,7 +35,6 @@ export class GovernanceController {
     private readonly dateUtilsService: DateUtilsService,
     private readonly validationService: ValidationService,
   ) {}
-
 
   @Get('kpis/date-range')
   @ApiQuery({

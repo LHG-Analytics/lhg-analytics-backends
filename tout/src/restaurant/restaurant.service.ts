@@ -93,7 +93,8 @@ export class RestaurantService {
 
       // Projeções
       const forecastValue = monthlyTotalValue + dailyAverageValue * remainingDays;
-      const forecastSalesRevenue = monthlyTotalSalesRevenue + dailyAverageSalesRevenue * remainingDays;
+      const forecastSalesRevenue =
+        monthlyTotalSalesRevenue + dailyAverageSalesRevenue * remainingDays;
       const forecastSales = monthlyTotalSales + dailyAverageSales * remainingDays;
 
       // Métricas recalculadas

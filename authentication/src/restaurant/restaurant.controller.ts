@@ -80,7 +80,9 @@ export class RestaurantController {
     // Valida formato e intervalo das datas
     this.validationService.validateDateInterval(startDate, endDate);
 
-    this.logger.log(`Buscando KPIs de Restaurant consolidados: ${startDate} - ${endDate}`);
+    this.logger.log(
+      `Buscando KPIs de Restaurant consolidados: ${startDate} - ${endDate}`,
+    );
 
     return this.restaurantService.getUnifiedKpis(startDate, endDate);
   }

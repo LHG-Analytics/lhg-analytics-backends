@@ -73,7 +73,8 @@ export class CacheController {
   @Header('Content-Type', 'application/json')
   @ApiOperation({
     summary: 'Cache Warmup',
-    description: 'Popula o cache com KPIs dos períodos principais. Chamado pelo GitHub Actions às 6h.',
+    description:
+      'Popula o cache com KPIs dos períodos principais. Chamado pelo GitHub Actions às 6h.',
   })
   @ApiResponse({ status: 200, description: 'Cache warmup concluído' })
   async warmup(): Promise<WarmupResult> {
@@ -113,10 +114,30 @@ export class CacheController {
 
     // Configuração dos serviços para warmup
     const servicesConfig = [
-      { name: 'company', serviceName: 'company' as const, token: CompanyService, method: 'calculateKpisByDateRangeSQL' },
-      { name: 'bookings', serviceName: 'bookings' as const, token: BookingsService, method: 'calculateKpibyDateRangeSQL' },
-      { name: 'restaurant', serviceName: 'restaurant' as const, token: RestaurantService, method: 'calculateKpisByDateRange' },
-      { name: 'governance', serviceName: 'governance' as const, token: GovernanceService, method: 'calculateKpibyDateRangeSQL' },
+      {
+        name: 'company',
+        serviceName: 'company' as const,
+        token: CompanyService,
+        method: 'calculateKpisByDateRangeSQL',
+      },
+      {
+        name: 'bookings',
+        serviceName: 'bookings' as const,
+        token: BookingsService,
+        method: 'calculateKpibyDateRangeSQL',
+      },
+      {
+        name: 'restaurant',
+        serviceName: 'restaurant' as const,
+        token: RestaurantService,
+        method: 'calculateKpisByDateRange',
+      },
+      {
+        name: 'governance',
+        serviceName: 'governance' as const,
+        token: GovernanceService,
+        method: 'calculateKpibyDateRangeSQL',
+      },
     ];
 
     // Executa warmup para cada combinação de serviço x período
@@ -135,7 +156,9 @@ export class CacheController {
             svcConfig.serviceName,
             period.period,
             () => (service as any)[svcConfig.method](period.start, period.end),
-            period.period === CachePeriodEnum.CUSTOM ? { start: period.start, end: period.end } : undefined,
+            period.period === CachePeriodEnum.CUSTOM
+              ? { start: period.start, end: period.end }
+              : undefined,
           );
 
           results.push({

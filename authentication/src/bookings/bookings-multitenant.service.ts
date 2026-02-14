@@ -74,32 +74,64 @@ export class BookingsMultitenantService {
     const connectedUnits = this.databaseService.getConnectedUnits();
 
     if (connectedUnits.length === 0) {
-      throw new Error('Nenhuma unidade conectada. Verifique as variáveis de ambiente.');
+      throw new Error(
+        'Nenhuma unidade conectada. Verifique as variáveis de ambiente.',
+      );
     }
 
-    this.logger.log(`Buscando KPIs de Bookings de ${connectedUnits.length} unidades...`);
+    this.logger.log(
+      `Buscando KPIs de Bookings de ${connectedUnits.length} unidades...`,
+    );
 
     // Calcula período anterior (mesma duração, imediatamente antes)
-    const { previousStart, previousEnd } = this.dateUtilsService.calculatePreviousPeriod(startDate, endDate);
+    const { previousStart, previousEnd } =
+      this.dateUtilsService.calculatePreviousPeriod(startDate, endDate);
 
     // Calcula período do mês atual para forecast (dia 1 às 06:00 até ontem às 05:59:59)
-    const { monthStart, monthEnd, daysElapsed, remainingDays, totalDaysInMonth } = this.dateUtilsService.calculateCurrentMonthPeriod();
+    const {
+      monthStart,
+      monthEnd,
+      daysElapsed,
+      remainingDays,
+      totalDaysInMonth,
+    } = this.dateUtilsService.calculateCurrentMonthPeriod();
 
     // Executa queries em paralelo para cada unidade (período atual + anterior + mês atual para forecast)
     // Limita a 2 unidades simultâneas para evitar sobrecarga do banco de dados
-    const unitDataTasks = connectedUnits.map((unit) =>
-      () => this.fetchUnitKpis(unit, startDate, endDate, previousStart, previousEnd, monthStart, monthEnd),
+    const unitDataTasks = connectedUnits.map(
+      (unit) => () =>
+        this.fetchUnitKpis(
+          unit,
+          startDate,
+          endDate,
+          previousStart,
+          previousEnd,
+          monthStart,
+          monthEnd,
+        ),
     );
 
-    const unitResults = await this.concurrencyUtils.executeWithLimit(unitDataTasks, 2);
-    const validResults = unitResults.filter((r) => r !== null) as UnitBookingsKpiData[];
+    const unitResults = await this.concurrencyUtils.executeWithLimit(
+      unitDataTasks,
+      2,
+    );
+    const validResults = unitResults.filter(
+      (r) => r !== null,
+    ) as UnitBookingsKpiData[];
 
     if (validResults.length === 0) {
       throw new Error('Nenhuma unidade retornou dados válidos');
     }
 
     // Consolida os dados
-    const consolidated = this.consolidateData(validResults, startDate, endDate, daysElapsed, remainingDays, totalDaysInMonth);
+    const consolidated = this.consolidateData(
+      validResults,
+      startDate,
+      endDate,
+      daysElapsed,
+      remainingDays,
+      totalDaysInMonth,
+    );
 
     this.logger.log(
       `KPIs de Bookings consolidados de ${validResults.length} unidades em ${Date.now() - startTime}ms`,
@@ -124,14 +156,46 @@ export class BookingsMultitenantService {
       // Executa todas as queries em paralelo para a unidade (atual + anterior + mês atual)
       // Limita a 5 queries simultâneas por unidade para evitar sobrecarga
       const queryTasks = [
-        () => this.databaseService.query(unit, getBookingsBigNumbersSQL(unit, startDate, endDate)),
-        () => this.databaseService.query(unit, getBookingsBigNumbersSQL(unit, previousStart, previousEnd)),
-        () => this.databaseService.query(unit, getBookingsBigNumbersSQL(unit, monthStart, monthEnd)),
-        () => this.databaseService.query(unit, getBillingByDateSQL(unit, startDate, endDate)),
-        () => this.databaseService.query(unit, getEcommerceBigNumbersSQL(unit, startDate, endDate)),
-        () => this.databaseService.query(unit, getEcommerceBigNumbersSQL(unit, previousStart, previousEnd)),
-        () => this.databaseService.query(unit, getEcommerceBigNumbersSQL(unit, monthStart, monthEnd)),
-        () => this.databaseService.query(unit, getEcommerceByDateSQL(unit, startDate, endDate)),
+        () =>
+          this.databaseService.query(
+            unit,
+            getBookingsBigNumbersSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getBookingsBigNumbersSQL(unit, previousStart, previousEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getBookingsBigNumbersSQL(unit, monthStart, monthEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getBillingByDateSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getEcommerceBigNumbersSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getEcommerceBigNumbersSQL(unit, previousStart, previousEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getEcommerceBigNumbersSQL(unit, monthStart, monthEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getEcommerceByDateSQL(unit, startDate, endDate),
+          ),
       ];
 
       const [
@@ -154,8 +218,16 @@ export class BookingsMultitenantService {
       // Converte valores monetários de USD para BRL se for LIV
       if (unit === 'liv') {
         const endDateObj = this.dateUtilsService.parseDate(endDate);
-        totalValue = await this.currencyConversionService.convertUsdToBrl(totalValue, unit, endDateObj);
-        totalRevenue = await this.currencyConversionService.convertUsdToBrl(totalRevenue, unit, endDateObj);
+        totalValue = await this.currencyConversionService.convertUsdToBrl(
+          totalValue,
+          unit,
+          endDateObj,
+        );
+        totalRevenue = await this.currencyConversionService.convertUsdToBrl(
+          totalRevenue,
+          unit,
+          endDateObj,
+        );
       }
 
       const bigNumbers: UnitBookingsBigNumbers = {
@@ -173,8 +245,16 @@ export class BookingsMultitenantService {
       // Converte valores monetários de USD para BRL se for LIV
       if (unit === 'liv') {
         const previousEndObj = this.dateUtilsService.parseDate(previousEnd);
-        totalValuePrev = await this.currencyConversionService.convertUsdToBrl(totalValuePrev, unit, previousEndObj);
-        totalRevenuePrev = await this.currencyConversionService.convertUsdToBrl(totalRevenuePrev, unit, previousEndObj);
+        totalValuePrev = await this.currencyConversionService.convertUsdToBrl(
+          totalValuePrev,
+          unit,
+          previousEndObj,
+        );
+        totalRevenuePrev = await this.currencyConversionService.convertUsdToBrl(
+          totalRevenuePrev,
+          unit,
+          previousEndObj,
+        );
       }
 
       const bigNumbersPrevious: UnitBookingsBigNumbers = {
@@ -192,8 +272,18 @@ export class BookingsMultitenantService {
       // Converte valores monetários de USD para BRL se for LIV
       if (unit === 'liv') {
         const monthEndObj = this.dateUtilsService.parseDate(monthEnd);
-        totalValueMonthly = await this.currencyConversionService.convertUsdToBrl(totalValueMonthly, unit, monthEndObj);
-        totalRevenueMonthly = await this.currencyConversionService.convertUsdToBrl(totalRevenueMonthly, unit, monthEndObj);
+        totalValueMonthly =
+          await this.currencyConversionService.convertUsdToBrl(
+            totalValueMonthly,
+            unit,
+            monthEndObj,
+          );
+        totalRevenueMonthly =
+          await this.currencyConversionService.convertUsdToBrl(
+            totalRevenueMonthly,
+            unit,
+            monthEndObj,
+          );
       }
 
       const bigNumbersMonthly: UnitBookingsBigNumbers = {
@@ -210,7 +300,11 @@ export class BookingsMultitenantService {
       // Converte valores monetários de USD para BRL se for LIV
       if (unit === 'liv') {
         const endDateObj = this.dateUtilsService.parseDate(endDate);
-        ecommerceValue = await this.currencyConversionService.convertUsdToBrl(ecommerceValue, unit, endDateObj);
+        ecommerceValue = await this.currencyConversionService.convertUsdToBrl(
+          ecommerceValue,
+          unit,
+          endDateObj,
+        );
       }
 
       const ecommerce: UnitBookingsEcommerce = {
@@ -226,7 +320,12 @@ export class BookingsMultitenantService {
       // Converte valores monetários de USD para BRL se for LIV
       if (unit === 'liv') {
         const previousEndObj = this.dateUtilsService.parseDate(previousEnd);
-        ecommerceValuePrev = await this.currencyConversionService.convertUsdToBrl(ecommerceValuePrev, unit, previousEndObj);
+        ecommerceValuePrev =
+          await this.currencyConversionService.convertUsdToBrl(
+            ecommerceValuePrev,
+            unit,
+            previousEndObj,
+          );
       }
 
       const ecommercePrevious: UnitBookingsEcommerce = {
@@ -237,12 +336,18 @@ export class BookingsMultitenantService {
       // Processa Ecommerce do mês atual (para forecast)
       const ecomMonthly = ecommerceBigNumbersMonthlyResult.rows[0] || {};
 
-      let ecommerceValueMonthly = parseFloat(ecomMonthly.total_ecommerce_value) || 0;
+      let ecommerceValueMonthly =
+        parseFloat(ecomMonthly.total_ecommerce_value) || 0;
 
       // Converte valores monetários de USD para BRL se for LIV
       if (unit === 'liv') {
         const monthEndObj = this.dateUtilsService.parseDate(monthEnd);
-        ecommerceValueMonthly = await this.currencyConversionService.convertUsdToBrl(ecommerceValueMonthly, unit, monthEndObj);
+        ecommerceValueMonthly =
+          await this.currencyConversionService.convertUsdToBrl(
+            ecommerceValueMonthly,
+            unit,
+            monthEndObj,
+          );
       }
 
       const ecommerceMonthly: UnitBookingsEcommerce = {
@@ -258,7 +363,11 @@ export class BookingsMultitenantService {
         let value = parseFloat(row.total_value) || 0;
         if (unit === 'liv') {
           const rowDate = new Date(row.date);
-          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+          value = await this.currencyConversionService.convertUsdToBrl(
+            value,
+            unit,
+            rowDate,
+          );
         }
         billingByDate.set(dateKey, value);
         bookingsByDate.set(dateKey, parseInt(row.total_bookings) || 0);
@@ -271,13 +380,19 @@ export class BookingsMultitenantService {
         let value = parseFloat(row.total_value) || 0;
         if (unit === 'liv') {
           const rowDate = new Date(row.date);
-          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+          value = await this.currencyConversionService.convertUsdToBrl(
+            value,
+            unit,
+            rowDate,
+          );
         }
         ecommerceBillingByDate.set(dateKey, value);
         ecommerceBookingsByDate.set(dateKey, parseInt(row.total_bookings) || 0);
       }
 
-      this.logger.log(`KPIs de Bookings de ${UNIT_CONFIGS[unit].name} obtidos com sucesso`);
+      this.logger.log(
+        `KPIs de Bookings de ${UNIT_CONFIGS[unit].name} obtidos com sucesso`,
+      );
 
       return {
         unit,
@@ -294,7 +409,9 @@ export class BookingsMultitenantService {
         ecommerceBookingsByDate,
       };
     } catch (error) {
-      this.logger.error(`Erro ao buscar KPIs de Bookings de ${UNIT_CONFIGS[unit].name}: ${error.message}`);
+      this.logger.error(
+        `Erro ao buscar KPIs de Bookings de ${UNIT_CONFIGS[unit].name}: ${error.message}`,
+      );
       return null;
     }
   }
@@ -313,39 +430,80 @@ export class BookingsMultitenantService {
     // Calcula a diferença de dias para determinar se agrupa por mês ou por dia
     const start = this.dateUtilsService.parseDate(startDate);
     const end = this.dateUtilsService.parseDate(endDate);
-    const rangeDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const rangeDays = Math.ceil(
+      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+    );
     const groupByMonth = rangeDays > 40;
 
     // Gera todas as datas/meses do período e prepara as categorias
-    const allPeriods = this.dateUtilsService.generatePeriodRange(startDate, endDate, groupByMonth);
+    const allPeriods = this.dateUtilsService.generatePeriodRange(
+      startDate,
+      endDate,
+      groupByMonth,
+    );
     const categories = allPeriods;
 
     // Consolida BigNumbers (com previousDate e monthlyForecast)
-    const bigNumbers = this.consolidateBigNumbers(results, daysElapsed, remainingDays, totalDaysInMonth);
+    const bigNumbers = this.consolidateBigNumbers(
+      results,
+      daysElapsed,
+      remainingDays,
+      totalDaysInMonth,
+    );
 
     // Consolida BigNumbersEcommerce (com previousDate e monthlyForecast)
-    const bigNumbersEcommerce = this.consolidateEcommerceBigNumbers(results, daysElapsed, remainingDays);
+    const bigNumbersEcommerce = this.consolidateEcommerceBigNumbers(
+      results,
+      daysElapsed,
+      remainingDays,
+    );
 
     // RevenueByCompany - faturamento total de reservas de cada unidade (consolidado)
-    const revenueByCompany = this.calculateRevenueByCompanyConsolidated(results);
+    const revenueByCompany =
+      this.calculateRevenueByCompanyConsolidated(results);
 
     // BookingsByCompany - quantidade total de reservas de cada unidade (consolidado)
-    const bookingsByCompany = this.calculateBookingsByCompanyConsolidated(results);
+    const bookingsByCompany =
+      this.calculateBookingsByCompanyConsolidated(results);
 
     // BillingOfReservationsByPeriod - faturamento por unidade por data/mês
-    const billingOfReservationsByPeriod = this.calculateBillingByPeriodGrouped(results, categories, groupByMonth);
+    const billingOfReservationsByPeriod = this.calculateBillingByPeriodGrouped(
+      results,
+      categories,
+      groupByMonth,
+    );
 
     // RepresentativenessOfReservesByPeriod - representatividade por unidade por data/mês
-    const representativenessOfReservesByPeriod = this.calculateRepresentativenessByPeriodGrouped(results, categories, groupByMonth);
+    const representativenessOfReservesByPeriod =
+      this.calculateRepresentativenessByPeriodGrouped(
+        results,
+        categories,
+        groupByMonth,
+      );
 
     // NumberOfReservationsPerPeriod - número de reservas por unidade por data/mês
-    const numberOfReservationsPerPeriod = this.calculateNumberOfReservationsByPeriodGrouped(results, categories, groupByMonth);
+    const numberOfReservationsPerPeriod =
+      this.calculateNumberOfReservationsByPeriodGrouped(
+        results,
+        categories,
+        groupByMonth,
+      );
 
     // ReservationsOfEcommerceByPeriod - reservas ecommerce por unidade por data/mês
-    const reservationsOfEcommerceByPeriod = this.calculateEcommerceReservationsByPeriodGrouped(results, categories, groupByMonth);
+    const reservationsOfEcommerceByPeriod =
+      this.calculateEcommerceReservationsByPeriodGrouped(
+        results,
+        categories,
+        groupByMonth,
+      );
 
     // BillingOfEcommerceByPeriod - faturamento ecommerce por unidade por data/mês
-    const billingOfEcommerceByPeriod = this.calculateEcommerceBillingByPeriodGrouped(results, categories, groupByMonth);
+    const billingOfEcommerceByPeriod =
+      this.calculateEcommerceBillingByPeriodGrouped(
+        results,
+        categories,
+        groupByMonth,
+      );
 
     return {
       Company: 'LHG',
@@ -353,7 +511,8 @@ export class BookingsMultitenantService {
       RevenueByCompany: revenueByCompany,
       BookingsByCompany: bookingsByCompany,
       BillingOfReservationsByPeriod: billingOfReservationsByPeriod,
-      RepresentativenessOfReservesByPeriod: representativenessOfReservesByPeriod,
+      RepresentativenessOfReservesByPeriod:
+        representativenessOfReservesByPeriod,
       NumberOfReservationsPerPeriod: numberOfReservationsPerPeriod,
       BigNumbersEcommerce: [bigNumbersEcommerce],
       ReservationsOfEcommerceByPeriod: reservationsOfEcommerceByPeriod,
@@ -408,11 +567,14 @@ export class BookingsMultitenantService {
     // --- Cálculos período atual ---
     const avgTicket = totalBookings > 0 ? totalValue / totalBookings : 0;
     // Representatividade multiplicada por 100 para mostrar como percentual (frontend só adiciona "%")
-    const representativeness = totalRevenue > 0 ? (totalValue / totalRevenue) * 100 : 0;
+    const representativeness =
+      totalRevenue > 0 ? (totalValue / totalRevenue) * 100 : 0;
 
     // --- Cálculos período anterior ---
-    const avgTicketPrev = totalBookingsPrev > 0 ? totalValuePrev / totalBookingsPrev : 0;
-    const representativenessPrev = totalRevenuePrev > 0 ? (totalValuePrev / totalRevenuePrev) * 100 : 0;
+    const avgTicketPrev =
+      totalBookingsPrev > 0 ? totalValuePrev / totalBookingsPrev : 0;
+    const representativenessPrev =
+      totalRevenuePrev > 0 ? (totalValuePrev / totalRevenuePrev) * 100 : 0;
 
     // --- Cálculos forecast mensal ---
     // Fórmula: forecastValue = monthlyTotalValue + (dailyAverageValue * remainingDays)
@@ -426,10 +588,13 @@ export class BookingsMultitenantService {
 
       // Projeção: valor atual do mês + (média diária * dias restantes)
       forecastValue = monthlyTotalValue + dailyAvgValue * remainingDays;
-      forecastBookings = Math.round(monthlyTotalBookings + dailyAvgBookings * remainingDays);
+      forecastBookings = Math.round(
+        monthlyTotalBookings + dailyAvgBookings * remainingDays,
+      );
     }
 
-    const forecastTicket = forecastBookings > 0 ? forecastValue / forecastBookings : 0;
+    const forecastTicket =
+      forecastBookings > 0 ? forecastValue / forecastBookings : 0;
     // Representatividade no forecast mantém o valor atual (não temos forecast de receita total)
     const forecastRepresentativeness = representativeness;
 
@@ -444,13 +609,17 @@ export class BookingsMultitenantService {
         totalAllValuePreviousData: Number(totalValuePrev.toFixed(2)),
         totalAllBookingsPreviousData: totalBookingsPrev,
         totalAllTicketAveragePreviousData: Number(avgTicketPrev.toFixed(2)),
-        totalAllRepresentativenessPreviousData: Number(representativenessPrev.toFixed(2)),
+        totalAllRepresentativenessPreviousData: Number(
+          representativenessPrev.toFixed(2),
+        ),
       },
       monthlyForecast: {
         totalAllValueForecast: Number(forecastValue.toFixed(2)),
         totalAllBookingsForecast: forecastBookings,
         totalAllTicketAverageForecast: Number(forecastTicket.toFixed(2)),
-        totalAllRepresentativenessForecast: Number(forecastRepresentativeness.toFixed(2)),
+        totalAllRepresentativenessForecast: Number(
+          forecastRepresentativeness.toFixed(2),
+        ),
       },
     };
   }
@@ -502,11 +671,14 @@ export class BookingsMultitenantService {
     // --- Cálculos período atual ---
     const avgTicket = totalBookings > 0 ? totalValue / totalBookings : 0;
     // Representatividade multiplicada por 100 para mostrar como percentual (frontend só adiciona "%")
-    const representativeness = totalRevenue > 0 ? (totalValue / totalRevenue) * 100 : 0;
+    const representativeness =
+      totalRevenue > 0 ? (totalValue / totalRevenue) * 100 : 0;
 
     // --- Cálculos período anterior ---
-    const avgTicketPrev = totalBookingsPrev > 0 ? totalValuePrev / totalBookingsPrev : 0;
-    const representativenessPrev = totalRevenuePrev > 0 ? (totalValuePrev / totalRevenuePrev) * 100 : 0;
+    const avgTicketPrev =
+      totalBookingsPrev > 0 ? totalValuePrev / totalBookingsPrev : 0;
+    const representativenessPrev =
+      totalRevenuePrev > 0 ? (totalValuePrev / totalRevenuePrev) * 100 : 0;
 
     // --- Cálculos forecast mensal ---
     let forecastValue = 0;
@@ -517,10 +689,13 @@ export class BookingsMultitenantService {
       const dailyAvgBookings = monthlyTotalBookings / daysElapsed;
 
       forecastValue = monthlyTotalValue + dailyAvgValue * remainingDays;
-      forecastBookings = Math.round(monthlyTotalBookings + dailyAvgBookings * remainingDays);
+      forecastBookings = Math.round(
+        monthlyTotalBookings + dailyAvgBookings * remainingDays,
+      );
     }
 
-    const forecastTicket = forecastBookings > 0 ? forecastValue / forecastBookings : 0;
+    const forecastTicket =
+      forecastBookings > 0 ? forecastValue / forecastBookings : 0;
     const forecastRepresentativeness = representativeness; // Mantém o valor atual
 
     return {
@@ -534,13 +709,17 @@ export class BookingsMultitenantService {
         totalAllValuePreviousData: Number(totalValuePrev.toFixed(2)),
         totalAllBookingsPreviousData: totalBookingsPrev,
         totalAllTicketAveragePreviousData: Number(avgTicketPrev.toFixed(2)),
-        totalAllRepresentativenessPreviousData: Number(representativenessPrev.toFixed(2)),
+        totalAllRepresentativenessPreviousData: Number(
+          representativenessPrev.toFixed(2),
+        ),
       },
       monthlyForecast: {
         totalAllValueForecast: Number(forecastValue.toFixed(2)),
         totalAllBookingsForecast: forecastBookings,
         totalAllTicketAverageForecast: Number(forecastTicket.toFixed(2)),
-        totalAllRepresentativenessForecast: Number(forecastRepresentativeness.toFixed(2)),
+        totalAllRepresentativenessForecast: Number(
+          forecastRepresentativeness.toFixed(2),
+        ),
       },
     };
   }
@@ -620,13 +799,17 @@ export class BookingsMultitenantService {
 
     // Calcula o total de faturamento do período para cada unidade
     for (const r of results) {
-      const totalPeriodBilling = Array.from(r.billingByDate.values()).reduce((sum, val) => sum + val, 0);
+      const totalPeriodBilling = Array.from(r.billingByDate.values()).reduce(
+        (sum, val) => sum + val,
+        0,
+      );
 
       const data: number[] = [];
       for (const dateKey of allDates) {
         const dayBilling = r.billingByDate.get(dateKey) || 0;
         // Multiplica por 100 para mostrar como percentual (ex: 1.6% em vez de 0.016)
-        const percent = totalPeriodBilling > 0 ? (dayBilling / totalPeriodBilling) * 100 : 0;
+        const percent =
+          totalPeriodBilling > 0 ? (dayBilling / totalPeriodBilling) * 100 : 0;
         data.push(Number(percent.toFixed(2)));
       }
       series.push({
@@ -700,7 +883,9 @@ export class BookingsMultitenantService {
     for (const r of results) {
       const data: number[] = [];
       for (const dateKey of allDates) {
-        data.push(Number((r.ecommerceBillingByDate.get(dateKey) || 0).toFixed(2)));
+        data.push(
+          Number((r.ecommerceBillingByDate.get(dateKey) || 0).toFixed(2)),
+        );
       }
       series.push({
         name: r.unitName,
@@ -731,11 +916,16 @@ export class BookingsMultitenantService {
   /**
    * Agrega dados de um Map por período (dia ou mês)
    */
-  private aggregateDataByPeriod(dataMap: Map<string, number>, groupByMonth: boolean): Map<string, number> {
+  private aggregateDataByPeriod(
+    dataMap: Map<string, number>,
+    groupByMonth: boolean,
+  ): Map<string, number> {
     const aggregated = new Map<string, number>();
 
     for (const [dateKey, value] of dataMap.entries()) {
-      const periodKey = groupByMonth ? this.dateUtilsService.formatDateToMonth(dateKey) : this.dateUtilsService.formatDateDisplay(dateKey);
+      const periodKey = groupByMonth
+        ? this.dateUtilsService.formatDateToMonth(dateKey)
+        : this.dateUtilsService.formatDateDisplay(dateKey);
       const current = aggregated.get(periodKey) || 0;
       aggregated.set(periodKey, current + value);
     }
@@ -754,7 +944,10 @@ export class BookingsMultitenantService {
     const series: Array<{ name: string; data: number[] }> = [];
 
     for (const r of results) {
-      const aggregatedData = this.aggregateDataByPeriod(r.billingByDate, groupByMonth);
+      const aggregatedData = this.aggregateDataByPeriod(
+        r.billingByDate,
+        groupByMonth,
+      );
       const data: number[] = [];
 
       for (const period of categories) {
@@ -781,7 +974,10 @@ export class BookingsMultitenantService {
     const series: Array<{ name: string; data: number[] }> = [];
 
     for (const r of results) {
-      const aggregatedData = this.aggregateDataByPeriod(r.bookingsByDate, groupByMonth);
+      const aggregatedData = this.aggregateDataByPeriod(
+        r.bookingsByDate,
+        groupByMonth,
+      );
       const data: number[] = [];
 
       for (const period of categories) {
@@ -808,7 +1004,10 @@ export class BookingsMultitenantService {
     const series: Array<{ name: string; data: number[] }> = [];
 
     for (const r of results) {
-      const aggregatedData = this.aggregateDataByPeriod(r.billingByDate, groupByMonth);
+      const aggregatedData = this.aggregateDataByPeriod(
+        r.billingByDate,
+        groupByMonth,
+      );
       const data: number[] = [];
 
       for (const period of categories) {
@@ -836,15 +1035,24 @@ export class BookingsMultitenantService {
     const series: Array<{ name: string; data: number[] }> = [];
 
     for (const r of results) {
-      const aggregatedData = this.aggregateDataByPeriod(r.billingByDate, groupByMonth);
-      const totalPeriodBilling = Array.from(aggregatedData.values()).reduce((sum, val) => sum + val, 0);
+      const aggregatedData = this.aggregateDataByPeriod(
+        r.billingByDate,
+        groupByMonth,
+      );
+      const totalPeriodBilling = Array.from(aggregatedData.values()).reduce(
+        (sum, val) => sum + val,
+        0,
+      );
 
       const data: number[] = [];
 
       for (const period of categories) {
         const periodBilling = aggregatedData.get(period) || 0;
         // Multiplica por 100 para mostrar como percentual (ex: 1.6% em vez de 0.016)
-        const percent = totalPeriodBilling > 0 ? (periodBilling / totalPeriodBilling) * 100 : 0;
+        const percent =
+          totalPeriodBilling > 0
+            ? (periodBilling / totalPeriodBilling) * 100
+            : 0;
         data.push(Number(percent.toFixed(2)));
       }
 
@@ -868,7 +1076,10 @@ export class BookingsMultitenantService {
     const series: Array<{ name: string; data: number[] }> = [];
 
     for (const r of results) {
-      const aggregatedData = this.aggregateDataByPeriod(r.bookingsByDate, groupByMonth);
+      const aggregatedData = this.aggregateDataByPeriod(
+        r.bookingsByDate,
+        groupByMonth,
+      );
       const data: number[] = [];
 
       for (const period of categories) {
@@ -895,7 +1106,10 @@ export class BookingsMultitenantService {
     const series: Array<{ name: string; data: number[] }> = [];
 
     for (const r of results) {
-      const aggregatedData = this.aggregateDataByPeriod(r.ecommerceBookingsByDate, groupByMonth);
+      const aggregatedData = this.aggregateDataByPeriod(
+        r.ecommerceBookingsByDate,
+        groupByMonth,
+      );
       const data: number[] = [];
 
       for (const period of categories) {
@@ -922,7 +1136,10 @@ export class BookingsMultitenantService {
     const series: Array<{ name: string; data: number[] }> = [];
 
     for (const r of results) {
-      const aggregatedData = this.aggregateDataByPeriod(r.ecommerceBillingByDate, groupByMonth);
+      const aggregatedData = this.aggregateDataByPeriod(
+        r.ecommerceBillingByDate,
+        groupByMonth,
+      );
       const data: number[] = [];
 
       for (const period of categories) {

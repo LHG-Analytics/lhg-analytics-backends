@@ -86,7 +86,9 @@ export class CompanyController {
     const userUnit = user?.unit;
     const userRole = user?.role;
 
-    this.logger.log(`Buscando KPIs consolidados: ${startDate} - ${endDate} (user: ${user?.email}, unit: ${userUnit}, role: ${userRole})`);
+    this.logger.log(
+      `Buscando KPIs consolidados: ${startDate} - ${endDate} (user: ${user?.email}, unit: ${userUnit}, role: ${userRole})`,
+    );
 
     return this.companyService.getUnifiedKpis(startDate, endDate, user);
   }

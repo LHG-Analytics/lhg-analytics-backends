@@ -7,8 +7,14 @@ if (process.env.NODE_ENV === 'production') {
   addAliases({
     '@client-local': join(__dirname, 'generated/client-local'),
     '@auth/auth/auth.service': join(__dirname, '../../../../authentication/dist/auth/auth.service'),
-    '@auth/prisma/prisma.service': join(__dirname, '../../../../authentication/dist/prisma/prisma.service'),
-    '@auth/auth/interfaces/jwt-payload.interface': join(__dirname, '../../../../authentication/dist/auth/interfaces/jwt-payload.interface'),
+    '@auth/prisma/prisma.service': join(
+      __dirname,
+      '../../../../authentication/dist/prisma/prisma.service',
+    ),
+    '@auth/auth/interfaces/jwt-payload.interface': join(
+      __dirname,
+      '../../../../authentication/dist/auth/interfaces/jwt-payload.interface',
+    ),
   });
 }
 import { config } from 'dotenv';
@@ -65,8 +71,8 @@ async function bootstrap() {
         showRequestDuration: true,
         syntaxHighlight: {
           activate: true,
-          theme: 'monokai'
-        }
+          theme: 'monokai',
+        },
       },
       customSiteTitle: 'LHG Analytics - Tout',
     });
@@ -94,20 +100,22 @@ async function bootstrap() {
       'http://localhost:3004', // Andar de Cima (Swagger)
       'http://localhost:3006', // Liv (Swagger)
     ];
-    const envOrigins = process.env.ALLOWED_ORIGINS
-      ?.split(',')
-      .map((o) => o.trim())
-      .filter(Boolean)
-      .map((o) => {
-        // Adiciona https:// se não tiver protocolo
-        if (!o.match(/^https?:\/\//)) {
-          return `https://${o}`;
-        }
-        return o;
-      }) || [];
+    const envOrigins =
+      process.env.ALLOWED_ORIGINS?.split(',')
+        .map((o) => o.trim())
+        .filter(Boolean)
+        .map((o) => {
+          // Adiciona https:// se não tiver protocolo
+          if (!o.match(/^https?:\/\//)) {
+            return `https://${o}`;
+          }
+          return o;
+        }) || [];
     // Adiciona URL do próprio servidor (para Swagger funcionar no Render)
     const serverUrl = process.env.RENDER_EXTERNAL_URL;
-    const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins, ...(serverUrl ? [serverUrl] : [])])];
+    const allowedOrigins = [
+      ...new Set([...defaultOrigins, ...envOrigins, ...(serverUrl ? [serverUrl] : [])]),
+    ];
 
     const corsOptions: CorsOptions = {
       origin: (origin, callback) => {

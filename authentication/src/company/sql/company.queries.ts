@@ -31,7 +31,10 @@ export function getDateRangeWithCutoff(
   const nextDay = QueryUtilsService.getNextDay(formattedEnd);
 
   return {
-    startTimestamp: QueryUtilsService.createSQLTimestamp(formattedStart, '06:00:00'),
+    startTimestamp: QueryUtilsService.createSQLTimestamp(
+      formattedStart,
+      '06:00:00',
+    ),
     endTimestamp: QueryUtilsService.createSQLTimestamp(nextDay, '05:59:59'),
   };
 }
@@ -40,7 +43,9 @@ export function getDateRangeWithCutoff(
  * Obtém os IDs de categorias formatados para SQL IN clause usando QueryUtilsService
  */
 export function getCategoryIds(unit: UnitKey): string {
-  return QueryUtilsService.sanitizeIdList(UNIT_CONFIGS[unit].suiteConfig.categoryIds);
+  return QueryUtilsService.sanitizeIdList(
+    UNIT_CONFIGS[unit].suiteConfig.categoryIds,
+  );
 }
 
 /**

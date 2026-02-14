@@ -30,7 +30,10 @@ export function getDateRangeWithCutoff(
   const nextDay = QueryUtilsService.getNextDay(formattedEnd);
 
   return {
-    startTimestamp: QueryUtilsService.createSQLTimestamp(formattedStart, '06:00:00'),
+    startTimestamp: QueryUtilsService.createSQLTimestamp(
+      formattedStart,
+      '06:00:00',
+    ),
     endTimestamp: QueryUtilsService.createSQLTimestamp(nextDay, '05:59:59'),
   };
 }

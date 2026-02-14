@@ -179,7 +179,10 @@ export class CurrencyConversionService {
   /**
    * Retorna estatísticas do cache
    */
-  getCacheStats(): { size: number; entries: Array<{ date: string; rate: number; age: number }> } {
+  getCacheStats(): {
+    size: number;
+    entries: Array<{ date: string; rate: number; age: number }>;
+  } {
     const entries = Array.from(this.cache.values()).map((entry) => ({
       date: entry.date,
       rate: entry.rate,

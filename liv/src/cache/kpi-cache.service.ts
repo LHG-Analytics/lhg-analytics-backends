@@ -47,11 +47,7 @@ export class KpiCacheService {
   /**
    * Fase 1.3 - Constrói a chave de cache baseada no serviço e período
    */
-  buildCacheKey(
-    service: ServiceType,
-    period: CachePeriodEnum,
-    customDates?: DateRange,
-  ): string {
+  buildCacheKey(service: ServiceType, period: CachePeriodEnum, customDates?: DateRange): string {
     const prefix = SERVICE_PREFIXES[service];
 
     if (period === CachePeriodEnum.CUSTOM && customDates) {

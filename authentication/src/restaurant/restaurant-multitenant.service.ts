@@ -73,32 +73,64 @@ export class RestaurantMultitenantService {
     const connectedUnits = this.databaseService.getConnectedUnits();
 
     if (connectedUnits.length === 0) {
-      throw new Error('Nenhuma unidade conectada. Verifique as variáveis de ambiente.');
+      throw new Error(
+        'Nenhuma unidade conectada. Verifique as variáveis de ambiente.',
+      );
     }
 
-    this.logger.log(`Buscando KPIs de Restaurant de ${connectedUnits.length} unidades...`);
+    this.logger.log(
+      `Buscando KPIs de Restaurant de ${connectedUnits.length} unidades...`,
+    );
 
     // Calcula período anterior (mesma duração, imediatamente antes)
-    const { previousStart, previousEnd } = this.dateUtilsService.calculatePreviousPeriod(startDate, endDate);
+    const { previousStart, previousEnd } =
+      this.dateUtilsService.calculatePreviousPeriod(startDate, endDate);
 
     // Calcula período do mês atual para forecast (dia 1 às 06:00 até ontem às 05:59:59)
-    const { monthStart, monthEnd, daysElapsed, remainingDays, totalDaysInMonth } = this.dateUtilsService.calculateCurrentMonthPeriod();
+    const {
+      monthStart,
+      monthEnd,
+      daysElapsed,
+      remainingDays,
+      totalDaysInMonth,
+    } = this.dateUtilsService.calculateCurrentMonthPeriod();
 
     // Executa queries em paralelo para cada unidade (período atual + anterior + mês atual para forecast)
     // Limita a 2 unidades simultâneas para evitar sobrecarga do banco de dados
-    const unitDataTasks = connectedUnits.map((unit) =>
-      () => this.fetchUnitKpis(unit, startDate, endDate, previousStart, previousEnd, monthStart, monthEnd),
+    const unitDataTasks = connectedUnits.map(
+      (unit) => () =>
+        this.fetchUnitKpis(
+          unit,
+          startDate,
+          endDate,
+          previousStart,
+          previousEnd,
+          monthStart,
+          monthEnd,
+        ),
     );
 
-    const unitResults = await this.concurrencyUtils.executeWithLimit(unitDataTasks, 2);
-    const validResults = unitResults.filter((r) => r !== null) as UnitRestaurantKpiData[];
+    const unitResults = await this.concurrencyUtils.executeWithLimit(
+      unitDataTasks,
+      2,
+    );
+    const validResults = unitResults.filter(
+      (r) => r !== null,
+    ) as UnitRestaurantKpiData[];
 
     if (validResults.length === 0) {
       throw new Error('Nenhuma unidade retornou dados válidos');
     }
 
     // Consolida os dados
-    const consolidated = this.consolidateData(validResults, startDate, endDate, daysElapsed, remainingDays, totalDaysInMonth);
+    const consolidated = this.consolidateData(
+      validResults,
+      startDate,
+      endDate,
+      daysElapsed,
+      remainingDays,
+      totalDaysInMonth,
+    );
 
     this.logger.log(
       `KPIs de Restaurant consolidados de ${validResults.length} unidades em ${Date.now() - startTime}ms`,
@@ -123,15 +155,51 @@ export class RestaurantMultitenantService {
       // Executa todas as queries em paralelo para a unidade (atual + anterior + mês atual)
       // Limita a 5 queries simultâneas por unidade para evitar sobrecarga
       const queryTasks = [
-        () => this.databaseService.query(unit, getRestaurantBigNumbersSQL(unit, startDate, endDate)),
-        () => this.databaseService.query(unit, getRestaurantBigNumbersSQL(unit, previousStart, previousEnd)),
-        () => this.databaseService.query(unit, getRestaurantBigNumbersSQL(unit, monthStart, monthEnd)),
-        () => this.databaseService.query(unit, getTotalSalesAndRevenueSQL(unit, startDate, endDate)),
-        () => this.databaseService.query(unit, getTotalSalesAndRevenueSQL(unit, previousStart, previousEnd)),
-        () => this.databaseService.query(unit, getTotalSalesAndRevenueSQL(unit, monthStart, monthEnd)),
-        () => this.databaseService.query(unit, getRevenueAbByDateSQL(unit, startDate, endDate)),
-        () => this.databaseService.query(unit, getTotalRevenueByDateSQL(unit, startDate, endDate)),
-        () => this.databaseService.query(unit, getSalesWithAbByDateSQL(unit, startDate, endDate)),
+        () =>
+          this.databaseService.query(
+            unit,
+            getRestaurantBigNumbersSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getRestaurantBigNumbersSQL(unit, previousStart, previousEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getRestaurantBigNumbersSQL(unit, monthStart, monthEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getTotalSalesAndRevenueSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getTotalSalesAndRevenueSQL(unit, previousStart, previousEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getTotalSalesAndRevenueSQL(unit, monthStart, monthEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getRevenueAbByDateSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getTotalRevenueByDateSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getSalesWithAbByDateSQL(unit, startDate, endDate),
+          ),
       ];
 
       const [
@@ -157,9 +225,22 @@ export class RestaurantMultitenantService {
       // Converte valores monetários de USD para BRL se for LIV
       if (unit === 'liv') {
         const endDateObj = this.dateUtilsService.parseDate(endDate);
-        totalValue = await this.currencyConversionService.convertUsdToBrl(totalValue, unit, endDateObj);
-        totalSalesRevenue = await this.currencyConversionService.convertUsdToBrl(totalSalesRevenue, unit, endDateObj);
-        totalRevenue = await this.currencyConversionService.convertUsdToBrl(totalRevenue, unit, endDateObj);
+        totalValue = await this.currencyConversionService.convertUsdToBrl(
+          totalValue,
+          unit,
+          endDateObj,
+        );
+        totalSalesRevenue =
+          await this.currencyConversionService.convertUsdToBrl(
+            totalSalesRevenue,
+            unit,
+            endDateObj,
+          );
+        totalRevenue = await this.currencyConversionService.convertUsdToBrl(
+          totalRevenue,
+          unit,
+          endDateObj,
+        );
       }
 
       const bigNumbers: UnitRestaurantBigNumbers = {
@@ -182,9 +263,22 @@ export class RestaurantMultitenantService {
       // Converte valores monetários de USD para BRL se for LIV
       if (unit === 'liv') {
         const previousEndObj = this.dateUtilsService.parseDate(previousEnd);
-        totalValuePrev = await this.currencyConversionService.convertUsdToBrl(totalValuePrev, unit, previousEndObj);
-        totalSalesRevenuePrev = await this.currencyConversionService.convertUsdToBrl(totalSalesRevenuePrev, unit, previousEndObj);
-        totalRevenuePrev = await this.currencyConversionService.convertUsdToBrl(totalRevenuePrev, unit, previousEndObj);
+        totalValuePrev = await this.currencyConversionService.convertUsdToBrl(
+          totalValuePrev,
+          unit,
+          previousEndObj,
+        );
+        totalSalesRevenuePrev =
+          await this.currencyConversionService.convertUsdToBrl(
+            totalSalesRevenuePrev,
+            unit,
+            previousEndObj,
+          );
+        totalRevenuePrev = await this.currencyConversionService.convertUsdToBrl(
+          totalRevenuePrev,
+          unit,
+          previousEndObj,
+        );
       }
 
       const bigNumbersPrevious: UnitRestaurantBigNumbers = {
@@ -201,15 +295,31 @@ export class RestaurantMultitenantService {
       const srMonthly = salesRevenueMonthlyResult.rows[0] || {};
 
       let totalValueMonthly = parseFloat(bnMonthly.total_ab_value) || 0;
-      let totalSalesRevenueMonthly = parseFloat(srMonthly.total_sales_revenue) || 0;
+      let totalSalesRevenueMonthly =
+        parseFloat(srMonthly.total_sales_revenue) || 0;
       let totalRevenueMonthly = parseFloat(srMonthly.total_revenue) || 0;
 
       // Converte valores monetários de USD para BRL se for LIV
       if (unit === 'liv') {
         const monthEndObj = this.dateUtilsService.parseDate(monthEnd);
-        totalValueMonthly = await this.currencyConversionService.convertUsdToBrl(totalValueMonthly, unit, monthEndObj);
-        totalSalesRevenueMonthly = await this.currencyConversionService.convertUsdToBrl(totalSalesRevenueMonthly, unit, monthEndObj);
-        totalRevenueMonthly = await this.currencyConversionService.convertUsdToBrl(totalRevenueMonthly, unit, monthEndObj);
+        totalValueMonthly =
+          await this.currencyConversionService.convertUsdToBrl(
+            totalValueMonthly,
+            unit,
+            monthEndObj,
+          );
+        totalSalesRevenueMonthly =
+          await this.currencyConversionService.convertUsdToBrl(
+            totalSalesRevenueMonthly,
+            unit,
+            monthEndObj,
+          );
+        totalRevenueMonthly =
+          await this.currencyConversionService.convertUsdToBrl(
+            totalRevenueMonthly,
+            unit,
+            monthEndObj,
+          );
       }
 
       const bigNumbersMonthly: UnitRestaurantBigNumbers = {
@@ -227,9 +337,16 @@ export class RestaurantMultitenantService {
         let value = parseFloat(row.total_ab_value) || 0;
         if (unit === 'liv') {
           const rowDate = new Date(row.date);
-          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+          value = await this.currencyConversionService.convertUsdToBrl(
+            value,
+            unit,
+            rowDate,
+          );
         }
-        revenueAbByDate.set(this.dateUtilsService.formatDateKey(row.date), value);
+        revenueAbByDate.set(
+          this.dateUtilsService.formatDateKey(row.date),
+          value,
+        );
       }
 
       const totalRevenueByDate = new Map<string, number>();
@@ -237,23 +354,38 @@ export class RestaurantMultitenantService {
         let value = parseFloat(row.total_revenue) || 0;
         if (unit === 'liv') {
           const rowDate = new Date(row.date);
-          value = await this.currencyConversionService.convertUsdToBrl(value, unit, rowDate);
+          value = await this.currencyConversionService.convertUsdToBrl(
+            value,
+            unit,
+            rowDate,
+          );
         }
-        totalRevenueByDate.set(this.dateUtilsService.formatDateKey(row.date), value);
+        totalRevenueByDate.set(
+          this.dateUtilsService.formatDateKey(row.date),
+          value,
+        );
       }
 
       const salesByDate = new Map<string, number>();
       for (const row of salesWithAbResult.rows) {
-        salesByDate.set(this.dateUtilsService.formatDateKey(row.date), parseInt(row.rentals_with_ab) || 0);
+        salesByDate.set(
+          this.dateUtilsService.formatDateKey(row.date),
+          parseInt(row.rentals_with_ab) || 0,
+        );
       }
 
       // Contagem de locações com A&B por data (para ticket médio)
       const rentalsWithAbByDate = new Map<string, number>();
       for (const row of salesWithAbResult.rows) {
-        rentalsWithAbByDate.set(this.dateUtilsService.formatDateKey(row.date), parseInt(row.rentals_with_ab) || 0);
+        rentalsWithAbByDate.set(
+          this.dateUtilsService.formatDateKey(row.date),
+          parseInt(row.rentals_with_ab) || 0,
+        );
       }
 
-      this.logger.log(`KPIs de Restaurant de ${UNIT_CONFIGS[unit].name} obtidos com sucesso`);
+      this.logger.log(
+        `KPIs de Restaurant de ${UNIT_CONFIGS[unit].name} obtidos com sucesso`,
+      );
 
       return {
         unit,
@@ -267,7 +399,9 @@ export class RestaurantMultitenantService {
         rentalsWithAbByDate,
       };
     } catch (error) {
-      this.logger.error(`Erro ao buscar KPIs de Restaurant de ${UNIT_CONFIGS[unit].name}: ${error.message}`);
+      this.logger.error(
+        `Erro ao buscar KPIs de Restaurant de ${UNIT_CONFIGS[unit].name}: ${error.message}`,
+      );
       return null;
     }
   }
@@ -286,30 +420,55 @@ export class RestaurantMultitenantService {
     // Calcula a diferença de dias para determinar se agrupa por mês ou por dia
     const start = this.dateUtilsService.parseDate(startDate);
     const end = this.dateUtilsService.parseDate(endDate);
-    const rangeDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const rangeDays = Math.ceil(
+      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+    );
     const groupByMonth = rangeDays > 40;
 
     // Gera todas as datas/meses do período e prepara as categorias
-    const allPeriods = this.generatePeriodRange(startDate, endDate, groupByMonth);
+    const allPeriods = this.generatePeriodRange(
+      startDate,
+      endDate,
+      groupByMonth,
+    );
     const categories = allPeriods;
 
     // Consolida BigNumbers (com previousDate e monthlyForecast)
-    const bigNumbers = this.consolidateBigNumbers(results, daysElapsed, remainingDays, totalDaysInMonth);
+    const bigNumbers = this.consolidateBigNumbers(
+      results,
+      daysElapsed,
+      remainingDays,
+      totalDaysInMonth,
+    );
 
     // RevenueByCompany - receita A&B total consolidada de cada unidade
-    const revenueByCompany = this.calculateRevenueByCompanyConsolidated(results);
+    const revenueByCompany =
+      this.calculateRevenueByCompanyConsolidated(results);
 
     // SalesByCompany - quantidade de vendas total consolidada de cada unidade
     const salesByCompany = this.calculateSalesByCompanyConsolidated(results);
 
     // RevenueAbByPeriod - receita A&B por unidade por data/mês
-    const revenueAbByPeriod = this.calculateRevenueAbByPeriodGrouped(results, categories, groupByMonth);
+    const revenueAbByPeriod = this.calculateRevenueAbByPeriodGrouped(
+      results,
+      categories,
+      groupByMonth,
+    );
 
     // RevenueAbByPeriodPercent - percentual A&B por unidade por data/mês
-    const revenueAbByPeriodPercent = this.calculateRevenueAbByPeriodPercentGrouped(results, categories, groupByMonth);
+    const revenueAbByPeriodPercent =
+      this.calculateRevenueAbByPeriodPercentGrouped(
+        results,
+        categories,
+        groupByMonth,
+      );
 
     // TicketAverageByPeriod - ticket médio por unidade por data/mês
-    const ticketAverageByPeriod = this.calculateTicketAverageByPeriodGrouped(results, categories, groupByMonth);
+    const ticketAverageByPeriod = this.calculateTicketAverageByPeriodGrouped(
+      results,
+      categories,
+      groupByMonth,
+    );
 
     return {
       Company: 'LHG',
@@ -390,14 +549,22 @@ export class RestaurantMultitenantService {
     // Ticket médio usa locações com A&B (totalSalesWithAb), igual ao individual
     const avgTicket = totalSalesWithAb > 0 ? totalValue / totalSalesWithAb : 0;
     const avgTicketByRentals = totalRentals > 0 ? totalValue / totalRentals : 0;
-    const abRepresentativity = totalRevenue > 0 ? (totalValue / totalRevenue) * 100 : 0;
-    const salesRepresentativity = totalRevenue > 0 ? (totalSalesRevenue / totalRevenue) * 100 : 0;
+    const abRepresentativity =
+      totalRevenue > 0 ? (totalValue / totalRevenue) * 100 : 0;
+    const salesRepresentativity =
+      totalRevenue > 0 ? (totalSalesRevenue / totalRevenue) * 100 : 0;
 
     // --- Cálculos período anterior ---
-    const avgTicketPrev = totalSalesWithAbPrev > 0 ? totalValuePrev / totalSalesWithAbPrev : 0;
-    const avgTicketByRentalsPrev = totalRentalsPrev > 0 ? totalValuePrev / totalRentalsPrev : 0;
-    const abRepresentativityPrev = totalRevenuePrev > 0 ? (totalValuePrev / totalRevenuePrev) * 100 : 0;
-    const salesRepresentativityPrev = totalRevenuePrev > 0 ? (totalSalesRevenuePrev / totalRevenuePrev) * 100 : 0;
+    const avgTicketPrev =
+      totalSalesWithAbPrev > 0 ? totalValuePrev / totalSalesWithAbPrev : 0;
+    const avgTicketByRentalsPrev =
+      totalRentalsPrev > 0 ? totalValuePrev / totalRentalsPrev : 0;
+    const abRepresentativityPrev =
+      totalRevenuePrev > 0 ? (totalValuePrev / totalRevenuePrev) * 100 : 0;
+    const salesRepresentativityPrev =
+      totalRevenuePrev > 0
+        ? (totalSalesRevenuePrev / totalRevenuePrev) * 100
+        : 0;
 
     // --- Cálculos forecast mensal ---
     // Fórmula: forecastValue = monthlyTotalValue + (dailyAverageValue * remainingDays)
@@ -417,16 +584,25 @@ export class RestaurantMultitenantService {
 
       // Projeção: valor atual do mês + (média diária * dias restantes)
       forecastValue = monthlyTotalValue + dailyAvgValue * remainingDays;
-      forecastSalesRevenue = monthlyTotalSalesRevenue + dailyAvgSalesRevenue * remainingDays;
-      forecastSales = Math.round(monthlyTotalAllSales + dailyAvgSales * remainingDays);
-      forecastRentals = Math.round(monthlyTotalRentals + dailyAvgRentals * remainingDays);
+      forecastSalesRevenue =
+        monthlyTotalSalesRevenue + dailyAvgSalesRevenue * remainingDays;
+      forecastSales = Math.round(
+        monthlyTotalAllSales + dailyAvgSales * remainingDays,
+      );
+      forecastRentals = Math.round(
+        monthlyTotalRentals + dailyAvgRentals * remainingDays,
+      );
       forecastRevenue = monthlyTotalRevenue + dailyAvgRevenue * remainingDays;
     }
 
-    const forecastTicket = forecastSales > 0 ? forecastValue / forecastSales : 0;
-    const forecastTicketByRentals = forecastRentals > 0 ? forecastValue / forecastRentals : 0;
-    const forecastAbRepresentativity = forecastRevenue > 0 ? (forecastValue / forecastRevenue) * 100 : 0;
-    const forecastSalesRepresentativity = forecastRevenue > 0 ? (forecastSalesRevenue / forecastRevenue) * 100 : 0;
+    const forecastTicket =
+      forecastSales > 0 ? forecastValue / forecastSales : 0;
+    const forecastTicketByRentals =
+      forecastRentals > 0 ? forecastValue / forecastRentals : 0;
+    const forecastAbRepresentativity =
+      forecastRevenue > 0 ? (forecastValue / forecastRevenue) * 100 : 0;
+    const forecastSalesRepresentativity =
+      forecastRevenue > 0 ? (forecastSalesRevenue / forecastRevenue) * 100 : 0;
 
     return {
       currentDate: {
@@ -434,27 +610,43 @@ export class RestaurantMultitenantService {
         totalAllSalesRevenue: Number(totalSalesRevenue.toFixed(2)),
         totalAllSales: totalAllSales,
         totalAllTicketAverage: Number(avgTicket.toFixed(2)),
-        totalAllTicketAverageByTotalRentals: Number(avgTicketByRentals.toFixed(2)),
+        totalAllTicketAverageByTotalRentals: Number(
+          avgTicketByRentals.toFixed(2),
+        ),
         abRepresentativity: Number(abRepresentativity.toFixed(2)),
         salesRepresentativity: Number(salesRepresentativity.toFixed(2)),
       },
       previousDate: {
         totalAllValuePreviousData: Number(totalValuePrev.toFixed(2)),
-        totalAllSalesRevenuePreviousData: Number(totalSalesRevenuePrev.toFixed(2)),
+        totalAllSalesRevenuePreviousData: Number(
+          totalSalesRevenuePrev.toFixed(2),
+        ),
         totalAllSalesPreviousData: totalAllSalesPrev,
         totalAllTicketAveragePreviousData: Number(avgTicketPrev.toFixed(2)),
-        totalAllTicketAverageByTotalRentalsPreviousData: Number(avgTicketByRentalsPrev.toFixed(2)),
-        abRepresentativityPreviousData: Number(abRepresentativityPrev.toFixed(2)),
-        salesRepresentativityPreviousData: Number(salesRepresentativityPrev.toFixed(2)),
+        totalAllTicketAverageByTotalRentalsPreviousData: Number(
+          avgTicketByRentalsPrev.toFixed(2),
+        ),
+        abRepresentativityPreviousData: Number(
+          abRepresentativityPrev.toFixed(2),
+        ),
+        salesRepresentativityPreviousData: Number(
+          salesRepresentativityPrev.toFixed(2),
+        ),
       },
       monthlyForecast: {
         totalAllValueForecast: Number(forecastValue.toFixed(2)),
         totalAllSalesRevenueForecast: Number(forecastSalesRevenue.toFixed(2)),
         totalAllSalesForecast: forecastSales,
         totalAllTicketAverageForecast: Number(forecastTicket.toFixed(2)),
-        totalAllTicketAverageByTotalRentalsForecast: Number(forecastTicketByRentals.toFixed(2)),
-        abRepresentativityForecast: Number(forecastAbRepresentativity.toFixed(2)),
-        salesRepresentativityForecast: Number(forecastSalesRepresentativity.toFixed(2)),
+        totalAllTicketAverageByTotalRentalsForecast: Number(
+          forecastTicketByRentals.toFixed(2),
+        ),
+        abRepresentativityForecast: Number(
+          forecastAbRepresentativity.toFixed(2),
+        ),
+        salesRepresentativityForecast: Number(
+          forecastSalesRepresentativity.toFixed(2),
+        ),
       },
     };
   }
@@ -506,8 +698,13 @@ export class RestaurantMultitenantService {
     const series: Array<{ name: string; data: number[] }> = [];
 
     for (const r of results) {
-      const periodDataMap = this.aggregateDataByPeriod(r.revenueAbByDate, groupByMonth);
-      const data = categories.map((period) => Number((periodDataMap.get(period) || 0).toFixed(2)));
+      const periodDataMap = this.aggregateDataByPeriod(
+        r.revenueAbByDate,
+        groupByMonth,
+      );
+      const data = categories.map((period) =>
+        Number((periodDataMap.get(period) || 0).toFixed(2)),
+      );
       series.push({ name: r.unitName, data });
     }
 
@@ -525,8 +722,14 @@ export class RestaurantMultitenantService {
     const series: Array<{ name: string; data: number[] }> = [];
 
     for (const r of results) {
-      const revenueAbMap = this.aggregateDataByPeriod(r.revenueAbByDate, groupByMonth);
-      const totalRevenueMap = this.aggregateDataByPeriod(r.totalRevenueByDate, groupByMonth);
+      const revenueAbMap = this.aggregateDataByPeriod(
+        r.revenueAbByDate,
+        groupByMonth,
+      );
+      const totalRevenueMap = this.aggregateDataByPeriod(
+        r.totalRevenueByDate,
+        groupByMonth,
+      );
 
       const data = categories.map((period) => {
         const revenueAb = revenueAbMap.get(period) || 0;
@@ -551,8 +754,14 @@ export class RestaurantMultitenantService {
     const series: Array<{ name: string; data: number[] }> = [];
 
     for (const r of results) {
-      const revenueAbMap = this.aggregateDataByPeriod(r.revenueAbByDate, groupByMonth);
-      const rentalsMap = this.aggregateDataByPeriod(r.rentalsWithAbByDate, groupByMonth);
+      const revenueAbMap = this.aggregateDataByPeriod(
+        r.revenueAbByDate,
+        groupByMonth,
+      );
+      const rentalsMap = this.aggregateDataByPeriod(
+        r.rentalsWithAbByDate,
+        groupByMonth,
+      );
 
       const data = categories.map((period) => {
         const revenueAb = revenueAbMap.get(period) || 0;
@@ -591,7 +800,11 @@ export class RestaurantMultitenantService {
    * Gera array de períodos (datas ou meses) entre startDate e endDate
    * @param groupByMonth Se true, agrupa por mês (MM/YYYY), senão por dia (DD/MM/YYYY)
    */
-  private generatePeriodRange(startDate: string, endDate: string, groupByMonth: boolean): string[] {
+  private generatePeriodRange(
+    startDate: string,
+    endDate: string,
+    groupByMonth: boolean,
+  ): string[] {
     const periods: string[] = [];
     const start = this.dateUtilsService.parseDate(startDate);
     const end = this.dateUtilsService.parseDate(endDate);

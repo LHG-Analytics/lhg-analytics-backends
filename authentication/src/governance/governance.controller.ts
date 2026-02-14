@@ -80,7 +80,9 @@ export class GovernanceController {
     // Valida formato e intervalo das datas
     this.validationService.validateDateInterval(startDate, endDate);
 
-    this.logger.log(`Buscando KPIs de Governance consolidados: ${startDate} - ${endDate}`);
+    this.logger.log(
+      `Buscando KPIs de Governance consolidados: ${startDate} - ${endDate}`,
+    );
 
     return this.governanceService.getUnifiedKpis(startDate, endDate);
   }

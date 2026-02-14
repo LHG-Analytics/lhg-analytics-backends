@@ -244,7 +244,6 @@ export class CompanyService {
     private kpiCacheService: KpiCacheService,
   ) {}
 
-
   private formatCurrency(value: number): string {
     return value.toLocaleString('pt-BR', {
       style: 'currency',
@@ -323,8 +322,15 @@ export class CompanyService {
     const remainingDays = totalDaysInMonth - daysElapsed;
 
     // Buscar dados do mês atual para forecast (do dia 1 até ontem)
-    const monthStartDate = currentMonthStart.clone().set({ hour: 6, minute: 0, second: 0 }).toDate();
-    const monthEndDate = yesterday.clone().set({ hour: 5, minute: 59, second: 59 }).add(1, 'day').toDate();
+    const monthStartDate = currentMonthStart
+      .clone()
+      .set({ hour: 6, minute: 0, second: 0 })
+      .toDate();
+    const monthEndDate = yesterday
+      .clone()
+      .set({ hour: 5, minute: 59, second: 59 })
+      .add(1, 'day')
+      .toDate();
 
     // Busca dados do mês com cache
     const monthlyResult = await this.kpiCacheService.getOrCalculate(
@@ -360,9 +366,7 @@ export class CompanyService {
         WHERE ca.id IN (2,3,4,5,6,7,12)
           AND a.dataexclusao IS NULL
       `;
-      const totalSuitesResult: any[] = await this.pgPool.query<any>(
-        totalSuitesSQL,
-      );
+      const totalSuitesResult: any[] = await this.pgPool.query<any>(totalSuitesSQL);
       const totalSuitesCount = Number(totalSuitesResult[0]?.total_suites) || 1;
 
       // Métricas recalculadas
@@ -383,7 +387,8 @@ export class CompanyService {
         totalAllTicketAverageForecast: forecastTicketAverage,
         totalAllTrevparForecast: forecastTrevpar,
         totalAllGiroForecast: forecastGiro,
-        totalAverageOccupationTimeForecast: monthlyBigNumbers.currentDate.totalAverageOccupationTime,
+        totalAverageOccupationTimeForecast:
+          monthlyBigNumbers.currentDate.totalAverageOccupationTime,
       };
     }
 
@@ -392,11 +397,13 @@ export class CompanyService {
       currentDate: currentBigNumbers.currentDate,
       previousDate: {
         totalAllValuePreviousData: previousBigNumbers.currentDate.totalAllValue,
-        totalAllRentalsApartmentsPreviousData: previousBigNumbers.currentDate.totalAllRentalsApartments,
+        totalAllRentalsApartmentsPreviousData:
+          previousBigNumbers.currentDate.totalAllRentalsApartments,
         totalAllTicketAveragePreviousData: previousBigNumbers.currentDate.totalAllTicketAverage,
         totalAllTrevparPreviousData: previousBigNumbers.currentDate.totalAllTrevpar,
         totalAllGiroPreviousData: previousBigNumbers.currentDate.totalAllGiro,
-        totalAverageOccupationTimePreviousData: previousBigNumbers.currentDate.totalAverageOccupationTime,
+        totalAverageOccupationTimePreviousData:
+          previousBigNumbers.currentDate.totalAverageOccupationTime,
       },
       monthlyForecast,
     };
@@ -433,7 +440,10 @@ export class CompanyService {
 
     if (groupByMonth) {
       // Agrupar por mês: gera array de meses no formato MM/YYYY
-      while (currentDate.isBefore(userEndDate, 'month') || currentDate.isSame(userEndDate, 'month')) {
+      while (
+        currentDate.isBefore(userEndDate, 'month') ||
+        currentDate.isSame(userEndDate, 'month')
+      ) {
         periodsArray.push(currentDate.format('MM/YYYY'));
         currentDate.add(1, 'month');
       }
@@ -1286,9 +1296,8 @@ export class CompanyService {
 
         // Tempo disponível = total de suítes × dias × 86400 segundos
         const totalAvailableTime = totalSuites * daysInPeriod * 86400;
-        const occupancyRate = totalAvailableTime > 0
-          ? (totalOccupiedTime / totalAvailableTime) * 100
-          : 0;
+        const occupancyRate =
+          totalAvailableTime > 0 ? (totalOccupiedTime / totalAvailableTime) * 100 : 0;
         return Number(occupancyRate.toFixed(2));
       }),
     };

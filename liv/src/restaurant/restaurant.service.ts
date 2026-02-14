@@ -95,7 +95,8 @@ export class RestaurantService {
 
       // Projeções
       const forecastValue = monthlyTotalValue + dailyAverageValue * remainingDays;
-      const forecastSalesRevenue = monthlyTotalSalesRevenue + dailyAverageSalesRevenue * remainingDays;
+      const forecastSalesRevenue =
+        monthlyTotalSalesRevenue + dailyAverageSalesRevenue * remainingDays;
       const forecastSales = monthlyTotalSales + dailyAverageSales * remainingDays;
 
       // Métricas recalculadas
@@ -164,7 +165,11 @@ export class RestaurantService {
 
     // Formatação segura de datas usando QueryUtilsService
     const startForDate = moment.utc(startDate).set({ hour: 6, minute: 0, second: 0 }).toDate();
-    const endForDate = moment.utc(endDate).add(1, 'day').set({ hour: 5, minute: 59, second: 59 }).toDate();
+    const endForDate = moment
+      .utc(endDate)
+      .add(1, 'day')
+      .set({ hour: 5, minute: 59, second: 59 })
+      .toDate();
 
     const formattedStart = this.queryUtils.formatDateToSQL(startForDate);
     const formattedEnd = this.queryUtils.formatDateToSQL(endForDate);
@@ -603,9 +608,7 @@ export class RestaurantService {
         const gross = Number(row.totalGross) || 0;
         const discount = Number(row.desconto) || 0;
         const abTotal = Number(row.abTotal) || 0;
-        const discountProportion = gross > 0
-          ? (discount * abTotal) / gross
-          : 0;
+        const discountProportion = gross > 0 ? (discount * abTotal) / gross : 0;
         const netAB = abTotal - discountProportion;
 
         totalGrossRevenue += gross;

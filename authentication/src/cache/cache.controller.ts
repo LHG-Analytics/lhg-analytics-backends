@@ -4,7 +4,14 @@
  * Usa ModuleRef para lazy loading e evitar dependência circular
  */
 
-import { Controller, Post, HttpCode, HttpStatus, Logger, Header } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Header,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { ModuleRef } from '@nestjs/core';
@@ -76,7 +83,8 @@ export class CacheController {
   @Header('Content-Type', 'application/json')
   @ApiOperation({
     summary: 'Cache Warmup',
-    description: 'Popula o cache com KPIs dos períodos principais. Chamado pelo GitHub Actions às 6h.',
+    description:
+      'Popula o cache com KPIs dos períodos principais. Chamado pelo GitHub Actions às 6h.',
   })
   @ApiResponse({ status: 200, description: 'Cache warmup concluído' })
   async warmup(): Promise<WarmupResult> {
@@ -116,20 +124,48 @@ export class CacheController {
 
     // Configuração dos serviços para warmup
     const servicesConfig = [
-      { name: 'company', serviceName: 'company' as const, token: CompanyMultitenantService, method: 'getUnifiedKpis' },
-      { name: 'bookings', serviceName: 'bookings' as const, token: BookingsMultitenantService, method: 'getUnifiedKpis' },
-      { name: 'restaurant', serviceName: 'restaurant' as const, token: RestaurantMultitenantService, method: 'getUnifiedKpis' },
-      { name: 'governance', serviceName: 'governance' as const, token: GovernanceMultitenantService, method: 'getUnifiedKpis' },
+      {
+        name: 'company',
+        serviceName: 'company' as const,
+        token: CompanyMultitenantService,
+        method: 'getUnifiedKpis',
+      },
+      {
+        name: 'bookings',
+        serviceName: 'bookings' as const,
+        token: BookingsMultitenantService,
+        method: 'getUnifiedKpis',
+      },
+      {
+        name: 'restaurant',
+        serviceName: 'restaurant' as const,
+        token: RestaurantMultitenantService,
+        method: 'getUnifiedKpis',
+      },
+      {
+        name: 'governance',
+        serviceName: 'governance' as const,
+        token: GovernanceMultitenantService,
+        method: 'getUnifiedKpis',
+      },
     ];
 
     // Unidades para popular cache específico (além do consolidado)
-    const unitKeys: UnitKey[] = ['lush_ipiranga', 'lush_lapa', 'tout', 'andar_de_cima', 'liv'];
+    const unitKeys: UnitKey[] = [
+      'lush_ipiranga',
+      'lush_lapa',
+      'tout',
+      'andar_de_cima',
+      'liv',
+    ];
 
     // Executa warmup para cada combinação de serviço x período x unidade
     for (const svcConfig of servicesConfig) {
       const service = this.getService(svcConfig.token);
       if (!service) {
-        this.logger.warn(`Serviço ${svcConfig.name} não encontrado, pulando...`);
+        this.logger.warn(
+          `Serviço ${svcConfig.name} não encontrado, pulando...`,
+        );
         continue;
       }
 
@@ -140,11 +176,14 @@ export class CacheController {
           const result = await this.cacheService.getOrCalculate(
             svcConfig.serviceName,
             period.period,
-            () => (service as any)[svcConfig.method](
-              moment(period.start).format('DD/MM/YYYY'),
-              moment(period.end).format('DD/MM/YYYY'),
-            ),
-            period.period === CachePeriodEnum.CUSTOM ? { start: period.start, end: period.end } : undefined,
+            () =>
+              (service as any)[svcConfig.method](
+                moment(period.start).format('DD/MM/YYYY'),
+                moment(period.end).format('DD/MM/YYYY'),
+              ),
+            period.period === CachePeriodEnum.CUSTOM
+              ? { start: period.start, end: period.end }
+              : undefined,
             undefined, // Sem unitKey = cache consolidado
           );
 
@@ -161,8 +200,11 @@ export class CacheController {
             `${resultKey}: ${result.fromCache ? 'CACHE HIT' : `CALCULATED (${result.calculationTime}ms)`}`,
           );
         } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          this.logger.error(`${svcConfig.name}:${period.name}:consolidated - ERROR - ${errorMsg}`);
+          const errorMsg =
+            error instanceof Error ? error.message : 'Unknown error';
+          this.logger.error(
+            `${svcConfig.name}:${period.name}:consolidated - ERROR - ${errorMsg}`,
+          );
           results.push({
             service: svcConfig.name,
             period: period.name,
@@ -180,11 +222,14 @@ export class CacheController {
             const result = await this.cacheService.getOrCalculate(
               svcConfig.serviceName,
               period.period,
-              () => (service as any)[svcConfig.method](
-                moment(period.start).format('DD/MM/YYYY'),
-                moment(period.end).format('DD/MM/YYYY'),
-              ),
-              period.period === CachePeriodEnum.CUSTOM ? { start: period.start, end: period.end } : undefined,
+              () =>
+                (service as any)[svcConfig.method](
+                  moment(period.start).format('DD/MM/YYYY'),
+                  moment(period.end).format('DD/MM/YYYY'),
+                ),
+              period.period === CachePeriodEnum.CUSTOM
+                ? { start: period.start, end: period.end }
+                : undefined,
               unitKey, // Cache específico da unidade
             );
 
@@ -201,8 +246,11 @@ export class CacheController {
               `${resultKey}: ${result.fromCache ? 'CACHE HIT' : `CALCULATED (${result.calculationTime}ms)`}`,
             );
           } catch (error) {
-            const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-            this.logger.error(`${svcConfig.name}:${period.name}:${unitKey} - ERROR - ${errorMsg}`);
+            const errorMsg =
+              error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(
+              `${svcConfig.name}:${period.name}:${unitKey} - ERROR - ${errorMsg}`,
+            );
             results.push({
               service: svcConfig.name,
               period: period.name,

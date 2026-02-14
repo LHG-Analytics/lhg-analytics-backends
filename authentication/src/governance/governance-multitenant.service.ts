@@ -81,10 +81,8 @@ export class GovernanceMultitenantService {
     );
 
     // Calcula período anterior (mesma duração, imediatamente antes)
-    const { previousStart, previousEnd } = this.dateUtilsService.calculatePreviousPeriod(
-      startDate,
-      endDate,
-    );
+    const { previousStart, previousEnd } =
+      this.dateUtilsService.calculatePreviousPeriod(startDate, endDate);
 
     // Calcula período do mês atual para forecast (dia 1 às 06:00 até ontem às 05:59:59)
     const {
@@ -96,26 +94,39 @@ export class GovernanceMultitenantService {
     } = this.dateUtilsService.calculateCurrentMonthPeriod();
 
     // Calcula total de dias do período selecionado
-    const totalDaysInPeriod = this.dateUtilsService.calculateTotalDays(startDate, endDate);
-    const previousDays = this.dateUtilsService.calculateTotalDays(previousStart, previousEnd);
-    const monthlyDays = this.dateUtilsService.calculateTotalDays(monthStart, monthEnd);
+    const totalDaysInPeriod = this.dateUtilsService.calculateTotalDays(
+      startDate,
+      endDate,
+    );
+    const previousDays = this.dateUtilsService.calculateTotalDays(
+      previousStart,
+      previousEnd,
+    );
+    const monthlyDays = this.dateUtilsService.calculateTotalDays(
+      monthStart,
+      monthEnd,
+    );
 
     // Executa queries em paralelo para cada unidade (período atual + anterior + mês atual para forecast)
     // Limita a 2 unidades simultâneas para evitar sobrecarga do banco de dados
-    const unitDataTasks = connectedUnits.map((unit) =>
-      () => this.fetchUnitKpis(
-        unit,
-        startDate,
-        endDate,
-        previousStart,
-        previousEnd,
-        monthStart,
-        monthEnd,
-        totalDaysInPeriod,
-      ),
+    const unitDataTasks = connectedUnits.map(
+      (unit) => () =>
+        this.fetchUnitKpis(
+          unit,
+          startDate,
+          endDate,
+          previousStart,
+          previousEnd,
+          monthStart,
+          monthEnd,
+          totalDaysInPeriod,
+        ),
     );
 
-    const unitResults = await this.concurrencyUtils.executeWithLimit(unitDataTasks, 2);
+    const unitResults = await this.concurrencyUtils.executeWithLimit(
+      unitDataTasks,
+      2,
+    );
     const validResults = unitResults.filter(
       (r) => r !== null,
     ) as UnitGovernanceKpiData[];
@@ -160,26 +171,31 @@ export class GovernanceMultitenantService {
       // Executa todas as queries em paralelo para a unidade (atual + anterior + mês atual + por dia)
       // Governance tem menos queries, então pode usar limite maior
       const queryTasks = [
-        () => this.databaseService.query(
-          unit,
-          getGovernanceBigNumbersSQL(unit, startDate, endDate),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getGovernanceBigNumbersSQL(unit, previousStart, previousEnd),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getGovernanceBigNumbersSQL(unit, monthStart, monthEnd),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getShiftCleaningSQL(unit, startDate, endDate),
-        ),
-        () => this.databaseService.query(
-          unit,
-          getShiftCleaningByDaySQL(unit, startDate, endDate),
-        ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getGovernanceBigNumbersSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getGovernanceBigNumbersSQL(unit, previousStart, previousEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getGovernanceBigNumbersSQL(unit, monthStart, monthEnd),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getShiftCleaningSQL(unit, startDate, endDate),
+          ),
+        () =>
+          this.databaseService.query(
+            unit,
+            getShiftCleaningByDaySQL(unit, startDate, endDate),
+          ),
       ];
 
       const [
@@ -200,7 +216,10 @@ export class GovernanceMultitenantService {
 
       // Processa BigNumbers anterior
       const bnPrev = bigNumbersPrevResult.rows[0] || {};
-      const previousDays = this.dateUtilsService.calculateTotalDays(previousStart, previousEnd);
+      const previousDays = this.dateUtilsService.calculateTotalDays(
+        previousStart,
+        previousEnd,
+      );
       const bigNumbersPrevious: UnitGovernanceBigNumbers = {
         totalCleanings: parseInt(bnPrev.total_cleanings) || 0,
         totalInspections: parseInt(bnPrev.total_inspections) || 0,
@@ -209,7 +228,10 @@ export class GovernanceMultitenantService {
 
       // Processa BigNumbers do mês atual (para forecast)
       const bnMonthly = bigNumbersMonthlyResult.rows[0] || {};
-      const monthlyDays = this.dateUtilsService.calculateTotalDays(monthStart, monthEnd);
+      const monthlyDays = this.dateUtilsService.calculateTotalDays(
+        monthStart,
+        monthEnd,
+      );
       const bigNumbersMonthly: UnitGovernanceBigNumbers = {
         totalCleanings: parseInt(bnMonthly.total_cleanings) || 0,
         totalInspections: parseInt(bnMonthly.total_inspections) || 0,
