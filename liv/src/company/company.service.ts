@@ -581,7 +581,7 @@ export class CompanyService {
       WITH receita_consumo AS (
         -- Calcula receita de consumo BRUTA (sem aplicar desconto aqui)
         -- O desconto de consumo já está incluído em locacaoapartamento.desconto
-        -- Filtrando apenas locações de apartamentos das categorias corretas (10,11,12,15,16,17,18,19,24)
+        -- Filtrando apenas locações de apartamentos das categorias corretas (1,2,3,4,5,7,8,9,10,11)
         SELECT
           la.id_apartamentostate as id_locacao,
           COALESCE(SUM(
@@ -598,7 +598,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND sei.cancelado IS NULL
-          AND ca_apt.id IN (10,11,12,15,16,17,18,19,24)
+          AND ca_apt.id IN (1,2,3,4,5,7,8,9,10,11)
         GROUP BY la.id_apartamentostate, vl.id_locacaoapartamento
       )
       SELECT
@@ -629,7 +629,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca_apt.id IN (10,11,12,15,16,17,18,19,24)
+        AND ca_apt.id IN (1,2,3,4,5,7,8,9,10,11)
     `;
 
     // SQL para vendas diretas - CORRIGIDO para dividir desconto proporcionalmente entre itens
@@ -664,7 +664,7 @@ export class CompanyService {
       SELECT COUNT(*) as total_suites
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
+      WHERE ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
         AND a.dataexclusao IS NULL
     `;
 
@@ -691,7 +691,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND sei.cancelado IS NULL
-          AND ca_apt.id IN (10,11,12,15,16,17,18,19,24)
+          AND ca_apt.id IN (1,2,3,4,5,7,8,9,10,11)
         GROUP BY CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -806,7 +806,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND sei.cancelado IS NULL
-          AND ca_apt.id IN (10,11,12,15,16,17,18,19,24)
+          AND ca_apt.id IN (1,2,3,4,5,7,8,9,10,11)
         GROUP BY la.id_apartamentostate
       )
       SELECT
@@ -870,7 +870,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND sei.cancelado IS NULL
-          AND ca_apt.id IN (10,11,12,15,16,17,18,19,24)
+          AND ca_apt.id IN (1,2,3,4,5,7,8,9,10,11)
         GROUP BY la.id_apartamentostate
       )
       SELECT
@@ -889,7 +889,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
+        AND ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
       GROUP BY ca.descricao
       ORDER BY category_revenue DESC
     `;
@@ -908,7 +908,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
+        AND ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -955,7 +955,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND sei.cancelado IS NULL
-          AND ca_apt.id IN (10,11,12,15,16,17,18,19,24)
+          AND ca_apt.id IN (1,2,3,4,5,7,8,9,10,11)
         GROUP BY la.id_apartamentostate
       )
       SELECT
@@ -1000,7 +1000,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
+        AND ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
       GROUP BY ca.descricao, CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -1014,7 +1014,7 @@ export class CompanyService {
         COUNT(a.id) as total_suites_in_category
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
+      WHERE ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
         AND a.dataexclusao IS NULL
       GROUP BY ca.descricao
     `;
@@ -1036,7 +1036,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
+        AND ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -1059,7 +1059,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('LUSH', 'LUSH POP', 'LUSH HIDRO', 'LUSH LOUNGE', 'LUSH SPA', 'LUSH CINE', 'LUSH SPLASH', 'LUSH SPA SPLASH', 'CASA LUSH')
+        AND ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
