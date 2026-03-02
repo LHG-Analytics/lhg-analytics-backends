@@ -79,17 +79,40 @@ export class CacheController {
    */
   @Post('warmup')
   @Public()
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.ACCEPTED)
   @Header('Content-Type', 'application/json')
   @ApiOperation({
     summary: 'Cache Warmup',
     description:
       'Popula o cache com KPIs dos períodos principais. Chamado pelo GitHub Actions às 6h.',
   })
-  @ApiResponse({ status: 200, description: 'Cache warmup concluído' })
-  async warmup(): Promise<WarmupResult> {
+  @ApiResponse({ status: 202, description: 'Cache warmup disparado em background' })
+  async warmup(): Promise<{ started: boolean; timestamp: string }> {
+    const timestamp = new Date().toISOString();
+    this.logger.log(
+      `Recebida requisição de cache warmup (async - Authentication) em ${timestamp}`,
+    );
+
+    this.runWarmupInternal()
+      .then(() => {
+        this.logger.log('Cache warmup (Authentication) concluído em background.');
+      })
+      .catch((error) => {
+        this.logger.error(
+          'Erro no cache warmup (Authentication) em background:',
+          error,
+        );
+      });
+
+    return {
+      started: true,
+      timestamp,
+    };
+  }
+
+  private async runWarmupInternal(): Promise<void> {
     const startTime = Date.now();
-    this.logger.log('Iniciando cache warmup (Authentication)...');
+    this.logger.log('Iniciando cache warmup (Authentication - background)...');
 
     const yesterday = moment().subtract(1, 'day');
     const results: WarmupResult['results'] = [];
@@ -277,15 +300,27 @@ export class CacheController {
       totalTimeMs: totalTime,
     };
 
+    const summary: WarmupResult['summary'] = {
+      total: results.length,
+      fromCache,
+      calculated,
+      errors,
+      totalTimeMs: totalTime,
+    };
+
     this.logger.log(
-      `Cache warmup concluído: ${calculated} calculados, ${fromCache} do cache, ${errors} erros (${totalTime}ms)`,
+      `Cache warmup (Authentication) concluído em background: ${calculated} calculados, ${fromCache} do cache, ${errors} erros (${totalTime}ms)`,
     );
 
-    return {
+    const response: WarmupResult = {
       timestamp: new Date().toISOString(),
       success: errors === 0,
       results,
       summary,
     };
+
+    this.logger.debug(
+      `Resumo do cache warmup (Authentication - background): ${JSON.stringify(response.summary)}`,
+    );
   }
 }
