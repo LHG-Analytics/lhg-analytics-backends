@@ -217,14 +217,6 @@ export class CacheController {
       totalTimeMs: totalTime,
     };
 
-    const summary: WarmupResult['summary'] = {
-      total: results.length,
-      fromCache,
-      calculated,
-      errors,
-      totalTimeMs: totalTime,
-    };
-
     this.logger.log(
       `Cache warmup concluído (background): ${calculated} calculados, ${fromCache} do cache, ${errors} erros (${totalTime}ms)`,
     );
