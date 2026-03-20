@@ -2284,15 +2284,47 @@ export class CompanyService {
         FROM day_of_week_mapping
         GROUP BY suite_category_name, day_of_week, day_of_week_num
       ),
-      total_by_day AS (
-        -- Total por dia da semana (todas as categorias)
+      revenue_by_day AS (
+        -- Receita por dia da semana específico (todas as categorias)
         SELECT
-          day_of_week,
-          day_of_week_num,
-          SUM(total_rentals) as grand_total_rentals,
-          SUM(total_revenue) as grand_total_revenue
-        FROM aggregated_by_category_day
-        GROUP BY day_of_week, day_of_week_num
+          EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          ) as day_of_week_num,
+          CASE EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          )
+            WHEN 0 THEN 'domingo'
+            WHEN 1 THEN 'segunda-feira'
+            WHEN 2 THEN 'terça-feira'
+            WHEN 3 THEN 'quarta-feira'
+            WHEN 4 THEN 'quinta-feira'
+            WHEN 5 THEN 'sexta-feira'
+            WHEN 6 THEN 'sábado'
+          END as day_of_week,
+          -- Receita de locação líquida (valorliquidolocação já contém desconto aplicado)
+          SUM(
+            COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)
+          ) as total_day_revenue
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
+          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND ca.id IN (10,11,12,15,16,17,18,19,24)
+          GROUP BY EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          )
       ),
       days_count_in_period AS (
         -- Conta quantos dias de cada dia da semana existem no período
@@ -2328,8 +2360,8 @@ export class CompanyService {
         acd.total_revenue,
         sc.total_suites_in_category,
         dc.days_count,
-        td.grand_total_rentals,
-        td.grand_total_revenue,
+        rd.total_day_revenue as grand_total_rentals,
+        rd.total_day_revenue as grand_total_revenue,
         -- Cálculos para REVPAR por categoria
         CASE
           WHEN sc.total_suites_in_category > 0 AND dc.days_count > 0 THEN
@@ -2339,13 +2371,13 @@ export class CompanyService {
         -- Cálculos para REVPAR total
         CASE
           WHEN ${totalSuites}::DECIMAL > 0 AND dc.days_count > 0 THEN
-            (td.grand_total_revenue::DECIMAL / (${totalSuites}::DECIMAL * dc.days_count))
+            (rd.total_day_revenue::DECIMAL / (${totalSuites}::DECIMAL * dc.days_count))
           ELSE 0
         END as total_revpar
       FROM aggregated_by_category_day acd
       INNER JOIN suite_counts sc ON acd.suite_category_name = sc.suite_category_name
       INNER JOIN days_count_in_period dc ON acd.day_of_week_num = dc.day_of_week_num
-      INNER JOIN total_by_day td ON acd.day_of_week_num = td.day_of_week_num
+      INNER JOIN revenue_by_day rd ON acd.day_of_week_num = rd.day_of_week_num
       ORDER BY acd.suite_category_name, acd.day_of_week_num
     `;
 
@@ -2618,15 +2650,47 @@ export class CompanyService {
         FROM day_of_week_mapping
         GROUP BY suite_category_name, day_of_week, day_of_week_num
       ),
-      total_by_day AS (
-        -- Total por dia da semana (todas as categorias)
+      revenue_by_day AS (
+        -- Receita por dia da semana específico (todas as categorias)
         SELECT
-          day_of_week,
-          day_of_week_num,
-          SUM(total_rentals) as grand_total_rentals,
-          SUM(total_revenue) as grand_total_revenue
-        FROM aggregated_by_category_day
-        GROUP BY day_of_week, day_of_week_num
+          EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          ) as day_of_week_num,
+          CASE EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          )
+            WHEN 0 THEN 'domingo'
+            WHEN 1 THEN 'segunda-feira'
+            WHEN 2 THEN 'terça-feira'
+            WHEN 3 THEN 'quarta-feira'
+            WHEN 4 THEN 'quinta-feira'
+            WHEN 5 THEN 'sexta-feira'
+            WHEN 6 THEN 'sábado'
+          END as day_of_week,
+          -- Receita de locação líquida (valorliquidolocação já contém desconto aplicado)
+          SUM(
+            COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)
+          ) as total_day_revenue
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicialdaocupacao >= ${formattedStart}::timestamp
+          AND la.datainicialdaocupacao <= ${formattedEnd}::timestamp
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND ca.id IN (10,11,12,15,16,17,18,19,24)
+          GROUP BY EXTRACT(DOW FROM
+            CASE
+              WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
+              ELSE la.datainicialdaocupacao
+            END
+          )
       ),
       days_count_in_period AS (
         -- Conta quantos dias de cada dia da semana existem no período
@@ -2662,8 +2726,8 @@ export class CompanyService {
         acd.total_revenue,
         sc.total_suites_in_category,
         dc.days_count,
-        td.grand_total_rentals,
-        td.grand_total_revenue,
+        rd.total_day_revenue as grand_total_rentals,
+        rd.total_day_revenue as grand_total_revenue,
         -- Cálculos para GIRO por categoria
         CASE
           WHEN sc.total_suites_in_category > 0 AND dc.days_count > 0 THEN
@@ -2685,13 +2749,13 @@ export class CompanyService {
         -- Cálculos para REVPAR total
         CASE
           WHEN ${totalSuites}::DECIMAL > 0 AND dc.days_count > 0 THEN
-            (td.grand_total_revenue::DECIMAL / (${totalSuites}::DECIMAL * dc.days_count))
+            (rd.total_day_revenue::DECIMAL / (${totalSuites}::DECIMAL * dc.days_count))
           ELSE 0
         END as total_revpar
       FROM aggregated_by_category_day acd
       INNER JOIN suite_counts sc ON acd.suite_category_name = sc.suite_category_name
       INNER JOIN days_count_in_period dc ON acd.day_of_week_num = dc.day_of_week_num
-      INNER JOIN total_by_day td ON acd.day_of_week_num = td.day_of_week_num
+      INNER JOIN revenue_by_day rd ON acd.day_of_week_num = rd.day_of_week_num
       ORDER BY acd.suite_category_name, acd.day_of_week_num
     `;
 
