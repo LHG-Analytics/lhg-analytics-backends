@@ -6,7 +6,7 @@
 
 import { Controller, Post, Get, Body, HttpCode, HttpStatus, Logger, Header } from '@nestjs/common';
 import { Public } from '../auth/public.decorator';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { ModuleRef } from '@nestjs/core';
 import * as moment from 'moment-timezone';
 import { KpiCacheService, CachePeriodEnum } from './';
@@ -117,6 +117,14 @@ export class CacheController {
       'Invalida e recalcula entradas específicas. Parâmetros opcionais: service (company|bookings|restaurant|governance) e period (LAST_7_D|LAST_MONTH|THIS_MONTH|YEAR_TO_DATE). Sem parâmetros, recalcula tudo.',
   })
   @ApiResponse({ status: 202, description: 'Cache refresh disparado em background' })
+  @ApiBody({
+    schema: {
+      properties: {
+        service: { type: 'string', enum: ['company', 'bookings', 'restaurant', 'governance'], description: 'Serviço a recalcular (omitir = todos)' },
+        period: { type: 'string', enum: ['LAST_7_D', 'LAST_MONTH', 'THIS_MONTH', 'YEAR_TO_DATE'], description: 'Período a recalcular (omitir = todos)' },
+      },
+    },
+  })
   async refresh(
     @Body() body: { service?: string; period?: string },
   ): Promise<{ started: boolean; timestamp: string }> {
