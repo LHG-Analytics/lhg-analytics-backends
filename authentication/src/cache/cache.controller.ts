@@ -116,9 +116,9 @@ export class CacheController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Status do Cache (Consolidado)',
+    summary: 'Status do Cache',
     description:
-      'Retorna o status atual de cada entrada no cache, com service, unit (consolidated | lush_ipiranga | ...), cachedAt, expiresAt e tempo restante.',
+      'Retorna o status atual de cada entrada no cache, com service, unit (lush_ipiranga | lush_lapa | tout | andar_de_cima | liv | consolidated), cachedAt, expiresAt e tempo restante.',
   })
   @ApiResponse({ status: 200, description: 'Status do cache retornado com sucesso' })
   getCacheStatus() {
@@ -129,9 +129,9 @@ export class CacheController {
   @Public()
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
-    summary: 'Refresh Seletivo do Cache (Consolidado)',
+    summary: 'Refresh Seletivo do Cache',
     description:
-      'Invalida e recalcula entradas específicas. Parâmetros opcionais: service (company|bookings|restaurant|governance), period (LAST_7_D|LAST_MONTH|THIS_MONTH|YEAR_TO_DATE), unit (consolidated|lush_ipiranga|lush_lapa|tout|andar_de_cima|liv). Sem parâmetros, recalcula tudo.',
+      'Invalida e recalcula entradas específicas. Parâmetros opcionais: service (company|bookings|restaurant|governance), period (LAST_7_D|LAST_MONTH|THIS_MONTH|YEAR_TO_DATE), unit (lush_ipiranga|lush_lapa|tout|andar_de_cima|liv). Sem parâmetros, recalcula tudo.',
   })
   @ApiResponse({ status: 202, description: 'Cache refresh disparado em background' })
   @ApiBody({
