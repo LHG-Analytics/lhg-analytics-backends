@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Warmup Lush Ipiranga
+        id: lush_ipiranga
+        continue-on-error: true
         run: |
           curl -X POST "${{ secrets.LUSH_IPIRANGA_URL }}/cache/warmup" \
             -H "Content-Type: application/json" \
@@ -21,6 +23,8 @@ jobs:
             --fail
 
       - name: Warmup Lush Lapa
+        id: lush_lapa
+        continue-on-error: true
         run: |
           curl -X POST "${{ secrets.LUSH_LAPA_URL }}/cache/warmup" \
             -H "Content-Type: application/json" \
@@ -28,6 +32,8 @@ jobs:
             --fail
 
       - name: Warmup Andar de Cima
+        id: andar_de_cima
+        continue-on-error: true
         run: |
           curl -X POST "${{ secrets.ANDAR_DE_CIMA_URL }}/cache/warmup" \
             -H "Content-Type: application/json" \
@@ -35,6 +41,8 @@ jobs:
             --fail
 
       - name: Warmup Tout
+        id: tout
+        continue-on-error: true
         run: |
           curl -X POST "${{ secrets.TOUT_URL }}/cache/warmup" \
             -H "Content-Type: application/json" \
@@ -42,6 +50,8 @@ jobs:
             --fail
 
       - name: Warmup Liv
+        id: liv
+        continue-on-error: true
         run: |
           curl -X POST "${{ secrets.LIV_URL }}/cache/warmup" \
             -H "Content-Type: application/json" \
@@ -49,8 +59,34 @@ jobs:
             --fail
 
       - name: Warmup Authentication
+        id: authentication
+        continue-on-error: true
         run: |
           curl -X POST "${{ secrets.AUTHENTICATION_URL }}/cache/warmup" \
             -H "Content-Type: application/json" \
             --max-time 180 \
             --fail
+
+      - name: Sumário dos resultados
+        if: always()
+        run: |
+          echo "## Cache Warmup - Resultados" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lush Ipiranga | ${{ steps.lush_ipiranga.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lush Lapa | ${{ steps.lush_lapa.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Andar de Cima | ${{ steps.andar_de_cima.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tout | ${{ steps.tout.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Liv | ${{ steps.liv.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Authentication | ${{ steps.authentication.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
+
+          # Falha o workflow se algum backend falhou (para notificação no GitHub)
+          if [[ "${{ steps.lush_ipiranga.outcome }}" == "failure" || \
+                "${{ steps.lush_lapa.outcome }}" == "failure" || \
+                "${{ steps.andar_de_cima.outcome }}" == "failure" || \
+                "${{ steps.tout.outcome }}" == "failure" || \
+                "${{ steps.liv.outcome }}" == "failure" || \
+                "${{ steps.authentication.outcome }}" == "failure" ]]; then
+            echo "⚠️ Um ou mais backends falharam no warmup."
+            exit 1
+          fi
