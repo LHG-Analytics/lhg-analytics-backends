@@ -7,6 +7,8 @@
 import {
   Controller,
   Post,
+  Get,
+  Body,
   HttpCode,
   HttpStatus,
   Logger,
@@ -110,15 +112,64 @@ export class CacheController {
     };
   }
 
-  private async runWarmupInternal(): Promise<void> {
+  @Get('status')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Status do Cache (Consolidado)',
+    description:
+      'Retorna o status atual de cada entrada no cache, com service, unit (consolidated | lush_ipiranga | ...), cachedAt, expiresAt e tempo restante.',
+  })
+  @ApiResponse({ status: 200, description: 'Status do cache retornado com sucesso' })
+  getCacheStatus() {
+    return this.cacheService.getDetailedStatus();
+  }
+
+  @Post('refresh')
+  @Public()
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Refresh Seletivo do Cache (Consolidado)',
+    description:
+      'Invalida e recalcula entradas específicas. Parâmetros opcionais: service (company|bookings|restaurant|governance), period (LAST_7_D|LAST_MONTH|THIS_MONTH|YEAR_TO_DATE), unit (consolidated|lush_ipiranga|lush_lapa|tout|andar_de_cima|liv). Sem parâmetros, recalcula tudo.',
+  })
+  @ApiResponse({ status: 202, description: 'Cache refresh disparado em background' })
+  async refresh(
+    @Body() body: { service?: string; period?: string; unit?: string },
+  ): Promise<{ started: boolean; timestamp: string }> {
+    const timestamp = new Date().toISOString();
+    const { service, period, unit } = body || {};
+    this.logger.log(
+      `Recebida requisição de cache refresh (Authentication): service=${service || 'all'}, period=${period || 'all'}, unit=${unit || 'all'}`,
+    );
+
+    this.runWarmupInternal(service, period, unit)
+      .then(() => {
+        this.logger.log('Cache refresh (Authentication) concluído em background.');
+      })
+      .catch((error) => {
+        this.logger.error('Erro no cache refresh (Authentication) em background:', error);
+      });
+
+    return { started: true, timestamp };
+  }
+
+  private async runWarmupInternal(
+    serviceFilter?: string,
+    periodFilter?: string,
+    unitFilter?: string,
+  ): Promise<void> {
     const startTime = Date.now();
-    this.logger.log('Iniciando cache warmup (Authentication - background)...');
+    const isRefresh = !!(serviceFilter || periodFilter || unitFilter);
+    this.logger.log(
+      `Iniciando cache ${isRefresh ? 'refresh' : 'warmup'} (Authentication - background)...`,
+    );
 
     const yesterday = moment().subtract(1, 'day');
     const results: WarmupResult['results'] = [];
 
     // Períodos a serem calculados (até ontem)
-    const periods = [
+    const allPeriods = [
       {
         name: 'LAST_7_D',
         period: CachePeriodEnum.LAST_7_D,
@@ -146,7 +197,7 @@ export class CacheController {
     ];
 
     // Configuração dos serviços para warmup
-    const servicesConfig = [
+    const allServicesConfig = [
       {
         name: 'company',
         serviceName: 'company' as const,
@@ -173,8 +224,8 @@ export class CacheController {
       },
     ];
 
-    // Unidades para popular cache específico (além do consolidado)
-    const unitKeys: UnitKey[] = [
+    // Todas as unidades para cache específico (além do consolidado)
+    const allUnitKeys: UnitKey[] = [
       'lush_ipiranga',
       'lush_lapa',
       'tout',
@@ -182,7 +233,34 @@ export class CacheController {
       'liv',
     ];
 
-    // Executa warmup para cada combinação de serviço x período x unidade
+    const periods = periodFilter ? allPeriods.filter((p) => p.name === periodFilter) : allPeriods;
+    const servicesConfig = serviceFilter
+      ? allServicesConfig.filter((s) => s.name === serviceFilter)
+      : allServicesConfig;
+
+    // Determina quais unidades recalcular
+    const includeConsolidated = !unitFilter || unitFilter === 'consolidated';
+    const unitKeys = unitFilter && unitFilter !== 'consolidated'
+      ? allUnitKeys.filter((u) => u === unitFilter)
+      : allUnitKeys;
+
+    // Para refresh: invalida as entradas antes de recalcular
+    if (isRefresh) {
+      for (const svcConfig of servicesConfig) {
+        if (!unitFilter) {
+          // Sem filtro de unidade: invalida tudo (consolidado + todas as unidades)
+          await this.cacheService.invalidateService(svcConfig.serviceName);
+        } else if (unitFilter === 'consolidated') {
+          // Só o consolidado
+          await this.cacheService.invalidateConsolidated(svcConfig.serviceName);
+        } else {
+          // Só a unidade específica
+          await this.cacheService.invalidateByUnit(svcConfig.serviceName, unitFilter);
+        }
+      }
+    }
+
+    // Executa warmup/refresh para cada combinação de serviço x período x unidade
     for (const svcConfig of servicesConfig) {
       const service = this.getService(svcConfig.token);
       if (!service) {
@@ -194,7 +272,7 @@ export class CacheController {
 
       for (const period of periods) {
         // Primeiro: cache consolidado (para ADMIN/LHG)
-        try {
+        if (includeConsolidated) try {
           const resultKey = `${svcConfig.name}:${period.name}:consolidated`;
           const result = await this.cacheService.getOrCalculate(
             svcConfig.serviceName,

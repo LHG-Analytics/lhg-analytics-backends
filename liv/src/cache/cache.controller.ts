@@ -4,7 +4,7 @@
  * Usa Injector para lazy loading e evitar dependência circular
  */
 
-import { Controller, Post, HttpCode, HttpStatus, Logger, Header } from '@nestjs/common';
+import { Controller, Post, Get, Body, HttpCode, HttpStatus, Logger, Header } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Public } from '../auth/public.decorator';
 import { ModuleRef } from '@nestjs/core';
@@ -95,15 +95,58 @@ export class CacheController {
     };
   }
 
-  private async runWarmupInternal(): Promise<void> {
+  @Get('status')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Status do Cache',
+    description:
+      'Retorna o status atual de cada entrada no cache, com cachedAt, expiresAt, tempo decorrido e tempo restante.',
+  })
+  @ApiResponse({ status: 200, description: 'Status do cache retornado com sucesso' })
+  getCacheStatus() {
+    return this.cacheService.getDetailedStatus();
+  }
+
+  @Post('refresh')
+  @Public()
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Refresh Seletivo do Cache',
+    description:
+      'Invalida e recalcula entradas específicas. Parâmetros opcionais: service (company|bookings|restaurant|governance) e period (LAST_7_D|LAST_MONTH|THIS_MONTH|YEAR_TO_DATE). Sem parâmetros, recalcula tudo.',
+  })
+  @ApiResponse({ status: 202, description: 'Cache refresh disparado em background' })
+  async refresh(
+    @Body() body: { service?: string; period?: string },
+  ): Promise<{ started: boolean; timestamp: string }> {
+    const timestamp = new Date().toISOString();
+    const { service, period } = body || {};
+    this.logger.log(
+      `Recebida requisição de cache refresh: service=${service || 'all'}, period=${period || 'all'}`,
+    );
+
+    this.runWarmupInternal(service, period)
+      .then(() => {
+        this.logger.log('Cache refresh concluído em background.');
+      })
+      .catch((error) => {
+        this.logger.error('Erro no cache refresh em background:', error);
+      });
+
+    return { started: true, timestamp };
+  }
+
+  private async runWarmupInternal(serviceFilter?: string, periodFilter?: string): Promise<void> {
     const startTime = Date.now();
-    this.logger.log('Iniciando cache warmup (background)...');
+    const isRefresh = !!(serviceFilter || periodFilter);
+    this.logger.log(`Iniciando cache ${isRefresh ? 'refresh' : 'warmup'} (background)...`);
 
     const yesterday = moment().subtract(1, 'day');
     const results: WarmupResult['results'] = [];
 
     // Períodos a serem calculados (até ontem)
-    const periods = [
+    const allPeriods = [
       {
         name: 'LAST_7_D',
         period: CachePeriodEnum.LAST_7_D,
@@ -131,7 +174,7 @@ export class CacheController {
     ];
 
     // Configuração dos serviços para warmup
-    const servicesConfig = [
+    const allServicesConfig = [
       {
         name: 'company',
         serviceName: 'company' as const,
@@ -158,7 +201,19 @@ export class CacheController {
       },
     ];
 
-    // Executa warmup para cada combinação de serviço x período
+    const periods = periodFilter ? allPeriods.filter((p) => p.name === periodFilter) : allPeriods;
+    const servicesConfig = serviceFilter
+      ? allServicesConfig.filter((s) => s.name === serviceFilter)
+      : allServicesConfig;
+
+    // Para refresh: invalida as entradas antes de recalcular
+    if (isRefresh) {
+      for (const svcConfig of servicesConfig) {
+        await this.cacheService.invalidateService(svcConfig.serviceName);
+      }
+    }
+
+    // Executa warmup/refresh para cada combinação de serviço x período
     for (const svcConfig of servicesConfig) {
       const service = this.getService(svcConfig.token);
       if (!service) {

@@ -371,6 +371,52 @@ export class KpiCacheService {
   }
 
   /**
+   * Retorna o status detalhado de cada entrada no cache
+   */
+  getDetailedStatus(): {
+    items: {
+      key: string;
+      service: ServiceType;
+      period: string;
+      cachedAt: string;
+      expiresAt: string;
+      isExpired: boolean;
+      ageMinutes: number;
+      expiresInMinutes: number;
+    }[];
+    summary: { total: number; active: number; expired: number };
+  } {
+    const now = new Date();
+    const items = Array.from(this.cache.entries()).map(([key, item]) => {
+      const isExpired = now > item.expiresAt;
+      const ageMs = now.getTime() - item.cachedAt.getTime();
+      const expiresMs = item.expiresAt.getTime() - now.getTime();
+
+      return {
+        key,
+        service: item.service,
+        period: String(item.period),
+        cachedAt: item.cachedAt.toISOString(),
+        expiresAt: item.expiresAt.toISOString(),
+        isExpired,
+        ageMinutes: Math.round(ageMs / 60000),
+        expiresInMinutes: isExpired ? 0 : Math.round(expiresMs / 60000),
+      };
+    });
+
+    items.sort((a, b) => a.service.localeCompare(b.service) || a.period.localeCompare(b.period));
+
+    return {
+      items,
+      summary: {
+        total: items.length,
+        active: items.filter((i) => !i.isExpired).length,
+        expired: items.filter((i) => i.isExpired).length,
+      },
+    };
+  }
+
+  /**
    * Limpa todo o cache
    */
   clearAll(): void {

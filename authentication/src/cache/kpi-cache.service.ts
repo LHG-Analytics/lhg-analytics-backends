@@ -314,6 +314,36 @@ export class KpiCacheService {
   }
 
   /**
+   * Invalida apenas as entradas consolidadas de um serviço (sem :unit: no key)
+   */
+  async invalidateConsolidated(service: ServiceType): Promise<number> {
+    const prefix = SERVICE_PREFIXES[service];
+    const keyPrefix = `${CACHE_KEY_PREFIX}:${prefix}:`;
+    let count = 0;
+
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(keyPrefix) && !key.includes(':unit:')) {
+        this.cache.delete(key);
+        count++;
+      }
+    }
+
+    this.logger.log(
+      `Invalidados ${count} itens consolidados de cache para serviço: ${service}`,
+    );
+    return count;
+  }
+
+  /**
+   * Invalida apenas as entradas de uma unidade específica
+   */
+  async invalidateByUnit(service: ServiceType, unitKey: string): Promise<number> {
+    const prefix = SERVICE_PREFIXES[service];
+    const pattern = `${CACHE_KEY_PREFIX}:${prefix}:*:unit:${unitKey}`;
+    return this.invalidatePattern(pattern);
+  }
+
+  /**
    * Obtém métricas de um serviço
    */
   getServiceMetrics(service: ServiceType): CacheMetrics {
@@ -396,6 +426,64 @@ export class KpiCacheService {
       services,
       oldestEntry,
       newestEntry,
+    };
+  }
+
+  /**
+   * Retorna o status detalhado de cada entrada no cache
+   * Inclui unit extraída da chave para facilitar filtragem
+   */
+  getDetailedStatus(): {
+    items: {
+      key: string;
+      service: ServiceType;
+      period: string;
+      unit: string;
+      cachedAt: string;
+      expiresAt: string;
+      isExpired: boolean;
+      ageMinutes: number;
+      expiresInMinutes: number;
+    }[];
+    summary: { total: number; active: number; expired: number };
+  } {
+    const now = new Date();
+    const items = Array.from(this.cache.entries()).map(([key, item]) => {
+      const isExpired = now > item.expiresAt;
+      const ageMs = now.getTime() - item.cachedAt.getTime();
+      const expiresMs = item.expiresAt.getTime() - now.getTime();
+
+      // Extrai a unidade da chave (ex: "...unit:lush_ipiranga" → "lush_ipiranga")
+      const unitMatch = key.match(/:unit:([^:]+)$/);
+      const unit = unitMatch ? unitMatch[1] : 'consolidated';
+
+      return {
+        key,
+        service: item.service,
+        period: String(item.period),
+        unit,
+        cachedAt: item.cachedAt.toISOString(),
+        expiresAt: item.expiresAt.toISOString(),
+        isExpired,
+        ageMinutes: Math.round(ageMs / 60000),
+        expiresInMinutes: isExpired ? 0 : Math.round(expiresMs / 60000),
+      };
+    });
+
+    items.sort(
+      (a, b) =>
+        a.service.localeCompare(b.service) ||
+        a.unit.localeCompare(b.unit) ||
+        a.period.localeCompare(b.period),
+    );
+
+    return {
+      items,
+      summary: {
+        total: items.length,
+        active: items.filter((i) => !i.isExpired).length,
+        expired: items.filter((i) => i.isExpired).length,
+      },
     };
   }
 
