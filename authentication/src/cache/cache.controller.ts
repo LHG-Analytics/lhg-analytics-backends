@@ -139,7 +139,7 @@ export class CacheController {
       properties: {
         service: { type: 'string', enum: ['company', 'bookings', 'restaurant', 'governance'], description: 'Serviço a recalcular (omitir = todos)' },
         period: { type: 'string', enum: ['LAST_7_D', 'LAST_MONTH', 'THIS_MONTH', 'YEAR_TO_DATE'], description: 'Período a recalcular (omitir = todos)' },
-        unit: { type: 'string', enum: ['consolidated', 'lush_ipiranga', 'lush_lapa', 'tout', 'andar_de_cima', 'liv'], description: 'Unidade a recalcular (omitir = todas + consolidado)' },
+        unit: { type: 'string', enum: ['lush_ipiranga', 'lush_lapa', 'tout', 'andar_de_cima', 'liv'], description: 'Unidade a recalcular (omitir = todas)' },
       },
     },
   })
@@ -181,59 +181,59 @@ export class CacheController {
     const allPeriods = [
       {
         name: 'LAST_7_D',
-        period: CachePeriodEnum.LAST_7_D,
         start: moment(yesterday).startOf('day').subtract(6, 'days').toDate(),
         end: moment(yesterday).endOf('day').toDate(),
       },
       {
         name: 'LAST_MONTH',
-        period: CachePeriodEnum.LAST_MONTH,
         start: moment(yesterday).subtract(1, 'month').startOf('month').toDate(),
         end: moment(yesterday).subtract(1, 'month').endOf('month').toDate(),
       },
       {
         name: 'THIS_MONTH',
-        period: CachePeriodEnum.CUSTOM, // Usa CUSTOM para este mês
         start: moment().startOf('month').toDate(),
         end: moment(yesterday).endOf('day').toDate(),
       },
       {
         name: 'YEAR_TO_DATE',
-        period: CachePeriodEnum.YEAR_TO_DATE,
         start: moment().startOf('year').toDate(),
         end: moment(yesterday).endOf('day').toDate(),
       },
     ];
 
     // Configuração dos serviços para warmup
+    // supportsUnit: apenas company filtra dados por unidade internamente
     const allServicesConfig = [
       {
         name: 'company',
         serviceName: 'company' as const,
         token: CompanyMultitenantService,
         method: 'getUnifiedKpis',
+        supportsUnit: true,
       },
       {
         name: 'bookings',
         serviceName: 'bookings' as const,
         token: BookingsMultitenantService,
         method: 'getUnifiedKpis',
+        supportsUnit: false,
       },
       {
         name: 'restaurant',
         serviceName: 'restaurant' as const,
         token: RestaurantMultitenantService,
         method: 'getUnifiedKpis',
+        supportsUnit: false,
       },
       {
         name: 'governance',
         serviceName: 'governance' as const,
         token: GovernanceMultitenantService,
         method: 'getUnifiedKpis',
+        supportsUnit: false,
       },
     ];
 
-    // Todas as unidades para cache específico (além do consolidado)
     const allUnitKeys: UnitKey[] = [
       'lush_ipiranga',
       'lush_lapa',
@@ -247,128 +247,103 @@ export class CacheController {
       ? allServicesConfig.filter((s) => s.name === serviceFilter)
       : allServicesConfig;
 
-    // Determina quais unidades recalcular
-    const includeConsolidated = !unitFilter || unitFilter === 'consolidated';
-    const unitKeys = unitFilter && unitFilter !== 'consolidated'
+    // Se unitFilter especificado: só aquela unidade; caso contrário: todas
+    const unitKeys = unitFilter
       ? allUnitKeys.filter((u) => u === unitFilter)
       : allUnitKeys;
+    const includeConsolidated = !unitFilter;
 
     // Para refresh: invalida as entradas antes de recalcular
     if (isRefresh) {
       for (const svcConfig of servicesConfig) {
         if (!unitFilter) {
-          // Sem filtro de unidade: invalida tudo (consolidado + todas as unidades)
           await this.cacheService.invalidateService(svcConfig.serviceName);
-        } else if (unitFilter === 'consolidated') {
-          // Só o consolidado
-          await this.cacheService.invalidateConsolidated(svcConfig.serviceName);
         } else {
-          // Só a unidade específica
           await this.cacheService.invalidateByUnit(svcConfig.serviceName, unitFilter);
         }
       }
     }
 
-    // Executa warmup/refresh para cada combinação de serviço x período x unidade
+    // Os serviços multitenant gerenciam o próprio cache internamente usando
+    // CachePeriodEnum.CUSTOM + datas. O warmup chama os serviços diretamente
+    // para que eles populem suas próprias chaves de cache.
     for (const svcConfig of servicesConfig) {
       const service = this.getService(svcConfig.token);
       if (!service) {
-        this.logger.warn(
-          `Serviço ${svcConfig.name} não encontrado, pulando...`,
-        );
+        this.logger.warn(`Serviço ${svcConfig.name} não encontrado, pulando...`);
         continue;
       }
 
       for (const period of periods) {
-        // Primeiro: cache consolidado (para ADMIN/LHG)
-        if (includeConsolidated) try {
-          const resultKey = `${svcConfig.name}:${period.name}:consolidated`;
-          const result = await this.cacheService.getOrCalculate(
-            svcConfig.serviceName,
-            period.period,
-            () =>
-              (service as any)[svcConfig.method](
-                moment(period.start).format('DD/MM/YYYY'),
-                moment(period.end).format('DD/MM/YYYY'),
-              ),
-            period.period === CachePeriodEnum.CUSTOM
-              ? { start: period.start, end: period.end }
-              : undefined,
-            undefined, // Sem unitKey = cache consolidado
-          );
+        const startDate = moment(period.start).format('DD/MM/YYYY');
+        const endDate = moment(period.end).format('DD/MM/YYYY');
+        const customDates = { start: period.start, end: period.end };
+        const dateRange = `${startDate} - ${endDate}`;
 
-          results.push({
-            service: svcConfig.name,
-            period: period.name,
-            unit: 'consolidated',
-            dateRange: `${moment(period.start).format('DD/MM/YYYY')} - ${moment(period.end).format('DD/MM/YYYY')}`,
-            fromCache: result.fromCache,
-            calculationTime: result.calculationTime,
-          });
-
-          this.logger.log(
-            `${resultKey}: ${result.fromCache ? 'CACHE HIT' : `CALCULATED (${result.calculationTime}ms)`}`,
-          );
-        } catch (error) {
-          const errorMsg =
-            error instanceof Error ? error.message : 'Unknown error';
-          this.logger.error(
-            `${svcConfig.name}:${period.name}:consolidated - ERROR - ${errorMsg}`,
-          );
-          results.push({
-            service: svcConfig.name,
-            period: period.name,
-            unit: 'consolidated',
-            dateRange: `${moment(period.start).format('DD/MM/YYYY')} - ${moment(period.end).format('DD/MM/YYYY')}`,
-            fromCache: false,
-            error: errorMsg,
-          });
-        }
-
-        // Segundo: cache específico de cada unidade (para gerentes)
-        for (const unitKey of unitKeys) {
+        // Cache consolidado (ADMIN/LHG): chama sem usuário
+        if (includeConsolidated) {
           try {
-            const resultKey = `${svcConfig.name}:${period.name}:${unitKey}`;
-            const result = await this.cacheService.getOrCalculate(
+            const cachedBefore = await this.cacheService.get(
               svcConfig.serviceName,
-              period.period,
-              () =>
-                (service as any)[svcConfig.method](
-                  moment(period.start).format('DD/MM/YYYY'),
-                  moment(period.end).format('DD/MM/YYYY'),
-                ),
-              period.period === CachePeriodEnum.CUSTOM
-                ? { start: period.start, end: period.end }
-                : undefined,
-              unitKey, // Cache específico da unidade
+              CachePeriodEnum.CUSTOM,
+              customDates,
             );
-
+            const t = Date.now();
+            await (service as any)[svcConfig.method](startDate, endDate);
+            const elapsed = Date.now() - t;
+            const fromCache = !!cachedBefore;
             results.push({
               service: svcConfig.name,
               period: period.name,
-              unit: unitKey,
-              dateRange: `${moment(period.start).format('DD/MM/YYYY')} - ${moment(period.end).format('DD/MM/YYYY')}`,
-              fromCache: result.fromCache,
-              calculationTime: result.calculationTime,
+              unit: 'consolidated',
+              dateRange,
+              fromCache,
+              calculationTime: fromCache ? undefined : elapsed,
             });
-
             this.logger.log(
-              `${resultKey}: ${result.fromCache ? 'CACHE HIT' : `CALCULATED (${result.calculationTime}ms)`}`,
+              `${svcConfig.name}:${period.name}:consolidated: ${fromCache ? 'CACHE HIT' : `CALCULATED (${elapsed}ms)`}`,
             );
           } catch (error) {
-            const errorMsg =
-              error instanceof Error ? error.message : 'Unknown error';
-            this.logger.error(
-              `${svcConfig.name}:${period.name}:${unitKey} - ERROR - ${errorMsg}`,
-            );
-            results.push({
-              service: svcConfig.name,
-              period: period.name,
-              unit: unitKey,
-              dateRange: `${moment(period.start).format('DD/MM/YYYY')} - ${moment(period.end).format('DD/MM/YYYY')}`,
-              fromCache: false,
-              error: errorMsg,
-            });
+            const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(`${svcConfig.name}:${period.name}:consolidated - ERROR - ${errorMsg}`);
+            results.push({ service: svcConfig.name, period: period.name, unit: 'consolidated', dateRange, fromCache: false, error: errorMsg });
+          }
+        }
+
+        // Cache por unidade (gerentes): apenas para serviços que suportam filtro de unidade
+        if (svcConfig.supportsUnit) {
+          for (const unitKey of unitKeys) {
+            try {
+              const cachedBefore = await this.cacheService.get(
+                svcConfig.serviceName,
+                CachePeriodEnum.CUSTOM,
+                customDates,
+                unitKey,
+              );
+              const t = Date.now();
+              // Passa fake user para que getUnifiedKpis filtre e cache por unidade
+              await (service as any)[svcConfig.method](startDate, endDate, {
+                unit: unitKey,
+                role: 'GERENTE_GERAL',
+              });
+              const elapsed = Date.now() - t;
+              const fromCache = !!cachedBefore;
+              results.push({
+                service: svcConfig.name,
+                period: period.name,
+                unit: unitKey,
+                dateRange,
+                fromCache,
+                calculationTime: fromCache ? undefined : elapsed,
+              });
+              this.logger.log(
+                `${svcConfig.name}:${period.name}:${unitKey}: ${fromCache ? 'CACHE HIT' : `CALCULATED (${elapsed}ms)`}`,
+              );
+            } catch (error) {
+              const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+              this.logger.error(`${svcConfig.name}:${period.name}:${unitKey} - ERROR - ${errorMsg}`);
+              results.push({ service: svcConfig.name, period: period.name, unit: unitKey, dateRange, fromCache: false, error: errorMsg });
+            }
           }
         }
       }
