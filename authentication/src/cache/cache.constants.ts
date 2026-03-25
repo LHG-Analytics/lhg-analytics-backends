@@ -69,6 +69,11 @@ export const UNIT_BACKENDS = {
     prefix: '/liv/api',
     name: 'Liv',
   },
+  altana: {
+    url: process.env.ALTANA_URL || 'http://localhost:3007',
+    prefix: '/altana/api',
+    name: 'Altana',
+  },
 };
 
 export type UnitKey = keyof typeof UNIT_BACKENDS;
