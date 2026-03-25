@@ -173,7 +173,7 @@ export class GovernanceService {
   WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND l."datafim" IS NOT NULL
     AND l."motivofim" = 'COMPLETA'
-    AND f."id_cargo" IN (6)
+    AND f."id_cargo" IN (6,7)
 `;
 
     const totalInspectionsSql = `
@@ -217,7 +217,7 @@ export class GovernanceService {
     WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
       AND l."datafim" IS NOT NULL
       AND l."motivofim" = 'COMPLETA'
-      AND f."id_cargo" IN (6)
+      AND f."id_cargo" IN (6,7)
   )
   SELECT
     shift AS name,
@@ -242,7 +242,7 @@ JOIN "funcionario" f ON f."id" = l."id_funcionario"
 WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
   AND l."datafim" IS NOT NULL
   AND l."motivofim" = 'COMPLETA'
-  AND f."id_cargo" IN (6)
+  AND f."id_cargo" IN (6,7)
 GROUP BY "date"
 ORDER BY "date" ASC;
 `;
@@ -265,7 +265,7 @@ WITH cleaning_data AS (
   WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND l."datafim" IS NOT NULL
     AND l."motivofim" = 'COMPLETA'
-    AND f."id_cargo" IN (6)
+    AND f."id_cargo" IN (6,7)
 )
 SELECT
   date,
@@ -304,7 +304,7 @@ ORDER BY
       l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
       AND l."datafim" IS NOT NULL
       AND l."motivofim" = 'COMPLETA'
-      AND f."id_cargo" IN (6)
+      AND f."id_cargo" IN (6,7)
       AND f."id_cargo" NOT IN (3)
 
   ),
@@ -376,7 +376,7 @@ shifted_cleanings AS (
   WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND l."datafim" IS NOT NULL
     AND l."motivofim" = 'COMPLETA'
-    AND f."id_cargo" IN (6)
+    AND f."id_cargo" IN (6,7)
     AND f."horarioinicioexpediente" IS NOT NULL
     AND TRIM(f."horarioinicioexpediente") <> ''
 ),
