@@ -22,6 +22,12 @@ module.exports = {
         JWT_SECRET: process.env.JWT_SECRET,
         JWT_EXPIRATION_TIME: process.env.JWT_EXPIRATION_TIME,
         PORT_AUTH: 3005,
+        LUSH_IPIRANGA_URL: process.env.LUSH_IPIRANGA_URL,
+        LUSH_LAPA_URL: process.env.LUSH_LAPA_URL,
+        TOUT_URL: process.env.TOUT_URL,
+        ANDAR_DE_CIMA_URL: process.env.ANDAR_DE_CIMA_URL,
+        LIV_URL: process.env.LIV_URL,
+        ALTANA_URL: process.env.ALTANA_URL,
       },
       env_production: {
         PORT_AUTH: 3005,
