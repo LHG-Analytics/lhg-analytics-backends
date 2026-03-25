@@ -11,56 +11,31 @@ export class BookingsService {
     private kpiCacheService: KpiCacheService,
   ) {}
 
-  private determineRentalPeriod(checkIn: Date, checkOut: Date, Booking: any): string {
+  private determineRentalPeriod(checkIn: Date, checkOut: Date, _Booking: any): string {
     const occupationTimeSeconds = this.calculateOccupationTime(checkIn, checkOut);
 
-    // Convertendo check-in e check-out para objetos Date
-    const checkInDate = new Date(checkIn);
-    const checkOutDate = new Date(checkOut);
-
-    const checkInHour = checkInDate.getHours();
-    const checkOutHour = checkOutDate.getHours();
-    const checkOutMinutes = checkOutDate.getMinutes();
-
-    // Verificação por horas de ocupação (3, 6 e 12 horas)
-    if (occupationTimeSeconds <= 3 * 3600 + 15 * 60) {
-      return 'THREE_HOURS';
-    } else if (occupationTimeSeconds <= 6 * 3600 + 15 * 60) {
-      return 'SIX_HOURS';
-    } else if (occupationTimeSeconds <= 12 * 3600 + 15 * 60) {
-      return 'TWELVE_HOURS';
+    // Altana utiliza períodos de 1h, 2h, 4h e 12h
+    if (occupationTimeSeconds <= 1 * 3600 + 15 * 60) {
+      return 'ONE_HOUR';
+    } else if (occupationTimeSeconds <= 2 * 3600 + 15 * 60) {
+      return 'TWO_HOURS';
+    } else if (occupationTimeSeconds <= 4 * 3600 + 15 * 60) {
+      return 'FOUR_HOURS';
     }
 
-    // Se houver reservas, calcular os tipos adicionais
-    if (Booking && Array.isArray(Booking) && Booking.length > 0) {
-      // Regra para Day Use
-      if (checkInHour >= 13 && checkOutHour <= 19 && checkOutMinutes <= 15) {
-        return 'DAY_USE';
-      }
-
-      // Regra para Overnight
-      const overnightMinimumStaySeconds = 12 * 3600 + 15 * 60;
-      if (
-        checkInHour >= 20 &&
-        checkInHour <= 23 &&
-        checkOutHour >= 8 &&
-        (checkOutHour < 12 || (checkOutHour === 12 && checkOutMinutes <= 15)) &&
-        occupationTimeSeconds >= overnightMinimumStaySeconds
-      ) {
-        return 'OVERNIGHT';
-      }
-
-      // Verificação para Diária
-      if (
-        occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
-        (checkInHour <= 15 && (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
-      ) {
-        return 'DAILY';
-      }
-    }
-
-    // Caso nenhuma condição acima seja satisfeita, retorna 12 horas como padrão
+    // Acima de 4h15min → 12 horas
     return 'TWELVE_HOURS';
+
+    // --- Lógica anterior (3h/6h/12h/DayUse/Pernoite/Diária) removida para o Altana ---
+    // if (occupationTimeSeconds <= 3 * 3600 + 15 * 60) return 'THREE_HOURS';
+    // else if (occupationTimeSeconds <= 6 * 3600 + 15 * 60) return 'SIX_HOURS';
+    // else if (occupationTimeSeconds <= 12 * 3600 + 15 * 60) return 'TWELVE_HOURS';
+    // if (Booking && Array.isArray(Booking) && Booking.length > 0) {
+    //   if (checkInHour >= 13 && checkOutHour <= 19 && checkOutMinutes <= 15) return 'DAY_USE';
+    //   if (checkInHour >= 20 && ...) return 'OVERNIGHT';
+    //   if (occupationTimeSeconds > 16 * 3600 + 15 * 60 || ...) return 'DAILY';
+    // }
+    // return 'TWELVE_HOURS';
   }
 
   private calculateOccupationTime(checkIn: Date, checkOut: Date): number {
@@ -560,12 +535,10 @@ FROM vendas_diretas vd, locacoes loc;
 
     // Processa os tipos de locação usando a lógica existente
     const rentalCounts = {
-      THREE_HOURS: 0,
-      SIX_HOURS: 0,
+      ONE_HOUR: 0,
+      TWO_HOURS: 0,
+      FOUR_HOURS: 0,
       TWELVE_HOURS: 0,
-      DAY_USE: 0,
-      OVERNIGHT: 0,
-      DAILY: 0,
     };
 
     let validRecordsCount = 0;
@@ -573,12 +546,10 @@ FROM vendas_diretas vd, locacoes loc;
 
     // Objetos para armazenar receita por tipo de reserva
     const rentalRevenue = {
-      THREE_HOURS: 0,
-      SIX_HOURS: 0,
+      ONE_HOUR: 0,
+      TWO_HOURS: 0,
+      FOUR_HOURS: 0,
       TWELVE_HOURS: 0,
-      DAY_USE: 0,
-      OVERNIGHT: 0,
-      DAILY: 0,
     };
 
     // Calcula o tipo de locação para cada reserva
@@ -586,29 +557,17 @@ FROM vendas_diretas vd, locacoes loc;
       if (booking.datainicio) {
         validRecordsCount++;
 
-        // Primeiro verifica se é um período programado (dayuse, daily, overnight)
-        const dataInicio = new Date(booking.datainicio);
-        const hora = dataInicio.getHours();
-
         let rentalType = '';
 
-        // Períodos programados - não precisa calcular encerramento_previsto
-        if (hora === 13) {
-          rentalType = 'DAY_USE'; // 13:00 - Dayuse
-        } else if (hora === 20) {
-          rentalType = 'OVERNIGHT'; // 20:00 - Pernoite
-        } else if (hora === 15) {
-          rentalType = 'DAILY'; // 15:00 - Diária
+        // Altana usa apenas períodos imediatos por duração (1h, 2h, 4h, 12h)
+        // Períodos programados (DayUse/Pernoite/Diária) não se aplicam ao Altana
+        if (booking.checkIn && booking.checkOut) {
+          const checkInDate = new Date(booking.checkIn);
+          const checkOutDate = new Date(booking.checkOut);
+          rentalType = this.determineRentalPeriod(checkInDate, checkOutDate, rentalTypeData);
         } else {
-          // Para períodos imediatos, usa checkIn/checkOut da locacaoapartamento
-          if (booking.checkIn && booking.checkOut) {
-            const checkInDate = new Date(booking.checkIn);
-            const checkOutDate = new Date(booking.checkOut);
-            rentalType = this.determineRentalPeriod(checkInDate, checkOutDate, rentalTypeData);
-          } else {
-            // Default para THREE_HOURS quando não tem locacaoapartamento vinculada
-            rentalType = 'THREE_HOURS';
-          }
+          // Default para ONE_HOUR quando não tem locacaoapartamento vinculada
+          rentalType = 'ONE_HOUR';
         }
 
         if (rentalCounts[rentalType as keyof typeof rentalCounts] !== undefined) {
@@ -803,7 +762,7 @@ FROM vendas_diretas vd, locacoes loc;
     };
 
     return {
-      Company: 'Lush Lapa',
+      Company: 'Altana',
       BigNumbers: [bigNumbers],
       PaymentMethods: paymentMethods,
       BillingPerChannel: billingPerChannel,

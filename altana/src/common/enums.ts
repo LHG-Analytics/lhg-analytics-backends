@@ -6,12 +6,10 @@ export enum PeriodEnum {
 }
 
 export enum RentalTypeEnum {
-  THREE_HOURS = 'THREE_HOURS',
-  SIX_HOURS = 'SIX_HOURS',
+  ONE_HOUR = 'ONE_HOUR',
+  TWO_HOURS = 'TWO_HOURS',
+  FOUR_HOURS = 'FOUR_HOURS',
   TWELVE_HOURS = 'TWELVE_HOURS',
-  DAY_USE = 'DAY_USE',
-  OVERNIGHT = 'OVERNIGHT',
-  DAILY = 'DAILY',
 }
 
 export enum ChannelTypeEnum {

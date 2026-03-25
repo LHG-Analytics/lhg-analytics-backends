@@ -656,7 +656,7 @@ ORDER BY
     });
 
     return {
-      Company: 'Lush Lapa',
+      Company: 'Altana',
       BigNumbers: [bigNumbers],
       SupervisorsPerformance: supervisorsPerformanceFormatted,
       ShiftCleaning: shiftCleaningFormatted,

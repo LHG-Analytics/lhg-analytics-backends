@@ -697,12 +697,10 @@ export class CompanyService {
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END as date,
         CASE
-          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
-          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 11.5 AND 12.5 THEN 'TWELVE_HOURS'
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 13 THEN 'DAY_USE'
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 15 THEN 'DAILY'
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 20 THEN 'OVERNIGHT'
-          ELSE 'THREE_HOURS'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 <= 1.25 THEN 'ONE_HOUR'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 <= 2.25 THEN 'TWO_HOURS'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 <= 4.25 THEN 'FOUR_HOURS'
+          ELSE 'TWELVE_HOURS'
         END as rental_type,
         COALESCE(SUM(
           COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
@@ -722,12 +720,10 @@ export class CompanyService {
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END,
         CASE
-          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
-          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 11.5 AND 12.5 THEN 'TWELVE_HOURS'
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 13 THEN 'DAY_USE'
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 15 THEN 'DAILY'
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 20 THEN 'OVERNIGHT'
-          ELSE 'THREE_HOURS'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 <= 1.25 THEN 'ONE_HOUR'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 <= 2.25 THEN 'TWO_HOURS'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 <= 4.25 THEN 'FOUR_HOURS'
+          ELSE 'TWELVE_HOURS'
         END
       ORDER BY date, rental_type
     `;
@@ -771,7 +767,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('LUSH', 'LUSH HIDRO', 'LUSH LOUNGE HIDRO', 'LUSH SPA', 'LUSH SPLASH', 'LUSH SPA SPLASH')
+        AND ca.id IN (1,2,3,4,5,6,7,8,9,10,11,12)
       GROUP BY ca.descricao
       ORDER BY category_revenue DESC
     `;
@@ -790,7 +786,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('LUSH', 'LUSH HIDRO', 'LUSH LOUNGE HIDRO', 'LUSH SPA', 'LUSH SPLASH', 'LUSH SPA SPLASH')
+        AND ca.id IN (1,2,3,4,5,6,7,8,9,10,11,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -882,7 +878,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('LUSH', 'LUSH HIDRO', 'LUSH LOUNGE HIDRO', 'LUSH SPA', 'LUSH SPLASH', 'LUSH SPA SPLASH')
+        AND ca.id IN (1,2,3,4,5,6,7,8,9,10,11,12)
       GROUP BY ca.descricao, CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -896,7 +892,7 @@ export class CompanyService {
         COUNT(a.id) as total_suites_in_category
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE ca.descricao IN ('LUSH', 'LUSH HIDRO', 'LUSH LOUNGE HIDRO', 'LUSH SPA', 'LUSH SPLASH', 'LUSH SPA SPLASH')
+      WHERE ca.id IN (1,2,3,4,5,6,7,8,9,10,11,12)
         AND a.dataexclusao IS NULL
       GROUP BY ca.descricao
     `;
@@ -916,7 +912,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('LUSH', 'LUSH HIDRO', 'LUSH LOUNGE HIDRO', 'LUSH SPA', 'LUSH SPLASH', 'LUSH SPA SPLASH')
+        AND ca.id IN (1,2,3,4,5,6,7,8,9,10,11,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -939,7 +935,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('LUSH', 'LUSH HIDRO', 'LUSH LOUNGE HIDRO', 'LUSH SPA', 'LUSH SPLASH', 'LUSH SPA SPLASH')
+        AND ca.id IN (1,2,3,4,5,6,7,8,9,10,11,12)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -1140,22 +1136,18 @@ export class CompanyService {
 
     // BillingRentalType seguindo padrão do bookings.service
     const allRentalTypes = [
-      'THREE_HOURS',
-      'SIX_HOURS',
+      'ONE_HOUR',
+      'TWO_HOURS',
+      'FOUR_HOURS',
       'TWELVE_HOURS',
-      'DAY_USE',
-      'DAILY',
-      'OVERNIGHT',
     ];
 
     // Mapeamento para exibição em português
     const rentalTypeLabels: Record<string, string> = {
-      THREE_HOURS: '3 Horas',
-      SIX_HOURS: '6 Horas',
+      ONE_HOUR: '1 Hora',
+      TWO_HOURS: '2 Horas',
+      FOUR_HOURS: '4 Horas',
       TWELVE_HOURS: '12 Horas',
-      DAY_USE: 'Dayuse',
-      DAILY: 'Diária',
-      OVERNIGHT: 'Pernoite',
     };
 
     const billingRentalType: ApexChartsSeriesData = {
@@ -2348,7 +2340,7 @@ export class CompanyService {
 
     // Retornos temporários (serão implementados um por vez)
     return {
-      Company: 'Lush Lapa',
+      Company: 'Altana',
       BigNumbers: [bigNumbers],
       BillingRentalType: billingRentalType,
       RevenueByDate: revenueByDate,
@@ -2377,55 +2369,39 @@ export class CompanyService {
     };
   }
 
-  private determineRentalPeriod(checkIn: Date, checkOut: Date, Booking: any): string {
+  private determineRentalPeriod(checkIn: Date, checkOut: Date, _Booking: any): string {
     const occupationTimeSeconds = this.calculateOccupationTime(checkIn, checkOut);
 
-    // Convertendo check-in e check-out para objetos Date
-    const checkInDate = new Date(checkIn);
-    const checkOutDate = new Date(checkOut);
-
-    const checkInHour = checkInDate.getHours();
-    const checkOutHour = checkOutDate.getHours();
-    const checkOutMinutes = checkOutDate.getMinutes();
-
-    // Verificação por horas de ocupação (3, 6 e 12 horas)
-    if (occupationTimeSeconds <= 3 * 3600 + 15 * 60) {
-      return 'THREE_HOURS';
-    } else if (occupationTimeSeconds <= 6 * 3600 + 15 * 60) {
-      return 'SIX_HOURS';
-    } else if (occupationTimeSeconds <= 12 * 3600 + 15 * 60) {
-      return 'TWELVE_HOURS';
+    // Altana utiliza períodos de 1h, 2h, 4h e 12h
+    if (occupationTimeSeconds <= 1 * 3600 + 15 * 60) {
+      return 'ONE_HOUR';
+    } else if (occupationTimeSeconds <= 2 * 3600 + 15 * 60) {
+      return 'TWO_HOURS';
+    } else if (occupationTimeSeconds <= 4 * 3600 + 15 * 60) {
+      return 'FOUR_HOURS';
     }
 
-    // Se houver reservas, calcular os tipos adicionais
-    if (Booking && Array.isArray(Booking) && Booking.length > 0) {
-      // Regra para Day Use
-      if (checkInHour >= 13 && checkOutHour <= 19 && checkOutMinutes <= 15) {
-        return 'DAY_USE';
-      }
-
-      // Regra para Overnight
-      const overnightMinimumStaySeconds = 12 * 3600 + 15 * 60;
-      if (
-        checkInHour >= 20 &&
-        checkInHour <= 23 &&
-        checkOutHour >= 8 &&
-        (checkOutHour < 12 || (checkOutHour === 12 && checkOutMinutes <= 15)) &&
-        occupationTimeSeconds >= overnightMinimumStaySeconds
-      ) {
-        return 'OVERNIGHT';
-      }
-
-      // Verificacao para Diaria
-      if (
-        occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
-        (checkInHour <= 15 && (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
-      ) {
-        return 'DAILY';
-      }
-    }
-
-    // Caso nenhuma condição acima seja satisfeita, retorna 12 horas como padrão
+    // Acima de 4h15min → 12 horas
     return 'TWELVE_HOURS';
+
+    // --- Lógica anterior (3h/6h/12h/DayUse/Pernoite/Diária) removida para o Altana ---
+    // const checkInDate = new Date(checkIn);
+    // const checkOutDate = new Date(checkOut);
+    // const checkInHour = checkInDate.getHours();
+    // const checkOutHour = checkOutDate.getHours();
+    // const checkOutMinutes = checkOutDate.getMinutes();
+    // if (occupationTimeSeconds <= 3 * 3600 + 15 * 60) return 'THREE_HOURS';
+    // else if (occupationTimeSeconds <= 6 * 3600 + 15 * 60) return 'SIX_HOURS';
+    // else if (occupationTimeSeconds <= 12 * 3600 + 15 * 60) return 'TWELVE_HOURS';
+    // if (Booking && Array.isArray(Booking) && Booking.length > 0) {
+    //   if (checkInHour >= 13 && checkOutHour <= 19 && checkOutMinutes <= 15) return 'DAY_USE';
+    //   const overnightMinimumStaySeconds = 12 * 3600 + 15 * 60;
+    //   if (checkInHour >= 20 && checkInHour <= 23 && checkOutHour >= 8 &&
+    //       (checkOutHour < 12 || (checkOutHour === 12 && checkOutMinutes <= 15)) &&
+    //       occupationTimeSeconds >= overnightMinimumStaySeconds) return 'OVERNIGHT';
+    //   if (occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
+    //       (checkInHour <= 15 && (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))) return 'DAILY';
+    // }
+    // return 'TWELVE_HOURS';
   }
 }

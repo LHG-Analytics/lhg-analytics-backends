@@ -143,25 +143,28 @@ export class RestaurantService {
    * Chamado pelo cache service quando há cache miss
    */
   private async _calculateKpisByDateRangeInternal(startDate: Date, endDate: Date) {
-    const abProductTypes = [40, 47, 33, 34, 32, 15, 13, 44, 10, 11, 31, 41, 27, 26, 25, 35];
+    // Altana tipoproduto IDs:
+    // 1=BEBIDAS, 2=PRATOS PRINCIPAIS, 3=ENTRADAS, 4=SOBREMESAS, 5=CAFE DA MANHA
+    // 6=SEXSHOP, 7=BOMBONIERE
+    const abProductTypes = [1, 2, 3, 4, 5]; // A (Alimentos) + B (Bebidas)
 
-    const aProductTypes = [47, 32, 13, 44, 10, 11, 31, 41, 27];
+    const aProductTypes = [2, 3, 4, 5]; // Alimentos: Pratos, Entradas, Sobremesas, Café
 
-    const bProductTypes = [40, 34, 15, 26, 25, 35];
+    const bProductTypes = [1]; // Bebidas
 
-    // Alimentos para ranking (aProductTypes sem 32, 33, 44)
-    const aProductTypesForRanking = [47, 13, 10, 11, 31, 41, 27];
+    // Alimentos para ranking
+    const aProductTypesForRanking = [2, 3, 4, 5];
 
-    // Bebidas para ranking (bProductTypes - nenhum removido)
-    const bProductTypesForRanking = [40, 34, 15, 26, 25, 35];
+    // Bebidas para ranking
+    const bProductTypesForRanking = [1];
 
-    // Alimentos para ranking de menos vendidos (aProductTypes sem 32, 33, 44, 2, 27)
-    const aProductTypesForLeastRanking = [47, 13, 10, 11, 31, 41];
+    // Alimentos para ranking de menos vendidos
+    const aProductTypesForLeastRanking = [2, 3, 4, 5];
 
-    // Bebidas para ranking de menos vendidos (bProductTypes - nenhum removido)
-    const bProductTypesForLeastRanking = [40, 34, 15, 26, 25, 35];
+    // Bebidas para ranking de menos vendidos
+    const bProductTypesForLeastRanking = [1];
 
-    const othersList = [45, 24, 38, 39, 37];
+    const othersList = [6, 7]; // SEXSHOP, BOMBONIERE
 
     // Formatação segura de datas usando QueryUtilsService
     const startForDate = moment.utc(startDate).set({ hour: 6, minute: 0, second: 0 }).toDate();
@@ -888,7 +891,7 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
 
       // --- Return final ---
       return {
-        Company: 'Lush Lapa',
+        Company: 'Altana',
         BigNumbers: [
           {
             currentDate: {
