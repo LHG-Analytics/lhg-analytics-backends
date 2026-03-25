@@ -230,7 +230,7 @@ WHERE
   AND r."valorcontratado" IS NOT NULL
   AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
 GROUP BY ROLLUP (r."id_tipoorigemreserva")
-HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva" IS NULL
+HAVING r."id_tipoorigemreserva" IN (1, 3, 4) OR r."id_tipoorigemreserva" IS NULL
 ORDER BY "id_tipoorigemreserva";
 `;
 
@@ -244,7 +244,7 @@ WHERE
   AND r."valorcontratado" IS NOT NULL
   AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
 GROUP BY ROLLUP (r."id_tipoorigemreserva")
-HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva" IS NULL
+HAVING r."id_tipoorigemreserva" IN (1, 3, 4) OR r."id_tipoorigemreserva" IS NULL
 ORDER BY "id_tipoorigemreserva";
 `;
 
@@ -395,10 +395,6 @@ FROM vendas_diretas vd, locacoes loc;
       r."periodocontratado",
       CASE
         WHEN r."id_tipoorigemreserva" = 1 THEN 'INTERNAL'
-        WHEN r."id_tipoorigemreserva" = 6 THEN 'INTERNAL'
-        WHEN r."id_tipoorigemreserva" = 7 THEN 'BOOKING'
-        WHEN r."id_tipoorigemreserva" = 8 THEN 'EXPEDIA'
-        WHEN r."id_tipoorigemreserva" = 10 THEN 'GIFT_CARD'
         WHEN r."id_tipoorigemreserva" = 3 THEN
           CASE
             WHEN COALESCE(r."reserva_programada_guia", false) = true THEN 'GUIA_SCHEDULED'
@@ -512,8 +508,6 @@ FROM vendas_diretas vd, locacoes loc;
 
     // Definir todas as categorias de canal possíveis na ordem desejada
     const allChannelCategories = [
-      'EXPEDIA',
-      'BOOKING',
       'GUIA_SCHEDULED',
       'GUIA_GO',
       'INTERNAL',
