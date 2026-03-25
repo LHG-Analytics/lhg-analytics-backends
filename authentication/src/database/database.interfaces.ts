@@ -142,7 +142,7 @@ export const UNIT_CONFIGS: Record<
         'ESPECIAL',
         'TEMATICA',
       ],
-      totalSuites: 0, // TODO: atualizar com o total real de suítes ativas do Altana
+      totalSuites: 63,
     },
   },
 };
