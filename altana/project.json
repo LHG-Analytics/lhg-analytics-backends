@@ -1,0 +1,24 @@
+{
+  "name": "altana",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "altana/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run build",
+        "cwd": "altana"
+      },
+      "dependsOn": ["@lhg/utils:build"]
+    },
+    "start:dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run start:dev",
+        "cwd": "altana"
+      }
+    }
+  },
+  "tags": ["app", "backend"]
+}

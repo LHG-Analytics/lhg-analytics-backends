@@ -48,6 +48,12 @@ const UNITS: UnitConfig[] = [
     name: 'Liv',
     key: 'liv',
   },
+  {
+    url: process.env.ALTANA_URL || 'http://localhost:3007',
+    prefix: '/altana/api',
+    name: 'Altana',
+    key: 'altana',
+  },
 ];
 
 @Injectable()
