@@ -139,7 +139,7 @@ export class CacheController {
       properties: {
         service: { type: 'string', enum: ['company', 'bookings', 'restaurant', 'governance'], description: 'Serviço a recalcular (omitir = todos)' },
         period: { type: 'string', enum: ['LAST_7_D', 'LAST_MONTH', 'THIS_MONTH', 'YEAR_TO_DATE'], description: 'Período a recalcular (omitir = todos)' },
-        unit: { type: 'string', enum: ['lush_ipiranga', 'lush_lapa', 'tout', 'andar_de_cima', 'liv'], description: 'Unidade a recalcular (omitir = todas)' },
+        unit: { type: 'string', enum: ['lush_ipiranga', 'lush_lapa', 'tout', 'andar_de_cima', 'liv', 'altana'], description: 'Unidade a recalcular (omitir = todas)' },
       },
     },
   })
@@ -240,6 +240,7 @@ export class CacheController {
       'tout',
       'andar_de_cima',
       'liv',
+      'altana',
     ];
 
     const periods = periodFilter ? allPeriods.filter((p) => p.name === periodFilter) : allPeriods;

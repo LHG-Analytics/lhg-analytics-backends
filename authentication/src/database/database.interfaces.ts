@@ -7,7 +7,8 @@ export type UnitKey =
   | 'lush_lapa'
   | 'tout'
   | 'andar_de_cima'
-  | 'liv';
+  | 'liv'
+  | 'altana';
 
 export interface UnitDatabaseConfig {
   key: UnitKey;
@@ -120,6 +121,28 @@ export const UNIT_CONFIGS: Record<
         'LOUNGE SPA 50 SOMBRAS',
       ],
       totalSuites: 61,
+    },
+  },
+  altana: {
+    name: 'Altana',
+    envVar: 'DATABASE_URL_LOCAL_ALTANA',
+    suiteConfig: {
+      categoryIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      categoryNames: [
+        'PANORAMICA 1',
+        'PANORAMICA 2',
+        'PREMIUM',
+        'TEMATICA 1',
+        'TEMATICA 2',
+        'PRATA',
+        'OURO',
+        'PLATINA',
+        'SPA',
+        'MASTER',
+        'ESPECIAL',
+        'TEMATICA',
+      ],
+      totalSuites: 0, // TODO: atualizar com o total real de suítes ativas do Altana
     },
   },
 };
