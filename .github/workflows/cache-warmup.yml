@@ -58,6 +58,15 @@ jobs:
             --max-time 180 \
             --fail
 
+      - name: Warmup Altana
+        id: altana
+        continue-on-error: true
+        run: |
+          curl -X POST "${{ secrets.ALTANA_URL }}/cache/warmup" \
+            -H "Content-Type: application/json" \
+            --max-time 180 \
+            --fail
+
       - name: Warmup Authentication
         id: authentication
         continue-on-error: true
@@ -78,6 +87,7 @@ jobs:
           echo "| Andar de Cima | ${{ steps.andar_de_cima.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Tout | ${{ steps.tout.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Liv | ${{ steps.liv.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Altana | ${{ steps.altana.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Authentication | ${{ steps.authentication.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
 
           # Falha o workflow se algum backend falhou (para notificação no GitHub)
@@ -86,6 +96,7 @@ jobs:
                 "${{ steps.andar_de_cima.outcome }}" == "failure" || \
                 "${{ steps.tout.outcome }}" == "failure" || \
                 "${{ steps.liv.outcome }}" == "failure" || \
+                "${{ steps.altana.outcome }}" == "failure" || \
                 "${{ steps.authentication.outcome }}" == "failure" ]]; then
             echo "⚠️ Um ou mais backends falharam no warmup."
             exit 1

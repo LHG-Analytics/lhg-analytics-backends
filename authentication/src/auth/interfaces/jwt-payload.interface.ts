@@ -8,7 +8,8 @@ export interface JwtPayload {
     | 'LUSH_IPIRANGA'
     | 'TOUT'
     | 'ANDAR_DE_CIMA'
-    | 'LIV'; // Tipos de unidades
+    | 'LIV'
+    | 'ALTANA'; // Tipos de unidades
   role:
     | 'ADMIN'
     | 'GERENTE_GERAL'

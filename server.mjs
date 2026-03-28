@@ -47,6 +47,10 @@ app.use(
   "/liv",
   createProxyMiddleware({ target: "http://localhost:3006", changeOrigin: true })
 );
+app.use(
+  "/altana",
+  createProxyMiddleware({ target: "http://localhost:3007", changeOrigin: true })
+);
 
 const port = process.env.PORT || 3000;
 app.listen(port, "0.0.0.0", () => {

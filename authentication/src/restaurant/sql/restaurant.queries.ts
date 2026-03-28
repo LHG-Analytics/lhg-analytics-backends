@@ -46,6 +46,11 @@ export const UNIT_AB_CONFIGS: Record<UnitKey, UnitABConfig> = {
     aProductTypes: [26, 23, 24, 6, 7, 2, 22, 5],
     bProductTypes: [31, 15, 12, 16, 9],
   },
+  altana: {
+    abProductTypes: [1, 2, 3, 4, 5],
+    aProductTypes: [2, 3, 4, 5],
+    bProductTypes: [1],
+  },
 };
 
 /**

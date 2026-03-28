@@ -103,6 +103,21 @@ module.exports = {
         PORT: 3006,
       },
     },
+    {
+      name: "altana",
+      script: "./dist/altana/src/main.js",
+      cwd: "./altana",
+      node_args: "-r module-alias/register",
+      env: {
+        NODE_ENV: "production",
+        DATABASE_URL_LOCAL_ALTANA: process.env.DATABASE_URL_LOCAL_ALTANA,
+        SERVICE_PREFIX_ALTANA: "altana",
+        PORT_ALTANA: 3007,
+      },
+      env_production: {
+        PORT_ALTANA: 3007,
+      },
+    },
   ],
   deploy: {
     production: {
