@@ -50,4 +50,5 @@ enum UserUnit {
     ANDAR_DE_CIMA
     LHG
     LIV
+    ALTANA
 }
