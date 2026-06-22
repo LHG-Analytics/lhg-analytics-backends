@@ -366,7 +366,7 @@ export class CompanyService {
         SELECT COUNT(*) as total_suites
         FROM apartamento a
         INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-        WHERE ca.id IN (7,8,9,10,11,12)
+        WHERE ca.id IN (7,8,9,10,11,12,13,14)
           AND a.dataexclusao IS NULL
       `;
       const totalSuitesResult: any[] = await this.pgPool.query<any>(totalSuitesSQL);
@@ -463,7 +463,7 @@ export class CompanyService {
       WITH receita_consumo AS (
         -- Calcula receita de consumo BRUTA (sem aplicar desconto aqui)
         -- O desconto de consumo já está incluído em locacaoapartamento.desconto
-        -- Filtrando apenas locações de apartamentos das categorias corretas (7,8,9,10,11,12)
+        -- Filtrando apenas locações de apartamentos das categorias corretas (7,8,9,10,11,12,13,14)
         SELECT
           la.id_apartamentostate as id_locacao,
           COALESCE(SUM(
@@ -480,7 +480,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND sei.cancelado IS NULL
-          AND ca_apt.id IN (7,8,9,10,11,12)
+          AND ca_apt.id IN (7,8,9,10,11,12,13,14)
         GROUP BY la.id_apartamentostate, vl.id_locacaoapartamento
       )
       SELECT
@@ -511,7 +511,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca_apt.id IN (7,8,9,10,11,12)
+        AND ca_apt.id IN (7,8,9,10,11,12,13,14)
     `;
 
     // SQL para vendas diretas - CORRIGIDO para dividir desconto proporcionalmente entre itens
@@ -546,7 +546,7 @@ export class CompanyService {
       SELECT COUNT(*) as total_suites
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE ca.id IN (7, 8, 9, 10, 11, 12)
+      WHERE ca.id IN (7, 8, 9, 10, 11, 12, 13, 14)
         AND a.dataexclusao IS NULL
     `;
 
@@ -573,7 +573,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND sei.cancelado IS NULL
-          AND ca_apt.id IN (7,8,9,10,11,12)
+          AND ca_apt.id IN (7,8,9,10,11,12,13,14)
         GROUP BY CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -598,7 +598,7 @@ export class CompanyService {
         WHERE la.datainicialdaocupacao >= '${formattedStart}'
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
-          AND ca.id IN (7,8,9,10,11,12)
+          AND ca.id IN (7,8,9,10,11,12,13,14)
         GROUP BY CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -660,7 +660,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (7,8,9,10,11,12)
+        AND ca.id IN (7,8,9,10,11,12,13,14)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -688,7 +688,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND sei.cancelado IS NULL
-          AND ca_apt.id IN (7,8,9,10,11,12)
+          AND ca_apt.id IN (7,8,9,10,11,12,13,14)
         GROUP BY la.id_apartamentostate
       )
       SELECT
@@ -752,7 +752,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND sei.cancelado IS NULL
-          AND ca_apt.id IN (7,8,9,10,11,12)
+          AND ca_apt.id IN (7,8,9,10,11,12,13,14)
         GROUP BY la.id_apartamentostate
       )
       SELECT
@@ -837,7 +837,7 @@ export class CompanyService {
           AND la.datainicialdaocupacao <= '${formattedEnd}'
           AND la.fimocupacaotipo = 'FINALIZADA'
           AND sei.cancelado IS NULL
-          AND ca_apt.id IN (7,8,9,10,11,12)
+          AND ca_apt.id IN (7,8,9,10,11,12,13,14)
         GROUP BY la.id_apartamentostate
       )
       SELECT
@@ -1437,7 +1437,7 @@ export class CompanyService {
         WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
           AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
-          AND ca.id IN (7,8,9,10,11,12)
+          AND ca.id IN (7,8,9,10,11,12,13,14)
           GROUP BY ca.id, ca.descricao
       ),
       suite_counts AS (
@@ -1446,7 +1446,7 @@ export class CompanyService {
           COUNT(DISTINCT a.id) as total_suites_in_category
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
-        WHERE ca.id IN (7,8,9,10,11,12)
+        WHERE ca.id IN (7,8,9,10,11,12,13,14)
           AND a.dataexclusao IS NULL
           GROUP BY ca.id, ca.descricao
       ),
@@ -1465,7 +1465,7 @@ export class CompanyService {
         WHERE la.datainicio < '${formattedEnd}'::timestamp
           AND la.datafim > '${formattedStart}'::timestamp
           AND la.datafim IS NOT NULL
-          AND ca.id IN (7,8,9,10,11,12)
+          AND ca.id IN (7,8,9,10,11,12,13,14)
 
         UNION ALL
 
@@ -1481,7 +1481,7 @@ export class CompanyService {
         WHERE d.datainicio < '${formattedEnd}'::timestamp
           AND d.datafim > '${formattedStart}'::timestamp
           AND d.datafim IS NOT NULL
-          AND ca.id IN (7,8,9,10,11,12)
+          AND ca.id IN (7,8,9,10,11,12,13,14)
       ),
       periods_with_lag AS (
         -- Adicionar informação do período anterior
@@ -1611,7 +1611,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
         AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (7,8,9,10,11,12)
+        AND ca.id IN (7,8,9,10,11,12,13,14)
     `;
     const rentalsData: any[] = await this.pgPool.query<any>(rentalsQuery);
 
@@ -1629,7 +1629,7 @@ export class CompanyService {
       WHERE la.datainicio >= '${formattedStart}'::timestamp
         AND la.datainicio <= '${formattedEnd}'::timestamp
         AND la.datafim IS NOT NULL
-        AND ca.id IN (7,8,9,10,11,12)
+        AND ca.id IN (7,8,9,10,11,12,13,14)
 
       UNION ALL
 
@@ -1646,7 +1646,7 @@ export class CompanyService {
       WHERE d.datainicio >= '${formattedStart}'::timestamp
         AND d.datainicio <= '${formattedEnd}'::timestamp
         AND d.datafim IS NOT NULL
-        AND ca.id IN (7,8,9,10,11,12)
+        AND ca.id IN (7,8,9,10,11,12,13,14)
     `;
     const unavailableTimesData: any[] = await this.pgPool.query<any>(unavailableTimesQuery);
 
@@ -1658,7 +1658,7 @@ export class CompanyService {
           a.id as first_suite_id
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
-        WHERE ca.id IN (7,8,9,10,11,12)
+        WHERE ca.id IN (7,8,9,10,11,12,13,14)
           ORDER BY ca.id, a.id
       )
       SELECT
@@ -1668,7 +1668,7 @@ export class CompanyService {
       FROM categoriaapartamento ca
       INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
       INNER JOIN first_suite_per_category fs ON ca.descricao = fs.category_name
-      WHERE ca.id IN (7,8,9,10,11,12)
+      WHERE ca.id IN (7,8,9,10,11,12,13,14)
       GROUP BY ca.descricao, fs.first_suite_id
     `;
     const metadataResult: any[] = await this.pgPool.query<any>(metadataQuery);
@@ -1926,7 +1926,7 @@ export class CompanyService {
         WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
           AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
-          AND ca.id IN (7,8,9,10,11,12)
+          AND ca.id IN (7,8,9,10,11,12,13,14)
           GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM
             CASE
               WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
@@ -1940,7 +1940,7 @@ export class CompanyService {
           COUNT(DISTINCT a.id) as total_suites_in_category
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
-        WHERE ca.id IN (7,8,9,10,11,12)
+        WHERE ca.id IN (7,8,9,10,11,12,13,14)
           AND a.dataexclusao IS NULL
           GROUP BY ca.id, ca.descricao
       ),
@@ -1990,7 +1990,7 @@ export class CompanyService {
         WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
           AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
-          AND ca.id IN (7,8,9,10,11,12)
+          AND ca.id IN (7,8,9,10,11,12,13,14)
           GROUP BY EXTRACT(DOW FROM
             CASE
               WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
@@ -2133,7 +2133,7 @@ export class CompanyService {
         WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
           AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
-          AND ca.id IN (7,8,9,10,11,12)
+          AND ca.id IN (7,8,9,10,11,12,13,14)
         GROUP BY ca.id, ca.descricao, EXTRACT(DOW FROM
           CASE
             WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
@@ -2147,7 +2147,7 @@ export class CompanyService {
           COUNT(DISTINCT a.id) as total_suites_in_category
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
-        WHERE ca.id IN (7,8,9,10,11,12)
+        WHERE ca.id IN (7,8,9,10,11,12,13,14)
           AND a.dataexclusao IS NULL
         GROUP BY ca.id, ca.descricao
       ),
@@ -2200,7 +2200,7 @@ export class CompanyService {
         WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
           AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
           AND la.fimocupacaotipo = 'FINALIZADA'
-          AND ca.id IN (7,8,9,10,11,12)
+          AND ca.id IN (7,8,9,10,11,12,13,14)
         GROUP BY EXTRACT(DOW FROM
           CASE
             WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) < 6 THEN la.datainicialdaocupacao - INTERVAL '1 day'
