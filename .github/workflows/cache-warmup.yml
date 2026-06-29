@@ -2,9 +2,9 @@ name: Cache Warmup
 
 on:
   schedule:
-    # Executa a cada 6 horas (horário de Brasília = UTC-3)
-    # 0h, 6h, 12h, 18h BRT = 3h, 9h, 15h, 21h UTC
-    - cron: '0 3,9,15,21 * * *'
+    # Horário de Brasília = UTC-3
+    # 0h, 6h, 12h, 15h BRT = 3h, 9h, 15h, 18h UTC
+    - cron: '0 3,9,15,18 * * *'
   workflow_dispatch:  # Permite execução manual via GitHub UI
 
 jobs:
