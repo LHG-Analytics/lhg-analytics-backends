@@ -101,3 +101,82 @@ jobs:
             echo "⚠️ Um ou mais backends falharam no warmup."
             exit 1
           fi
+
+  verify-cache:
+    name: Verifica população do cache
+    needs: warmup-all-backends
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Consulta /cache/status e valida entradas
+        run: |
+          # O warmup é fire-and-forget (responde 202 e calcula em background),
+          # então o "sucesso" do passo anterior NÃO garante que o cache populou.
+          # Aqui consultamos GET /cache/status (endpoint público) com polling até
+          # o cálculo em background gravar as entradas.
+          # Unidades populam 4 serviços x 4 períodos = 16 entradas (tolerância: >=12).
+          check() {
+            local name="$1" url="$2" min="$3" out="$4"
+            if [ -z "$url" ]; then
+              echo "WARN  $name: URL não configurada (secret ausente)" > "$out"; return
+            fi
+            local active=0
+            for i in $(seq 1 12); do
+              active=$(curl -s --max-time 30 "$url/cache/status" | jq -r '.summary.active // 0' 2>/dev/null || echo 0)
+              [ -z "$active" ] && active=0
+              if [ "$active" -ge "$min" ]; then
+                echo "OK    $name: $active entradas ativas (min $min)" > "$out"; return
+              fi
+              sleep 30
+            done
+            echo "FAIL  $name: apenas $active entradas ativas (min $min)" > "$out"
+          }
+
+          TMP=$(mktemp -d)
+          check "Lush Ipiranga"  "${{ secrets.LUSH_IPIRANGA_URL }}"  12 "$TMP/ipiranga" &
+          check "Lush Lapa"      "${{ secrets.LUSH_LAPA_URL }}"      12 "$TMP/lapa" &
+          check "Andar de Cima"  "${{ secrets.ANDAR_DE_CIMA_URL }}"  12 "$TMP/adc" &
+          check "Tout"           "${{ secrets.TOUT_URL }}"           12 "$TMP/tout" &
+          check "Liv"            "${{ secrets.LIV_URL }}"            12 "$TMP/liv" &
+          check "Altana"         "${{ secrets.ALTANA_URL }}"         12 "$TMP/altana" &
+          check "Authentication" "${{ secrets.AUTHENTICATION_URL }}"  1 "$TMP/auth" &
+          wait
+
+          {
+            echo "## Verificação do Cache (/cache/status)"
+            echo '```'
+            cat "$TMP"/*
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat "$TMP"/*
+
+          if grep -q '^FAIL' "$TMP"/*; then
+            echo "::error::Um ou mais backends não populou o cache corretamente."
+            exit 1
+          fi
+
+  keepalive:
+    name: Keepalive (evita disabled_inactivity)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Commit vazio se repositório inativo (~50 dias)
+        run: |
+          # O GitHub desativa workflows agendados após 60 dias SEM commits no repo
+          # (runs do próprio Actions NÃO contam como atividade). Este passo cria um
+          # commit vazio quando o último commit passa de 50 dias, resetando o contador.
+          LAST=$(git log -1 --format=%ct)
+          NOW=$(date +%s)
+          DAYS=$(( (NOW - LAST) / 86400 ))
+          echo "Último commit há $DAYS dia(s)."
+          if [ "$DAYS" -ge 50 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "chore(ci): keepalive para manter o cron de warmup ativo"
+            git push
+          else
+            echo "Sem necessidade de keepalive (< 50 dias)."
+          fi

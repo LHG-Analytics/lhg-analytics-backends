@@ -1,6 +1,6 @@
 /**
  * Controller para gerenciamento de cache
- * Endpoint /warmup usado pelo GitHub Actions para popular cache às 6h
+ * Endpoint /warmup usado pelo GitHub Actions para popular cache periodicamente (ver .github/workflows/cache-warmup.yml)
  * Usa ModuleRef para lazy loading e evitar dependência circular
  */
 
@@ -58,7 +58,7 @@ export class CacheController {
   }
 
   /**
-   * Endpoint para cache warmup - chamado pelo GitHub Actions às 6h
+   * Endpoint para cache warmup - chamado pelo GitHub Actions de 6 em 6h (00h/06h/12h/15h BRT)
    * Calcula e armazena em cache os KPIs dos períodos principais
    *
    * Períodos calculados (até ONTEM):
@@ -74,7 +74,7 @@ export class CacheController {
   @ApiOperation({
     summary: 'Cache Warmup',
     description:
-      'Popula o cache com KPIs dos períodos principais. Chamado pelo GitHub Actions às 6h.',
+      'Popula o cache com KPIs dos períodos principais. Chamado pelo GitHub Actions de 6 em 6h (00h/06h/12h/15h BRT).',
   })
   @ApiResponse({ status: 202, description: 'Cache warmup disparado em background' })
   async warmup(): Promise<{ started: boolean; timestamp: string }> {
