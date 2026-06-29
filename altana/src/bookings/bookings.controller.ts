@@ -27,7 +27,7 @@ import { DateUtilsService, ValidationService } from '@lhg/utils';
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, UnitsGuard)
 @Roles('ADMIN', 'GERENTE_GERAL', 'GERENTE_RESERVAS')
-@Units('LHG', 'LUSH_LAPA')
+@Units('LHG', 'ALTANA')
 @Controller('Bookings')
 export class BookingsController {
   constructor(

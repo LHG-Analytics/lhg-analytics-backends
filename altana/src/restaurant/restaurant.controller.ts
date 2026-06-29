@@ -27,7 +27,7 @@ import { DateUtilsService, ValidationService } from '@lhg/utils';
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, UnitsGuard)
 @Roles('ADMIN', 'GERENTE_GERAL', 'GERENTE_RESTAURANTE')
-@Units('LHG', 'LUSH_LAPA')
+@Units('LHG', 'ALTANA')
 @Controller('Restaurants')
 export class RestaurantController {
   constructor(
