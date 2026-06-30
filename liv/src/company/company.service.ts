@@ -664,7 +664,7 @@ export class CompanyService {
       SELECT COUNT(*) as total_suites
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
+      WHERE ca.id IN (1,2,3,4,5,7,8,9,10,11)
         AND a.dataexclusao IS NULL
     `;
 
@@ -889,7 +889,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
+        AND ca.id IN (1,2,3,4,5,7,8,9,10,11)
       GROUP BY ca.descricao
       ORDER BY category_revenue DESC
     `;
@@ -908,7 +908,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
+        AND ca.id IN (1,2,3,4,5,7,8,9,10,11)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -1000,7 +1000,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
+        AND ca.id IN (1,2,3,4,5,7,8,9,10,11)
       GROUP BY ca.descricao, CASE
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -1014,7 +1014,7 @@ export class CompanyService {
         COUNT(a.id) as total_suites_in_category
       FROM apartamento a
       INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
+      WHERE ca.id IN (1,2,3,4,5,7,8,9,10,11)
         AND a.dataexclusao IS NULL
       GROUP BY ca.descricao
     `;
@@ -1036,7 +1036,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
+        AND ca.id IN (1,2,3,4,5,7,8,9,10,11)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
@@ -1059,7 +1059,7 @@ export class CompanyService {
       WHERE la.datainicialdaocupacao >= '${formattedStart}'
         AND la.datainicialdaocupacao <= '${formattedEnd}'
         AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.descricao IN ('HIDRO + SAUNA', 'HIDRO SEXY', 'LOUNGE ACQUA', 'VIP', 'HIDRO PROMO', 'LOUNGE', 'LOUNGE-HIDRO', 'DIAMOND', 'LOUNGE SPA', 'LOUNGE SPA 50 SOMBRAS')
+        AND ca.id IN (1,2,3,4,5,7,8,9,10,11)
       GROUP BY CASE
         WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
         ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
