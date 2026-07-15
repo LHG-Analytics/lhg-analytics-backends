@@ -97,15 +97,11 @@ export class RestaurantService {
         monthlyTotalSalesRevenue + dailyAverageSalesRevenue * remainingDays;
       const forecastSales = monthlyTotalSales + dailyAverageSales * remainingDays;
 
-      // Métricas recalculadas
-      const forecastTicketAverage =
-        forecastSales > 0 ? Number((forecastValue / forecastSales).toFixed(2)) : 0;
-
       monthlyForecast = {
         totalAllValueForecast: Number(forecastValue.toFixed(2)),
         totalAllSalesRevenueForecast: Number(forecastSalesRevenue.toFixed(2)),
         totalAllSalesForecast: Math.round(forecastSales),
-        totalAllTicketAverageForecast: forecastTicketAverage,
+        totalAllTicketAverageForecast: monthlyBigNumbers.currentDate.totalAllTicketAverage,
         totalAllTicketAverageByTotalRentalsForecast:
           monthlyBigNumbers.currentDate.totalAllTicketAverageByTotalRentals,
         abRepresentativityForecast: monthlyBigNumbers.currentDate.abRepresentativity,
