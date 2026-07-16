@@ -181,14 +181,17 @@ Executada em 2026-07-16 com D1–D3 decididos:
 
 **Racional**: unificar ANTES de reconciliar espalharia mudanças de números no meio do refactor, impossibilitando o teste de paridade da Fase 3.
 
-### Fase 2 — Construção do `lhg-api` multi-tenant
-- [ ] Novo workspace `lhg-api` no monorepo (não tocar nos 6 existentes).
-- [ ] TenantModule + registry (3.2) com as 6 unidades atuais.
-- [ ] DatabaseModule multi-pool (basear em `authentication/src/database/` que já faz isso).
-- [ ] Portar módulos na ordem: `restaurant` (menor) → `governance` → `bookings` → `company` (maior). Company: portar de `prismaLocal.$queryRaw` para `PgPoolService` no processo.
-- [ ] Cache com chave por unidade + warmup all-units.
-- [ ] Auth: guards atuais + `UnitsGuard` ciente do `:unit` da rota. Remover o acoplamento `rootDirs`/`@auth/*` (extrair `JwtPayload` para `@lhg/utils`).
-- [ ] Swagger único com o parâmetro de unidade.
+### Fase 2 — Construção do `lhg-api` multi-tenant 🔄 em andamento
+- [x] Novo workspace `lhg-api` no monorepo (porta 3010; sem Prisma, sem module-alias, sem acoplamento `@auth/*`).
+- [x] Tenant registry (`src/tenant/tenant.registry.ts`) com as 6 unidades e TODO o DNA por unidade (suítes, governance, restaurant, rental types).
+- [x] `TenantPoolService` — um pool `pg` por unidade (lazy, max 5), padrão herdado do authentication.
+- [x] Auth desacoplado: `JwtPayload` local + guards próprios; `UnitsGuard` compara `user.unit` × tenant da ROTA (`:unit`), LHG acessa todas; `TenantGuard` resolve o slug → 404 para unidade desconhecida.
+- [x] Cache multi-tenant: chave `kpi:{unit}:{svc}:{period}`, TTL/estratégia iguais aos atuais, status agrupado por unidade.
+- [x] **`restaurant` portado** (base: altana, o canônico com líquido/catch-all) parametrizado por `tenant.restaurant.*`. Rota: `GET /:unit/api/Restaurants/restaurants/date-range`.
+- [x] Warmup multi-unidade: `POST /api/cache/warmup` aquece TODAS as unidades (6 × 4 períodos, concorrência 3, TTL 12h); `GET /api/cache/status` com resumo por unidade.
+- [x] Swagger em `/api/docs`.
+- [ ] Portar `governance` → `bookings` → `company` (company migra de `prismaLocal.$queryRaw` para pools `pg` no processo).
+- [ ] Adicionar `lhg-api` ao PM2/warmup do CI quando entrar em shadow (Fase 3).
 
 ### Fase 3 — Paridade (shadow testing)
 - [ ] Rodar `lhg-api` em paralelo com os 6 (porta nova no PM2, sem tráfego real).
