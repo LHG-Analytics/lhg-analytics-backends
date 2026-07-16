@@ -14,6 +14,9 @@ import { TenantConfig } from '../tenant/tenant.interfaces';
 import { CachePeriodEnum, ServiceType } from './cache.interfaces';
 import { KpiCacheService } from './kpi-cache.service';
 import { RestaurantService } from '../restaurant/restaurant.service';
+import { GovernanceService } from '../governance/governance.service';
+import { BookingsService } from '../bookings/bookings.service';
+import { CompanyService } from '../company/company.service';
 
 // TTL longo (>= maior intervalo entre warmups; cron 3,9,15,18 UTC → gap máx 9h)
 const WARMUP_TTL_SECONDS = 12 * 60 * 60;
@@ -97,14 +100,31 @@ export class CacheController {
     const startTime = Date.now();
     const periods = this.buildPeriods();
 
-    // Serviços portados até agora (governance/bookings/company entram conforme o port avança)
+    // Todos os 4 domínios portados
     const services: { name: ServiceType; run: (t: TenantConfig, s: Date, e: Date) => Promise<any> }[] = [
+      {
+        name: 'company',
+        run: (t, s, e) =>
+          this.moduleRef.get(CompanyService, { strict: false }).calculateKpisByDateRangeSQL(t, s, e),
+      },
+      {
+        name: 'bookings',
+        run: (t, s, e) =>
+          this.moduleRef.get(BookingsService, { strict: false }).calculateKpibyDateRangeSQL(t, s, e),
+      },
       {
         name: 'restaurant',
         run: (t, s, e) =>
           this.moduleRef
             .get(RestaurantService, { strict: false })
             .calculateKpisByDateRange(t, s, e),
+      },
+      {
+        name: 'governance',
+        run: (t, s, e) =>
+          this.moduleRef
+            .get(GovernanceService, { strict: false })
+            .calculateKpibyDateRangeSQL(t, s, e),
       },
     ];
 

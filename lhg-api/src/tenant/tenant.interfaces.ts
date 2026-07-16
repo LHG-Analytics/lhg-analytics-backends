@@ -16,6 +16,8 @@ export interface TenantGovernanceConfig {
   /** id_cargo do supervisor (vistorias) */
   supervisorCargoId: number;
   terceirizados: TerceirizadosStrategy;
+  /** id_cargo considerados no dimensionamento de equipe (difere de camareirasCargoIds em várias unidades) */
+  teamSizingCargoIds: number[];
   /** funcionario.id excluídos do dimensionamento de equipe */
   excludedEmployeeIds: number[];
 }
@@ -59,4 +61,10 @@ export interface TenantConfig {
   restaurant: TenantRestaurantConfig;
   /** thresholds de classificação de locações por duração, em ordem crescente */
   rentalTypes: RentalTypeThreshold[];
+  /**
+   * Regras estendidas de classificação (DAY_USE/OVERNIGHT/DAILY por horário de
+   * check-in/out quando há reserva). true no padrão Lush; false em adc/altana
+   * (classificam só por duração).
+   */
+  extendedRentalRules: boolean;
 }

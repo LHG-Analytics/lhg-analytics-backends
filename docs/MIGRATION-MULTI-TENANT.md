@@ -190,7 +190,13 @@ Executada em 2026-07-16 com D1–D3 decididos:
 - [x] **`restaurant` portado** (base: altana, o canônico com líquido/catch-all) parametrizado por `tenant.restaurant.*`. Rota: `GET /:unit/api/Restaurants/restaurants/date-range`.
 - [x] Warmup multi-unidade: `POST /api/cache/warmup` aquece TODAS as unidades (6 × 4 períodos, concorrência 3, TTL 12h); `GET /api/cache/status` com resumo por unidade.
 - [x] Swagger em `/api/docs`.
-- [ ] Portar `governance` → `bookings` → `company` (company migra de `prismaLocal.$queryRaw` para pools `pg` no processo).
+- [x] **`governance`, `bookings` e `company` portados** (base canônica: lapa/Grupo B). Detalhes:
+  - Company já veio 100% em `pg` (o Grupo B tinha migrado de Prisma) → **lhg-api não tem Prisma**.
+  - Governance parametrizado: camareiras/supervisor/teamSizing/excluídos/terceirizados (estratégia por unidade) via registry.
+  - Bookings: `determineRentalPeriod` dirigido por `tenant.rentalTypes` + flag `extendedRentalRules` (altana 1h/2h/4h/12h; adc só duração).
+  - Warmup agora cobre 4 serviços × 6 unidades × 4 períodos = 96 entradas.
+  - **Smoke test integral (2026-07-16)**: 403 cross-tenant (GERENTE LIV → /altana), e os 4 domínios respondendo com dados reais do Altana; Altana e Liv servidos **pelo mesmo processo** com cache por unidade (giro do Liv = 1,94, batendo com o valor pós-correção — validação cruzada).
+- [ ] Conhecidos para a paridade (Fase 3): variantes locais de rentalType do tout (classificação inline por hora 13h) e adc — reconciliar ou registrar como drift aceito.
 - [ ] Adicionar `lhg-api` ao PM2/warmup do CI quando entrar em shadow (Fase 3).
 
 ### Fase 3 — Paridade (shadow testing)

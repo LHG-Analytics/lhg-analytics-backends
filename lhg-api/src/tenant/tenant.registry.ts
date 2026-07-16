@@ -39,6 +39,7 @@ export const TENANTS: Record<string, TenantConfig> = {
       camareirasCargoIds: [4, 45],
       supervisorCargoId: 24,
       terceirizados: { kind: 'byEmployeeIds', ids: [998548, 1047691, 1047692] },
+      teamSizingCargoIds: [4],
       excludedEmployeeIds: [1047694, 20388],
     },
     restaurant: {
@@ -51,6 +52,7 @@ export const TENANTS: Record<string, TenantConfig> = {
       bLeastRankingIds: [56, 79, 54, 55, 80, 53],
     },
     rentalTypes: DEFAULT_RENTAL_TYPES,
+    extendedRentalRules: true,
   },
 
   lush_lapa: {
@@ -63,6 +65,7 @@ export const TENANTS: Record<string, TenantConfig> = {
       camareirasCargoIds: [4, 20],
       supervisorCargoId: 19,
       terceirizados: { kind: 'byEmployeeIds', ids: [32118, 32120, 32121] },
+      teamSizingCargoIds: [4],
       excludedEmployeeIds: [112857, 3361],
     },
     restaurant: {
@@ -75,6 +78,7 @@ export const TENANTS: Record<string, TenantConfig> = {
       bLeastRankingIds: [40, 34, 15, 26, 25, 35],
     },
     rentalTypes: DEFAULT_RENTAL_TYPES,
+    extendedRentalRules: true,
   },
 
   tout: {
@@ -87,7 +91,8 @@ export const TENANTS: Record<string, TenantConfig> = {
       camareirasCargoIds: [4, 20],
       supervisorCargoId: 2,
       terceirizados: { kind: 'none' },
-      excludedEmployeeIds: [],
+      teamSizingCargoIds: [4],
+      excludedEmployeeIds: [164635],
     },
     restaurant: {
       abProductTypeIds: [35, 59, 49, 50, 60, 62, 23, 1, 4, 12, 46, 11, 14, 42, 13],
@@ -99,6 +104,7 @@ export const TENANTS: Record<string, TenantConfig> = {
       bLeastRankingIds: [49, 50, 60, 62, 23, 35],
     },
     rentalTypes: DEFAULT_RENTAL_TYPES,
+    extendedRentalRules: true,
   },
 
   andar_de_cima: {
@@ -111,7 +117,8 @@ export const TENANTS: Record<string, TenantConfig> = {
       camareirasCargoIds: [7, 13],
       supervisorCargoId: 6,
       terceirizados: { kind: 'none' },
-      excludedEmployeeIds: [],
+      teamSizingCargoIds: [7],
+      excludedEmployeeIds: [11],
     },
     restaurant: {
       abProductTypeIds: [6, 13, 2, 4, 5, 3, 20, 14, 16, 18, 7, 15, 17],
@@ -123,6 +130,7 @@ export const TENANTS: Record<string, TenantConfig> = {
       bLeastRankingIds: [6, 13, 2, 4, 5, 3, 20],
     },
     rentalTypes: DEFAULT_RENTAL_TYPES,
+    extendedRentalRules: false,
   },
 
   liv: {
@@ -135,6 +143,7 @@ export const TENANTS: Record<string, TenantConfig> = {
       camareirasCargoIds: [4],
       supervisorCargoId: 7,
       terceirizados: { kind: 'byNullSchedule' },
+      teamSizingCargoIds: [4],
       excludedEmployeeIds: [],
     },
     restaurant: {
@@ -147,6 +156,7 @@ export const TENANTS: Record<string, TenantConfig> = {
       bLeastRankingIds: [31, 15, 12, 16, 9],
     },
     rentalTypes: DEFAULT_RENTAL_TYPES,
+    extendedRentalRules: true,
   },
 
   altana: {
@@ -159,6 +169,7 @@ export const TENANTS: Record<string, TenantConfig> = {
       camareirasCargoIds: [6, 7],
       supervisorCargoId: 3,
       terceirizados: { kind: 'none' },
+      teamSizingCargoIds: [6, 7],
       excludedEmployeeIds: [],
     },
     restaurant: {
@@ -171,6 +182,7 @@ export const TENANTS: Record<string, TenantConfig> = {
       bLeastRankingIds: [1, 17, 19, 20, 23, 24],
     },
     rentalTypes: ALTANA_RENTAL_TYPES,
+    extendedRentalRules: false,
   },
 };
 

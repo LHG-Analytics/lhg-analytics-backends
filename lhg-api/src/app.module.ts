@@ -10,6 +10,9 @@ import {
 import { DatabaseModule } from './database/database.module';
 import { CacheModule } from './cache/cache.module';
 import { RestaurantModule } from './restaurant/restaurant.module';
+import { GovernanceModule } from './governance/governance.module';
+import { BookingsModule } from './bookings/bookings.module';
+import { CompanyModule } from './company/company.module';
 
 @Module({
   imports: [
@@ -21,6 +24,9 @@ import { RestaurantModule } from './restaurant/restaurant.module';
     DatabaseModule,
     CacheModule,
     RestaurantModule,
+    GovernanceModule,
+    BookingsModule,
+    CompanyModule,
   ],
   providers: [
     {
