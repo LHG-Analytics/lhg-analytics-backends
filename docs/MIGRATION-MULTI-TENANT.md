@@ -199,9 +199,12 @@ Executada em 2026-07-16 com D1–D3 decididos:
 - [ ] Conhecidos para a paridade (Fase 3): variantes locais de rentalType do tout (classificação inline por hora 13h) e adc — reconciliar ou registrar como drift aceito.
 - [ ] Adicionar `lhg-api` ao PM2/warmup do CI quando entrar em shadow (Fase 3).
 
-### Fase 3 — Paridade (shadow testing)
-- [ ] Rodar `lhg-api` em paralelo com os 6 (porta nova no PM2, sem tráfego real).
-- [ ] Script de paridade: para cada unidade × serviço × período (7d/mês passado/mês atual/YTD), comparar JSON do backend antigo vs novo (tolerância de arredondamento). **Critério de saída: 100% dos KPIs batendo** para 2 ciclos de warmup consecutivos.
+### Fase 3 — Paridade (shadow testing) 🔄 em andamento
+- [x] **Script oficial**: `scripts/parity-check.mjs` — compara o JSON COMPLETO dos 4 endpoints (old × new) com tolerância de centavos, reporta diffs por caminho. Uso no cabeçalho do arquivo.
+- [x] **Ajustes p/ staging**: lhg-api respeita `PORT` do Render + `GET /health`.
+- [x] **Primeira rodada real (2026-07-16, local)**: altana antigo (:3007) × lhg-api (:3010) → **8/8 células 100% idênticas** (4 serviços × 2 períodos). A rodada revelou e corrigiu 3 configs por unidade que faltavam no registry: `billingRentalType` (CASE SQL + labels — altana 1h/2h/4h/12h), `bookingChannels` (altana 5; adc tem AIRBNB; demais 7) e `rentalCounts`/default do ReservationsByRentalType. Aprendizado: rodar paridade com os DOIS caches nascendo juntos (dados vivos driftam entre instantes de cálculo).
+- [ ] Staging no Render (ver `docs/STAGING.md`) + paridade completa: 6 unidades × 4 serviços × 3 períodos contra produção. **Critério de saída: 100% por 2 ciclos.**
+- [ ] Validação humana no frontend preview (irmão), com a lista de deltas esperados (nenhum — Fase 1 já está em produção).
 
 ### Fase 4 — Cutover incremental
 - [ ] No proxy `server.mjs`, apontar UMA unidade (sugestão: `tout`, menor risco) para o `lhg-api`; observar 2–3 dias.

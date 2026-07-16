@@ -28,6 +28,51 @@ const ALTANA_RENTAL_TYPES: RentalTypeThreshold[] = [
   { type: 'TWELVE_HOURS', maxSeconds: 12 * 3600 + TOLERANCE },
 ];
 
+/** CASE de rental type do BillingRentalType (company) — padrão Lush (3/6/12 + horários) */
+const DEFAULT_BILLING_RENTAL_TYPE = {
+  sqlCaseBody: `
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 11.5 AND 12.5 THEN 'TWELVE_HOURS'
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 13 THEN 'DAY_USE'
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 15 THEN 'DAILY'
+          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 20 THEN 'OVERNIGHT'
+          ELSE 'THREE_HOURS'`,
+  types: [
+    { key: 'THREE_HOURS', label: '3 Horas' },
+    { key: 'SIX_HOURS', label: '6 Horas' },
+    { key: 'TWELVE_HOURS', label: '12 Horas' },
+    { key: 'DAY_USE', label: 'Dayuse' },
+    { key: 'DAILY', label: 'Diária' },
+    { key: 'OVERNIGHT', label: 'Pernoite' },
+  ],
+};
+
+/** Altana: 1h/2h/4h/12h por duração pura */
+const ALTANA_BILLING_RENTAL_TYPE = {
+  sqlCaseBody: `
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 <= 1.25 THEN 'ONE_HOUR'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 <= 2.25 THEN 'TWO_HOURS'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 <= 4.25 THEN 'FOUR_HOURS'
+          ELSE 'TWELVE_HOURS'`,
+  types: [
+    { key: 'ONE_HOUR', label: '1 Hora' },
+    { key: 'TWO_HOURS', label: '2 Horas' },
+    { key: 'FOUR_HOURS', label: '4 Horas' },
+    { key: 'TWELVE_HOURS', label: '12 Horas' },
+  ],
+};
+
+/** Canais do BillingPerChannel — padrão (5 unidades) */
+const DEFAULT_BOOKING_CHANNELS = [
+  'EXPEDIA',
+  'BOOKING',
+  'GUIA_SCHEDULED',
+  'GUIA_GO',
+  'INTERNAL',
+  'WEBSITE_IMMEDIATE',
+  'WEBSITE_SCHEDULED',
+];
+
 export const TENANTS: Record<string, TenantConfig> = {
   lush_ipiranga: {
     slug: 'lush_ipiranga',
@@ -53,6 +98,8 @@ export const TENANTS: Record<string, TenantConfig> = {
     },
     rentalTypes: DEFAULT_RENTAL_TYPES,
     extendedRentalRules: true,
+    billingRentalType: DEFAULT_BILLING_RENTAL_TYPE,
+    bookingChannels: DEFAULT_BOOKING_CHANNELS,
   },
 
   lush_lapa: {
@@ -79,6 +126,8 @@ export const TENANTS: Record<string, TenantConfig> = {
     },
     rentalTypes: DEFAULT_RENTAL_TYPES,
     extendedRentalRules: true,
+    billingRentalType: DEFAULT_BILLING_RENTAL_TYPE,
+    bookingChannels: DEFAULT_BOOKING_CHANNELS,
   },
 
   tout: {
@@ -105,6 +154,8 @@ export const TENANTS: Record<string, TenantConfig> = {
     },
     rentalTypes: DEFAULT_RENTAL_TYPES,
     extendedRentalRules: true,
+    billingRentalType: DEFAULT_BILLING_RENTAL_TYPE,
+    bookingChannels: DEFAULT_BOOKING_CHANNELS,
   },
 
   andar_de_cima: {
@@ -131,6 +182,17 @@ export const TENANTS: Record<string, TenantConfig> = {
     },
     rentalTypes: DEFAULT_RENTAL_TYPES,
     extendedRentalRules: false,
+    billingRentalType: DEFAULT_BILLING_RENTAL_TYPE,
+    bookingChannels: [
+      'EXPEDIA',
+      'BOOKING',
+      'AIRBNB',
+      'GUIA_SCHEDULED',
+      'GUIA_GO',
+      'INTERNAL',
+      'WEBSITE_IMMEDIATE',
+      'WEBSITE_SCHEDULED',
+    ],
   },
 
   liv: {
@@ -157,6 +219,8 @@ export const TENANTS: Record<string, TenantConfig> = {
     },
     rentalTypes: DEFAULT_RENTAL_TYPES,
     extendedRentalRules: true,
+    billingRentalType: DEFAULT_BILLING_RENTAL_TYPE,
+    bookingChannels: DEFAULT_BOOKING_CHANNELS,
   },
 
   altana: {
@@ -183,6 +247,14 @@ export const TENANTS: Record<string, TenantConfig> = {
     },
     rentalTypes: ALTANA_RENTAL_TYPES,
     extendedRentalRules: false,
+    billingRentalType: ALTANA_BILLING_RENTAL_TYPE,
+    bookingChannels: [
+      'GUIA_SCHEDULED',
+      'GUIA_GO',
+      'INTERNAL',
+      'WEBSITE_IMMEDIATE',
+      'WEBSITE_SCHEDULED',
+    ],
   },
 };
 

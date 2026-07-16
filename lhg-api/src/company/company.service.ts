@@ -435,6 +435,8 @@ export class CompanyService {
   ): Promise<CompanyKpiApexChartsResponse> {
     // Lista de categorias de suíte da unidade (tenant registry) — usada em todas as queries
     const suiteIdsSqlList = tenant.suiteCategoryIds.join(',');
+    // Corpo do CASE de classificação de rental type (BillingRentalType) — varia por unidade
+    const billingCaseBody = tenant.billingRentalType.sqlCaseBody;
     // Controller já adiciona D+1, não precisa fazer novamente aqui
     // Formatação das datas para SQL (seguindo padrão do bookings.service)
     const formattedStart = moment.utc(startDate).format('YYYY-MM-DD HH:mm:ss');
@@ -705,13 +707,7 @@ export class CompanyService {
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END as date,
-        CASE
-          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
-          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 11.5 AND 12.5 THEN 'TWELVE_HOURS'
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 13 THEN 'DAY_USE'
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 15 THEN 'DAILY'
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 20 THEN 'OVERNIGHT'
-          ELSE 'THREE_HOURS'
+        CASE ${billingCaseBody}
         END as rental_type,
         COALESCE(SUM(
           COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
@@ -730,13 +726,7 @@ export class CompanyService {
           WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
           ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
         END,
-        CASE
-          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
-          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 11.5 AND 12.5 THEN 'TWELVE_HOURS'
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 13 THEN 'DAY_USE'
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 15 THEN 'DAILY'
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) = 20 THEN 'OVERNIGHT'
-          ELSE 'THREE_HOURS'
+        CASE ${billingCaseBody}
         END
       ORDER BY date, rental_type
     `;
@@ -1147,25 +1137,11 @@ export class CompanyService {
       billingDataMap.get(dateKey)![item.rental_type] = currentValue + Number(item.total_revenue);
     });
 
-    // BillingRentalType seguindo padrão do bookings.service
-    const allRentalTypes = [
-      'THREE_HOURS',
-      'SIX_HOURS',
-      'TWELVE_HOURS',
-      'DAY_USE',
-      'DAILY',
-      'OVERNIGHT',
-    ];
-
-    // Mapeamento para exibição em português
-    const rentalTypeLabels: Record<string, string> = {
-      THREE_HOURS: '3 Horas',
-      SIX_HOURS: '6 Horas',
-      TWELVE_HOURS: '12 Horas',
-      DAY_USE: 'Dayuse',
-      DAILY: 'Diária',
-      OVERNIGHT: 'Pernoite',
-    };
+    // BillingRentalType — tipos, ordem e rótulos vêm do tenant registry (variam por unidade)
+    const allRentalTypes = tenant.billingRentalType.types.map((t) => t.key);
+    const rentalTypeLabels: Record<string, string> = Object.fromEntries(
+      tenant.billingRentalType.types.map((t) => [t.key, t.label]),
+    );
 
     const billingRentalType: ApexChartsSeriesData = {
       categories: [...periodsArray],

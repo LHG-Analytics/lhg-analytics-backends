@@ -62,6 +62,16 @@ export interface TenantConfig {
   /** thresholds de classificação de locações por duração, em ordem crescente */
   rentalTypes: RentalTypeThreshold[];
   /**
+   * Classificação de rental type NO SQL (BillingRentalType do company) —
+   * corpo do CASE (só os WHEN/ELSE) + tipos na ordem das séries do gráfico, com rótulo.
+   */
+  billingRentalType: {
+    sqlCaseBody: string;
+    types: { key: string; label: string }[];
+  };
+  /** Categorias de canal do gráfico BillingPerChannel (ordem de exibição) */
+  bookingChannels: string[];
+  /**
    * Regras estendidas de classificação (DAY_USE/OVERNIGHT/DAILY por horário de
    * check-in/out quando há reserva). true no padrão Lush; false em adc/altana
    * (classificam só por duração).

@@ -63,7 +63,8 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  const port = process.env.PORT_LHG_API || 3010;
+  // Render injeta PORT; local usa PORT_LHG_API (3010) para não colidir com os backends antigos
+  const port = process.env.PORT || process.env.PORT_LHG_API || 3010;
   await app.listen(port, '0.0.0.0');
   console.log(`🚀 lhg-api (multi-tenant) rodando na porta ${port}`);
 }

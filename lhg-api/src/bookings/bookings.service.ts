@@ -546,16 +546,8 @@ FROM vendas_diretas vd, locacoes loc;
       series: paymentMethodsData.map((item: any) => Number(item.totalValue)),
     };
 
-    // Definir todas as categorias de canal possíveis na ordem desejada
-    const allChannelCategories = [
-      'EXPEDIA',
-      'BOOKING',
-      'GUIA_SCHEDULED',
-      'GUIA_GO',
-      'INTERNAL',
-      'WEBSITE_IMMEDIATE',
-      'WEBSITE_SCHEDULED',
-    ];
+    // Categorias de canal na ordem de exibição — variam por unidade (tenant registry)
+    const allChannelCategories = tenant.bookingChannels;
 
     // Criar mapa dos dados retornados da query
     const channelDataMap = new Map();
@@ -569,28 +561,25 @@ FROM vendas_diretas vd, locacoes loc;
       series: allChannelCategories.map((category) => channelDataMap.get(category) || 0),
     };
 
-    // Processa os tipos de locação usando a lógica existente
-    const rentalCounts = {
-      THREE_HOURS: 0,
-      SIX_HOURS: 0,
-      TWELVE_HOURS: 0,
-      DAY_USE: 0,
-      OVERNIGHT: 0,
-      DAILY: 0,
-    };
+    // Tipos de locação da unidade (tenant registry) + regras estendidas quando aplicáveis
+    const rentalCounts: Record<string, number> = Object.fromEntries([
+      ...tenant.rentalTypes.map((t) => [t.type, 0]),
+      ...(tenant.extendedRentalRules
+        ? [
+            ['DAY_USE', 0],
+            ['OVERNIGHT', 0],
+            ['DAILY', 0],
+          ]
+        : []),
+    ]);
 
     let validRecordsCount = 0;
     let invalidRecordsCount = 0;
 
-    // Objetos para armazenar receita por tipo de reserva
-    const rentalRevenue = {
-      THREE_HOURS: 0,
-      SIX_HOURS: 0,
-      TWELVE_HOURS: 0,
-      DAY_USE: 0,
-      OVERNIGHT: 0,
-      DAILY: 0,
-    };
+    // Receita por tipo de reserva — mesmas chaves do rentalCounts (tenant-driven)
+    const rentalRevenue: Record<string, number> = Object.fromEntries(
+      Object.keys(rentalCounts).map((k) => [k, 0]),
+    );
 
     // Calcula o tipo de locação para cada reserva
     rentalTypeData.forEach((booking: any) => {
@@ -603,12 +592,12 @@ FROM vendas_diretas vd, locacoes loc;
 
         let rentalType = '';
 
-        // Períodos programados - não precisa calcular encerramento_previsto
-        if (hora === 13) {
+        // Períodos programados (Dayuse/Pernoite/Diária) — só nas unidades com regras estendidas
+        if (tenant.extendedRentalRules && hora === 13) {
           rentalType = 'DAY_USE'; // 13:00 - Dayuse
-        } else if (hora === 20) {
+        } else if (tenant.extendedRentalRules && hora === 20) {
           rentalType = 'OVERNIGHT'; // 20:00 - Pernoite
-        } else if (hora === 15) {
+        } else if (tenant.extendedRentalRules && hora === 15) {
           rentalType = 'DAILY'; // 15:00 - Diária
         } else {
           // Para períodos imediatos, usa checkIn/checkOut da locacaoapartamento
@@ -617,8 +606,9 @@ FROM vendas_diretas vd, locacoes loc;
             const checkOutDate = new Date(booking.checkOut);
             rentalType = this.determineRentalPeriod(tenant, checkInDate, checkOutDate, rentalTypeData);
           } else {
-            // Default para THREE_HOURS quando não tem locacaoapartamento vinculada
-            rentalType = 'THREE_HOURS';
+            // Default quando não há locacaoapartamento vinculada: o menor tipo da unidade
+            // (padrão Lush: THREE_HOURS; altana: ONE_HOUR — comportamento dos backends antigos)
+            rentalType = tenant.rentalTypes[0].type;
           }
         }
 

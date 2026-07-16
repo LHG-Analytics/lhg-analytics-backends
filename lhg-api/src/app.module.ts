@@ -7,6 +7,7 @@ import {
   QueryUtilsModule,
   ValidationModule,
 } from '@lhg/utils';
+import { HealthController } from './health.controller';
 import { DatabaseModule } from './database/database.module';
 import { CacheModule } from './cache/cache.module';
 import { RestaurantModule } from './restaurant/restaurant.module';
@@ -28,6 +29,7 @@ import { CompanyModule } from './company/company.module';
     BookingsModule,
     CompanyModule,
   ],
+  controllers: [HealthController],
   providers: [
     {
       provide: APP_GUARD,
