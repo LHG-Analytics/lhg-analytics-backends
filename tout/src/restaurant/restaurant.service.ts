@@ -160,10 +160,13 @@ export class RestaurantService {
     const othersList = [38, 3, 41, 36, 43, 25];
 
     // Formatação segura de datas usando QueryUtilsService
-    // NOTA: mantém as bordas 00:00–23:59 (dia civil) que o tout usa hoje.
-    // As demais unidades usam dia comercial 06:00–05:59 — alinhamento pendente de decisão (muda números).
-    const startForDate = moment.utc(startDate).set({ hour: 0, minute: 0, second: 0 }).toDate();
-    const endForDate = moment.utc(endDate).set({ hour: 23, minute: 59, second: 59 }).toDate();
+    // Dia comercial 06:00–05:59 (D+1), alinhado às demais unidades (decisão D7, 2026-07-16)
+    const startForDate = moment.utc(startDate).set({ hour: 6, minute: 0, second: 0 }).toDate();
+    const endForDate = moment
+      .utc(endDate)
+      .add(1, 'day')
+      .set({ hour: 5, minute: 59, second: 59 })
+      .toDate();
 
     const formattedStart = this.queryUtils.formatDateToSQL(startForDate);
     const formattedEnd = this.queryUtils.formatDateToSQL(endForDate);

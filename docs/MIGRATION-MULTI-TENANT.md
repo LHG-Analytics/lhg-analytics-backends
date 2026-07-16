@@ -151,7 +151,7 @@ Canônico novo: `/:unit/api/{Company|Bookings|Restaurants|Governance|auth|cache}
 | D4 | `RentalTypeEnum` do Altana | ⏳ Recomendação: manter por tenant no registry |
 | D5 | Absorver `authentication` no unificado? | ⏳ Recomendação: manter separado na v1 (menos risco) |
 | D6 | Redis para cache | ⏳ Recomendação: depois do cutover |
-| D7 | **Janela de datas do restaurant do tout**: usa dia civil 00:00–23:59; as demais unidades usam dia comercial 06:00–05:59 | ⏳ **NOVO** (descoberto na Fase 1). Alinhar muda os números de A&B do tout — decidir antes da Fase 2. A parte mecânica (queryUtils/sanitize) já foi padronizada preservando o comportamento atual. |
+| D7 | **Janela de datas do restaurant do tout**: usava dia civil 00:00–23:59 | ✅ **DECIDIDO (2026-07-16): alinhar ao dia comercial 06:00–05:59** como as demais unidades. Impacto medido: −2,3% no A&B dos últimos 7 dias. |
 
 ## 5. Fases
 
@@ -171,7 +171,13 @@ Executada em 2026-07-16 com D1–D3 decididos:
 - [x] D3: governance da Lapa normalizado 04→06h. **Muda governance da Lapa.**
 - [x] Filtros `ca.descricao` → `ca.id` em ipiranga (9 IDs) e lapa (8 IDs) — os 6 company services agora filtram só por ID. **Corrige o Giro/Trevpar inflado do ipiranga** (mesmo bug do LIV corrigido em jul/2026).
 - [x] tout/restaurant: `queryUtils.formatDateToSQL` + `sanitizeIdList` (mecânico, sem mudança de números; janela civil preservada → ver D7).
-- [ ] **Validação em produção**: após deploy da branch, comparar KPIs antes/depois por unidade (reservas ipiranga/liv, governance lapa, giro ipiranga) e validar com o relatório do AUTOMO.
+- [x] **Validação direta nos bancos AUTOMO** (2026-07-16, janela 09–15/07, queries antigas vs novas lado a lado):
+  - Bookings **ipiranga**: antiga R$ 79.153,08 (129 res.) → nova R$ 76.378,18 (126 res.) = **−3,5%** (a antiga incluía origem 7 por `datainicio`, cancelamentos tardios e fallback de permanência). Bookings **liv**: **delta zero** na janela (nenhuma reserva afetada pelas regras extras).
+  - Governance **lapa** (04h→06h): 393 → 395 limpezas (**+2**, impacto mínimo).
+  - **ipiranga nome×ID**: conjuntos IDÊNTICOS (61 = 61 suítes, 9 categorias 1:1) — o ipiranga **não** tinha o bug do LIV; a conversão para ID é robustez pura, delta zero.
+  - **D2 semanal (ipiranga)**: variante antiga vs nova = **61/61 células (categoria×dia) idênticas** ✅ equivalência numérica comprovada.
+  - **D7 tout A&B** (civil→comercial): R$ 21.873,34 → R$ 21.378,34 = **−2,3%** na janela.
+- [ ] Conferir os novos números no dashboard contra o relatório do AUTOMO após o deploy da branch (sanity check final com o negócio).
 
 **Racional**: unificar ANTES de reconciliar espalharia mudanças de números no meio do refactor, impossibilitando o teste de paridade da Fase 3.
 
