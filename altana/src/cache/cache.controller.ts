@@ -221,7 +221,27 @@ export class CacheController {
       }
     }
 
-    // Executa warmup/refresh para cada combinação de serviço x período
+    // TTL longo (>= maior intervalo entre warmups; cron 3,9,15,18 UTC → gap máx 9h)
+    // para que todos os períodos fiquem populados até o próximo warmup.
+    const WARMUP_TTL_SECONDS = 12 * 60 * 60; // 12h
+    // Concorrência: o pool do Postgres (máx 5 conexões) é o limitante real do DB;
+    // limitamos aqui para não segurar muitos result sets grandes em memória de uma vez.
+    const WARMUP_CONCURRENCY = 3;
+
+    // Worker pool simples: roda as tarefas com no máximo `limit` em paralelo
+    const runWithConcurrency = async (jobs: (() => Promise<void>)[], limit: number) => {
+      let idx = 0;
+      const workers = Array.from({ length: Math.min(limit, jobs.length) }, async () => {
+        while (idx < jobs.length) {
+          const current = idx++;
+          await jobs[current]();
+        }
+      });
+      await Promise.all(workers);
+    };
+
+    // Monta todas as combinações serviço × período como tarefas
+    const tasks: (() => Promise<void>)[] = [];
     for (const svcConfig of servicesConfig) {
       const service = this.getService(svcConfig.token);
       if (!service) {
@@ -230,42 +250,50 @@ export class CacheController {
       }
 
       for (const period of periods) {
-        const resultKey = `${svcConfig.name}:${period.name}`;
-        try {
-          // Usa getOrCalculate para forçar o cálculo e salvar em cache
-          const result = await this.cacheService.getOrCalculate(
-            svcConfig.serviceName,
-            period.period,
-            () => (service as any)[svcConfig.method](period.start, period.end),
-            period.period === CachePeriodEnum.CUSTOM
-              ? { start: period.start, end: period.end }
-              : undefined,
-          );
+        tasks.push(async () => {
+          const resultKey = `${svcConfig.name}:${period.name}`;
+          const dateRange = `${moment(period.start).format('DD/MM/YYYY')} - ${moment(period.end).format('DD/MM/YYYY')}`;
+          try {
+            // Recalcula sempre (dados "até ontem" mudam a cada dia) e grava com TTL longo.
+            const calcStart = Date.now();
+            const data = await (service as any)[svcConfig.method](period.start, period.end);
+            const calculationTime = Date.now() - calcStart;
 
-          results.push({
-            service: svcConfig.name,
-            period: period.name,
-            dateRange: `${moment(period.start).format('DD/MM/YYYY')} - ${moment(period.end).format('DD/MM/YYYY')}`,
-            fromCache: result.fromCache,
-            calculationTime: result.calculationTime,
-          });
+            await this.cacheService.set(
+              svcConfig.serviceName,
+              period.period,
+              data,
+              period.period === CachePeriodEnum.CUSTOM
+                ? { start: period.start, end: period.end }
+                : undefined,
+              WARMUP_TTL_SECONDS,
+            );
 
-          this.logger.log(
-            `${resultKey}: ${result.fromCache ? 'CACHE HIT' : `CALCULATED (${result.calculationTime}ms)`}`,
-          );
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          this.logger.error(`${resultKey}: ERROR - ${errorMsg}`);
-          results.push({
-            service: svcConfig.name,
-            period: period.name,
-            dateRange: `${moment(period.start).format('DD/MM/YYYY')} - ${moment(period.end).format('DD/MM/YYYY')}`,
-            fromCache: false,
-            error: errorMsg,
-          });
-        }
+            results.push({
+              service: svcConfig.name,
+              period: period.name,
+              dateRange,
+              fromCache: false,
+              calculationTime,
+            });
+            this.logger.log(`${resultKey}: CALCULATED (${calculationTime}ms)`);
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(`${resultKey}: ERROR - ${errorMsg}`);
+            results.push({
+              service: svcConfig.name,
+              period: period.name,
+              dateRange,
+              fromCache: false,
+              error: errorMsg,
+            });
+          }
+        });
       }
     }
+
+    // Executa com concorrência limitada
+    await runWithConcurrency(tasks, WARMUP_CONCURRENCY);
 
     const totalTime = Date.now() - startTime;
     const fromCache = results.filter((r) => r.fromCache && !r.error).length;

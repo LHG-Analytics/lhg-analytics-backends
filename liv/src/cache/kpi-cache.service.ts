@@ -103,9 +103,10 @@ export class KpiCacheService {
     period: CachePeriodEnum,
     data: T,
     customDates?: DateRange,
+    ttlSecondsOverride?: number,
   ): Promise<void> {
     const key = this.buildCacheKey(service, period, customDates);
-    const ttl = this.getTTL(period, customDates);
+    const ttl = ttlSecondsOverride ?? this.getTTL(period, customDates);
 
     try {
       // Limpa cache se excedeu tamanho máximo
