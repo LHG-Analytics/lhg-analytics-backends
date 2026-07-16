@@ -1,93 +1,81 @@
-# Staging do `lhg-api` no Render (Fase 3 da migração)
+# Staging do `lhg-api` (Fase 3 da migração)
 
 Objetivo: colocar o backend multi-tenant online **sem tocar em produção**, para
-validação humana (dashboards) e para o `scripts/parity-check.mjs` rodar contra
-produção × staging.
+validação humana (dashboards) e para o `scripts/parity-check.mjs` rodar
+old×new lado a lado.
 
-## 1. Criar o serviço no Render
+## Opção A (ATUAL): staging existente da branch `developer` ✅
 
-**New → Web Service**, apontando para este repositório:
+O projeto já tem um ambiente de staging que deploya a branch **`developer`**
+(mesma topologia de produção: PM2 + proxy + backends por unidade). Com a
+`refactor` mergeada na `developer`, esse ambiente também roda o **lhg-api**:
 
-| Campo | Valor |
-|-------|-------|
-| Name | `lhg-api-staging` |
-| Branch | **`refactor`** ← a chave: staging acompanha a branch, produção continua no master |
-| Root Directory | (vazio — raiz do repo) |
-| Runtime | Node |
-| Build Command | `npm install && npm run build:api` |
-| Start Command | `node lhg-api/dist/main.js` |
-| Health Check Path | `/health` |
-| Instance | o menor pago que não hiberne (free hiberna e perde o cache em memória) |
+- `ecosystem.config.js` ganhou o app `lhg-api` (porta interna 3010), reusando
+  as MESMAS env vars que o serviço já tem (`DATABASE_URL_LOCAL_*`, `JWT_SECRET`).
+- `server.mjs` ganhou a rota `/lhg/*` → lhg-api (com strip do prefixo).
 
-Auto-deploy ligado na branch `refactor` = cada push nosso atualiza o staging.
-
-## 2. Variáveis de ambiente (dashboard do Render)
-
-Obrigatórias:
+URLs no staging (host = o do serviço da branch developer):
 
 ```
-JWT_SECRET                       ← MESMO valor dos serviços atuais (o login de produção passa a valer no staging)
-DATABASE_URL_LOCAL_IPIRANGA      ← as mesmas de produção (consulta/read-only)
-DATABASE_URL_LOCAL_LAPA
-DATABASE_URL_LOCAL_TOUT
-DATABASE_URL_LOCAL_ANDAR_DE_CIMA
-DATABASE_URL_LOCAL_LIV           ← usar o host que FUNCIONA (o do authentication/.env; o do liv/.env está desatualizado)
-DATABASE_URL_LOCAL_ALTANA
+https://<staging-host>/lhg/health                                  ← healthcheck
+https://<staging-host>/lhg/api/docs                                ← swagger
+https://<staging-host>/lhg/{unit}/api/Company/kpis/date-range?...  ← rotas por unidade
+https://<staging-host>/lhg/api/cache/warmup                        ← warmup all-units (POST)
+BACKENDS ANTIGOS continuam nos paths atuais: perfeito para a paridade no mesmo host.
 ```
 
-Opcionais:
+Nenhuma env var nova é necessária (o serviço já tem todas).
 
-```
-ALLOWED_ORIGINS=preview-do-frontend.vercel.app   ← origem do preview do front (CSV)
-NODE_OPTIONS=--max-old-space-size=1024
-```
+## Opção B (alternativa): serviço dedicado só para o lhg-api
 
-`PORT` é injetada pelo Render automaticamente (o main.ts respeita).
+**New → Web Service**: Branch `refactor` | Build `npm install && npm run build:api`
+| Start `node lhg-api/dist/main.js` | Health Check `/health` | envs: `JWT_SECRET`
++ 6× `DATABASE_URL_LOCAL_*` (a do LIV: usar o host do authentication/.env — o do
+liv/.env está desatualizado) + `ALLOWED_ORIGINS` opcional. `PORT` é injetada
+pelo Render (o main.ts respeita).
 
-## 3. Verificação pós-deploy (2 minutos)
+## Verificação pós-deploy (2 minutos)
 
 ```bash
+HOST=https://<staging-host>
+
 # 1. Saúde
-curl https://lhg-api-staging.onrender.com/health
+curl $HOST/lhg/health
 # → {"status":"ok","service":"lhg-api","units":[...6 slugs...]}
 
 # 2. Auth funcionando (espera 401 sem token)
-curl -i https://lhg-api-staging.onrender.com/altana/api/Company/kpis/date-range?startDate=01/07/2026&endDate=10/07/2026
+curl -i "$HOST/lhg/altana/api/Company/kpis/date-range?startDate=01/07/2026&endDate=10/07/2026"
 
 # 3. Warmup multi-unidade (popula o cache das 6 unidades de uma vez)
-curl -X POST https://lhg-api-staging.onrender.com/api/cache/warmup
-curl https://lhg-api-staging.onrender.com/api/cache/status   # byUnit deve encher
+curl -X POST $HOST/lhg/api/cache/warmup
+curl $HOST/lhg/api/cache/status   # byUnit deve encher (6 unidades × 4 serviços × 4 períodos)
 ```
 
-Swagger: `https://lhg-api-staging.onrender.com/api/docs`
+## Paridade no staging (o critério do "100%")
 
-## 4. Paridade contra produção (o critério do "100%")
-
-Do seu terminal (ou de um runner), com o `JWT_SECRET` real:
+Old e new no MESMO host — mesmo instante, mesmos bancos (elimina drift de dados vivos):
 
 ```bash
 JWT_SECRET=... \
-OLD_BASE=https://<host-de-producao>       # o proxy atual (server.mjs)
-NEW_BASE=https://lhg-api-staging.onrender.com \
+OLD_BASE=https://<staging-host> \
+NEW_BASE=https://<staging-host>/lhg \
 UNITS=lush_ipiranga,lush_lapa,tout,andar_de_cima,liv,altana \
 PERIODS=LAST_7_D,THIS_MONTH,LAST_MONTH \
 node scripts/parity-check.mjs
 ```
 
 Saída esperada: `🎉 PARIDADE 100%` (ou a lista exata de diffs por caminho do JSON).
-Exceções conhecidas/documentadas: variantes locais de rentalType do tout/adc
-(ver docs/MIGRATION-MULTI-TENANT.md, Fase 2) — se aparecerem, conferir se o diff
-está restrito a `ReservationsByRentalType`/campos de rental type.
+Rodada de referência: altana local = 8/8 idênticas (2026-07-16). Se surgirem diffs
+nas outras unidades, é provável que sejam variantes locais ainda não parametrizadas
+(caso do tout/adc em rentalType) — o diff por caminho aponta exatamente onde.
 
-⚠️ Os paths são os mesmos nos dois lados (`/{unit}/api/...`), mas no lado antigo
-o path passa pelo proxy (`/{unit}` → serviço da unidade, que tem prefixo
-`{service_prefix}/api`). Se o host antigo usado não for o proxy e sim um serviço
-direto, ajuste OLD_BASE de acordo.
+⚠️ Se um path antigo diferir (`/{unit}/{service_prefix}/api/...` via proxy),
+ajustar OLD_BASE ou o mapeamento — validar com uma unidade antes da bateria completa.
 
 ## 5. Validação pelo frontend (preview)
 
 1. Criar um preview do frontend na Vercel com os rewrites das unidades apontando
-   para `https://lhg-api-staging.onrender.com` (auth continua apontando para a
+   para `https://<staging-host>/lhg` (auth continua apontando para a
    produção — o `JWT_SECRET` é o mesmo, o cookie emitido lá vale no staging).
 2. Adicionar a origem do preview em `ALLOWED_ORIGINS` do staging.
 3. Navegar unidade por unidade × módulo por módulo comparando com produção.

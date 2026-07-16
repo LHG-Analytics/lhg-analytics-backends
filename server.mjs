@@ -26,6 +26,18 @@ app.use(
   })
 );
 
+// Backend multi-tenant unificado (lhg-api) — acesso via /lhg/{unit}/api/...
+// Permite rodar old×new lado a lado no MESMO host (paridade + validação do frontend).
+// No cutover (Fase 4), as rotas das unidades abaixo passam a apontar para ele.
+app.use(
+  "/lhg",
+  createProxyMiddleware({
+    target: "http://localhost:3010",
+    changeOrigin: true,
+    pathRewrite: { "^/lhg": "" },
+  })
+);
+
 // As outras unidades permanecem inalteradas
 app.use(
   "/lush_ipiranga",

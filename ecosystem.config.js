@@ -14,6 +14,28 @@ module.exports = {
       },
     },
     {
+      // Backend multi-tenant unificado (migração — ver docs/MIGRATION-MULTI-TENANT.md).
+      // Exposto no proxy via /lhg/* (server.mjs). No cutover (Fase 4), as rotas das
+      // unidades passam a apontar para ele e os processos antigos são desligados.
+      name: "lhg-api",
+      script: "./lhg-api/dist/main.js",
+      env: {
+        NODE_ENV: "production",
+        PORT: 3010, // fixa a porta interna (evita herdar o $PORT do Render, que é do proxy)
+        JWT_SECRET: process.env.JWT_SECRET,
+        ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
+        DATABASE_URL_LOCAL_IPIRANGA: process.env.DATABASE_URL_LOCAL_IPIRANGA,
+        DATABASE_URL_LOCAL_LAPA: process.env.DATABASE_URL_LOCAL_LAPA,
+        DATABASE_URL_LOCAL_TOUT: process.env.DATABASE_URL_LOCAL_TOUT,
+        DATABASE_URL_LOCAL_ANDAR_DE_CIMA: process.env.DATABASE_URL_LOCAL_ANDAR_DE_CIMA,
+        DATABASE_URL_LOCAL_LIV: process.env.DATABASE_URL_LOCAL_LIV,
+        DATABASE_URL_LOCAL_ALTANA: process.env.DATABASE_URL_LOCAL_ALTANA,
+      },
+      env_production: {
+        PORT: 3010,
+      },
+    },
+    {
       name: "auth",
       script: "./authentication/dist/main.js",
       env: {
