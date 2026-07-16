@@ -609,7 +609,9 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
       }
 
       const totalNetRevenue = totalGrossRevenue - totalDiscount;
-      const totalRentals = rawResult.length;
+      // Locações distintas no período (uma locação pode ter várias vendas/saídas de estoque,
+      // então rawResult.length contaria a mesma locação mais de uma vez)
+      const totalRentals = new Set(rawResult.map((r) => r.id_apartamentostate)).size;
       const totalAllTicketAverage =
         rentalsWithABCount > 0 ? totalABNetRevenue / rentalsWithABCount : 0;
       const totalAllTicketAverageByTotalRentals =
