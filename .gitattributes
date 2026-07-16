@@ -1,0 +1,15 @@
+# Normaliza line endings no repositório (LF no índice; checkout conforme core.autocrlf)
+# Contexto: altana estava em LF e as demais unidades em CRLF, poluindo diffs/merges.
+# Após clonar/atualizar, recomenda-se: git config merge.renormalize true
+* text=auto
+
+# Arquivos binários comuns — nunca normalizar
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.node binary

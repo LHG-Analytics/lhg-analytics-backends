@@ -334,60 +334,6 @@ ORDER BY
     employee_name;
 `;
 
-    // Debug: Verificar se existem dados de limpeza
-    const debugCleaningSQL = `
-      SELECT COUNT(*) as total
-      FROM "limpezaapartamento" l
-      JOIN "funcionario" f ON f.id = l."id_funcionario"
-      WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
-        AND l."datafim" IS NOT NULL
-        AND l."motivofim" = 'COMPLETA'
-        AND f."id_cargo" IN (4)
-    `;
-
-    const debugResult = await this.pgPool.query(debugCleaningSQL);
-    console.log('[DEBUG] Limpezaapartamento count:', debugResult[0]);
-
-    const debugCargoSQL = `
-      SELECT DISTINCT f."id_cargo", c."descricao"
-      FROM "funcionario" f
-      LEFT JOIN "cargo" c ON c.id = f."id_cargo"
-      LIMIT 10
-    `;
-
-    const debugCargoResult = await this.pgPool.query(debugCargoSQL);
-    console.log('[DEBUG] Cargos encontrados:', debugCargoResult);
-
-    // Debug: Verificar horarios dos funcionarios
-    const debugHorariosSQL = `
-      SELECT
-        f.id,
-        f."horarioinicioexpediente",
-        c."descricao"
-      FROM "funcionario" f
-      LEFT JOIN "cargo" c ON c.id = f."id_cargo"
-      WHERE f."id_cargo" = 4
-      LIMIT 10
-    `;
-
-    const debugHorariosResult = await this.pgPool.query(debugHorariosSQL);
-    console.log('[DEBUG] Horarios das camareiras:', debugHorariosResult);
-
-    // Debug: Verificar se tem horario NULL
-    const debugNullSQL = `
-      SELECT COUNT(*) as total
-      FROM "limpezaapartamento" l
-      JOIN "funcionario" f ON f.id = l."id_funcionario"
-      WHERE l."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}'
-        AND l."datafim" IS NOT NULL
-        AND l."motivofim" = 'COMPLETA'
-        AND f."id_cargo" = 4
-        AND (f."horarioinicioexpediente" IS NULL OR TRIM(f."horarioinicioexpediente") = '')
-    `;
-
-    const debugNullResult = await this.pgPool.query(debugNullSQL);
-    console.log('[DEBUG] Limpezas sem horario:', debugNullResult[0]);
-
     const teamSizingSQL = `
 WITH date_range AS (
   SELECT generate_series(
@@ -676,10 +622,6 @@ ORDER BY
     };
 
     const teamSizing: Record<string, any> = {};
-
-    // Debug log
-    console.log('TeamSizing result length:', teamSizingResult.length);
-    console.log('TeamSizing result:', JSON.stringify(teamSizingResult, null, 2));
 
     for (const row of teamSizingResult) {
       const shift = row.shift;
