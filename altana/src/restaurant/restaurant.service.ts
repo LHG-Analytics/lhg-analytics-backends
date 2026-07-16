@@ -139,28 +139,34 @@ export class RestaurantService {
    * Chamado pelo cache service quando há cache miss
    */
   private async _calculateKpisByDateRangeInternal(startDate: Date, endDate: Date) {
-    // Altana tipoproduto IDs:
-    // 1=BEBIDAS, 2=PRATOS PRINCIPAIS, 3=ENTRADAS, 4=SOBREMESAS, 5=CAFE DA MANHA
-    // 6=SEXSHOP, 7=BOMBONIERE
-    const abProductTypes = [1, 2, 3, 4, 5]; // A (Alimentos) + B (Bebidas)
+    // Altana tipoproduto IDs (categorização A&B por decisão do negócio):
+    //   Alimentos: 2=PRATOS PRINCIPAIS, 3=ENTRADAS, 4=SOBREMESAS, 5=CAFE DA MANHA,
+    //              14=LANCHES, 15=ACOMPANHAMENTO, 16=PETISCOS, 7=BOMBONIERE, 13=ADICIONAIS
+    //   Bebidas:   1=BEBIDAS, 17=SOFT DRINKS, 19=DOSES, 20=COQUETEIS, 23=CERVEJAS, 24=VINHOS E ESPUMANTES
+    //   Outros (não A&B): 6=SEXSHOP, 12=TABACARIA, 25=CONVENIENCIA, 9=PACOTE DE PRODUTOS e SEM TIPO (NULL)
+    const abProductTypes = [1, 2, 3, 4, 5, 7, 13, 14, 15, 16, 17, 19, 20, 23, 24]; // A + B
 
-    const aProductTypes = [2, 3, 4, 5]; // Alimentos: Pratos, Entradas, Sobremesas, Café
+    // Alimentos (inclui Bomboniere e Adicionais; contam em todos os indicadores, menos no ranking)
+    const aProductTypes = [2, 3, 4, 5, 7, 13, 14, 15, 16];
 
-    const bProductTypes = [1]; // Bebidas
+    // Bebidas
+    const bProductTypes = [1, 17, 19, 20, 23, 24];
 
-    // Alimentos para ranking
-    const aProductTypesForRanking = [2, 3, 4, 5];
+    // Ranking de Alimentos (Mais Vendidos): só pratos/itens de refeição
+    // (exclui Acompanhamento, Bomboniere e Adicionais)
+    const aProductTypesForRanking = [2, 3, 4, 5, 14, 16];
 
-    // Bebidas para ranking
-    const bProductTypesForRanking = [1];
+    // Ranking de Bebidas (Mais Vendidas): todas as bebidas
+    const bProductTypesForRanking = [1, 17, 19, 20, 23, 24];
 
-    // Alimentos para ranking de menos vendidos
-    const aProductTypesForLeastRanking = [2, 3, 4, 5];
+    // Ranking de Alimentos menos vendidos (mesma lista do mais vendidos)
+    const aProductTypesForLeastRanking = [2, 3, 4, 5, 14, 16];
 
-    // Bebidas para ranking de menos vendidos
-    const bProductTypesForLeastRanking = [1];
+    // Ranking de Bebidas menos vendidas
+    const bProductTypesForLeastRanking = [1, 17, 19, 20, 23, 24];
 
-    const othersList = [6, 7]; // SEXSHOP, BOMBONIERE
+    // "Outros" (Produtos Adicionais) = tudo que NÃO é A&B (catch-all, inclui SEM TIPO/NULL),
+    // garantindo que A&B + Outros = Receita de vendas. Ver reportByOthersSql / gráfico de grupos.
 
     // Formatação segura de datas usando QueryUtilsService
     const startForDate = moment.utc(startDate).set({ hour: 6, minute: 0, second: 0 }).toDate();
@@ -177,7 +183,6 @@ export class RestaurantService {
     const abProductTypesSqlList = this.queryUtils.sanitizeIdList(abProductTypes);
     const aProductTypesSqlList = this.queryUtils.sanitizeIdList(aProductTypes);
     const bProductTypesSqlList = this.queryUtils.sanitizeIdList(bProductTypes);
-    const othersProductTypesSqlList = this.queryUtils.sanitizeIdList(othersList);
     const aProductTypesForRankingSqlList = this.queryUtils.sanitizeIdList(aProductTypesForRanking);
     const bProductTypesForRankingSqlList = this.queryUtils.sanitizeIdList(bProductTypesForRanking);
     const aProductTypesForLeastRankingSqlList = this.queryUtils.sanitizeIdList(
@@ -301,15 +306,29 @@ export class RestaurantService {
     const bestSellingFoodSql = `
   SELECT
     p."descricao" AS "productName",
-    SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
-    SUM(soi."quantidade") AS "totalSales"
-  FROM "saidaestoque" so
-  JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-  JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
-  JOIN "produto" p ON p.id = pe."id_produto"
-  JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE tp.id IN (${aProductTypesForRankingSqlList})
-    AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    COALESCE(SUM(
+      (soi."precovenda" * soi."quantidade") * (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
+    ), 0) AS "totalRevenue",
+    COALESCE(SUM(soi."quantidade"), 0) AS "totalSales"
+  FROM "locacaoapartamento" ra
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+  LEFT JOIN "produto" p ON p.id = ps."id_produto"
+  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+  LEFT JOIN (
+    SELECT
+      soi."id_saidaestoque",
+      SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+    FROM "saidaestoqueitem" soi
+    WHERE soi."cancelado" IS NULL
+    GROUP BY soi."id_saidaestoque"
+  ) AS so_total ON so_total."id_saidaestoque" = so.id
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+    AND tp.id IN (${aProductTypesForRankingSqlList})
   GROUP BY p."descricao"
   ORDER BY "totalRevenue" DESC
   LIMIT 10;
@@ -319,15 +338,29 @@ export class RestaurantService {
     const leastSellingFoodSql = `
   SELECT
     p."descricao" AS "productName",
-    SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
-    SUM(soi."quantidade") AS "totalSales"
-  FROM "saidaestoque" so
-  JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-  JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
-  JOIN "produto" p ON p.id = pe."id_produto"
-  JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE tp.id IN (${aProductTypesForLeastRankingSqlList})
-    AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    COALESCE(SUM(
+      (soi."precovenda" * soi."quantidade") * (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
+    ), 0) AS "totalRevenue",
+    COALESCE(SUM(soi."quantidade"), 0) AS "totalSales"
+  FROM "locacaoapartamento" ra
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+  LEFT JOIN "produto" p ON p.id = ps."id_produto"
+  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+  LEFT JOIN (
+    SELECT
+      soi."id_saidaestoque",
+      SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+    FROM "saidaestoqueitem" soi
+    WHERE soi."cancelado" IS NULL
+    GROUP BY soi."id_saidaestoque"
+  ) AS so_total ON so_total."id_saidaestoque" = so.id
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+    AND tp.id IN (${aProductTypesForLeastRankingSqlList})
   GROUP BY p."descricao"
   HAVING SUM(soi."precovenda" * soi."quantidade") > 0
   ORDER BY "totalRevenue" ASC
@@ -338,15 +371,29 @@ export class RestaurantService {
     const bestSellingDrinksSql = `
   SELECT
     p."descricao" AS "productName",
-    SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
-    SUM(soi."quantidade") AS "totalSales"
-  FROM "saidaestoque" so
-  JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-  JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
-  JOIN "produto" p ON p.id = pe."id_produto"
-  JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE tp.id IN (${bProductTypesForRankingSqlList})
-    AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    COALESCE(SUM(
+      (soi."precovenda" * soi."quantidade") * (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
+    ), 0) AS "totalRevenue",
+    COALESCE(SUM(soi."quantidade"), 0) AS "totalSales"
+  FROM "locacaoapartamento" ra
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+  LEFT JOIN "produto" p ON p.id = ps."id_produto"
+  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+  LEFT JOIN (
+    SELECT
+      soi."id_saidaestoque",
+      SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+    FROM "saidaestoqueitem" soi
+    WHERE soi."cancelado" IS NULL
+    GROUP BY soi."id_saidaestoque"
+  ) AS so_total ON so_total."id_saidaestoque" = so.id
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+    AND tp.id IN (${bProductTypesForRankingSqlList})
   GROUP BY p."descricao"
   ORDER BY "totalRevenue" DESC
   LIMIT 10;
@@ -356,15 +403,29 @@ export class RestaurantService {
     const leastSellingDrinksSql = `
   SELECT
     p."descricao" AS "productName",
-    SUM(soi."precovenda" * soi."quantidade") AS "totalRevenue",
-    SUM(soi."quantidade") AS "totalSales"
-  FROM "saidaestoque" so
-  JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-  JOIN "produtoestoque" pe ON pe.id = soi."id_produtoestoque"
-  JOIN "produto" p ON p.id = pe."id_produto"
-  JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  WHERE tp.id IN (${bProductTypesForLeastRankingSqlList})
-    AND so."datasaida" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    COALESCE(SUM(
+      (soi."precovenda" * soi."quantidade") * (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
+    ), 0) AS "totalRevenue",
+    COALESCE(SUM(soi."quantidade"), 0) AS "totalSales"
+  FROM "locacaoapartamento" ra
+  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+  LEFT JOIN "produto" p ON p.id = ps."id_produto"
+  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+  LEFT JOIN (
+    SELECT
+      soi."id_saidaestoque",
+      SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+    FROM "saidaestoqueitem" soi
+    WHERE soi."cancelado" IS NULL
+    GROUP BY soi."id_saidaestoque"
+  ) AS so_total ON so_total."id_saidaestoque" = so.id
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+    AND ra."fimocupacaotipo" = 'FINALIZADA'
+    AND tp.id IN (${bProductTypesForLeastRankingSqlList})
   GROUP BY p."descricao"
   HAVING SUM(soi."precovenda" * soi."quantidade") > 0
   ORDER BY "totalRevenue" ASC
@@ -378,7 +439,7 @@ export class RestaurantService {
     COALESCE(SUM(
       CASE
         WHEN tp.id IN (${aProductTypesSqlList})
-        THEN soi."precovenda" * soi."quantidade"
+        THEN (soi."precovenda" * soi."quantidade") * (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
         ELSE 0
       END
     ), 0) AS "ALIMENTOS",
@@ -386,15 +447,15 @@ export class RestaurantService {
     COALESCE(SUM(
       CASE
         WHEN tp.id IN (${bProductTypesSqlList})
-        THEN soi."precovenda" * soi."quantidade"
+        THEN (soi."precovenda" * soi."quantidade") * (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
         ELSE 0
       END
     ), 0) AS "BEBIDAS",
 
     COALESCE(SUM(
       CASE
-        WHEN tp.id NOT IN (${abProductTypesSqlList})
-        THEN soi."precovenda" * soi."quantidade"
+        WHEN tp.id NOT IN (${abProductTypesSqlList}) OR tp.id IS NULL
+        THEN (soi."precovenda" * soi."quantidade") * (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
         ELSE 0
       END
     ), 0) AS "OUTROS"
@@ -406,6 +467,15 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+  LEFT JOIN (
+    SELECT
+      soi."id_saidaestoque",
+      SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+    FROM "saidaestoqueitem" soi
+    WHERE soi."cancelado" IS NULL
+    GROUP BY soi."id_saidaestoque"
+  ) AS so_total ON so_total."id_saidaestoque" = so.id
 
   WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND ra."fimocupacaotipo" = 'FINALIZADA'
@@ -418,7 +488,9 @@ export class RestaurantService {
   SELECT
     TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
     tp."descricao" AS "category",
-    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalValue"
+    COALESCE(SUM(
+      (soi."precovenda" * soi."quantidade") * (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
+    ), 0) AS "totalValue"
   FROM "locacaoapartamento" ra
   LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
   LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
@@ -426,6 +498,15 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+  LEFT JOIN (
+    SELECT
+      soi."id_saidaestoque",
+      SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+    FROM "saidaestoqueitem" soi
+    WHERE soi."cancelado" IS NULL
+    GROUP BY soi."id_saidaestoque"
+  ) AS so_total ON so_total."id_saidaestoque" = so.id
   WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${aProductTypesSqlList})
@@ -437,7 +518,9 @@ export class RestaurantService {
   SELECT
     TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
     tp."descricao" AS "category",
-    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalValue"
+    COALESCE(SUM(
+      (soi."precovenda" * soi."quantidade") * (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
+    ), 0) AS "totalValue"
   FROM "locacaoapartamento" ra
   LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
   LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
@@ -445,6 +528,15 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+  LEFT JOIN (
+    SELECT
+      soi."id_saidaestoque",
+      SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+    FROM "saidaestoqueitem" soi
+    WHERE soi."cancelado" IS NULL
+    GROUP BY soi."id_saidaestoque"
+  ) AS so_total ON so_total."id_saidaestoque" = so.id
   WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${bProductTypesSqlList})
@@ -455,7 +547,9 @@ export class RestaurantService {
     const reportByFoodSql = `
   SELECT
     tp."descricao" AS "category",
-    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "revenue",
+    COALESCE(SUM(
+      (soi."precovenda" * soi."quantidade") * (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
+    ), 0) AS "revenue",
     COALESCE(SUM(soi."quantidade"), 0) AS "quantity"
   FROM "locacaoapartamento" ra
   LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
@@ -464,6 +558,15 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+  LEFT JOIN (
+    SELECT
+      soi."id_saidaestoque",
+      SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+    FROM "saidaestoqueitem" soi
+    WHERE soi."cancelado" IS NULL
+    GROUP BY soi."id_saidaestoque"
+  ) AS so_total ON so_total."id_saidaestoque" = so.id
   WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${aProductTypesSqlList})
@@ -474,7 +577,9 @@ export class RestaurantService {
     const reportByDrinkSql = `
   SELECT
     tp."descricao" AS "category",
-    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "revenue",
+    COALESCE(SUM(
+      (soi."precovenda" * soi."quantidade") * (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
+    ), 0) AS "revenue",
     COALESCE(SUM(soi."quantidade"), 0) AS "quantity"
   FROM "locacaoapartamento" ra
   LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
@@ -483,7 +588,16 @@ export class RestaurantService {
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+  LEFT JOIN (
+    SELECT
+      soi."id_saidaestoque",
+      SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+    FROM "saidaestoqueitem" soi
+    WHERE soi."cancelado" IS NULL
+    GROUP BY soi."id_saidaestoque"
+  ) AS so_total ON so_total."id_saidaestoque" = so.id
+  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND ra."fimocupacaotipo" = 'FINALIZADA'
     AND tp.id IN (${bProductTypesSqlList})
   GROUP BY tp."descricao"
@@ -492,8 +606,10 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
 
     const reportByOthersSql = `
   SELECT
-    tp."descricao" AS "category",
-    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "revenue",
+    COALESCE(tp."descricao", 'SEM TIPO') AS "category",
+    COALESCE(SUM(
+      (soi."precovenda" * soi."quantidade") * (1 - COALESCE(s."desconto", 0) / NULLIF(so_total."total_bruto", 0))
+    ), 0) AS "revenue",
     COALESCE(SUM(soi."quantidade"), 0) AS "quantity"
   FROM "locacaoapartamento" ra
   LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
@@ -502,9 +618,19 @@ WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd
   LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
   LEFT JOIN "produto" p ON p.id = ps."id_produto"
   LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+  LEFT JOIN (
+    SELECT
+      soi."id_saidaestoque",
+      SUM(soi."precovenda" * soi."quantidade") AS total_bruto
+    FROM "saidaestoqueitem" soi
+    WHERE soi."cancelado" IS NULL
+    GROUP BY soi."id_saidaestoque"
+  ) AS so_total ON so_total."id_saidaestoque" = so.id
  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND ra."fimocupacaotipo" = 'FINALIZADA'
-    AND tp.id IN (${othersProductTypesSqlList})
+    AND soi."id_saidaestoque" IS NOT NULL
+    AND (tp.id NOT IN (${abProductTypesSqlList}) OR tp.id IS NULL)
   GROUP BY tp."descricao"
   ORDER BY revenue DESC
 `;
