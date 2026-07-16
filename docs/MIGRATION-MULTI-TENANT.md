@@ -141,16 +141,17 @@ Canônico novo: `/:unit/api/{Company|Bookings|Restaurants|Governance|auth|cache}
 - **Cache**: mesmo `KpiCacheService`, com `unit` na chave. `MAX_CACHE_SIZE` recalibrado (100 → 100×N ou por-unidade). **Fase posterior (opcional)**: trocar por Redis para sobreviver a restart — decisão independente da unificação.
 - **Warmup**: 1 chamada aquece todas as unidades (loop registry × 4 serviços × 4 períodos, concorrência limitada). O workflow do GitHub Actions encolhe para 1 step + verify.
 
-## 4. Decisões de negócio pendentes (bloqueiam a Fase 1)
+## 4. Decisões de negócio
 
-| # | Decisão | Opções | Recomendação |
-|---|---------|--------|--------------|
-| D1 | **Lógica canônica de receita de reservas** (bookings) | Grupo A (fallback + cancelamento tardio + ramo origem) vs Grupo B (simples) | Validar com o negócio qual número é o "certo"; implementar UMA no unificado. Os números das unidades do grupo perdedor **vão mudar** — comunicar. |
-| D2 | **Query semanal RevPAR/Giro** (company) | 3 variantes estruturais | Escolher 1, validar equivalência numérica contra as 3 antes do cutover |
-| D3 | Horário comercial da Lapa (04→03:59) | Config real ou drift? | Confirmar com operação; se real, vira campo do registry (já previsto) |
-| D4 | `RentalTypeEnum` do Altana | Config por tenant ou padronizar? | Manter por tenant no registry |
-| D5 | Absorver `authentication` no unificado? | Manter separado / absorver | Manter separado na v1 (menos risco); reavaliar depois |
-| D6 | Redis para cache | Agora / depois / nunca | Depois do cutover (a unificação já reduz muito a pressão de memória) |
+| # | Decisão | Status |
+|---|---------|--------|
+| D1 | **Lógica canônica de receita de reservas** (bookings) | ✅ **DECIDIDO (2026-07-16): Grupo B** (`SUM(valorcontratado)` simples, dia comercial 06→05:59) — números batem com o relatório do AUTOMO; menos complexidade. Aplicado a ipiranga/liv na Fase 1 → **os números de reservas dessas 2 unidades mudam**. |
+| D2 | **Query semanal RevPAR/Giro** (company) | ✅ **DECIDIDO (2026-07-16): variante do Grupo B** (`weekly_revenue`). Na prática só o ipiranga divergia (liv já era equivalente à lapa); bloco transplantado na Fase 1. |
+| D3 | Horário comercial da Lapa (04→03:59) | ✅ **DECIDIDO (2026-07-16): era drift** ("a Lapa não tem período de 4 horas") — normalizado para 06→05:59 na Fase 1 → **governance da Lapa muda de números**. |
+| D4 | `RentalTypeEnum` do Altana | ⏳ Recomendação: manter por tenant no registry |
+| D5 | Absorver `authentication` no unificado? | ⏳ Recomendação: manter separado na v1 (menos risco) |
+| D6 | Redis para cache | ⏳ Recomendação: depois do cutover |
+| D7 | **Janela de datas do restaurant do tout**: usa dia civil 00:00–23:59; as demais unidades usam dia comercial 06:00–05:59 | ⏳ **NOVO** (descoberto na Fase 1). Alinhar muda os números de A&B do tout — decidir antes da Fase 2. A parte mecânica (queryUtils/sanitize) já foi padronizada preservando o comportamento atual. |
 
 ## 5. Fases
 
@@ -163,13 +164,14 @@ Sem impacto para frontend, sem mudança de comportamento:
 - [x] Lixo removido: `build_output.log` (lapa/altana), `liv/package-lock.json`.
 - [x] CLAUDE.md corrigido (Prisma local, IDs da lapa, altana, topologia, cache/warmup real).
 
-### Fase 1 — Reconciliação de drift (ainda nos 6 backends, ANTES de unificar)
-Requer D1–D3 decididos. Cada item muda números → validar com dashboard:
-- [ ] Aplicar a lógica canônica de bookings (D1) nas unidades do grupo perdedor.
-- [ ] Unificar a query semanal RevPAR/Giro (D2) nos 6.
-- [ ] Trocar filtros por `ca.descricao` restantes por `ca.id` (fonte recorrente de bugs).
-- [ ] tout: migrar `restaurant` para `queryUtils.formatDateToSQL` como os demais.
-- [ ] Rodar 1 ciclo de produção comparando KPIs antes/depois por unidade.
+### Fase 1 — Reconciliação de drift ✅ código aplicado (validação em produção pendente)
+Executada em 2026-07-16 com D1–D3 decididos:
+- [x] D1: bookings canônico (arquivo da lapa, Grupo B) adotado em ipiranga e liv, incluindo o dia comercial 06→05:59 nos controllers. **Muda receita de reservas de ipiranga/liv.**
+- [x] D2: bloco semanal de RevPAR (`weekly_revenue`) transplantado para o ipiranga (liv já era equivalente); Giro semanal já era uniforme nos 3.
+- [x] D3: governance da Lapa normalizado 04→06h. **Muda governance da Lapa.**
+- [x] Filtros `ca.descricao` → `ca.id` em ipiranga (9 IDs) e lapa (8 IDs) — os 6 company services agora filtram só por ID. **Corrige o Giro/Trevpar inflado do ipiranga** (mesmo bug do LIV corrigido em jul/2026).
+- [x] tout/restaurant: `queryUtils.formatDateToSQL` + `sanitizeIdList` (mecânico, sem mudança de números; janela civil preservada → ver D7).
+- [ ] **Validação em produção**: após deploy da branch, comparar KPIs antes/depois por unidade (reservas ipiranga/liv, governance lapa, giro ipiranga) e validar com o relatório do AUTOMO.
 
 **Racional**: unificar ANTES de reconciliar espalharia mudanças de números no meio do refactor, impossibilitando o teste de paridade da Fase 3.
 

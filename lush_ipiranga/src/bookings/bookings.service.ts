@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { KpiCacheService } from '../cache/kpi-cache.service';
@@ -10,6 +10,64 @@ export class BookingsService {
     private pgPool: PgPoolService,
     private kpiCacheService: KpiCacheService,
   ) {}
+
+  private determineRentalPeriod(checkIn: Date, checkOut: Date, Booking: any): string {
+    const occupationTimeSeconds = this.calculateOccupationTime(checkIn, checkOut);
+
+    // Convertendo check-in e check-out para objetos Date
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+
+    const checkInHour = checkInDate.getHours();
+    const checkOutHour = checkOutDate.getHours();
+    const checkOutMinutes = checkOutDate.getMinutes();
+
+    // Verificação por horas de ocupação (3, 6 e 12 horas)
+    if (occupationTimeSeconds <= 3 * 3600 + 15 * 60) {
+      return 'THREE_HOURS';
+    } else if (occupationTimeSeconds <= 6 * 3600 + 15 * 60) {
+      return 'SIX_HOURS';
+    } else if (occupationTimeSeconds <= 12 * 3600 + 15 * 60) {
+      return 'TWELVE_HOURS';
+    }
+
+    // Se houver reservas, calcular os tipos adicionais
+    if (Booking && Array.isArray(Booking) && Booking.length > 0) {
+      // Regra para Day Use
+      if (checkInHour >= 13 && checkOutHour <= 19 && checkOutMinutes <= 15) {
+        return 'DAY_USE';
+      }
+
+      // Regra para Overnight
+      const overnightMinimumStaySeconds = 12 * 3600 + 15 * 60;
+      if (
+        checkInHour >= 20 &&
+        checkInHour <= 23 &&
+        checkOutHour >= 8 &&
+        (checkOutHour < 12 || (checkOutHour === 12 && checkOutMinutes <= 15)) &&
+        occupationTimeSeconds >= overnightMinimumStaySeconds
+      ) {
+        return 'OVERNIGHT';
+      }
+
+      // Verificação para Diária
+      if (
+        occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
+        (checkInHour <= 15 && (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
+      ) {
+        return 'DAILY';
+      }
+    }
+
+    // Caso nenhuma condição acima seja satisfeita, retorna 12 horas como padrão
+    return 'TWELVE_HOURS';
+  }
+
+  private calculateOccupationTime(checkIn: Date, checkOut: Date): number {
+    const checkInTime = new Date(checkIn).getTime();
+    const checkOutTime = new Date(checkOut).getTime();
+    return (checkOutTime - checkInTime) / 1000; // Tempo em segundos
+  }
 
   async calculateKpibyDateRangeSQL(startDate: Date, endDate: Date): Promise<any> {
     // Calcula o período anterior automaticamente
@@ -190,20 +248,12 @@ export class BookingsService {
     const totalBookingRevenueSQL = `
   SELECT
   COALESCE(r."id_tipoorigemreserva", 0) AS "id_tipoorigemreserva",
-  ROUND(SUM(COALESCE(r."valorcontratado", la."valortotalpermanencia"))::numeric, 2) AS "totalAllValue"
+  ROUND(SUM(r."valorcontratado")::numeric, 2) AS "totalAllValue"
 FROM "reserva" r
-LEFT JOIN "locacaoapartamento" la ON r."id_locacaoapartamento" = la."id_apartamentostate"
 WHERE
-  (
-    r."cancelada" IS NULL
-    OR r."cancelada"::date > (r."datainicio"::date + 7)
-  )
-  AND (r."valorcontratado" IS NOT NULL OR la."valortotalpermanencia" IS NOT NULL)
-  AND (
-    (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-    OR
-    (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-  )
+  r."cancelada" IS NULL
+  AND r."valorcontratado" IS NOT NULL
+  AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
 GROUP BY ROLLUP (r."id_tipoorigemreserva")
 HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva" IS NULL
 ORDER BY "id_tipoorigemreserva";
@@ -214,18 +264,10 @@ ORDER BY "id_tipoorigemreserva";
   COALESCE(r."id_tipoorigemreserva", 0) AS "id_tipoorigemreserva",
   COUNT(r."id") AS "totalAllBookings"
 FROM "reserva" r
-LEFT JOIN "locacaoapartamento" la ON r."id_locacaoapartamento" = la."id_apartamentostate"
 WHERE
-  (
-    r."cancelada" IS NULL
-    OR r."cancelada"::date > (r."datainicio"::date + 7)
-  )
-  AND (r."valorcontratado" IS NOT NULL OR la."valortotalpermanencia" IS NOT NULL)
-  AND (
-    (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-    OR
-    (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-  )
+  r."cancelada" IS NULL
+  AND r."valorcontratado" IS NOT NULL
+  AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
 GROUP BY ROLLUP (r."id_tipoorigemreserva")
 HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva" IS NULL
 ORDER BY "id_tipoorigemreserva";
@@ -260,50 +302,29 @@ FROM vendas_diretas vd, locacoes loc;
     SELECT DISTINCT r."id" as reserva_id
     FROM "reserva" r
     JOIN "novo_lancamento" nl ON r."id" = nl."id_originado"
-    LEFT JOIN "locacaoapartamento" la ON r."id_locacaoapartamento" = la."id_apartamentostate"
-    WHERE (
-        r."cancelada" IS NULL
-        OR r."cancelada"::date > (r."datainicio"::date + 7)
-      )
-      AND (r."valorcontratado" IS NOT NULL OR la."valortotalpermanencia" IS NOT NULL)
+    WHERE r."cancelada" IS NULL
+      AND r."valorcontratado" IS NOT NULL
       AND nl."dataexclusao" IS NULL
       AND nl."tipolancamento" = 'RESERVA'
       AND nl."id_contapagarreceber" IS NULL
-      AND (
-        (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-        OR
-        (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      )
+      AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
   ),
   pagamentos_reserva AS (
-    -- Lançamentos do tipo RESERVA (usa valor contratado com desconto para Guia Go)
+    -- Lançamentos do tipo RESERVA (usa valor contratado)
     SELECT
       mp."nome" AS "paymentMethod",
-      CASE
-        WHEN r."id_tipoorigemreserva" = 3 AND r."reserva_programada_guia" = false THEN
-          COALESCE(r."valorcontratado", la."valortotalpermanencia") - COALESCE(r."desconto_reserva", 0)
-        ELSE
-          COALESCE(r."valorcontratado", la."valortotalpermanencia")
-      END AS "valor",
+      r."valorcontratado" AS "valor",
       r."id" as reserva_id
     FROM "reserva" r
     JOIN "novo_lancamento" nl ON r."id" = nl."id_originado"
     JOIN "meiopagamento" mp ON nl."id_meiopagamento" = mp."id"
-    LEFT JOIN "locacaoapartamento" la ON r."id_locacaoapartamento" = la."id_apartamentostate"
-    WHERE (
-        r."cancelada" IS NULL
-        OR r."cancelada"::date > (r."datainicio"::date + 7)
-      )
-      AND (r."valorcontratado" IS NOT NULL OR la."valortotalpermanencia" IS NOT NULL)
+    WHERE r."cancelada" IS NULL
+      AND r."valorcontratado" IS NOT NULL
       AND nl."dataexclusao" IS NULL
       AND nl."tipolancamento" = 'RESERVA'
       AND nl."id_contapagarreceber" IS NULL
       AND mp."dataexclusao" IS NULL
-      AND (
-        (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-        OR
-        (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      )
+      AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
   ),
   pagamentos_locacao AS (
     -- Lançamentos do tipo LOCACAO apenas para reservas SEM lançamento RESERVA
@@ -314,22 +335,14 @@ FROM vendas_diretas vd, locacoes loc;
     FROM "reserva" r
     JOIN "novo_lancamento" nl ON r."id" = nl."id_originado"
     JOIN "meiopagamento" mp ON nl."id_meiopagamento" = mp."id"
-    LEFT JOIN "locacaoapartamento" la ON r."id_locacaoapartamento" = la."id_apartamentostate"
-    WHERE (
-        r."cancelada" IS NULL
-        OR r."cancelada"::date > (r."datainicio"::date + 7)
-      )
-      AND (r."valorcontratado" IS NOT NULL OR la."valortotalpermanencia" IS NOT NULL)
+    WHERE r."cancelada" IS NULL
+      AND r."valorcontratado" IS NOT NULL
       AND nl."dataexclusao" IS NULL
       AND nl."tipolancamento" = 'LOCACAO'
       AND nl."id_contapagarreceber" IS NULL
       AND mp."dataexclusao" IS NULL
       AND r."id" NOT IN (SELECT reserva_id FROM reservas_com_pagamento)
-      AND (
-        (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-        OR
-        (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      )
+      AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
   ),
   todos_pagamentos AS (
     SELECT "paymentMethod", "valor", reserva_id FROM pagamentos_reserva
@@ -350,55 +363,28 @@ FROM vendas_diretas vd, locacoes loc;
     r."id",
     r."dataatendimento",
     r."datainicio",
-    CASE
-      WHEN r."id_tipoorigemreserva" = 3 AND r."reserva_programada_guia" = false THEN
-        COALESCE(r."valorcontratado", la."valortotalpermanencia") - COALESCE(r."desconto_reserva", 0)
-      ELSE
-        COALESCE(r."valorcontratado", la."valortotalpermanencia")
-    END AS "valorcontratado",
+    r."valorcontratado",
     r."id_tipoorigemreserva",
     r."id_locacaoapartamento" AS "rentalApartmentId",
     la."datainicialdaocupacao" AS "checkIn",
     la."datafinaldaocupacao" AS "checkOut"
   FROM "reserva" r
   LEFT JOIN "locacaoapartamento" la ON r."id_locacaoapartamento" = la."id_apartamentostate"
-  WHERE (
-      r."cancelada" IS NULL
-      OR r."cancelada"::date > (r."datainicio"::date + 7)
-    )
-    AND (r."valorcontratado" IS NOT NULL OR la."valortotalpermanencia" IS NOT NULL)
-    AND (
-      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      OR
-      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-    );
+  WHERE r."cancelada" IS NULL
+    AND r."valorcontratado" IS NOT NULL
+    AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}';
 `;
 
     // SQL para obter dados agrupados por data para os períodos
     const billingByDateSQL = `
   SELECT
     DATE(r."dataatendimento") as booking_date,
-    ROUND(SUM(
-      CASE
-        WHEN r."id_tipoorigemreserva" = 3 AND r."reserva_programada_guia" = false THEN
-          COALESCE(r."valorcontratado", la."valortotalpermanencia") - COALESCE(r."desconto_reserva", 0)
-        ELSE
-          COALESCE(r."valorcontratado", la."valortotalpermanencia")
-      END
-    )::numeric, 2) AS total_value,
+    ROUND(SUM(r."valorcontratado")::numeric, 2) AS total_value,
     COUNT(*) AS total_bookings
   FROM "reserva" r
-  LEFT JOIN "locacaoapartamento" la ON r."id_locacaoapartamento" = la."id_apartamentostate"
-  WHERE (
-      r."cancelada" IS NULL
-      OR r."cancelada"::date > (r."datainicio"::date + 7)
-    )
-    AND (r."valorcontratado" IS NOT NULL OR la."valortotalpermanencia" IS NOT NULL)
-    AND (
-      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      OR
-      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-    )
+  WHERE r."cancelada" IS NULL
+    AND r."valorcontratado" IS NOT NULL
+    AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND DATE(r."dataatendimento") BETWEEN DATE('${formattedStart}') AND DATE('${formattedEnd}')
   GROUP BY booking_date
   ORDER BY booking_date DESC;
@@ -408,28 +394,13 @@ FROM vendas_diretas vd, locacoes loc;
     const ecommerceByDateSQL = `
   SELECT
     DATE(r."dataatendimento") as booking_date,
-    ROUND(SUM(
-      CASE
-        WHEN r."id_tipoorigemreserva" = 3 AND r."reserva_programada_guia" = false THEN
-          COALESCE(r."valorcontratado", la."valortotalpermanencia") - COALESCE(r."desconto_reserva", 0)
-        ELSE
-          COALESCE(r."valorcontratado", la."valortotalpermanencia")
-      END
-    )::numeric, 2) AS total_value,
+    ROUND(SUM(r."valorcontratado")::numeric, 2) AS total_value,
     COUNT(*) AS total_bookings
   FROM "reserva" r
-  LEFT JOIN "locacaoapartamento" la ON r."id_locacaoapartamento" = la."id_apartamentostate"
-  WHERE (
-      r."cancelada" IS NULL
-      OR r."cancelada"::date > (r."datainicio"::date + 7)
-    )
-    AND (r."valorcontratado" IS NOT NULL OR la."valortotalpermanencia" IS NOT NULL)
+  WHERE r."cancelada" IS NULL
+    AND r."valorcontratado" IS NOT NULL
     AND r."id_tipoorigemreserva" = 4
-    AND (
-      (r."id_tipoorigemreserva" NOT IN (7, 8) AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-      OR
-      (r."id_tipoorigemreserva" IN (7, 8) AND r."datainicio" BETWEEN '${formattedStart}' AND '${formattedEnd}')
-    )
+    AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
     AND DATE(r."dataatendimento") BETWEEN DATE('${formattedStart}') AND DATE('${formattedEnd}')
   GROUP BY booking_date
   ORDER BY booking_date DESC;
@@ -438,7 +409,6 @@ FROM vendas_diretas vd, locacoes loc;
     // Query SQL para classificação refinada de canais
     // Para WEBSITE (id=4): usa periodocontratado + hora para classificar SCHEDULED vs IMMEDIATE
     // Para WEBSITE: usa novo_lancamento com versao=0 e tipolancamento='RESERVA' para obter o valor correto
-    // Inclui: no-show (cancelada > datainicio + 7 dias)
     const billingPerChannelSQL = `
   WITH reservas_com_canal_refinado AS (
     SELECT
@@ -476,28 +446,18 @@ FROM vendas_diretas vd, locacoes loc;
         ELSE CONCAT('CANAL_', r."id_tipoorigemreserva")
       END AS channel_type
     FROM "reserva" r
-    LEFT JOIN "locacaoapartamento" la ON r."id_locacaoapartamento" = la."id_apartamentostate"
-    WHERE (
-        r."cancelada" IS NULL
-        OR r."cancelada"::date > (r."datainicio"::date + 7)
-      )
-      AND (r."valorcontratado" IS NOT NULL OR la."valortotalpermanencia" IS NOT NULL)
+    WHERE r."cancelada" IS NULL
+      AND r."valorcontratado" IS NOT NULL
       AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
   ),
-  -- Para canais que não são WEBSITE (4), usa valorcontratado ou valortotalpermanencia
+  -- Para canais que não são WEBSITE (4), usa valorcontratado
   valores_outros_canais AS (
     SELECT
       rcr."id",
       rcr.channel_type,
-      CASE
-        WHEN rcr."id_tipoorigemreserva" = 3 AND rcr."reserva_programada_guia" = false THEN
-          COALESCE(r."valorcontratado", la."valortotalpermanencia") - COALESCE(r."desconto_reserva", 0)
-        ELSE
-          COALESCE(r."valorcontratado", la."valortotalpermanencia")
-      END AS valor
+      r."valorcontratado" AS valor
     FROM reservas_com_canal_refinado rcr
     JOIN "reserva" r ON rcr."id" = r."id"
-    LEFT JOIN "locacaoapartamento" la ON r."id_locacaoapartamento" = la."id_apartamentostate"
     WHERE rcr."id_tipoorigemreserva" != 4
   ),
   -- Para canal WEBSITE (4), usa novo_lancamento com versao=0 e tipolancamento='RESERVA'
@@ -565,9 +525,9 @@ FROM vendas_diretas vd, locacoes loc;
     // Extrai a receita total
     const revenueTotal = Number(totalRevenue[0]?.totalRevenue ?? 0);
 
-    // Calcula a representatividade (multiplicada por 100 para mostrar como percentual)
+    // Calcula a representatividade
     const representativeness =
-      revenueTotal > 0 ? Number(((totalValue / revenueTotal) * 100).toFixed(2)) : 0;
+      revenueTotal > 0 ? Number((totalValue / revenueTotal).toFixed(4)) : 0;
 
     // Processa os dados dos métodos de pagamento
     const paymentMethods = {
@@ -856,63 +816,5 @@ FROM vendas_diretas vd, locacoes loc;
       ReservationsOfEcommerceByPeriod: reservationsOfEcommerceByPeriod,
       BillingOfEcommerceByPeriod: billingOfEcommerceByPeriod,
     };
-  }
-
-  private determineRentalPeriod(checkIn: Date, checkOut: Date, Booking: any): string {
-    const occupationTimeSeconds = this.calculateOccupationTime(checkIn, checkOut);
-
-    // Convertendo check-in e check-out para objetos Date
-    const checkInDate = new Date(checkIn);
-    const checkOutDate = new Date(checkOut);
-
-    const checkInHour = checkInDate.getHours();
-    const checkOutHour = checkOutDate.getHours();
-    const checkOutMinutes = checkOutDate.getMinutes();
-
-    // Verificação por horas de ocupação (3, 6 e 12 horas)
-    if (occupationTimeSeconds <= 3 * 3600 + 15 * 60) {
-      return 'THREE_HOURS';
-    } else if (occupationTimeSeconds <= 6 * 3600 + 15 * 60) {
-      return 'SIX_HOURS';
-    } else if (occupationTimeSeconds <= 12 * 3600 + 15 * 60) {
-      return 'TWELVE_HOURS';
-    }
-
-    // Se houver reservas, calcular os tipos adicionais
-    if (Booking && Array.isArray(Booking) && Booking.length > 0) {
-      // Regra para Day Use
-      if (checkInHour >= 13 && checkOutHour <= 19 && checkOutMinutes <= 15) {
-        return 'DAY_USE';
-      }
-
-      // Regra para Overnight
-      const overnightMinimumStaySeconds = 12 * 3600 + 15 * 60;
-      if (
-        checkInHour >= 20 &&
-        checkInHour <= 23 &&
-        checkOutHour >= 8 &&
-        (checkOutHour < 12 || (checkOutHour === 12 && checkOutMinutes <= 15)) &&
-        occupationTimeSeconds >= overnightMinimumStaySeconds
-      ) {
-        return 'OVERNIGHT';
-      }
-
-      // Verificação para Diária
-      if (
-        occupationTimeSeconds > 16 * 3600 + 15 * 60 ||
-        (checkInHour <= 15 && (checkOutHour > 12 || (checkOutHour === 12 && checkOutMinutes <= 15)))
-      ) {
-        return 'DAILY';
-      }
-    }
-
-    // Caso nenhuma condição acima seja satisfeita, retorna 12 horas como padrão
-    return 'TWELVE_HOURS';
-  }
-
-  private calculateOccupationTime(checkIn: Date, checkOut: Date): number {
-    const checkInTime = new Date(checkIn).getTime();
-    const checkOutTime = new Date(checkOut).getTime();
-    return (checkOutTime - checkInTime) / 1000; // Tempo em segundos
   }
 }

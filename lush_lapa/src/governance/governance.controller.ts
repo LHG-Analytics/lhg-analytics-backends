@@ -63,14 +63,14 @@ export class GovernanceController {
       // Conversão das datas passadas como string para Date
       const start = this.dateUtilsService.convertToDate(startDate, {
         useUTC: true,
-        startHour: 4,
+        startHour: 6,
         startMinute: 0,
         startSecond: 0,
       })!;
       const end = this.dateUtilsService.convertToDate(endDate, {
         isEndDate: true,
         useUTC: true,
-        endHour: 3,
+        endHour: 5,
         endMinute: 59,
         endSecond: 59,
       })!;

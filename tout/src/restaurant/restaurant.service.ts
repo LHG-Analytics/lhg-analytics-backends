@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as moment from 'moment-timezone';
+import { QueryUtilsService } from '@lhg/utils';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
 import { KpiCacheService } from '../cache/kpi-cache.service';
 import { PgPoolService } from '../database/database.service';
@@ -9,6 +10,7 @@ export class RestaurantService {
   constructor(
     private pgPool: PgPoolService,
     private kpiCacheService: KpiCacheService,
+    private queryUtils: QueryUtilsService,
   ) {}
 
   async calculateKpisByDateRange(startDate: Date, endDate: Date) {
@@ -157,24 +159,28 @@ export class RestaurantService {
 
     const othersList = [38, 3, 41, 36, 43, 25];
 
-    const formattedStart = moment
-      .utc(startDate)
-      .set({ hour: 0, minute: 0, second: 0 })
-      .format('YYYY-MM-DD HH:mm:ss');
+    // Formatação segura de datas usando QueryUtilsService
+    // NOTA: mantém as bordas 00:00–23:59 (dia civil) que o tout usa hoje.
+    // As demais unidades usam dia comercial 06:00–05:59 — alinhamento pendente de decisão (muda números).
+    const startForDate = moment.utc(startDate).set({ hour: 0, minute: 0, second: 0 }).toDate();
+    const endForDate = moment.utc(endDate).set({ hour: 23, minute: 59, second: 59 }).toDate();
 
-    const formattedEnd = moment
-      .utc(endDate)
-      .set({ hour: 23, minute: 59, second: 59 })
-      .format('YYYY-MM-DD HH:mm:ss');
+    const formattedStart = this.queryUtils.formatDateToSQL(startForDate);
+    const formattedEnd = this.queryUtils.formatDateToSQL(endForDate);
 
-    const abProductTypesSqlList = abProductTypes.join(', ');
-    const aProductTypesSqlList = aProductTypes.join(', ');
-    const bProductTypesSqlList = bProductTypes.join(', ');
-    const othersProductTypesSqlList = othersList.join(', ');
-    const aProductTypesForRankingSqlList = aProductTypesForRanking.join(', ');
-    const bProductTypesForRankingSqlList = bProductTypesForRanking.join(', ');
-    const aProductTypesForLeastRankingSqlList = aProductTypesForLeastRanking.join(', ');
-    const bProductTypesForLeastRankingSqlList = bProductTypesForLeastRanking.join(', ');
+    // Sanitização segura de listas de IDs usando QueryUtilsService
+    const abProductTypesSqlList = this.queryUtils.sanitizeIdList(abProductTypes);
+    const aProductTypesSqlList = this.queryUtils.sanitizeIdList(aProductTypes);
+    const bProductTypesSqlList = this.queryUtils.sanitizeIdList(bProductTypes);
+    const othersProductTypesSqlList = this.queryUtils.sanitizeIdList(othersList);
+    const aProductTypesForRankingSqlList = this.queryUtils.sanitizeIdList(aProductTypesForRanking);
+    const bProductTypesForRankingSqlList = this.queryUtils.sanitizeIdList(bProductTypesForRanking);
+    const aProductTypesForLeastRankingSqlList = this.queryUtils.sanitizeIdList(
+      aProductTypesForLeastRanking,
+    );
+    const bProductTypesForLeastRankingSqlList = this.queryUtils.sanitizeIdList(
+      bProductTypesForLeastRanking,
+    );
 
     const kpisRawSql = `
   SELECT
