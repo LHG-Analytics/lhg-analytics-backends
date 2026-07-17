@@ -224,11 +224,11 @@ Executada em 2026-07-16 com D1–D3 decididos:
 - [ ] Repetir a bateria no staging quando a instância aguentar (hoje: Free/512MB não sustenta 9 processos — OOM churn; upgrade recomendado para a fase de validação humana).
 - [ ] Validação humana no frontend preview (irmão), com a lista de mudanças esperadas: gráficos por categoria de ipiranga/liv (correção do shift), restaurant das 5 unidades (normalização líquido), tout conforme D8.
 
-### Fase 4 — Cutover incremental
-- [ ] No proxy `server.mjs`, apontar UMA unidade (sugestão: `tout`, menor risco) para o `lhg-api`; observar 2–3 dias.
-- [ ] Migrar as demais em ondas (2+2+1). O frontend não muda nada nesta fase (proxy mantém os paths).
-- [ ] Desligar os processos antigos no PM2 conforme migram; RAM liberada.
-- [ ] Ao final: frontend migra para as rotas canônicas no seu ritmo (guia próprio); proxy vira shim mínimo e depois morre.
+### Fase 4 — Cutover
+- [x] **Mecanismo pronto e validado (2026-07-17)**: flag `LHG_CUTOVER=1` — o PM2 sobe só proxy + auth + lhg-api (3 processos em vez de 9) e o proxy reescreve os paths antigos do frontend (`/{unit}/{prefixo}/api` → `/{unit}/api`) para o lhg-api. Testado localmente nas 6 unidades com os paths reais do frontend: todas OK. O frontend NÃO muda nada.
+- [ ] Ativar `LHG_CUTOVER=1` no staging (branch developer) → validação humana com o frontend de staging inalterado.
+- [ ] Após OK do irmão: merge refactor→master + `LHG_CUTOVER=1` em produção. Rollback = remover a env (processos antigos voltam).
+- [ ] Estado final de infraestrutura: 3 processos (proxy-shim de ~40 linhas + auth + lhg-api). Depois, opcional: frontend adota rotas canônicas → proxy morre; D5 (absorver auth) → 1 processo único.
 
 ### Fase 5 — Onboarding Goiânia (o payoff)
 Por unidade nova: 1 entrada no registry + 1 env var `DATABASE_URL_LOCAL_<UNIT>` + 1 valor no enum `UserUnit` (migration Supabase) + warmup automático. **Sem** novo processo, deploy, rota de proxy ou secret de CI. Checklist de descoberta dos IDs (categorias de suíte, cargos, tipos de produto) via queries de diagnóstico documentadas.

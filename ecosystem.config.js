@@ -147,3 +147,14 @@ module.exports = {
     },
   },
 };
+
+// ============================================================================
+// MODO CUTOVER (LHG_CUTOVER=1): sobe somente proxy + auth + lhg-api.
+// Os 6 backends por unidade não são iniciados — as rotas das unidades são
+// servidas pelo lhg-api (ver server.mjs). De 9 processos para 3: cabe no
+// plano Free do Render. É o mecanismo da Fase 4 (staging = ensaio geral).
+// ============================================================================
+if (process.env.LHG_CUTOVER === "1") {
+  const keep = new Set(["proxy", "auth", "lhg-api"]);
+  module.exports.apps = module.exports.apps.filter((app) => keep.has(app.name));
+}

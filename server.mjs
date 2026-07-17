@@ -28,7 +28,6 @@ app.use(
 
 // Backend multi-tenant unificado (lhg-api) — acesso via /lhg/{unit}/api/...
 // Permite rodar old×new lado a lado no MESMO host (paridade + validação do frontend).
-// No cutover (Fase 4), as rotas das unidades abaixo passam a apontar para ele.
 app.use(
   "/lhg",
   createProxyMiddleware({
@@ -38,7 +37,41 @@ app.use(
   })
 );
 
-// As outras unidades permanecem inalteradas
+// ============================================================================
+// MODO CUTOVER (LHG_CUTOVER=1): as rotas das unidades passam a ser servidas
+// pelo lhg-api (multi-tenant), preservando os paths que o frontend já usa:
+//   /{unit}/{prefixo_interno}/api/...  →  lhg-api /{unit}/api/...
+// Os backends antigos não são iniciados (ver ecosystem.config.js).
+// É o mecanismo da Fase 4 — no staging serve de ensaio geral no plano Free.
+// ============================================================================
+const CUTOVER = process.env.LHG_CUTOVER === "1";
+const UNIT_PREFIXES = {
+  lush_ipiranga: "ipiranga",
+  lush_lapa: "lapa",
+  tout: "tout",
+  andar_de_cima: "andar_de_cima",
+  liv: "liv",
+  altana: "altana",
+};
+
+if (CUTOVER) {
+  console.log("⚡ MODO CUTOVER ativo: unidades servidas pelo lhg-api (:3010)");
+  for (const [unit, prefix] of Object.entries(UNIT_PREFIXES)) {
+    // O http-proxy-middleware recebe a URL já SEM o prefixo do mount (/{unit}),
+    // então o rewrite converte /{prefixo_interno}/api/... → /{unit}/api/...
+    app.use(
+      `/${unit}`,
+      createProxyMiddleware({
+        target: "http://localhost:3010",
+        changeOrigin: true,
+        pathRewrite: { [`^/${prefix}/api`]: `/${unit}/api` },
+      })
+    );
+  }
+}
+
+// Rotas para os backends antigos por unidade (ignoradas no modo cutover,
+// pois o app.use das unidades acima intercepta antes)
 app.use(
   "/lush_ipiranga",
   createProxyMiddleware({ target: "http://localhost:3001", changeOrigin: true })

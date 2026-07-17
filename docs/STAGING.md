@@ -26,6 +26,18 @@ BACKENDS ANTIGOS continuam nos paths atuais: perfeito para a paridade no mesmo h
 
 Nenhuma env var nova é necessária (o serviço já tem todas).
 
+### Modo CUTOVER no staging (recomendado para o plano Free) ⚡
+
+A instância Free (512 MB) não sustenta os 9 processos (OOM churn). Adicione a
+env **`LHG_CUTOVER=1`** no serviço de staging: o PM2 sobe só **3 processos**
+(proxy + auth + lhg-api) e o proxy passa a servir as rotas das unidades pelo
+lhg-api, **preservando os paths que o frontend já usa**
+(`/{unit}/{prefixo}/api/...` → reescrito para `/{unit}/api/...`).
+
+Resultado: o frontend de staging funciona SEM NENHUMA mudança, 100% servido
+pelo multi-tenant — é o ensaio geral exato da Fase 4 (validado localmente nas
+6 unidades em 2026-07-17). Para voltar ao modo antigo: remover a env.
+
 ## Opção B (alternativa): serviço dedicado só para o lhg-api
 
 **New → Web Service**: Branch `refactor` | Build `npm install && npm run build:api`
