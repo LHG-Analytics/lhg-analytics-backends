@@ -100,6 +100,7 @@ export const TENANTS: Record<string, TenantConfig> = {
     extendedRentalRules: true,
     billingRentalType: DEFAULT_BILLING_RENTAL_TYPE,
     bookingChannels: DEFAULT_BOOKING_CHANNELS,
+    bookingValidOriginIds: [1, 3, 4, 6, 7, 8],
   },
 
   lush_lapa: {
@@ -128,6 +129,7 @@ export const TENANTS: Record<string, TenantConfig> = {
     extendedRentalRules: true,
     billingRentalType: DEFAULT_BILLING_RENTAL_TYPE,
     bookingChannels: DEFAULT_BOOKING_CHANNELS,
+    bookingValidOriginIds: [1, 3, 4, 6, 7, 8],
   },
 
   tout: {
@@ -156,6 +158,7 @@ export const TENANTS: Record<string, TenantConfig> = {
     extendedRentalRules: true,
     billingRentalType: DEFAULT_BILLING_RENTAL_TYPE,
     bookingChannels: DEFAULT_BOOKING_CHANNELS,
+    bookingValidOriginIds: [1, 3, 4, 6, 7, 8],
   },
 
   andar_de_cima: {
@@ -193,6 +196,7 @@ export const TENANTS: Record<string, TenantConfig> = {
       'WEBSITE_IMMEDIATE',
       'WEBSITE_SCHEDULED',
     ],
+    bookingValidOriginIds: [1, 3, 4, 6, 7, 8],
   },
 
   liv: {
@@ -221,6 +225,7 @@ export const TENANTS: Record<string, TenantConfig> = {
     extendedRentalRules: true,
     billingRentalType: DEFAULT_BILLING_RENTAL_TYPE,
     bookingChannels: DEFAULT_BOOKING_CHANNELS,
+    bookingValidOriginIds: [1, 3, 4, 6, 7, 8],
   },
 
   altana: {
@@ -255,6 +260,7 @@ export const TENANTS: Record<string, TenantConfig> = {
       'WEBSITE_IMMEDIATE',
       'WEBSITE_SCHEDULED',
     ],
+    bookingValidOriginIds: [1, 3, 4],
   },
 };
 

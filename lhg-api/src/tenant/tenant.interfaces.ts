@@ -71,6 +71,8 @@ export interface TenantConfig {
   };
   /** Categorias de canal do gráfico BillingPerChannel (ordem de exibição) */
   bookingChannels: string[];
+  /** id_tipoorigemreserva válidos nos agregados de reservas (HAVING) — altana usa só 1,3,4 */
+  bookingValidOriginIds: number[];
   /**
    * Regras estendidas de classificação (DAY_USE/OVERNIGHT/DAILY por horário de
    * check-in/out quando há reserva). true no padrão Lush; false em adc/altana

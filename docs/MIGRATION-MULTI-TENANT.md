@@ -203,8 +203,25 @@ Executada em 2026-07-16 com D1–D3 decididos:
 - [x] **Script oficial**: `scripts/parity-check.mjs` — compara o JSON COMPLETO dos 4 endpoints (old × new) com tolerância de centavos, reporta diffs por caminho. Uso no cabeçalho do arquivo.
 - [x] **Ajustes p/ staging**: lhg-api respeita `PORT` do Render + `GET /health`.
 - [x] **Primeira rodada real (2026-07-16, local)**: altana antigo (:3007) × lhg-api (:3010) → **8/8 células 100% idênticas** (4 serviços × 2 períodos). A rodada revelou e corrigiu 3 configs por unidade que faltavam no registry: `billingRentalType` (CASE SQL + labels — altana 1h/2h/4h/12h), `bookingChannels` (altana 5; adc tem AIRBNB; demais 7) e `rentalCounts`/default do ReservationsByRentalType. Aprendizado: rodar paridade com os DOIS caches nascendo juntos (dados vivos driftam entre instantes de cálculo).
-- [ ] Staging no Render (ver `docs/STAGING.md`) + paridade completa: 6 unidades × 4 serviços × 3 períodos contra produção. **Critério de saída: 100% por 2 ciclos.**
-- [ ] Validação humana no frontend preview (irmão), com a lista de deltas esperados (nenhum — Fase 1 já está em produção).
+- [x] **Bateria completa LOCAL (2026-07-16)** — 6 unidades × 4 serviços × 3 períodos, backends antigos × lhg-api, bancos reais:
+
+  | Unidade | company | bookings | governance | restaurant |
+  |---------|---------|----------|------------|------------|
+  | altana | ✅ 3/3 | ✅ 3/3 | ✅ 3/3 | ✅ 3/3 |
+  | lush_lapa | ✅ 3/3 | ✅ 3/3 | ✅ 3/3 | Ⓝ normalização |
+  | liv | Ⓑ bug antigo | ✅ 3/3 | ✅ 3/3 | Ⓝ normalização |
+  | lush_ipiranga | Ⓑ bug antigo | ✅ 3/3 | ✅ 3/3 | Ⓝ normalização |
+  | andar_de_cima | ✅ 3/3 | Ⓓ drift (±2 res.) | ✅ 3/3 | Ⓝ normalização |
+  | tout | Ⓓ drift (R$ ~6-23/dia BillingRentalType) | Ⓓ drift (±2 res.) | Ⓓ drift (ShiftCleaning) | Ⓝ normalização + D7 |
+
+  **Classificação dos diffs (nenhum é bug do lhg-api):**
+  - **Ⓝ Normalização aprovada**: restaurant das 5 unidades ≠ altana-canônico (líquido + base de locações + outros catch-all) — mudança desejada, aprovada no caso Altana em jul/2026.
+  - **Ⓑ Bug do código ANTIGO (Grupo A/Prisma)**: gráficos por categoria de ipiranga/liv (OccupancyRateBySuiteCategory etc.) estão **deslocados 1 dia** (shift de timezone do Prisma com colunas DATE; o último dia aparece zerado). O lhg-api (pg) CORRIGE — dashboards de ipiranga/liv vão mudar nesses gráficos, para melhor.
+  - **Ⓓ Drift local de tout/adc** (decisão D8 pendente): (i) bookings de tout/adc contam ±2 reservas vs canônico; (ii) ShiftCleaning do tout classifica por escala do funcionário (367+ caem em 'Terceirizado' que o tout nem tem) vs canônico por horário da limpeza — usado pelas outras 5 unidades; (iii) BillingRentalType do tout com deltas de centavos/dia. Recomendação: adotar o canônico (consistente com D1).
+  - **Fix aplicado durante a bateria**: `bookingValidOriginIds` no registry (altana usa origens 1,3,4; demais 1,3,4,6,7,8) — sem ele o lhg-api mostraria origens inexistentes no altana. Revalidado: altana 12/12.
+- [ ] D8: decidir direção do drift de tout/adc (recomendação: canônico).
+- [ ] Repetir a bateria no staging quando a instância aguentar (hoje: Free/512MB não sustenta 9 processos — OOM churn; upgrade recomendado para a fase de validação humana).
+- [ ] Validação humana no frontend preview (irmão), com a lista de mudanças esperadas: gráficos por categoria de ipiranga/liv (correção do shift), restaurant das 5 unidades (normalização líquido), tout conforme D8.
 
 ### Fase 4 — Cutover incremental
 - [ ] No proxy `server.mjs`, apontar UMA unidade (sugestão: `tout`, menor risco) para o `lhg-api`; observar 2–3 dias.

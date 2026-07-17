@@ -246,6 +246,8 @@ export class BookingsService {
     startDate: Date,
     endDate: Date,
   ): Promise<any> {
+    // Origens de reserva válidas nos agregados (variam por unidade — ver registry)
+    const validOriginsSqlList = tenant.bookingValidOriginIds.join(', ');
     const formattedStart = moment
       .utc(startDate)
       .set({ hour: 0, minute: 0, second: 0 })
@@ -266,7 +268,7 @@ WHERE
   AND r."valorcontratado" IS NOT NULL
   AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
 GROUP BY ROLLUP (r."id_tipoorigemreserva")
-HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva" IS NULL
+HAVING r."id_tipoorigemreserva" IN (${validOriginsSqlList}) OR r."id_tipoorigemreserva" IS NULL
 ORDER BY "id_tipoorigemreserva";
 `;
 
@@ -280,7 +282,7 @@ WHERE
   AND r."valorcontratado" IS NOT NULL
   AND r."dataatendimento" BETWEEN '${formattedStart}' AND '${formattedEnd}'
 GROUP BY ROLLUP (r."id_tipoorigemreserva")
-HAVING r."id_tipoorigemreserva" IN (1, 3, 4, 6, 7, 8) OR r."id_tipoorigemreserva" IS NULL
+HAVING r."id_tipoorigemreserva" IN (${validOriginsSqlList}) OR r."id_tipoorigemreserva" IS NULL
 ORDER BY "id_tipoorigemreserva";
 `;
 

@@ -76,12 +76,27 @@ const token = jwt.sign(
   { expiresIn: '30m' },
 );
 
-async function fetchJson(base, unit, ep, period) {
-  const url = `${base}/${unit}/api/${ep}?startDate=${encodeURIComponent(period.start)}&endDate=${encodeURIComponent(period.end)}`;
+async function fetchJson(base, unitPath, ep, period) {
+  const url = `${base}/${unitPath}/api/${ep}?startDate=${encodeURIComponent(period.start)}&endDate=${encodeURIComponent(period.end)}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`HTTP ${res.status} em ${url}`);
   return res.json();
 }
+
+/**
+ * Prefixo do lado ANTIGO. O lhg-api sempre usa o slug (/{unit}/api/...), mas os
+ * backends antigos têm prefixo interno próprio (lush_ipiranga → /ipiranga/api).
+ * OLD_PREFIX: override único (uso com UNITS de 1 unidade) ou mapa slug=prefixo csv
+ * (ex.: "lush_ipiranga=ipiranga,lush_lapa=lapa"). Default: o próprio slug.
+ */
+const OLD_PREFIX_MAP = Object.fromEntries(
+  (process.env.OLD_PREFIX || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((pair) => (pair.includes('=') ? pair.split('=') : [null, pair])),
+);
+const oldPathFor = (unit) => OLD_PREFIX_MAP[unit] ?? OLD_PREFIX_MAP[null] ?? unit;
 
 /** Compara recursivamente; retorna lista de diffs {path, old, new} */
 function deepDiff(a, b, base = '', diffs = []) {
@@ -128,7 +143,7 @@ async function main() {
         totalCells++;
         try {
           const [oldJson, newJson] = await Promise.all([
-            fetchJson(OLD_BASE, unit, ep.path, period),
+            fetchJson(OLD_BASE, oldPathFor(unit), ep.path, period),
             fetchJson(NEW_BASE, unit, ep.path, period),
           ]);
           const diffs = deepDiff(oldJson, newJson);
