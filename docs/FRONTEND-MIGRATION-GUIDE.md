@@ -17,7 +17,15 @@
 > (correção de deslocamento de 1 dia do backend antigo), relatórios de
 > restaurante das 5 unidades (valores líquidos/base de locações, padrão
 > Altana), tout/adc (decisão D8: reservas ±2/semana; turnos de limpeza do
-> tout corrigidos).
+> tout corrigidos). **Altana e a tela Consolidada devem bater 100%** —
+> são as referências de sanidade da validação.
+>
+> **NOVO (2026-07-17)**: os KPIs **Consolidados** (tela LHG) também migraram
+> do serviço de autenticação para o lhg-api, com **paridade 12/12 comprovada**
+> (respostas idênticas). Os paths `/auth/api/{Company|Bookings|Restaurant|
+> Governance}/kpis/date-range` continuam funcionando (o proxy redireciona por
+> baixo dos panos); o serviço de autenticação segue respondendo apenas por
+> login/refresh/logout/me/users.
 
 ## 1. O que muda (e o que não muda)
 
@@ -27,7 +35,7 @@
 | **Query params** | `startDate`/`endDate` em `DD/MM/YYYY` | **IDÊNTICOS** | Nenhuma |
 | **Autenticação** | Cookies httpOnly (`access_token`/`refresh_token`) via `/auth/api/*`, `credentials: 'include'` | **IDÊNTICA** (serviço auth continua separado) | Nenhuma |
 | **Roles/Units** | `@Roles`/`@Units` por módulo | **IDÊNTICOS** (mesma matriz de acesso) | Nenhuma |
-| **Consolidated (LHG)** | `authentication` `/auth/api/{Company,Bookings,Restaurant,Governance}/kpis/date-range` | **IDÊNTICO** | Nenhuma |
+| **Consolidated (LHG)** | `/auth/api/{Company,Bookings,Restaurant,Governance}/kpis/date-range` (servido pelo authentication) | **Payload IDÊNTICO** (paridade 12/12), agora servido pelo lhg-api; path antigo segue funcionando via proxy. Rota canônica nova: `/api/consolidated/{Nome}/kpis/date-range` | Nenhuma agora; adotar a canônica junto com as demais (seção 3) |
 | **Path das rotas por unidade** | 1 prefixo de proxy + 1 prefixo interno por unidade (ex.: `/lush_ipiranga/ipiranga/api/...`) | **1 único padrão**: `/{unit}/api/...` | Trocar a montagem da URL (seção 3) |
 | **Host** | 1 host único (proxy na Render) | Mesmo host | Nenhuma |
 
@@ -44,6 +52,17 @@ Padrão: `https://<host>/{unit}/api/{Módulo}/...`
 | Restaurant | `GET /{unit}/api/Restaurants/restaurants/date-range?startDate=...&endDate=...` | GERENTE_GERAL, GERENTE_RESTAURANTE |
 | Governance | `GET /{unit}/api/Governance/kpis/date-range?startDate=...&endDate=...` | GERENTE_GERAL, GERENTE_OPERACIONAL |
 
+**Consolidado (LHG)** — mesmo padrão de rota do lhg-api, prefixo próprio (acesso: ADMIN + unidade LHG):
+
+| Módulo | Rota canônica nova |
+|--------|--------------------|
+| Company | `GET /api/consolidated/Company/kpis/date-range?startDate=...&endDate=...` |
+| Bookings | `GET /api/consolidated/Bookings/kpis/date-range?...` |
+| Restaurant | `GET /api/consolidated/Restaurant/kpis/date-range?...` |
+| Governance | `GET /api/consolidated/Governance/kpis/date-range?...` |
+
+(Enquanto o proxy-shim existir, prefixar com `/lhg`: `/lhg/api/consolidated/...`. Os paths antigos `/auth/api/{Nome}/kpis/date-range` continuam funcionando via proxy até o frontend migrar.)
+
 Auth (INALTERADO): `POST /auth/api/login`, `POST /auth/api/refresh`, `POST /auth/api/logout`, `GET /auth/api/me` — cookies httpOnly, sempre com `credentials: 'include'` / `withCredentials: true`.
 
 ## 3. Mapeamento antigo → novo
@@ -58,6 +77,7 @@ A única mudança é a **eliminação do prefixo interno duplicado** de cada uni
 | Andar de Cima | `/andar_de_cima/andar_de_cima/api/...` | `/andar_de_cima/api/...` |
 | Liv | `/liv/liv/api/...` | `/liv/api/...` |
 | Altana | `/altana/altana/api/...` | `/altana/api/...` |
+| **Consolidado (LHG)** | `/auth/api/{Nome}/kpis/date-range` | `/api/consolidated/{Nome}/kpis/date-range` |
 
 > ⚠️ Os paths "antigos" acima refletem o roteamento do backend (proxy `server.mjs` + prefixo global de cada app NestJS). Se o frontend tem rewrites próprios no Next.js (ex.: `baseURL: '/api'`), valide o mapeamento real no seu `next.config` — o contrato garantido é: **o segmento `/{service_prefix}` interno deixa de existir; o path passa a ser `/{unit}/api/...`**.
 
@@ -99,11 +119,22 @@ Centralize a base URL num único ponto e migre com 1 linha por etapa:
 ```ts
 // etapa atual (paths antigos, funcionam em staging e produção):
 const unitApi = (unit, prefix) => axios.create({ baseURL: `/${unit}/${prefix}/api`, withCredentials: true });
+const consolidatedApi = axios.create({ baseURL: `/auth/api`, withCredentials: true });
+
 // etapa canônica com o shim vivo:
 const unitApi = (unit) => axios.create({ baseURL: `/lhg/${unit}/api`, withCredentials: true });
+const consolidatedApi = axios.create({ baseURL: `/lhg/api/consolidated`, withCredentials: true });
+
 // estado final (sem proxy):
 const unitApi = (unit) => axios.create({ baseURL: `/${unit}/api`, withCredentials: true });
+const consolidatedApi = axios.create({ baseURL: `/api/consolidated`, withCredentials: true });
 ```
+
+> Nota: nas rotas canônicas do consolidado, os sub-paths mudam levemente em
+> relação aos das unidades — no consolidado todos os módulos usam
+> `{Nome}/kpis/date-range` (ex.: `Bookings/kpis/date-range`), enquanto nas
+> unidades bookings/restaurant usam `Bookings/bookings/date-range` e
+> `Restaurants/restaurants/date-range` (mesmos sub-paths de hoje).
 
 ## 6. Erros e casos de borda (inalterados, mas vale reconfirmar)
 
