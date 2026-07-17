@@ -46,12 +46,23 @@ const PERIOD_NAMES = (process.env.PERIODS || 'LAST_7_D,THIS_MONTH')
 const TOLERANCE = Number(process.env.TOLERANCE || 0.011);
 const MAX_DIFFS = Number(process.env.MAX_DIFFS || 12);
 
-const ENDPOINTS = [
+const UNIT_ENDPOINTS = [
   { service: 'company', path: 'Company/kpis/date-range' },
   { service: 'bookings', path: 'Bookings/bookings/date-range' },
   { service: 'restaurant', path: 'Restaurants/restaurants/date-range' },
   { service: 'governance', path: 'Governance/kpis/date-range' },
 ];
+
+// O Consolidated (ex-authentication): old = /api/{Nome}/kpis; new = /api/consolidated/{Nome}/kpis.
+// Uso: UNITS=consolidated OLD_BASE=http://localhost:3005 OLD_PREFIX="consolidated=" (prefixo antigo vazio)
+const CONSOLIDATED_ENDPOINTS = [
+  { service: 'company', path: 'Company/kpis/date-range', newPath: 'consolidated/Company/kpis/date-range' },
+  { service: 'bookings', path: 'Bookings/kpis/date-range', newPath: 'consolidated/Bookings/kpis/date-range' },
+  { service: 'restaurant', path: 'Restaurant/kpis/date-range', newPath: 'consolidated/Restaurant/kpis/date-range' },
+  { service: 'governance', path: 'Governance/kpis/date-range', newPath: 'consolidated/Governance/kpis/date-range' },
+];
+
+const endpointsFor = (unit) => (unit === 'consolidated' ? CONSOLIDATED_ENDPOINTS : UNIT_ENDPOINTS);
 
 function buildPeriods() {
   const yesterday = moment().subtract(1, 'day');
@@ -71,13 +82,15 @@ function buildPeriods() {
 }
 
 const token = jwt.sign(
-  { id: 0, email: 'parity@lhg', name: 'Parity', unit: 'LHG', role: 'ADMIN' },
+  // id: 1 (não 0!) — o validate() do authentication rejeita id falsy
+  { id: 1, email: 'parity@lhg', name: 'Parity', unit: 'LHG', role: 'ADMIN' },
   SECRET,
   { expiresIn: '30m' },
 );
 
 async function fetchJson(base, unitPath, ep, period) {
-  const url = `${base}/${unitPath}/api/${ep}?startDate=${encodeURIComponent(period.start)}&endDate=${encodeURIComponent(period.end)}`;
+  const seg = unitPath ? `/${unitPath}` : '';
+  const url = `${base}${seg}/api/${ep}?startDate=${encodeURIComponent(period.start)}&endDate=${encodeURIComponent(period.end)}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`HTTP ${res.status} em ${url}`);
   return res.json();
@@ -137,14 +150,19 @@ async function main() {
   const failures = [];
 
   for (const unit of UNITS) {
-    for (const ep of ENDPOINTS) {
+    for (const ep of endpointsFor(unit)) {
       for (const period of periods) {
         const label = `${unit} × ${ep.service} × ${period.name}`;
         totalCells++;
         try {
           const [oldJson, newJson] = await Promise.all([
             fetchJson(OLD_BASE, oldPathFor(unit), ep.path, period),
-            fetchJson(NEW_BASE, unit, ep.path, period),
+            fetchJson(
+              NEW_BASE,
+              unit === 'consolidated' ? '' : unit,
+              ep.newPath ?? ep.path,
+              period,
+            ),
           ]);
           const diffs = deepDiff(oldJson, newJson);
           if (diffs.length === 0) {

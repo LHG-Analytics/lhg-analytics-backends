@@ -4,6 +4,26 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
 
+// MODO CUTOVER: os KPIs consolidados saíram do authentication e agora vivem
+// no lhg-api (/consolidated/api/...). Este interceptor (registrado ANTES do
+// /auth genérico) redireciona só as rotas de KPI; login/refresh/users/etc.
+// continuam indo para o serviço de autenticação.
+if (process.env.LHG_CUTOVER === "1") {
+  const CONSOLIDATED_KPIS = /^\/(Company|Bookings|Restaurant|Governance)\//;
+  app.use(
+    "/auth/api",
+    createProxyMiddleware({
+      changeOrigin: true,
+      router: (req) =>
+        CONSOLIDATED_KPIS.test(req.url)
+          ? "http://localhost:3010"
+          : "http://localhost:3005",
+      pathRewrite: (path) =>
+        CONSOLIDATED_KPIS.test(path) ? `/api/consolidated${path}` : `/api${path}`,
+    })
+  );
+}
+
 // ⚠️ REMOVE "/auth" antes de enviar para o Nest (que escuta em /api)
 app.use(
   "/auth",

@@ -149,7 +149,7 @@ Canônico novo: `/:unit/api/{Company|Bookings|Restaurants|Governance|auth|cache}
 | D2 | **Query semanal RevPAR/Giro** (company) | ✅ **DECIDIDO (2026-07-16): variante do Grupo B** (`weekly_revenue`). Na prática só o ipiranga divergia (liv já era equivalente à lapa); bloco transplantado na Fase 1. |
 | D3 | Horário comercial da Lapa (04→03:59) | ✅ **DECIDIDO (2026-07-16): era drift** ("a Lapa não tem período de 4 horas") — normalizado para 06→05:59 na Fase 1 → **governance da Lapa muda de números**. |
 | D4 | `RentalTypeEnum` do Altana | ⏳ Recomendação: manter por tenant no registry |
-| D5 | Absorver `authentication` no unificado? | ⏳ Recomendação: manter separado na v1 (menos risco) |
+| D5 | Absorver `authentication` no unificado? | ✅ **PARCIAL (2026-07-17)**: os KPIs **Consolidated** (80% do serviço!) migraram para o lhg-api (`/api/consolidated/{Company\|Bookings\|Restaurant\|Governance}/kpis/date-range`), com **paridade 12/12 comprovada** contra o original. O shim de cutover redireciona `/auth/api/{KPIs}` → lhg-api; login/refresh/users continuam no authentication (que emagrece na Fase 6: remover os 4 módulos + pools + cache pesado). Absorver o login em si: adiado. |
 | D6 | Redis para cache | ⏳ Recomendação: depois do cutover |
 | D7 | **Janela de datas do restaurant do tout**: usava dia civil 00:00–23:59 | ✅ **DECIDIDO (2026-07-16): alinhar ao dia comercial 06:00–05:59** como as demais unidades. Impacto medido: −2,3% no A&B dos últimos 7 dias. |
 | D8 | **Drift local de tout/adc** (bookings ±2 reservas; ShiftCleaning do tout por escala do funcionário; BillingRentalType do tout ±centavos/dia) | ✅ **DECIDIDO (2026-07-17): canônico para tudo** — tout/adc calculam igual às demais unidades na migração. O turno "Terceirizado" fantasma do tout (343 limpezas de funcionários sem escala cadastrada) é corrigido. |
@@ -234,6 +234,7 @@ Executada em 2026-07-16 com D1–D3 decididos:
 Por unidade nova: 1 entrada no registry + 1 env var `DATABASE_URL_LOCAL_<UNIT>` + 1 valor no enum `UserUnit` (migration Supabase) + warmup automático. **Sem** novo processo, deploy, rota de proxy ou secret de CI. Checklist de descoberta dos IDs (categorias de suíte, cargos, tipos de produto) via queries de diagnóstico documentadas.
 
 ### Fase 6 — Limpeza
+- [ ] **Emagrecer o authentication**: remover os 4 módulos de KPI consolidado (migrados para o lhg-api em 2026-07-17 com paridade 12/12), o DatabaseService multi-pool (6 bancos × 20 conexões!), o cache/warmup pesado e o fork de DateUtils — o serviço volta a ser só auth/usuários (~20% do tamanho atual).
 - [ ] Remover os 6 workspaces antigos, `server.mjs`, `ecosystem.config.js` (ou reduzir a 2 apps: api + auth).
 - [ ] Consolidar `lhg-utils` (remover código morto; absorver o fork de DateUtils do authentication).
 - [ ] Rotacionar `JWT_SECRET` e senhas de banco; centralizar env no Render.

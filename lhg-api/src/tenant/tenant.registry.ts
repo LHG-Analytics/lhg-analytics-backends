@@ -268,6 +268,7 @@ export function getTenant(slug: string): TenantConfig | undefined {
   return TENANTS[slug];
 }
 
+
 export function allTenants(): TenantConfig[] {
   return Object.values(TENANTS);
 }

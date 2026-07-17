@@ -1,0 +1,93 @@
+/**
+ * Controller para KPIs unificados de Company
+ * Rota: /api/Company/kpis/date-range
+ * Versão Multi-Tenant - conexão direta aos bancos
+ */
+
+import {
+  Controller,
+  Get,
+  Query,
+  HttpException,
+  HttpStatus,
+  Logger,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiQuery,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
+import { CompanyMultitenantService } from './company-multitenant.service';
+import { UnifiedCompanyKpiResponse } from './company.interfaces';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { RolesGuard } from '../../auth/roles.guard';
+import { LhgOnlyGuard } from '../../auth/lhg-only.guard';
+import { Roles } from '../../auth/roles.decorator';
+import { ValidationService } from '@lhg/utils';
+
+@ApiTags('Company')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard, LhgOnlyGuard)
+@Roles('ADMIN')
+@Controller('api/consolidated/Company')
+export class CompanyController {
+  private readonly logger = new Logger(CompanyController.name);
+
+  constructor(
+    private readonly companyService: CompanyMultitenantService,
+    private readonly validationService: ValidationService,
+  ) {}
+
+  @Get('kpis/date-range')
+  @ApiOperation({
+    summary: 'Obtém KPIs consolidados de Company de todas as unidades',
+    description:
+      'Retorna dados consolidados de faturamento, locações, ticket médio, taxa de ocupação, TRevPAR e giro de todas as unidades (Lush Ipiranga, Lush Lapa, Andar de Cima, Tout). Utiliza conexão direta com os bancos de dados.',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    description: 'Data inicial no formato DD/MM/YYYY',
+    example: '01/01/2025',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    description: 'Data final no formato DD/MM/YYYY',
+    example: '31/01/2025',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'KPIs consolidados retornados com sucesso',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Parâmetros inválidos',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autorizado',
+  })
+  async getKpisByDateRange(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Request() req: any,
+  ): Promise<UnifiedCompanyKpiResponse> {
+    // Valida formato e intervalo das datas
+    this.validationService.validateDateInterval(startDate, endDate);
+
+    const user = req?.user;
+    const userUnit = user?.unit;
+    const userRole = user?.role;
+
+    this.logger.log(
+      `Buscando KPIs consolidados: ${startDate} - ${endDate} (user: ${user?.email}, unit: ${userUnit}, role: ${userRole})`,
+    );
+
+    return this.companyService.getUnifiedKpis(startDate, endDate, user);
+  }
+}
