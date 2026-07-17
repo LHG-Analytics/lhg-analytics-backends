@@ -16,8 +16,10 @@ const SERVICE_PREFIXES: Record<ServiceType, string> = {
 };
 
 const CACHE_KEY_PREFIX = 'kpi';
-// 6 unidades × 4 serviços × ~10 períodos com folga; recalibrar ao entrar Goiânia
-const MAX_CACHE_SIZE = 800;
+// Dimensionado pelo registry: (unidades + consolidated + folga) × 4 serviços × ~15 slots.
+// Escala sozinho quando novas unidades (Goiânia) entrarem no tenant registry.
+import { allTenants } from '../tenant/tenant.registry';
+const MAX_CACHE_SIZE = Math.max(480, (allTenants().length + 2) * 60);
 
 const PERIOD_TTL: Record<CachePeriodEnum, number> = {
   [CachePeriodEnum.LAST_7_D]: 21600,

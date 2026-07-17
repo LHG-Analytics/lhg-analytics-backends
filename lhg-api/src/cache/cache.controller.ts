@@ -17,12 +17,18 @@ import { RestaurantService } from '../restaurant/restaurant.service';
 import { GovernanceService } from '../governance/governance.service';
 import { BookingsService } from '../bookings/bookings.service';
 import { CompanyService } from '../company/company.service';
+import { CompanyMultitenantService } from '../consolidated/company/company-multitenant.service';
+import { BookingsMultitenantService } from '../consolidated/bookings/bookings-multitenant.service';
+import { RestaurantMultitenantService } from '../consolidated/restaurant/restaurant-multitenant.service';
+import { GovernanceMultitenantService } from '../consolidated/governance/governance-multitenant.service';
 
 // TTL longo (>= maior intervalo entre warmups; cron 3,9,15,18 UTC → gap máx 9h)
 const WARMUP_TTL_SECONDS = 12 * 60 * 60;
-// Concorrência global do warmup (cada unidade tem pool próprio de 5 conexões;
-// 3 tarefas simultâneas no total mantém a carga baixa em todos os bancos)
-const WARMUP_CONCURRENCY = 3;
+// Paralelismo POR UNIDADE: cada unidade tem um worker sequencial próprio
+// (1 query de warmup por vez em cada banco AUTOMO — carga gentil por banco),
+// e as unidades rodam em paralelo entre si (pools independentes). Escala
+// sozinho com o registry; teto de segurança para não saturar o processo.
+const MAX_PARALLEL_WORKERS = 16;
 
 interface WarmupTask {
   tenant: TenantConfig;
@@ -128,48 +134,89 @@ export class CacheController {
       },
     ];
 
-    const tasks: (() => Promise<void>)[] = [];
     let calculated = 0;
     let errors = 0;
 
-    for (const tenant of allTenants()) {
+    // Um worker sequencial POR UNIDADE (paralelismo entre unidades, carga
+    // de 1 query de warmup por vez em cada banco AUTOMO)
+    const unitWorkers = allTenants().map((tenant) => async () => {
       for (const svc of services) {
         for (const p of periods) {
-          tasks.push(async () => {
-            const key = `${tenant.slug}:${svc.name}:${p.name}`;
-            try {
-              const calcStart = Date.now();
-              const data = await svc.run(tenant, p.start, p.end);
-              await this.cacheService.set(
-                tenant.slug,
-                svc.name,
-                p.period,
-                data,
-                p.period === CachePeriodEnum.CUSTOM ? { start: p.start, end: p.end } : undefined,
-                WARMUP_TTL_SECONDS,
-              );
-              calculated++;
-              this.logger.log(`${key}: CALCULATED (${Date.now() - calcStart}ms)`);
-            } catch (error) {
-              errors++;
-              this.logger.error(
-                `${key}: ERROR - ${error instanceof Error ? error.message : error}`,
-              );
-            }
-          });
+          const key = `${tenant.slug}:${svc.name}:${p.name}`;
+          try {
+            const calcStart = Date.now();
+            const data = await svc.run(tenant, p.start, p.end);
+            await this.cacheService.set(
+              tenant.slug,
+              svc.name,
+              p.period,
+              data,
+              p.period === CachePeriodEnum.CUSTOM ? { start: p.start, end: p.end } : undefined,
+              WARMUP_TTL_SECONDS,
+            );
+            calculated++;
+            this.logger.log(`${key}: CALCULATED (${Date.now() - calcStart}ms)`);
+          } catch (error) {
+            errors++;
+            this.logger.error(`${key}: ERROR - ${error instanceof Error ? error.message : error}`);
+          }
         }
       }
-    }
+    });
 
-    // Worker pool simples com concorrência limitada
+    // Worker do CONSOLIDATED (sequencial nas suas células — cada getUnifiedKpis
+    // já faz fan-out paralelo interno para todas as unidades)
+    const fmt = (d: Date) => moment(d).format('DD/MM/YYYY');
+    const consolidatedServices: { name: string; run: (s: string, e: string) => Promise<any> }[] = [
+      {
+        name: 'company',
+        run: (s, e) =>
+          this.moduleRef.get(CompanyMultitenantService, { strict: false }).getUnifiedKpis(s, e),
+      },
+      {
+        name: 'bookings',
+        run: (s, e) =>
+          this.moduleRef.get(BookingsMultitenantService, { strict: false }).getUnifiedKpis(s, e),
+      },
+      {
+        name: 'restaurant',
+        run: (s, e) =>
+          this.moduleRef.get(RestaurantMultitenantService, { strict: false }).getUnifiedKpis(s, e),
+      },
+      {
+        name: 'governance',
+        run: (s, e) =>
+          this.moduleRef.get(GovernanceMultitenantService, { strict: false }).getUnifiedKpis(s, e),
+      },
+    ];
+    const consolidatedWorker = async () => {
+      for (const svc of consolidatedServices) {
+        for (const p of periods) {
+          const key = `consolidated:${svc.name}:${p.name}`;
+          try {
+            const calcStart = Date.now();
+            // getUnifiedKpis cacheia internamente nas MESMAS chaves que a API consulta
+            await svc.run(fmt(p.start), fmt(p.end));
+            calculated++;
+            this.logger.log(`${key}: CALCULATED (${Date.now() - calcStart}ms)`);
+          } catch (error) {
+            errors++;
+            this.logger.error(`${key}: ERROR - ${error instanceof Error ? error.message : error}`);
+          }
+        }
+      }
+    };
+
+    // Executa todos os workers em paralelo (com teto de segurança)
+    const workers = [...unitWorkers, consolidatedWorker];
     let idx = 0;
-    const workers = Array.from({ length: Math.min(WARMUP_CONCURRENCY, tasks.length) }, async () => {
-      while (idx < tasks.length) {
+    const runners = Array.from({ length: Math.min(MAX_PARALLEL_WORKERS, workers.length) }, async () => {
+      while (idx < workers.length) {
         const current = idx++;
-        await tasks[current]();
+        await workers[current]();
       }
     });
-    await Promise.all(workers);
+    await Promise.all(runners);
 
     this.logger.log(
       `Warmup multi-tenant: ${calculated} calculados, ${errors} erros (${Date.now() - startTime}ms)`,
