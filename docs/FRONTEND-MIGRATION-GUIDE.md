@@ -1,8 +1,23 @@
 # Guia para o Frontend — Migração para o Backend Multi-Tenant
 
-> **Status**: PLANEJADO — nada muda para o frontend ainda. Este documento descreve o contrato do novo backend unificado (`lhg-api`) para que o frontend possa se preparar. As datas de ativação serão comunicadas por fase (ver [MIGRATION-MULTI-TENANT.md](./MIGRATION-MULTI-TENANT.md)).
+> **Status (2026-07-17)**: backend multi-tenant PRONTO e com paridade validada
+> (6 unidades × 4 serviços — ver plano). **Staging disponível** em
+> `https://analytics-dev.lhgmoteis.com.br` com o modo cutover (`LHG_CUTOVER=1`):
+> os paths ANTIGOS continuam funcionando (reescritos internamente para o
+> multi-tenant) — ou seja, **o frontend de staging funciona sem mudar nada** e
+> já é 100% servido pelo backend novo. Ver [STAGING.md](./STAGING.md).
 >
-> **Garantia central da migração**: durante o cutover (Fase 4), o proxy manterá os paths atuais funcionando — **o frontend não precisa mudar nada para a migração acontecer**. A adoção das rotas novas é um passo posterior, no ritmo do frontend.
+> **Garantia central da migração**: no cutover (staging e produção), o proxy
+> mantém os paths atuais funcionando — **o frontend não precisa mudar nada
+> para a migração acontecer**. A adoção das rotas novas é um passo posterior,
+> no ritmo do frontend.
+>
+> **Mudanças de NÚMEROS esperadas ao comparar staging × produção** (não são
+> bugs; detalhes no plano, Fase 3): gráficos por categoria de ipiranga/liv
+> (correção de deslocamento de 1 dia do backend antigo), relatórios de
+> restaurante das 5 unidades (valores líquidos/base de locações, padrão
+> Altana), tout/adc (decisão D8: reservas ±2/semana; turnos de limpeza do
+> tout corrigidos).
 
 ## 1. O que muda (e o que não muda)
 
@@ -72,10 +87,23 @@ const unitApi = (unit: keyof typeof UNITS) =>
 
 ## 5. Cronologia e compatibilidade
 
-1. **Hoje / Fases 1–3**: nada muda. Backends atuais seguem respondendo nos paths atuais.
-2. **Fase 4 (cutover)**: o proxy redireciona internamente os paths antigos para o `lhg-api`. **Frontend continua funcionando sem deploy.**
-3. **Pós-cutover**: frontend migra para as rotas canônicas da seção 2 no seu ritmo. Os aliases antigos serão mantidos por um período de transição acordado e então removidos.
-4. **Goiânia**: unidades novas já nascem SOMENTE no padrão novo (`/{unit}/api/...`).
+1. **AGORA (staging)**: `analytics-dev.lhgmoteis.com.br` está em modo cutover — paths antigos funcionando, servidos pelo multi-tenant. Validar os dashboards aqui.
+2. **Cutover de produção** (após validação): mesma mecânica — paths antigos continuam. **Frontend continua funcionando sem deploy.**
+3. **Pós-cutover**: frontend migra para as rotas canônicas da seção 2 no seu ritmo. **Enquanto o proxy-shim existir**, as rotas canônicas ficam sob o prefixo `/lhg`: `https://<host>/lhg/{unit}/api/...` (é o mesmo backend; o shim só reescreve os paths antigos). Quando o proxy for aposentado, o canônico passa a ser direto: `/{unit}/api/...`.
+4. **Goiânia**: unidades novas já nascem SOMENTE no padrão novo.
+
+### Sugestão prática para a adoção
+
+Centralize a base URL num único ponto e migre com 1 linha por etapa:
+
+```ts
+// etapa atual (paths antigos, funcionam em staging e produção):
+const unitApi = (unit, prefix) => axios.create({ baseURL: `/${unit}/${prefix}/api`, withCredentials: true });
+// etapa canônica com o shim vivo:
+const unitApi = (unit) => axios.create({ baseURL: `/lhg/${unit}/api`, withCredentials: true });
+// estado final (sem proxy):
+const unitApi = (unit) => axios.create({ baseURL: `/${unit}/api`, withCredentials: true });
+```
 
 ## 6. Erros e casos de borda (inalterados, mas vale reconfirmar)
 
