@@ -152,6 +152,7 @@ Canônico novo: `/:unit/api/{Company|Bookings|Restaurants|Governance|auth|cache}
 | D5 | Absorver `authentication` no unificado? | ⏳ Recomendação: manter separado na v1 (menos risco) |
 | D6 | Redis para cache | ⏳ Recomendação: depois do cutover |
 | D7 | **Janela de datas do restaurant do tout**: usava dia civil 00:00–23:59 | ✅ **DECIDIDO (2026-07-16): alinhar ao dia comercial 06:00–05:59** como as demais unidades. Impacto medido: −2,3% no A&B dos últimos 7 dias. |
+| D8 | **Drift local de tout/adc** (bookings ±2 reservas; ShiftCleaning do tout por escala do funcionário; BillingRentalType do tout ±centavos/dia) | ✅ **DECIDIDO (2026-07-17): canônico para tudo** — tout/adc calculam igual às demais unidades na migração. O turno "Terceirizado" fantasma do tout (343 limpezas de funcionários sem escala cadastrada) é corrigido. |
 
 ## 5. Fases
 
@@ -219,7 +220,7 @@ Executada em 2026-07-16 com D1–D3 decididos:
   - **Ⓑ Bug do código ANTIGO (Grupo A/Prisma)**: gráficos por categoria de ipiranga/liv (OccupancyRateBySuiteCategory etc.) estão **deslocados 1 dia** (shift de timezone do Prisma com colunas DATE; o último dia aparece zerado). O lhg-api (pg) CORRIGE — dashboards de ipiranga/liv vão mudar nesses gráficos, para melhor.
   - **Ⓓ Drift local de tout/adc** (decisão D8 pendente): (i) bookings de tout/adc contam ±2 reservas vs canônico; (ii) ShiftCleaning do tout classifica por escala do funcionário (367+ caem em 'Terceirizado' que o tout nem tem) vs canônico por horário da limpeza — usado pelas outras 5 unidades; (iii) BillingRentalType do tout com deltas de centavos/dia. Recomendação: adotar o canônico (consistente com D1).
   - **Fix aplicado durante a bateria**: `bookingValidOriginIds` no registry (altana usa origens 1,3,4; demais 1,3,4,6,7,8) — sem ele o lhg-api mostraria origens inexistentes no altana. Revalidado: altana 12/12.
-- [ ] D8: decidir direção do drift de tout/adc (recomendação: canônico).
+- [x] **D8 DECIDIDO (2026-07-17): canônico para tudo.** Tout e ADC adotam as fórmulas padrão na migração — sem código extra. Mudanças esperadas no cutover dessas 2 unidades: reservas ±2/semana (tout 104→106, adc 153→151 na janela testada), ShiftCleaning do tout corrigido (some o turno "Terceirizado" fantasma de 343 limpezas; distribuição real por horário da limpeza), BillingRentalType do tout ±R$ 6-23/dia.
 - [ ] Repetir a bateria no staging quando a instância aguentar (hoje: Free/512MB não sustenta 9 processos — OOM churn; upgrade recomendado para a fase de validação humana).
 - [ ] Validação humana no frontend preview (irmão), com a lista de mudanças esperadas: gráficos por categoria de ipiranga/liv (correção do shift), restaurant das 5 unidades (normalização líquido), tout conforme D8.
 
