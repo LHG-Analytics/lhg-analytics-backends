@@ -54,10 +54,20 @@ async function bootstrap() {
     .setDescription(
       `Backend unificado das unidades: ${allTenants()
         .map((t) => t.slug)
-        .join(', ')}. Rotas: /{unit}/api/...`,
+        .join(', ')}. Rotas: /{unit}/api/... e /api/consolidated/... | ` +
+        `Auth: Bearer token OU cookie access_token (faça login no frontend do mesmo host).`,
     )
     .setVersion('0.1')
+    // Servidores: via proxy-shim (/lhg) e direto (sem proxy)
+    .addServer('/lhg', 'via proxy (staging/produção com shim)')
+    .addServer('/', 'direto (sem proxy)')
+    // Botão Authorize (Bearer) aplicado a todas as operações
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
+    .addSecurityRequirements('JWT')
+    .addTag('Company')
+    .addTag('Bookings')
     .addTag('Restaurant')
+    .addTag('Governance')
     .addTag('Cache')
     .build();
   const document = SwaggerModule.createDocument(app, config);
