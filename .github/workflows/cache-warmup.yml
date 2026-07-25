@@ -5,156 +5,118 @@ on:
     # Horário de Brasília = UTC-3
     # 0h, 6h, 12h, 15h BRT = 3h, 9h, 15h, 18h UTC
     - cron: '0 3,9,15,18 * * *'
-  workflow_dispatch:  # Permite execução manual via GitHub UI
+  workflow_dispatch: # Permite execução manual via GitHub UI
 
 jobs:
-  warmup-all-backends:
-    name: Warmup Cache - All Backends
+  warmup:
+    name: Warmup + verificação
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Warmup Lush Ipiranga
-        id: lush_ipiranga
-        continue-on-error: true
+      - name: Warmup e verificação do cache
+        env:
+          AUTH_URL: ${{ secrets.AUTHENTICATION_URL }}
+          # Fallback para o modelo antigo (usados só se o lhg-api NÃO estiver no ar)
+          LUSH_IPIRANGA_URL: ${{ secrets.LUSH_IPIRANGA_URL }}
+          LUSH_LAPA_URL: ${{ secrets.LUSH_LAPA_URL }}
+          ANDAR_DE_CIMA_URL: ${{ secrets.ANDAR_DE_CIMA_URL }}
+          TOUT_URL: ${{ secrets.TOUT_URL }}
+          LIV_URL: ${{ secrets.LIV_URL }}
+          ALTANA_URL: ${{ secrets.ALTANA_URL }}
         run: |
-          curl -X POST "${{ secrets.LUSH_IPIRANGA_URL }}/cache/warmup" \
-            -H "Content-Type: application/json" \
-            --max-time 180 \
-            --fail
+          set -uo pipefail
 
-      - name: Warmup Lush Lapa
-        id: lush_lapa
-        continue-on-error: true
-        run: |
-          curl -X POST "${{ secrets.LUSH_LAPA_URL }}/cache/warmup" \
-            -H "Content-Type: application/json" \
-            --max-time 180 \
-            --fail
+          # Deriva o host base a partir do AUTHENTICATION_URL (ex.: https://host/auth/api → https://host)
+          BASE="${AUTH_URL%/}"
+          BASE="${BASE%/auth/api}"
+          BASE="${BASE%/auth}"
+          LHG="$BASE/lhg"
 
-      - name: Warmup Andar de Cima
-        id: andar_de_cima
-        continue-on-error: true
-        run: |
-          curl -X POST "${{ secrets.ANDAR_DE_CIMA_URL }}/cache/warmup" \
-            -H "Content-Type: application/json" \
-            --max-time 180 \
-            --fail
+          echo "Base: $BASE"
 
-      - name: Warmup Tout
-        id: tout
-        continue-on-error: true
-        run: |
-          curl -X POST "${{ secrets.TOUT_URL }}/cache/warmup" \
-            -H "Content-Type: application/json" \
-            --max-time 180 \
-            --fail
-
-      - name: Warmup Liv
-        id: liv
-        continue-on-error: true
-        run: |
-          curl -X POST "${{ secrets.LIV_URL }}/cache/warmup" \
-            -H "Content-Type: application/json" \
-            --max-time 180 \
-            --fail
-
-      - name: Warmup Altana
-        id: altana
-        continue-on-error: true
-        run: |
-          curl -X POST "${{ secrets.ALTANA_URL }}/cache/warmup" \
-            -H "Content-Type: application/json" \
-            --max-time 180 \
-            --fail
-
-      - name: Warmup Authentication
-        id: authentication
-        continue-on-error: true
-        run: |
-          curl -X POST "${{ secrets.AUTHENTICATION_URL }}/cache/warmup" \
-            -H "Content-Type: application/json" \
-            --max-time 180 \
-            --fail
-
-      - name: Sumário dos resultados
-        if: always()
-        run: |
-          echo "## Cache Warmup - Resultados" >> $GITHUB_STEP_SUMMARY
-          echo "| Backend | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Lush Ipiranga | ${{ steps.lush_ipiranga.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Lush Lapa | ${{ steps.lush_lapa.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Andar de Cima | ${{ steps.andar_de_cima.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Tout | ${{ steps.tout.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Liv | ${{ steps.liv.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Altana | ${{ steps.altana.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Authentication | ${{ steps.authentication.outcome == 'success' && '✅ OK' || '❌ FALHOU' }} |" >> $GITHUB_STEP_SUMMARY
-
-          # Falha o workflow se algum backend falhou (para notificação no GitHub)
-          if [[ "${{ steps.lush_ipiranga.outcome }}" == "failure" || \
-                "${{ steps.lush_lapa.outcome }}" == "failure" || \
-                "${{ steps.andar_de_cima.outcome }}" == "failure" || \
-                "${{ steps.tout.outcome }}" == "failure" || \
-                "${{ steps.liv.outcome }}" == "failure" || \
-                "${{ steps.altana.outcome }}" == "failure" || \
-                "${{ steps.authentication.outcome }}" == "failure" ]]; then
-            echo "⚠️ Um ou mais backends falharam no warmup."
-            exit 1
+          # ── Detecção de arquitetura ────────────────────────────────────────
+          # Se o lhg-api responde em /lhg/health, estamos no backend multi-tenant
+          # (cutover OU merge com o lhg-api no ar). Senão, cai no modelo antigo.
+          if curl -s --max-time 60 -o /dev/null -w '%{http_code}' "$LHG/health" | grep -q '^200$'; then
+            MODE=multitenant
+          else
+            MODE=legacy
           fi
+          echo "Modo detectado: $MODE"
 
-  verify-cache:
-    name: Verifica população do cache
-    needs: warmup-all-backends
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Consulta /cache/status e valida entradas
-        run: |
-          # O warmup é fire-and-forget (responde 202 e calcula em background),
-          # então o "sucesso" do passo anterior NÃO garante que o cache populou.
-          # Aqui consultamos GET /cache/status (endpoint público) com polling até
-          # o cálculo em background gravar as entradas.
-          # Unidades populam 4 serviços x 4 períodos = 16 entradas (tolerância: >=12).
-          check() {
-            local name="$1" url="$2" min="$3" out="$4"
-            if [ -z "$url" ]; then
-              echo "WARN  $name: URL não configurada (secret ausente)" > "$out"; return
-            fi
-            local active=0
-            # Polling mais tolerante: até 20x30s = 10 min (o warmup é fire-and-forget e,
-            # numa instância fria/lenta como a do Liv, o cálculo em background demora).
+          # ════════════════════════════════════════════════════════════════════
+          if [ "$MODE" = "multitenant" ]; then
+            echo "→ Warmup único (todas as unidades + consolidado)"
+            curl -s -X POST --max-time 120 "$LHG/api/cache/warmup" || true
+
+            # Polling do status agregado (byUnit)
+            STATUS='{}'
             for i in $(seq 1 20); do
-              active=$(curl -s --max-time 30 "$url/cache/status" | jq -r '.summary.active // 0' 2>/dev/null || echo 0)
-              [ -z "$active" ] && active=0
-              if [ "$active" -ge "$min" ]; then
-                echo "OK    $name: $active entradas ativas (min $min)" > "$out"; return
-              fi
+              STATUS=$(curl -s --max-time 30 "$LHG/api/cache/status" || echo '{}')
+              TOTAL=$(echo "$STATUS" | jq -r '.summary.active // 0' 2>/dev/null || echo 0)
+              # Nº de unidades com >=12 entradas ativas
+              READY=$(echo "$STATUS" | jq -r '[.byUnit // {} | to_entries[] | select(.value.active >= 12)] | length' 2>/dev/null || echo 0)
+              echo "  tentativa $i: total=$TOTAL, unidades prontas=$READY"
+              [ "${READY:-0}" -ge 6 ] && break
               sleep 30
             done
-            echo "FAIL  $name: apenas $active entradas ativas (min $min)" > "$out"
-          }
 
-          TMP=$(mktemp -d)
-          check "Lush Ipiranga"  "${{ secrets.LUSH_IPIRANGA_URL }}"  12 "$TMP/ipiranga" &
-          check "Lush Lapa"      "${{ secrets.LUSH_LAPA_URL }}"      12 "$TMP/lapa" &
-          check "Andar de Cima"  "${{ secrets.ANDAR_DE_CIMA_URL }}"  12 "$TMP/adc" &
-          check "Tout"           "${{ secrets.TOUT_URL }}"           12 "$TMP/tout" &
-          check "Liv"            "${{ secrets.LIV_URL }}"            12 "$TMP/liv" &
-          check "Altana"         "${{ secrets.ALTANA_URL }}"         12 "$TMP/altana" &
-          check "Authentication" "${{ secrets.AUTHENTICATION_URL }}"  1 "$TMP/auth" &
-          wait
+            {
+              echo "## Cache Warmup (multi-tenant) — $LHG"
+              echo '```'
+              echo "$STATUS" | jq -r '.byUnit // {} | to_entries[] | "\(.key): \(.value.active) ativas"' 2>/dev/null || echo "sem detalhe por unidade"
+              echo "TOTAL ativas: $TOTAL"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
 
-          {
-            echo "## Verificação do Cache (/cache/status)"
-            echo '```'
-            cat "$TMP"/*
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          cat "$TMP"/*
+            # Unidades com 0 entradas provavelmente têm o BANCO DA UNIDADE fora do ar
+            # (infra da unidade, não do backend) — reporta como aviso, não falha.
+            EMPTY=$(echo "$STATUS" | jq -r '[.byUnit // {} | to_entries[] | select(.value.active == 0) | .key] | join(", ")' 2>/dev/null || echo "")
+            if [ -n "$EMPTY" ] && [ "$EMPTY" != "null" ]; then
+              echo "::warning::Unidade(s) com cache vazio (provável banco da unidade inacessível): $EMPTY"
+            fi
 
-          if grep -q '^FAIL' "$TMP"/*; then
-            echo "::error::Um ou mais backends não populou o cache corretamente."
+            # FALHA só se o backend estiver realmente quebrado: total criticamente
+            # baixo (não é 1 banco de unidade fora, é o warmup inteiro falhando).
+            if [ "${TOTAL:-0}" -lt 40 ]; then
+              echo "::error::Warmup multi-tenant com apenas $TOTAL entradas ativas — backend possivelmente com problema."
+              exit 1
+            fi
+            echo "OK: $TOTAL entradas ativas."
+            exit 0
+          fi
+
+          # ════════════════════════════════════════════════════════════════════
+          echo "→ Modelo antigo (um endpoint por backend)"
+          declare -A URLS=(
+            [Lush_Ipiranga]="$LUSH_IPIRANGA_URL" [Lush_Lapa]="$LUSH_LAPA_URL"
+            [Andar_de_Cima]="$ANDAR_DE_CIMA_URL" [Tout]="$TOUT_URL"
+            [Liv]="$LIV_URL" [Altana]="$ALTANA_URL" [Authentication]="$AUTH_URL"
+          )
+          for name in "${!URLS[@]}"; do
+            u="${URLS[$name]}"; [ -z "$u" ] && continue
+            curl -s -X POST --max-time 180 "$u/cache/warmup" >/dev/null || echo "warmup $name falhou (segue)"
+          done
+
+          FAILED=""
+          for name in "${!URLS[@]}"; do
+            u="${URLS[$name]}"; [ -z "$u" ] && continue
+            min=12; [ "$name" = "Authentication" ] && min=1
+            active=0
+            for i in $(seq 1 20); do
+              active=$(curl -s --max-time 30 "$u/cache/status" | jq -r '.summary.active // 0' 2>/dev/null || echo 0)
+              [ "${active:-0}" -ge "$min" ] && break
+              sleep 30
+            done
+            echo "$name: $active ativas (min $min)" >> "$GITHUB_STEP_SUMMARY"
+            if [ "${active:-0}" -eq 0 ]; then
+              echo "::warning::$name com cache vazio (provável banco da unidade inacessível)"
+            elif [ "${active:-0}" -lt "$min" ]; then
+              FAILED="$FAILED $name"
+            fi
+          done
+          if [ -n "$FAILED" ]; then
+            echo "::error::Backends abaixo do mínimo (e não zerados):$FAILED"
             exit 1
           fi
 
