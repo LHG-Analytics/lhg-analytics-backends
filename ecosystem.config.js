@@ -1,5 +1,12 @@
 require("module-alias/register");
 
+// ============================================================================
+// Topologia pós-migração multi-tenant (2026-07-25): 3 processos.
+//   proxy   — server.mjs (entrypoint público, porta $PORT)
+//   lhg-api — backend multi-tenant: todas as unidades + Consolidated (:3010)
+//   auth    — authentication: login/refresh/logout/me/users (:3005)
+// Os 6 backends por unidade foram aposentados (o lhg-api os substitui).
+// ============================================================================
 module.exports = {
   apps: [
     {
@@ -14,9 +21,7 @@ module.exports = {
       },
     },
     {
-      // Backend multi-tenant unificado (migração — ver docs/MIGRATION-MULTI-TENANT.md).
-      // Exposto no proxy via /lhg/* (server.mjs). No cutover (Fase 4), as rotas das
-      // unidades passam a apontar para ele e os processos antigos são desligados.
+      // Backend multi-tenant unificado — serve /lhg/{unit}/api/... e o Consolidated.
       name: "lhg-api",
       script: "./lhg-api/dist/main.js",
       env: {
@@ -49,97 +54,6 @@ module.exports = {
         PORT_AUTH: 3005,
       },
     },
-    {
-      name: "lush_ipiranga",
-      script: "./dist/lush_ipiranga/src/main.js",
-      cwd: "./lush_ipiranga",
-      node_args: "-r module-alias/register",
-      env: {
-        NODE_ENV: "production",
-        DATABASE_URL_LOCAL_IPIRANGA: process.env.DATABASE_URL_LOCAL_IPIRANGA,
-        SERVICE_PREFIX: "ipiranga",
-        PORT: 3001,
-      },
-      env_production: {
-        PORT: 3001,
-      },
-    },
-    {
-      name: "lush_lapa",
-      script: "./dist/lush_lapa/src/main.js",
-      cwd: "./lush_lapa",
-      node_args: "-r module-alias/register",
-      env: {
-        NODE_ENV: "production",
-        DATABASE_URL_LOCAL_LAPA: process.env.DATABASE_URL_LOCAL_LAPA,
-        SERVICE_PREFIX: "lapa",
-        PORT: 3002,
-      },
-      env_production: {
-        PORT: 3002,
-      },
-    },
-    {
-      name: "tout",
-      script: "./dist/tout/src/main.js",
-      cwd: "./tout",
-      node_args: "-r module-alias/register",
-      env: {
-        NODE_ENV: "production",
-        DATABASE_URL_LOCAL_TOUT: process.env.DATABASE_URL_LOCAL_TOUT,
-        SERVICE_PREFIX: "tout",
-        PORT: 3003,
-      },
-      env_production: {
-        PORT: 3003,
-      },
-    },
-    {
-      name: "andar_de_cima",
-      script: "./dist/andar_de_cima/src/main.js",
-      cwd: "./andar_de_cima",
-      node_args: "-r module-alias/register",
-      env: {
-        NODE_ENV: "production",
-        DATABASE_URL_LOCAL_ANDAR_DE_CIMA:
-          process.env.DATABASE_URL_LOCAL_ANDAR_DE_CIMA,
-        SERVICE_PREFIX: "andar_de_cima",
-        PORT: 3004,
-      },
-      env_production: {
-        PORT: 3004,
-      },
-    },
-    {
-      name: "liv",
-      script: "./dist/liv/src/main.js",
-      cwd: "./liv",
-      node_args: "-r module-alias/register",
-      env: {
-        NODE_ENV: "production",
-        DATABASE_URL_LOCAL_LIV: process.env.DATABASE_URL_LOCAL_LIV,
-        SERVICE_PREFIX: "liv",
-        PORT: 3006,
-      },
-      env_production: {
-        PORT: 3006,
-      },
-    },
-    {
-      name: "altana",
-      script: "./dist/altana/src/main.js",
-      cwd: "./altana",
-      node_args: "-r module-alias/register",
-      env: {
-        NODE_ENV: "production",
-        DATABASE_URL_LOCAL_ALTANA: process.env.DATABASE_URL_LOCAL_ALTANA,
-        SERVICE_PREFIX_ALTANA: "altana",
-        PORT_ALTANA: 3007,
-      },
-      env_production: {
-        PORT_ALTANA: 3007,
-      },
-    },
   ],
   deploy: {
     production: {
@@ -147,14 +61,3 @@ module.exports = {
     },
   },
 };
-
-// ============================================================================
-// MODO CUTOVER (LHG_CUTOVER=1): sobe somente proxy + auth + lhg-api.
-// Os 6 backends por unidade não são iniciados — as rotas das unidades são
-// servidas pelo lhg-api (ver server.mjs). De 9 processos para 3: cabe no
-// plano Free do Render. É o mecanismo da Fase 4 (staging = ensaio geral).
-// ============================================================================
-if (process.env.LHG_CUTOVER === "1") {
-  const keep = new Set(["proxy", "auth", "lhg-api"]);
-  module.exports.apps = module.exports.apps.filter((app) => keep.has(app.name));
-}

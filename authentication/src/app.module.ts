@@ -7,20 +7,11 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { CacheModule } from './cache/cache.module';
-import { DatabaseModule } from './database/database.module';
-import { UtilsModule } from './utils/utils.module';
-import {
-  ValidationModule,
-  QueryUtilsModule,
-  ConcurrencyUtilsModule,
-  CompressionUtilsModule,
-} from '@lhg/utils';
-import { CompanyModule } from './company/company.module';
-import { RestaurantModule } from './restaurant/restaurant.module';
-import { BookingsModule } from './bookings/bookings.module';
-import { GovernanceModule } from './governance/governance.module';
 
+// NOTA (limpeza pós-migração multi-tenant, 2026-07-25): os módulos de KPI
+// (company/bookings/governance/restaurant) e sua infra (cache/database/utils)
+// migraram para o lhg-api (inclusive a visão Consolidated). Este serviço agora
+// responde SOMENTE por autenticação e usuários (login/refresh/logout/me/users).
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -30,17 +21,6 @@ import { GovernanceModule } from './governance/governance.module';
         limit: 100, // 100 requests per minute (global)
       },
     ]),
-    CacheModule,
-    DatabaseModule,
-    UtilsModule,
-    ValidationModule,
-    QueryUtilsModule,
-    ConcurrencyUtilsModule,
-    CompressionUtilsModule,
-    CompanyModule,
-    RestaurantModule,
-    BookingsModule,
-    GovernanceModule,
     UsersModule,
     AuthModule,
   ],
