@@ -1,11 +1,13 @@
 # Guia para o Frontend — Migração para o Backend Multi-Tenant
 
-> **Status (2026-07-17)**: backend multi-tenant PRONTO e com paridade validada
-> (6 unidades × 4 serviços — ver plano). **Staging disponível** em
-> `https://analytics-dev.lhgmoteis.com.br` com o modo cutover (`LHG_CUTOVER=1`):
-> os paths ANTIGOS continuam funcionando (reescritos internamente para o
-> multi-tenant) — ou seja, **o frontend de staging funciona sem mudar nada** e
-> já é 100% servido pelo backend novo. Ver [STAGING.md](./STAGING.md).
+> **Status (2026-07-25)**: backend multi-tenant **NO AR EM PRODUÇÃO** em modo
+> cutover (`LHG_CUTOVER=1`), e também em staging. Os DOIS ambientes têm **as
+> mesmas rotas** — só muda o domínio (ver Seção 0). Os paths ANTIGOS continuam
+> funcionando (reescritos internamente para o multi-tenant), então **o frontend
+> atual roda sem mudar nada**; adotar o formato novo (`/lhg/...`) é opcional e no
+> ritmo do frontend.
+> - **Produção**: `https://analytics.lhgmoteis.com.br`
+> - **Staging/dev**: `https://analytics-dev.lhgmoteis.com.br` — ver [STAGING.md](./STAGING.md).
 >
 > **Garantia central da migração**: no cutover (staging e produção), o proxy
 > mantém os paths atuais funcionando — **o frontend não precisa mudar nada
@@ -26,6 +28,97 @@
 > Governance}/kpis/date-range` continuam funcionando (o proxy redireciona por
 > baixo dos panos); o serviço de autenticação segue respondendo apenas por
 > login/refresh/logout/me/users.
+
+## 0. Referência rápida — o que usar AGORA (verificado em prod e staging)
+
+> Todas as rotas abaixo foram testadas nos dois ambientes em 2026-07-25 e
+> respondem **idêntico**. `200` = pública OK · `401` = existe e está protegida
+> (só falta login) · `404` = você chamou uma base sem o recurso completo.
+
+**Regra de ouro:** o path é **o mesmo em prod e dev**. Só troca o domínio.
+
+| Ambiente | Domínio (base) |
+|----------|----------------|
+| Produção | `https://analytics.lhgmoteis.com.br` |
+| Staging/dev | `https://analytics-dev.lhgmoteis.com.br` |
+
+### 0.1 Autenticação (serviço `authentication`, prefixo `/auth/api`) — INALTERADO
+Sempre com cookie httpOnly → `withCredentials: true` / `credentials: 'include'`.
+
+| Método | Rota | Acesso |
+|--------|------|--------|
+| POST | `/auth/api/login` | pública |
+| POST | `/auth/api/refresh` | pública (via cookie) |
+| POST | `/auth/api/logout` | pública |
+| GET | `/auth/api/me` | logado |
+| GET/POST | `/auth/api/users` · `/auth/api/users/email/:email` · `/auth/api/users/:id` (PATCH/DELETE) | ADMIN |
+
+### 0.2 KPIs por unidade — base `/lhg/{unidade}/api`
+`{unidade}` ∈ `lush_ipiranga` · `lush_lapa` · `tout` · `andar_de_cima` · `liv` · `altana`
+Query em TODAS: `?startDate=DD/MM/YYYY&endDate=DD/MM/YYYY`
+
+| Módulo | Path (após a base) | Perfis (além de ADMIN/LHG) |
+|--------|--------------------|----------------------------|
+| Company | `/Company/kpis/date-range` | GERENTE_GERAL, GERENTE_FINANCEIRO |
+| Bookings | `/Bookings/bookings/date-range` | GERENTE_GERAL, GERENTE_RESERVAS |
+| Restaurant | `/Restaurants/restaurants/date-range` | GERENTE_GERAL, GERENTE_RESTAURANTE |
+| Governance | `/Governance/kpis/date-range` | GERENTE_GERAL, GERENTE_OPERACIONAL |
+
+Exemplo completo (Lush Ipiranga, Company):
+`GET https://analytics.lhgmoteis.com.br/lhg/lush_ipiranga/api/Company/kpis/date-range?startDate=01/07/2026&endDate=24/07/2026`
+
+### 0.3 Consolidado (tela LHG) — base `/lhg/api/consolidated` — só ADMIN/LHG
+| Módulo | Path (após a base) |
+|--------|--------------------|
+| Company | `/Company/kpis/date-range` |
+| Bookings | `/Bookings/kpis/date-range` |
+| Restaurant | `/Restaurant/kpis/date-range` |
+| Governance | `/Governance/kpis/date-range` |
+
+### 0.4 Utilitários (públicos)
+`GET /lhg/health` · `GET /lhg/api/cache/status` · `POST /lhg/api/cache/warmup`
+
+### 0.5 ⚠️ 3 pegadinhas que NÃO são bug (herança dos backends antigos, mantida p/ o payload não mudar)
+1. **O sub-recurso muda por módulo** — não dá para adivinhar, use a tabela:
+   Company/Governance → `kpis` · Bookings → `bookings` · Restaurant → `restaurants`.
+2. **Restaurante: plural × singular.** Por unidade é `/Restaurants/restaurants/...`
+   (plural); no consolidado é `/Restaurant/kpis/...` (singular). Repare.
+3. **`401` não é "quebrado"** — é "faltou login". Todo KPI é protegido; sem o cookie
+   volta `401`. Chamar a base sem o recurso (ex.: `/lhg/lush_ipiranga/api`) volta `404`.
+   Sempre: **base + recurso + `?startDate=&endDate=`** e estar logado.
+
+### 0.6 Implementação sugerida (centraliza tudo em 1 ponto)
+```ts
+// única fonte de verdade da base; trocar aqui se um dia o /lhg for aposentado
+const API_BASE = ''; // mesma origem do frontend (prod ou dev)
+
+const unitApi = (unidade: string) =>
+  axios.create({ baseURL: `${API_BASE}/lhg/${unidade}/api`, withCredentials: true });
+
+const consolidatedApi =
+  axios.create({ baseURL: `${API_BASE}/lhg/api/consolidated`, withCredentials: true });
+
+const authApi =
+  axios.create({ baseURL: `${API_BASE}/auth/api`, withCredentials: true });
+
+// uso:
+unitApi('lush_ipiranga').get('/Company/kpis/date-range',   { params: { startDate, endDate } });
+unitApi('lush_ipiranga').get('/Bookings/bookings/date-range',   { params: { startDate, endDate } });
+unitApi('lush_ipiranga').get('/Restaurants/restaurants/date-range', { params: { startDate, endDate } });
+unitApi('lush_ipiranga').get('/Governance/kpis/date-range', { params: { startDate, endDate } });
+consolidatedApi.get('/Company/kpis/date-range', { params: { startDate, endDate } });
+```
+
+> **Sobre o prefixo `/lhg`:** é o caminho atual para o backend novo enquanto o
+> proxy existir (situação estável em produção). Se um dia o proxy for aposentado,
+> some só o `/lhg` (`/lush_ipiranga/api/...` e `/api/consolidated/...`). Como a base
+> está num único ponto (`unitApi`/`consolidatedApi`), essa mudança futura é **1 linha**.
+
+> **Andar de Cima (ADC):** pode retornar erro em **qualquer** ambiente enquanto o
+> servidor do banco da unidade estiver fora do ar — isso é infra da unidade, não do
+> backend. Para testar o padrão, use `lush_ipiranga` (sempre no ar).
+
+---
 
 ## 1. O que muda (e o que não muda)
 
