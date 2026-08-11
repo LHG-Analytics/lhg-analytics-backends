@@ -262,6 +262,40 @@ export const TENANTS: Record<string, TenantConfig> = {
     ],
     bookingValidOriginIds: [1, 3, 4],
   },
+
+  // ⚠️ RASCUNHO (2026-07-25) — Getan Garavelo (Goiânia). NÃO PRONTO PARA PRODUÇÃO.
+  // IDs confirmados no banco: suiteCategoryIds, camareirasCargoIds, restaurant A/B.
+  // STUBS a confirmar com o negócio (marcados abaixo): supervisorCargoId,
+  // terceirizados, rentalTypes, billingRentalType, bookingChannels, bookingValidOriginIds.
+  // Existe só para o passe de compatibilidade de schema — ver [[getan-onboarding]].
+  getan_garavelo: {
+    slug: 'getan_garavelo',
+    unitEnum: 'GETAN_GARAVELO',
+    displayName: 'Getan Garavelo',
+    databaseUrlEnv: 'DATABASE_URL_LOCAL_GETAN_GARAVELO',
+    suiteCategoryIds: [1, 2, 3, 4, 5, 6], // ✓ confirmado (80 apês)
+    governance: {
+      camareirasCargoIds: [3], // ✓ CAMAREIRA (38 ativas)
+      supervisorCargoId: 3, // ⚠️ STUB — não há cargo de supervisor óbvio; confirmar
+      terceirizados: { kind: 'none' }, // ⚠️ STUB — confirmar
+      teamSizingCargoIds: [3], // ⚠️ STUB
+      excludedEmployeeIds: [],
+    },
+    restaurant: {
+      abProductTypeIds: [2, 3], // ✓ BEBIDA(2) + COZINHA(3)
+      aProductTypeIds: [3], // ✓ COZINHA
+      bProductTypeIds: [2], // ✓ BEBIDA
+      aRankingIds: [3],
+      bRankingIds: [2],
+      aLeastRankingIds: [3],
+      bLeastRankingIds: [2],
+    },
+    rentalTypes: DEFAULT_RENTAL_TYPES, // ⚠️ STUB — duração real ~1/2/3h; confirmar períodos
+    extendedRentalRules: false,
+    billingRentalType: DEFAULT_BILLING_RENTAL_TYPE, // ⚠️ STUB
+    bookingChannels: DEFAULT_BOOKING_CHANNELS, // ⚠️ STUB
+    bookingValidOriginIds: [1, 3, 4], // ⚠️ STUB — origens GETAN: 1,3,4 existem
+  },
 };
 
 export function getTenant(slug: string): TenantConfig | undefined {
