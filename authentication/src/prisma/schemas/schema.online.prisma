@@ -52,4 +52,5 @@ enum UserUnit {
     LIV
     ALTANA
     GETAN_GARAVELO
+    GETAN_PQ_OESTE
 }

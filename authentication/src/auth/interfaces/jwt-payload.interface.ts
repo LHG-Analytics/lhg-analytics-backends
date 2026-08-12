@@ -10,7 +10,8 @@ export interface JwtPayload {
     | 'ANDAR_DE_CIMA'
     | 'LIV'
     | 'ALTANA'
-    | 'GETAN_GARAVELO'; // Tipos de unidades
+    | 'GETAN_GARAVELO'
+    | 'GETAN_PQ_OESTE'; // Tipos de unidades
   role:
     | 'ADMIN'
     | 'GERENTE_GERAL'
