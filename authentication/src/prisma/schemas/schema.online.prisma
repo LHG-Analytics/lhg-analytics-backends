@@ -51,4 +51,5 @@ enum UserUnit {
     LHG
     LIV
     ALTANA
+    GETAN_GARAVELO
 }
