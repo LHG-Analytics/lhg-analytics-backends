@@ -62,6 +62,25 @@ const ALTANA_BILLING_RENTAL_TYPE = {
   ],
 };
 
+/**
+ * Getan Garavelo: 3h/6h/12h por DURAÇÃO pura, SEM os gatilhos por hora de
+ * check-in (13→Dayuse, 15→Diária, 20→Pernoite) do padrão Lush — porque o GETAN
+ * ainda não vende esses períodos (sem módulo de reservas/site). Usar o CASE
+ * padrão classificaria erradamente as locações normais das 15h/20h (centenas)
+ * como Diária/Pernoite. Confirmado com o negócio (2026-07-25).
+ */
+const GETAN_BILLING_RENTAL_TYPE = {
+  sqlCaseBody: `
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 11.5 AND 12.5 THEN 'TWELVE_HOURS'
+          ELSE 'THREE_HOURS'`,
+  types: [
+    { key: 'THREE_HOURS', label: '3 Horas' },
+    { key: 'SIX_HOURS', label: '6 Horas' },
+    { key: 'TWELVE_HOURS', label: '12 Horas' },
+  ],
+};
+
 /** Canais do BillingPerChannel — padrão (5 unidades) */
 const DEFAULT_BOOKING_CHANNELS = [
   'EXPEDIA',
@@ -263,38 +282,39 @@ export const TENANTS: Record<string, TenantConfig> = {
     bookingValidOriginIds: [1, 3, 4],
   },
 
-  // ⚠️ RASCUNHO (2026-07-25) — Getan Garavelo (Goiânia). NÃO PRONTO PARA PRODUÇÃO.
-  // IDs confirmados no banco: suiteCategoryIds, camareirasCargoIds, restaurant A/B.
-  // STUBS a confirmar com o negócio (marcados abaixo): supervisorCargoId,
-  // terceirizados, rentalTypes, billingRentalType, bookingChannels, bookingValidOriginIds.
-  // Existe só para o passe de compatibilidade de schema — ver [[getan-onboarding]].
+  // Getan Garavelo (Goiânia) — 1ª unidade GETAN. Valores confirmados no banco +
+  // com o negócio (2026-07-25). Ver [[getan-onboarding]].
   getan_garavelo: {
     slug: 'getan_garavelo',
     unitEnum: 'GETAN_GARAVELO',
     displayName: 'Getan Garavelo',
     databaseUrlEnv: 'DATABASE_URL_LOCAL_GETAN_GARAVELO',
-    suiteCategoryIds: [1, 2, 3, 4, 5, 6], // ✓ confirmado (80 apês)
+    suiteCategoryIds: [1, 2, 3, 4, 5, 6], // 80 apês (LUXO/GETE/LUXO ESP./MASTER GETE/SUPER LUXO/S.LUXO C/TETO)
     governance: {
-      camareirasCargoIds: [3], // ✓ CAMAREIRA (38 ativas)
-      supervisorCargoId: 3, // ⚠️ STUB — não há cargo de supervisor óbvio; confirmar
-      terceirizados: { kind: 'none' }, // ⚠️ STUB — confirmar
-      teamSizingCargoIds: [3], // ⚠️ STUB
+      camareirasCargoIds: [3], // CAMAREIRA
+      // Vistorias NÃO são registradas no AUTOMO do GETAN (vistoriaapartamento vazia) →
+      // KPI de vistorias = 0. Fisicamente são feitas por camareiras+gerentes, mas sem
+      // registro no sistema. supervisorCargoId = 5 (GERENTE): não afeta a contagem de
+      // vistoria (tabela vazia) e ≠ camareira, então NÃO exclui camareiras do ShiftCleaning.
+      supervisorCargoId: 5,
+      terceirizados: { kind: 'none' }, // sem terceirização
+      teamSizingCargoIds: [3], // só camareiras
       excludedEmployeeIds: [],
     },
     restaurant: {
-      abProductTypeIds: [2, 3], // ✓ BEBIDA(2) + COZINHA(3)
-      aProductTypeIds: [3], // ✓ COZINHA
-      bProductTypeIds: [2], // ✓ BEBIDA
+      abProductTypeIds: [2, 3], // BEBIDA(2) + COZINHA(3)
+      aProductTypeIds: [3], // COZINHA (alimentos)
+      bProductTypeIds: [2], // BEBIDA
       aRankingIds: [3],
       bRankingIds: [2],
       aLeastRankingIds: [3],
       bLeastRankingIds: [2],
     },
-    rentalTypes: DEFAULT_RENTAL_TYPES, // ⚠️ STUB — duração real ~1/2/3h; confirmar períodos
-    extendedRentalRules: false,
-    billingRentalType: DEFAULT_BILLING_RENTAL_TYPE, // ⚠️ STUB
-    bookingChannels: DEFAULT_BOOKING_CHANNELS, // ⚠️ STUB
-    bookingValidOriginIds: [1, 3, 4], // ⚠️ STUB — origens GETAN: 1,3,4 existem
+    rentalTypes: DEFAULT_RENTAL_TYPES, // 3h/6h/12h
+    extendedRentalRules: false, // sem Dayuse/Diária/Pernoite (sem módulo de reservas)
+    billingRentalType: GETAN_BILLING_RENTAL_TYPE, // 3/6/12 por duração pura (sem gatilho por hora)
+    bookingChannels: ['GUIA_SCHEDULED', 'GUIA_GO', 'INTERNAL'], // origens 1(INTERNAL)+3(GUIA)
+    bookingValidOriginIds: [1, 3], // SISTEMA + GUIA_DE_MOTEIS
   },
 };
 
