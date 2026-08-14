@@ -185,31 +185,50 @@ export class RestaurantService {
       bProductTypesForLeastRanking,
     );
 
+    // Agregado NO SQL (antes vinham ~44k linhas de detalhe que o JS somava em loop —
+    // transferir isso do banco da unidade até o Render travava faixas grandes, ex.: LIV).
+    // A subquery interna é IDÊNTICA à original; a agregação externa espelha exatamente
+    // o loop JS antigo (validado campo a campo: resultado idêntico à casa dos centavos).
+    // Retorna 1 linha em vez de dezenas de milhares.
     const kpisRawSql = `
   SELECT
-    ra."id_apartamentostate",
-    so.id AS "id_saidaestoque",
-    TO_CHAR(ra."datainicialdaocupacao" - INTERVAL '6 hours', 'YYYY-MM-DD') AS "date",
-    COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalGross",
-    COALESCE(s."desconto", 0) AS "desconto",
+    COALESCE(SUM("totalGross"), 0) AS "totalGrossRevenue",
+    COALESCE(SUM("desconto"), 0) AS "totalDiscount",
     COALESCE(SUM(
       CASE
-        WHEN tp.id IN (${abProductTypesSqlList})
-        THEN soi."precovenda" * soi."quantidade"
+        WHEN "abTotal" > 0
+        THEN "abTotal" - (CASE WHEN "totalGross" > 0 THEN "desconto" * "abTotal" / "totalGross" ELSE 0 END)
         ELSE 0
       END
-    ), 0) AS "abTotal"
-  FROM "locacaoapartamento" ra
-  LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
-  LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
-  LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
-  LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
-  LEFT JOIN "produto" p ON p.id = ps."id_produto"
-  LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
-  LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
-  WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
-    AND ra."fimocupacaotipo" = 'FINALIZADA'
-  GROUP BY ra."id_apartamentostate", so.id, s."desconto", ra."datainicialdaocupacao"
+    ), 0) AS "totalABNetRevenue",
+    COUNT(*) FILTER (WHERE "abTotal" > 0) AS "rentalsWithABCount",
+    COUNT(*) FILTER (WHERE "totalGross" > 0) AS "totalAllSales",
+    COUNT(DISTINCT "id_apartamentostate") AS "totalRentals"
+  FROM (
+    SELECT
+      ra."id_apartamentostate",
+      so.id AS "id_saidaestoque",
+      COALESCE(SUM(soi."precovenda" * soi."quantidade"), 0) AS "totalGross",
+      COALESCE(s."desconto", 0) AS "desconto",
+      COALESCE(SUM(
+        CASE
+          WHEN tp.id IN (${abProductTypesSqlList})
+          THEN soi."precovenda" * soi."quantidade"
+          ELSE 0
+        END
+      ), 0) AS "abTotal"
+    FROM "locacaoapartamento" ra
+    LEFT JOIN "vendalocacao" sl ON sl."id_locacaoapartamento" = ra."id_apartamentostate"
+    LEFT JOIN "saidaestoque" so ON so.id = sl."id_saidaestoque"
+    LEFT JOIN "saidaestoqueitem" soi ON soi."id_saidaestoque" = so.id AND soi."cancelado" IS NULL
+    LEFT JOIN "produtoestoque" ps ON ps.id = soi."id_produtoestoque"
+    LEFT JOIN "produto" p ON p.id = ps."id_produto"
+    LEFT JOIN "tipoproduto" tp ON tp.id = p."id_tipoproduto"
+    LEFT JOIN "venda" s ON s."id_saidaestoque" = so.id
+    WHERE ra."datainicialdaocupacao" BETWEEN '${formattedStart}' AND '${formattedEnd}'
+      AND ra."fimocupacaotipo" = 'FINALIZADA'
+    GROUP BY ra."id_apartamentostate", so.id, s."desconto", ra."datainicialdaocupacao"
+  ) AS per_saida
 `;
 
     const revenueAbPeriodSql = `
@@ -711,37 +730,18 @@ export class RestaurantService {
         this.pools.query<any>(tenant.slug, totalSalesRevenueSql),
       ]);
 
-      // --- BigNumbers ---
-      let totalGrossRevenue = 0;
-      let totalDiscount = 0;
-      let totalABNetRevenue = 0;
-      let rentalsWithABCount = 0;
-      let totalAllSales = 0;
-
-      for (const row of rawResult) {
-        const gross = Number(row.totalGross) || 0;
-        const discount = Number(row.desconto) || 0;
-        const abTotal = Number(row.abTotal) || 0;
-        const discountProportion = gross > 0 ? (discount * abTotal) / gross : 0;
-        const netAB = abTotal - discountProportion;
-
-        totalGrossRevenue += gross;
-        totalDiscount += discount;
-
-        if (abTotal > 0) {
-          totalABNetRevenue += netAB;
-          rentalsWithABCount++;
-        }
-
-        if (gross > 0) {
-          totalAllSales++;
-        }
-      }
+      // --- BigNumbers --- (kpisRawSql agora agrega no próprio SQL e retorna 1 linha;
+      // a lógica é a mesma do loop antigo, validada campo a campo como idêntica)
+      const kpisAgg = rawResult[0] || {};
+      const totalGrossRevenue = Number(kpisAgg.totalGrossRevenue) || 0;
+      const totalDiscount = Number(kpisAgg.totalDiscount) || 0;
+      const totalABNetRevenue = Number(kpisAgg.totalABNetRevenue) || 0;
+      const rentalsWithABCount = Number(kpisAgg.rentalsWithABCount) || 0;
+      const totalAllSales = Number(kpisAgg.totalAllSales) || 0;
 
       const totalNetRevenue = totalGrossRevenue - totalDiscount;
-      // Locações distintas no período (uma locação pode ter várias vendas/saídas de estoque,
-      // então rawResult.length contaria a mesma locação mais de uma vez)
-      const totalRentals = new Set(rawResult.map((r) => r.id_apartamentostate)).size;
+      // Locações distintas no período (uma locação pode ter várias vendas/saídas de estoque)
+      const totalRentals = Number(kpisAgg.totalRentals) || 0;
       const totalAllTicketAverage =
         rentalsWithABCount > 0 ? totalABNetRevenue / rentalsWithABCount : 0;
       const totalAllTicketAverageByTotalRentals =
