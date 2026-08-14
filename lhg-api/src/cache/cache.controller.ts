@@ -73,31 +73,39 @@ export class CacheController {
   }
 
   private buildPeriods(): { name: string; period: CachePeriodEnum; start: Date; end: Date }[] {
-    const yesterday = moment().subtract(1, 'day');
+    // IMPORTANTE: o frontend consulta SEMPRE por datas explícitas (período CUSTOM)
+    // terminando HOJE — ex.: mês atual = 01/mês..hoje; últimos 7 = hoje-7..hoje.
+    // Por isso todos os períodos aqui são CUSTOM e terminam HOJE: a chave gerada
+    // (kpi:{unit}:{svc}:custom:{start}:{end}) fica IDÊNTICA à que o front pede, e
+    // o primeiro clique já vem do cache (antes o warmup terminava ONTEM → miss
+    // garantido → query ao vivo → timeout no front). O dado reflete o último
+    // warmup (0/6/12/15h BRT); atualiza a cada 6h.
+    const now = moment();
+    const endToday = moment(now).endOf('day').toDate();
     return [
       {
         name: 'LAST_7_D',
-        period: CachePeriodEnum.LAST_7_D,
-        start: moment(yesterday).startOf('day').subtract(6, 'days').toDate(),
-        end: moment(yesterday).endOf('day').toDate(),
+        period: CachePeriodEnum.CUSTOM,
+        start: moment(now).startOf('day').subtract(7, 'days').toDate(),
+        end: endToday,
       },
       {
         name: 'LAST_MONTH',
-        period: CachePeriodEnum.LAST_MONTH,
-        start: moment(yesterday).subtract(1, 'month').startOf('month').toDate(),
-        end: moment(yesterday).subtract(1, 'month').endOf('month').toDate(),
+        period: CachePeriodEnum.CUSTOM,
+        start: moment(now).subtract(1, 'month').startOf('month').toDate(),
+        end: moment(now).subtract(1, 'month').endOf('month').toDate(),
       },
       {
         name: 'THIS_MONTH',
         period: CachePeriodEnum.CUSTOM,
-        start: moment().startOf('month').toDate(),
-        end: moment(yesterday).endOf('day').toDate(),
+        start: moment(now).startOf('month').toDate(),
+        end: endToday,
       },
       {
         name: 'YEAR_TO_DATE',
-        period: CachePeriodEnum.YEAR_TO_DATE,
-        start: moment().startOf('year').toDate(),
-        end: moment(yesterday).endOf('day').toDate(),
+        period: CachePeriodEnum.CUSTOM,
+        start: moment(now).startOf('year').toDate(),
+        end: endToday,
       },
     ];
   }
