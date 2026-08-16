@@ -1008,69 +1008,11 @@ export class CompanyService {
           ? Number(totalSaleDirectResult[0].total_sale_direct) || 0
           : 0;
 
-      // 🔍 INVESTIGAÇÃO REAL DAS VENDAS DIRETAS:
-
-      // Executar a query investigativa
-      try {
-        const investigationQuery = `
-          SELECT
-            se.id as venda_id,
-            vd.venda_completa,
-            sei.id as item_id,
-            sei.precovenda,
-            sei.quantidade,
-            (CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))) as valor_item,
-            v.desconto as desconto_venda,
-            sei.datasaidaitem,
-            sei.cancelado
-          FROM saidaestoque se
-          INNER JOIN vendadireta vd ON se.id = vd.id_saidaestoque
-          INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
-          LEFT JOIN venda v ON se.id = v.id_saidaestoque
-          WHERE vd.venda_completa = true
-            AND sei.cancelado IS NULL
-            AND sei.datasaidaitem >= '${formattedStart}'::timestamp
-            AND sei.datasaidaitem <= '${formattedEnd}'::timestamp
-          ORDER BY se.id, sei.id
-        `;
-        const investigationResult = await this.pools.query<any>(tenant.slug, investigationQuery);
-
-        // Agrupar por venda para análise
-        const vendasDetalhadas: any = {};
-        let totalReceitaManual = 0;
-        let totalDescontoManual = 0;
-
-        (investigationResult as any[]).forEach((item: any) => {
-          const vendaId = item.venda_id;
-
-          if (!vendasDetalhadas[vendaId]) {
-            vendasDetalhadas[vendaId] = {
-              venda_id: vendaId,
-              desconto: Number(item.desconto_venda) || 0,
-              itens: [],
-              receita_bruta: 0,
-            };
-          }
-
-          const valorItem = Number(item.valor_item);
-          vendasDetalhadas[vendaId].itens.push({
-            item_id: item.item_id,
-            precovenda: Number(item.precovenda),
-            quantidade: Number(item.quantidade),
-            valor_item: valorItem,
-          });
-
-          vendasDetalhadas[vendaId].receita_bruta += valorItem;
-        });
-
-        // Calcular totais manualmente
-        Object.values(vendasDetalhadas).forEach((venda: any) => {
-          totalReceitaManual += venda.receita_bruta;
-          totalDescontoManual += venda.desconto;
-        });
-      } catch (error) {
-        // Erro na investigação ignorado para não quebrar o fluxo
-      }
+      // (Removido) Bloco de "investigação" de vendas diretas: rodava uma query
+      // pesada item-a-item em TODA requisição e descartava o resultado (os totais
+      // calculados nunca eram usados). Remoção não altera nenhum valor de retorno
+      // e elimina uma query + transferência de rede por request — impacto grande
+      // em unidades com link lento (ex.: LIV).
 
       // totalAllValue = locação + vendas diretas
       const finalTotalAllValue = totalAllValue + totalSaleDirect;
