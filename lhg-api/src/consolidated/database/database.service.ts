@@ -53,8 +53,13 @@ export class DatabaseService {
   }
 
   getConnectedUnits(): UnitKey[] {
-    // Pools do lhg-api são lazy — considera todas as unidades do registry
-    return allTenants().map((t) => t.slug as UnitKey);
+    // Pools do lhg-api são lazy — considera as unidades do registry que TÊM
+    // config no consolidado (UNIT_CONFIGS). Se uma unidade nova entrar no registry
+    // sem entrada aqui, é ignorada no consolidado em vez de derrubar tudo (o
+    // acesso a UNIT_CONFIGS[unit].name no tratamento de erro quebrava a agregação).
+    return allTenants()
+      .map((t) => t.slug as UnitKey)
+      .filter((u) => UNIT_CONFIGS[u]);
   }
 
   isConnected(unit: UnitKey): boolean {
