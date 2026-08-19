@@ -8,7 +8,9 @@ export type UnitKey =
   | 'tout'
   | 'andar_de_cima'
   | 'liv'
-  | 'altana';
+  | 'altana'
+  | 'getan_garavelo'
+  | 'getan_pq_oeste';
 
 export interface UnitDatabaseConfig {
   key: UnitKey;
@@ -143,6 +145,31 @@ export const UNIT_CONFIGS: Record<
         'TEMATICA',
       ],
       totalSuites: 63,
+    },
+  },
+  getan_garavelo: {
+    name: 'Getan Garavelo',
+    envVar: 'DATABASE_URL_LOCAL_GETAN_GARAVELO',
+    suiteConfig: {
+      categoryIds: [1, 2, 3, 4, 5, 6],
+      categoryNames: [
+        'LUXO',
+        'GETE',
+        'LUXO ESPECIAL',
+        'MASTER GETE',
+        'SUPER LUXO',
+        'SUPER LUXO C/ TETO',
+      ],
+      totalSuites: 80,
+    },
+  },
+  getan_pq_oeste: {
+    name: 'Getan Parque Oeste',
+    envVar: 'DATABASE_URL_LOCAL_GETAN_PQ_OESTE',
+    suiteConfig: {
+      categoryIds: [2, 5, 6],
+      categoryNames: ['LUXO', 'GETE', 'SUPER LUXO'],
+      totalSuites: 46,
     },
   },
 };

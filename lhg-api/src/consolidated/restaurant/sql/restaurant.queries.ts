@@ -51,6 +51,16 @@ export const UNIT_AB_CONFIGS: Record<UnitKey, UnitABConfig> = {
     aProductTypes: [2, 3, 4, 5],
     bProductTypes: [1],
   },
+  getan_garavelo: {
+    abProductTypes: [2, 3],
+    aProductTypes: [3],
+    bProductTypes: [2],
+  },
+  getan_pq_oeste: {
+    abProductTypes: [2, 3, 6],
+    aProductTypes: [3],
+    bProductTypes: [2, 6],
+  },
 };
 
 /**
