@@ -24,10 +24,13 @@ async function bootstrap() {
     .map((o) => (o.startsWith('http') ? o : `https://${o}`));
   const renderUrl = process.env.RENDER_EXTERNAL_URL;
   const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins, ...(renderUrl ? [renderUrl] : [])])];
+  // Libera qualquer subdomínio próprio (*.lhgmoteis.com.br) — cobre front de
+  // prod, dev, previews e ambientes futuros sem precisar cadastrar origem a origem.
+  const lhgDomainRegex = /^https:\/\/([a-z0-9-]+\.)*lhgmoteis\.com\.br$/i;
 
   app.enableCors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || lhgDomainRegex.test(origin)) {
         callback(null, true);
       } else {
         console.warn(`CORS bloqueado para origem: ${origin}`);

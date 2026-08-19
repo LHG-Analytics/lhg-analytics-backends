@@ -62,6 +62,25 @@ const ALTANA_BILLING_RENTAL_TYPE = {
   ],
 };
 
+/**
+ * Getan Garavelo: 3h/6h/12h por DURAÇÃO pura, SEM os gatilhos por hora de
+ * check-in (13→Dayuse, 15→Diária, 20→Pernoite) do padrão Lush — porque o GETAN
+ * ainda não vende esses períodos (sem módulo de reservas/site). Usar o CASE
+ * padrão classificaria erradamente as locações normais das 15h/20h (centenas)
+ * como Diária/Pernoite. Confirmado com o negócio (2026-07-25).
+ */
+const GETAN_BILLING_RENTAL_TYPE = {
+  sqlCaseBody: `
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 5.5 AND 6.5 THEN 'SIX_HOURS'
+          WHEN EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao) / 3600 BETWEEN 11.5 AND 12.5 THEN 'TWELVE_HOURS'
+          ELSE 'THREE_HOURS'`,
+  types: [
+    { key: 'THREE_HOURS', label: '3 Horas' },
+    { key: 'SIX_HOURS', label: '6 Horas' },
+    { key: 'TWELVE_HOURS', label: '12 Horas' },
+  ],
+};
+
 /** Canais do BillingPerChannel — padrão (5 unidades) */
 const DEFAULT_BOOKING_CHANNELS = [
   'EXPEDIA',
@@ -261,6 +280,78 @@ export const TENANTS: Record<string, TenantConfig> = {
       'WEBSITE_SCHEDULED',
     ],
     bookingValidOriginIds: [1, 3, 4],
+  },
+
+  // Getan Garavelo (Goiânia) — 1ª unidade GETAN. Valores confirmados no banco +
+  // com o negócio (2026-07-25). Ver [[getan-onboarding]].
+  getan_garavelo: {
+    slug: 'getan_garavelo',
+    unitEnum: 'GETAN_GARAVELO',
+    displayName: 'Getan Garavelo',
+    databaseUrlEnv: 'DATABASE_URL_LOCAL_GETAN_GARAVELO',
+    suiteCategoryIds: [1, 2, 3, 4, 5, 6], // 80 apês (LUXO/GETE/LUXO ESP./MASTER GETE/SUPER LUXO/S.LUXO C/TETO)
+    governance: {
+      camareirasCargoIds: [3], // CAMAREIRA
+      // Vistorias NÃO são registradas no AUTOMO do GETAN (vistoriaapartamento vazia) →
+      // KPI de vistorias = 0. Fisicamente são feitas por camareiras+gerentes, mas sem
+      // registro no sistema. supervisorCargoId = 5 (GERENTE): não afeta a contagem de
+      // vistoria (tabela vazia) e ≠ camareira, então NÃO exclui camareiras do ShiftCleaning.
+      supervisorCargoId: 5,
+      terceirizados: { kind: 'none' }, // sem terceirização
+      teamSizingCargoIds: [3], // só camareiras
+      excludedEmployeeIds: [],
+    },
+    restaurant: {
+      abProductTypeIds: [2, 3], // BEBIDA(2) + COZINHA(3)
+      aProductTypeIds: [3], // COZINHA (alimentos)
+      bProductTypeIds: [2], // BEBIDA
+      aRankingIds: [3],
+      bRankingIds: [2],
+      aLeastRankingIds: [3],
+      bLeastRankingIds: [2],
+    },
+    rentalTypes: DEFAULT_RENTAL_TYPES, // 3h/6h/12h
+    extendedRentalRules: false, // sem Dayuse/Diária/Pernoite (sem módulo de reservas)
+    billingRentalType: GETAN_BILLING_RENTAL_TYPE, // 3/6/12 por duração pura (sem gatilho por hora)
+    bookingChannels: ['GUIA_SCHEDULED', 'GUIA_GO', 'INTERNAL'], // origens 1(INTERNAL)+3(GUIA)
+    bookingValidOriginIds: [1, 3], // SISTEMA + GUIA_DE_MOTEIS
+  },
+
+  // Getan Parque Oeste (Goiânia) — 2ª unidade GETAN. IDs próprios (diferentes do
+  // Garavelo!) confirmados no banco + mesmas regras de negócio (2026-07-25).
+  // Mesmas 2 limitações de dado do Garavelo: vistoriaapartamento vazia (vistorias=0)
+  // e horário das camareiras em branco (ShiftCleaning degenerado). Ver [[getan-onboarding]].
+  getan_pq_oeste: {
+    slug: 'getan_pq_oeste',
+    unitEnum: 'GETAN_PQ_OESTE',
+    displayName: 'Getan Parque Oeste',
+    databaseUrlEnv: 'DATABASE_URL_LOCAL_GETAN_PQ_OESTE',
+    suiteCategoryIds: [2, 5, 6], // LUXO(2)/GETE(5)/SUPER LUXO(6) — 46 apês
+    governance: {
+      camareirasCargoIds: [6], // CAMAREIRA (id 6 aqui, ≠ Garavelo)
+      // Vistorias não registradas no AUTOMO (tabela vazia) → KPI=0. supervisorCargoId=4
+      // (GERENTE INTERNO): ≠ camareira(6), mantém ShiftCleaning correto.
+      supervisorCargoId: 4,
+      terceirizados: { kind: 'none' },
+      teamSizingCargoIds: [6],
+      excludedEmployeeIds: [],
+    },
+    restaurant: {
+      // A&B = COZINHA(3) + BEBIDAS(2) + BEBIDAPREPARO(6, drinks: caipirinha/whisky/etc.).
+      // DIVERSOS(4)/EROTICO(5) = "outros", fora do A&B (decisão do negócio 2026-07-25).
+      abProductTypeIds: [2, 3, 6],
+      aProductTypeIds: [3], // COZINHA (alimentos)
+      bProductTypeIds: [2, 6], // BEBIDAS + BEBIDAPREPARO
+      aRankingIds: [3],
+      bRankingIds: [2, 6],
+      aLeastRankingIds: [3],
+      bLeastRankingIds: [2, 6],
+    },
+    rentalTypes: DEFAULT_RENTAL_TYPES, // 3h/6h/12h
+    extendedRentalRules: false, // sem Dayuse/Diária/Pernoite
+    billingRentalType: GETAN_BILLING_RENTAL_TYPE, // 3/6/12 por duração pura
+    bookingChannels: ['GUIA_SCHEDULED', 'GUIA_GO', 'INTERNAL'],
+    bookingValidOriginIds: [1, 3], // SISTEMA + GUIA_DE_MOTEIS
   },
 };
 

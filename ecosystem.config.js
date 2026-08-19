@@ -35,6 +35,10 @@ module.exports = {
         DATABASE_URL_LOCAL_ANDAR_DE_CIMA: process.env.DATABASE_URL_LOCAL_ANDAR_DE_CIMA,
         DATABASE_URL_LOCAL_LIV: process.env.DATABASE_URL_LOCAL_LIV,
         DATABASE_URL_LOCAL_ALTANA: process.env.DATABASE_URL_LOCAL_ALTANA,
+        DATABASE_URL_LOCAL_GETAN_GARAVELO:
+          process.env.DATABASE_URL_LOCAL_GETAN_GARAVELO,
+        DATABASE_URL_LOCAL_GETAN_PQ_OESTE:
+          process.env.DATABASE_URL_LOCAL_GETAN_PQ_OESTE,
       },
       env_production: {
         PORT: 3010,
