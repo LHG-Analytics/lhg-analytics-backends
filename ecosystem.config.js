@@ -39,6 +39,8 @@ module.exports = {
           process.env.DATABASE_URL_LOCAL_GETAN_GARAVELO,
         DATABASE_URL_LOCAL_GETAN_PQ_OESTE:
           process.env.DATABASE_URL_LOCAL_GETAN_PQ_OESTE,
+        DATABASE_URL_LOCAL_GETAN_INDEPENDENCIA:
+          process.env.DATABASE_URL_LOCAL_GETAN_INDEPENDENCIA,
       },
       env_production: {
         PORT: 3010,

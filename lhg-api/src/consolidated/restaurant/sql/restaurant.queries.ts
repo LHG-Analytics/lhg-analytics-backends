@@ -61,6 +61,12 @@ export const UNIT_AB_CONFIGS: Record<UnitKey, UnitABConfig> = {
     aProductTypes: [3],
     bProductTypes: [2, 6],
   },
+  getan_independencia: {
+    // A = COZINHA(5) + COZINHA.(6); B = BEBIDA(2) + AGUA(3)
+    abProductTypes: [2, 3, 5, 6],
+    aProductTypes: [5, 6],
+    bProductTypes: [2, 3],
+  },
 };
 
 /**
