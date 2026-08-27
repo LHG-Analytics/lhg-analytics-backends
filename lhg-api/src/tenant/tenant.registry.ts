@@ -353,6 +353,41 @@ export const TENANTS: Record<string, TenantConfig> = {
     bookingChannels: ['GUIA_SCHEDULED', 'GUIA_GO', 'INTERNAL'],
     bookingValidOriginIds: [1, 3], // SISTEMA + GUIA_DE_MOTEIS
   },
+
+  // Getan Independência (Goiânia) — 3ª unidade GETAN. IDs próprios confirmados no
+  // banco (2026-08-27). Mesmas regras GETAN (3/6/12 puro, sem terceirização,
+  // vistoria não registrada). Nota: 17/74 camareiras têm horário → ShiftCleaning
+  // parcial (as outras GETAN tinham 0). Ver [[getan-onboarding]].
+  getan_independencia: {
+    slug: 'getan_independencia',
+    unitEnum: 'GETAN_INDEPENDENCIA',
+    displayName: 'Getan Independência',
+    databaseUrlEnv: 'DATABASE_URL_LOCAL_GETAN_INDEPENDENCIA',
+    suiteCategoryIds: [1, 2, 4, 5], // LUXO ESP.(1)/LUXO(2)/MASTER GETE(4)/SUPER LUXO ESP.(5) — 47 apês
+    governance: {
+      camareirasCargoIds: [3], // CAMAREIRA (74)
+      supervisorCargoId: 2, // GERENTE (≠ camareira; vistoria vazia → KPI=0)
+      terceirizados: { kind: 'none' },
+      teamSizingCargoIds: [3],
+      excludedEmployeeIds: [],
+    },
+    restaurant: {
+      // A = COZINHA(5) + COZINHA.(6, 2ª cat. de comida); B = BEBIDA(2) + AGUA(3).
+      // DIVERSOS(1)/EROTICO(15) = "outros", fora do A&B.
+      abProductTypeIds: [2, 3, 5, 6],
+      aProductTypeIds: [5, 6],
+      bProductTypeIds: [2, 3],
+      aRankingIds: [5, 6],
+      bRankingIds: [2, 3],
+      aLeastRankingIds: [5, 6],
+      bLeastRankingIds: [2, 3],
+    },
+    rentalTypes: DEFAULT_RENTAL_TYPES, // 3h/6h/12h
+    extendedRentalRules: false,
+    billingRentalType: GETAN_BILLING_RENTAL_TYPE, // 3/6/12 por duração pura
+    bookingChannels: ['GUIA_SCHEDULED', 'GUIA_GO', 'INTERNAL'],
+    bookingValidOriginIds: [1, 3], // SISTEMA + GUIA_DE_MOTEIS
+  },
 };
 
 export function getTenant(slug: string): TenantConfig | undefined {

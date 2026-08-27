@@ -10,7 +10,8 @@ export type UnitKey =
   | 'liv'
   | 'altana'
   | 'getan_garavelo'
-  | 'getan_pq_oeste';
+  | 'getan_pq_oeste'
+  | 'getan_independencia';
 
 export interface UnitDatabaseConfig {
   key: UnitKey;
@@ -170,6 +171,20 @@ export const UNIT_CONFIGS: Record<
       categoryIds: [2, 5, 6],
       categoryNames: ['LUXO', 'GETE', 'SUPER LUXO'],
       totalSuites: 46,
+    },
+  },
+  getan_independencia: {
+    name: 'Getan Independência',
+    envVar: 'DATABASE_URL_LOCAL_GETAN_INDEPENDENCIA',
+    suiteConfig: {
+      categoryIds: [1, 2, 4, 5],
+      categoryNames: [
+        'LUXO ESPECIAL',
+        'LUXO',
+        'MASTER GETE',
+        'SUPER LUXO ESPECIAL',
+      ],
+      totalSuites: 47,
     },
   },
 };

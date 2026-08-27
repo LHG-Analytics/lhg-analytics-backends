@@ -53,4 +53,5 @@ enum UserUnit {
     ALTANA
     GETAN_GARAVELO
     GETAN_PQ_OESTE
+    GETAN_INDEPENDENCIA
 }
