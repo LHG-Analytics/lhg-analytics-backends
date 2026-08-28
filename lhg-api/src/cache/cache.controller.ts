@@ -68,7 +68,7 @@ export class CacheController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Status detalhado do cache (todas as unidades)' })
-  getCacheStatus() {
+  async getCacheStatus() {
     return this.cacheService.getDetailedStatus();
   }
 

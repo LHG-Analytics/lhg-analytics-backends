@@ -43,6 +43,10 @@ module.exports = {
           process.env.DATABASE_URL_LOCAL_GETAN_INDEPENDENCIA,
         DATABASE_URL_LOCAL_GETAN_NOVO_MUNDO:
           process.env.DATABASE_URL_LOCAL_GETAN_NOVO_MUNDO,
+        // Cache Redis (opcional): se ausente, o KpiCacheService usa Map em memória.
+        // CACHE_PREFIX separa os ambientes num Redis compartilhado (ex.: prod/dev).
+        REDIS_URL: process.env.REDIS_URL,
+        CACHE_PREFIX: process.env.CACHE_PREFIX,
       },
       env_production: {
         PORT: 3010,
