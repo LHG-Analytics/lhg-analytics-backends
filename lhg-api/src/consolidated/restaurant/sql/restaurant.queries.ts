@@ -67,6 +67,12 @@ export const UNIT_AB_CONFIGS: Record<UnitKey, UnitABConfig> = {
     aProductTypes: [5, 6],
     bProductTypes: [2, 3],
   },
+  getan_novo_mundo: {
+    // A = COZINHA(3); B = BEBIDAS(2) + BEBIDAPREPARO(6)
+    abProductTypes: [2, 3, 6],
+    aProductTypes: [3],
+    bProductTypes: [2, 6],
+  },
 };
 
 /**

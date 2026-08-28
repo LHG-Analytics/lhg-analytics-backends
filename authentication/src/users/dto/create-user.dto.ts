@@ -24,7 +24,8 @@ export type UserUnit =
   | 'ALTANA'
   | 'GETAN_GARAVELO'
   | 'GETAN_PQ_OESTE'
-  | 'GETAN_INDEPENDENCIA';
+  | 'GETAN_INDEPENDENCIA'
+  | 'GETAN_NOVO_MUNDO';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'João Silva' })
@@ -48,10 +49,10 @@ export class CreateUserDto {
   cpf: string;
 
   @ApiProperty({
-    enum: ['LHG', 'LUSH_LAPA', 'LUSH_IPIRANGA', 'TOUT', 'ANDAR_DE_CIMA', 'LIV', 'ALTANA', 'GETAN_GARAVELO', 'GETAN_PQ_OESTE', 'GETAN_INDEPENDENCIA'],
+    enum: ['LHG', 'LUSH_LAPA', 'LUSH_IPIRANGA', 'TOUT', 'ANDAR_DE_CIMA', 'LIV', 'ALTANA', 'GETAN_GARAVELO', 'GETAN_PQ_OESTE', 'GETAN_INDEPENDENCIA', 'GETAN_NOVO_MUNDO'],
     example: 'LUSH_LAPA',
   })
-  @IsEnum(['LHG', 'LUSH_LAPA', 'LUSH_IPIRANGA', 'TOUT', 'ANDAR_DE_CIMA', 'LIV', 'ALTANA', 'GETAN_GARAVELO', 'GETAN_PQ_OESTE', 'GETAN_INDEPENDENCIA'])
+  @IsEnum(['LHG', 'LUSH_LAPA', 'LUSH_IPIRANGA', 'TOUT', 'ANDAR_DE_CIMA', 'LIV', 'ALTANA', 'GETAN_GARAVELO', 'GETAN_PQ_OESTE', 'GETAN_INDEPENDENCIA', 'GETAN_NOVO_MUNDO'])
   @IsNotEmpty()
   unit: UserUnit;
 

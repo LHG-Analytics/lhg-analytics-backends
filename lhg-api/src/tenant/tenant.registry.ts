@@ -388,6 +388,41 @@ export const TENANTS: Record<string, TenantConfig> = {
     bookingChannels: ['GUIA_SCHEDULED', 'GUIA_GO', 'INTERNAL'],
     bookingValidOriginIds: [1, 3], // SISTEMA + GUIA_DE_MOTEIS
   },
+
+  // Getan Novo Mundo (Goiânia) — 4ª unidade GETAN. IDs próprios confirmados no
+  // banco (2026-08-28) — idênticos ao PQ Oeste. Mesmas regras GETAN (3/6/12 puro,
+  // sem terceirização, vistoria não registrada, 0 camareiras c/ horário). Ver
+  // [[getan-onboarding]].
+  getan_novo_mundo: {
+    slug: 'getan_novo_mundo',
+    unitEnum: 'GETAN_NOVO_MUNDO',
+    displayName: 'Getan Novo Mundo',
+    databaseUrlEnv: 'DATABASE_URL_LOCAL_GETAN_NOVO_MUNDO',
+    suiteCategoryIds: [2, 3, 5], // LUXO(2)/SUPER LUXO(3)/MASTER GETE(5) — 53 apês
+    governance: {
+      camareirasCargoIds: [6], // CAMAREIRA (38)
+      supervisorCargoId: 4, // GERENTE INTERNO (≠ camareira; vistoria vazia → KPI=0)
+      terceirizados: { kind: 'none' },
+      teamSizingCargoIds: [6],
+      excludedEmployeeIds: [],
+    },
+    restaurant: {
+      // A = COZINHA(3); B = BEBIDAS(2) + BEBIDAPREPARO(6, drinks caipirinha/whisky).
+      // DIVERSOS(4, salgadinho+higiene/roupa)/EROTICO(5) = "outros", fora do A&B.
+      abProductTypeIds: [2, 3, 6],
+      aProductTypeIds: [3],
+      bProductTypeIds: [2, 6],
+      aRankingIds: [3],
+      bRankingIds: [2, 6],
+      aLeastRankingIds: [3],
+      bLeastRankingIds: [2, 6],
+    },
+    rentalTypes: DEFAULT_RENTAL_TYPES, // 3h/6h/12h
+    extendedRentalRules: false,
+    billingRentalType: GETAN_BILLING_RENTAL_TYPE, // 3/6/12 por duração pura
+    bookingChannels: ['GUIA_SCHEDULED', 'GUIA_GO', 'INTERNAL'],
+    bookingValidOriginIds: [1, 3], // SISTEMA + GUIA_DE_MOTEIS
+  },
 };
 
 export function getTenant(slug: string): TenantConfig | undefined {
