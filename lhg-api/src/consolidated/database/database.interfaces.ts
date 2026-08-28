@@ -11,7 +11,8 @@ export type UnitKey =
   | 'altana'
   | 'getan_garavelo'
   | 'getan_pq_oeste'
-  | 'getan_independencia';
+  | 'getan_independencia'
+  | 'getan_novo_mundo';
 
 export interface UnitDatabaseConfig {
   key: UnitKey;
@@ -185,6 +186,15 @@ export const UNIT_CONFIGS: Record<
         'SUPER LUXO ESPECIAL',
       ],
       totalSuites: 47,
+    },
+  },
+  getan_novo_mundo: {
+    name: 'Getan Novo Mundo',
+    envVar: 'DATABASE_URL_LOCAL_GETAN_NOVO_MUNDO',
+    suiteConfig: {
+      categoryIds: [2, 3, 5],
+      categoryNames: ['LUXO', 'SUPER LUXO', 'MASTER GETE'],
+      totalSuites: 53,
     },
   },
 };
