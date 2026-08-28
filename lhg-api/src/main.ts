@@ -7,6 +7,7 @@ import * as cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { allTenants } from './tenant/tenant.registry';
+import { CacheController } from './cache/cache.controller';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -80,6 +81,23 @@ async function bootstrap() {
   const port = process.env.PORT || process.env.PORT_LHG_API || 3010;
   await app.listen(port, '0.0.0.0');
   console.log(`🚀 lhg-api (multi-tenant) rodando na porta ${port}`);
+
+  // Auto-warmup no boot: todo deploy/restart nasce com o cache VAZIO (Map novo,
+  // ou namespace Redis que ainda não foi reaquecido neste ciclo). Dispara o
+  // warmup em BACKGROUND após um pequeno atraso — tempo do health-check inicial
+  // passar antes da carga. Desligável com WARMUP_ON_BOOT=false (ex.: instância
+  // free de dev com pouca memória). O warmup segue rodando também no cron 0/6/12/15h.
+  if (process.env.WARMUP_ON_BOOT !== 'false') {
+    const delayMs = Number(process.env.WARMUP_ON_BOOT_DELAY_MS) || 15000;
+    setTimeout(() => {
+      try {
+        app.get(CacheController, { strict: false }).warmup();
+        console.log(`🔥 Auto-warmup disparado no boot (após ${delayMs}ms).`);
+      } catch (err) {
+        console.error('Falha ao disparar auto-warmup no boot:', err);
+      }
+    }, delayMs);
+  }
 }
 
 bootstrap().catch((error) => {
