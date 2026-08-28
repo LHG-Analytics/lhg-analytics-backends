@@ -83,32 +83,7 @@ export class BookingsService {
     const previousStartDate = startMoment.clone().subtract(1, 'year').toDate();
     const previousEndDate = endMoment.clone().subtract(1, 'year').toDate();
 
-    // Busca período atual com cache
-    const currentResult = await this.kpiCacheService.getOrCalculate(
-      tenant.slug,
-      'bookings',
-      CachePeriodEnum.CUSTOM,
-      async () => this._calculateKpibyDateRangeSQLInternal(tenant, startDate, endDate),
-      { start: startDate, end: endDate },
-    );
-
-    // Busca período anterior com cache
-    const previousResult = await this.kpiCacheService.getOrCalculate(
-      tenant.slug,
-      'bookings',
-      CachePeriodEnum.CUSTOM,
-      async () => this._calculateKpibyDateRangeSQLInternal(tenant, previousStartDate, previousEndDate),
-      { start: previousStartDate, end: previousEndDate },
-    );
-
-    const currentData = currentResult.data;
-    const previousData = previousResult.data;
-
-    // Extrair BigNumbers dos períodos
-    const currentBigNumbers = currentData.BigNumbers[0];
-    const previousBigNumbers = previousData.BigNumbers[0];
-
-    // Calcular previsão mensal (monthlyForecast)
+    // Datas do forecast mensal — computadas ANTES do fan-out (são puras, sem I/O).
     const nowForForecast = moment.tz('America/Sao_Paulo');
     const currentMonthStart = nowForForecast.clone().startOf('month');
     const currentMonthEnd = nowForForecast.clone().endOf('month');
@@ -127,16 +102,52 @@ export class BookingsService {
       .toDate();
     const monthEndDate = yesterday.clone().set({ hour: 23, minute: 59, second: 59 }).toDate();
 
-    // Busca dados do mês com cache
-    const monthlyResult = await this.kpiCacheService.getOrCalculate(
-      tenant.slug,
-      'bookings',
-      CachePeriodEnum.CUSTOM,
-      async () => this._calculateKpibyDateRangeSQLInternal(tenant, monthStartDate, monthEndDate),
-      { start: monthStartDate, end: monthEndDate },
-    );
+    // As 3 passagens (período atual / ano anterior / mês p/ forecast) são
+    // INDEPENDENTES — rodam em PARALELO para cortar round-trips sequenciais
+    // (crítico em unidades de alta latência). Resultado IDÊNTICO: só combinadas
+    // depois; cada uma mantém seu próprio cache (chaves distintas por range).
+    const [currentResult, previousResult, monthlyResult] = await Promise.all([
+      this.kpiCacheService.getOrCalculate(
+        tenant.slug,
+        'bookings',
+        CachePeriodEnum.CUSTOM,
+        async () =>
+          this._calculateKpibyDateRangeSQLInternal(tenant, startDate, endDate),
+        { start: startDate, end: endDate },
+      ),
+      this.kpiCacheService.getOrCalculate(
+        tenant.slug,
+        'bookings',
+        CachePeriodEnum.CUSTOM,
+        async () =>
+          this._calculateKpibyDateRangeSQLInternal(
+            tenant,
+            previousStartDate,
+            previousEndDate,
+          ),
+        { start: previousStartDate, end: previousEndDate },
+      ),
+      this.kpiCacheService.getOrCalculate(
+        tenant.slug,
+        'bookings',
+        CachePeriodEnum.CUSTOM,
+        async () =>
+          this._calculateKpibyDateRangeSQLInternal(
+            tenant,
+            monthStartDate,
+            monthEndDate,
+          ),
+        { start: monthStartDate, end: monthEndDate },
+      ),
+    ]);
 
+    const currentData = currentResult.data;
+    const previousData = previousResult.data;
     const monthlyData = monthlyResult.data;
+
+    // Extrair BigNumbers dos períodos
+    const currentBigNumbers = currentData.BigNumbers[0];
+    const previousBigNumbers = previousData.BigNumbers[0];
     const monthlyBigNumbers = monthlyData.BigNumbers[0];
 
     // Calcular forecast

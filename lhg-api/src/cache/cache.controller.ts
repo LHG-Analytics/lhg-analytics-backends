@@ -153,7 +153,10 @@ export class CacheController {
           const key = `${tenant.slug}:${svc.name}:${p.name}`;
           try {
             const calcStart = Date.now();
-            const data = await svc.run(tenant, p.start, p.end);
+            const data = await this.withRetry(
+              () => svc.run(tenant, p.start, p.end),
+              key,
+            );
             await this.cacheService.set(
               tenant.slug,
               svc.name,
@@ -204,7 +207,7 @@ export class CacheController {
           try {
             const calcStart = Date.now();
             // getUnifiedKpis cacheia internamente nas MESMAS chaves que a API consulta
-            await svc.run(fmt(p.start), fmt(p.end));
+            await this.withRetry(() => svc.run(fmt(p.start), fmt(p.end)), key);
             calculated++;
             this.logger.log(`${key}: CALCULATED (${Date.now() - calcStart}ms)`);
           } catch (error) {
@@ -229,5 +232,36 @@ export class CacheController {
     this.logger.log(
       `Warmup multi-tenant: ${calculated} calculados, ${errors} erros (${Date.now() - startTime}ms)`,
     );
+  }
+
+  /**
+   * Executa `fn` com retry — tolerância p/ unidades de banco lento/instável
+   * (ex.: LIV, PQ Oeste) que às vezes falham na 1ª tentativa e passam na 2ª.
+   * Só afeta o WARMUP (background); não muda o caminho da API. Backoff 2s → 5s.
+   */
+  private async withRetry<T>(
+    fn: () => Promise<T>,
+    label: string,
+    delaysMs: number[] = [2000, 5000],
+  ): Promise<T> {
+    const maxAttempts = delaysMs.length + 1;
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastErr = err;
+        if (attempt < maxAttempts) {
+          const wait = delaysMs[attempt - 1];
+          this.logger.warn(
+            `${label}: tentativa ${attempt}/${maxAttempts} falhou (${
+              err instanceof Error ? err.message : err
+            }) — novo retry em ${wait}ms`,
+          );
+          await new Promise((r) => setTimeout(r, wait));
+        }
+      }
+    }
+    throw lastErr;
   }
 }
