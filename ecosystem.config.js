@@ -47,6 +47,9 @@ module.exports = {
         // CACHE_PREFIX separa os ambientes num Redis compartilhado (ex.: prod/dev).
         REDIS_URL: process.env.REDIS_URL,
         CACHE_PREFIX: process.env.CACHE_PREFIX,
+        // Auto-warmup no boot (default ligado). WARMUP_ON_BOOT=false desliga.
+        WARMUP_ON_BOOT: process.env.WARMUP_ON_BOOT,
+        WARMUP_ON_BOOT_DELAY_MS: process.env.WARMUP_ON_BOOT_DELAY_MS,
       },
       env_production: {
         PORT: 3010,
