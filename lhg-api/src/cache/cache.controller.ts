@@ -93,15 +93,19 @@ export class CacheController {
     timestamp: string;
   }> {
     const before = await this.cacheService.getDetailedStatus();
-    await this.cacheService.clearAll();
-    this.logger.log(`Cache invalidado sob demanda: ${before.summary.total} chaves.`);
+    // Usa a contagem REAL devolvida pelo clearAll (e não o total do status): se o
+    // UNLINK falhar, o número reflete isso em vez de dar um falso positivo.
+    const cleared = await this.cacheService.clearAll();
+    this.logger.log(
+      `Cache invalidado sob demanda: ${cleared} chaves apagadas (status via antes: ${before.summary.total}).`,
+    );
 
     this.runWarmupInternal()
       .then(() => this.logger.log('Reaquecimento pós-limpeza concluído.'))
       .catch((error) => this.logger.error('Erro no reaquecimento pós-limpeza:', error));
 
     return {
-      cleared: before.summary.total,
+      cleared,
       namespace: before.namespace,
       rewarming: true,
       timestamp: new Date().toISOString(),

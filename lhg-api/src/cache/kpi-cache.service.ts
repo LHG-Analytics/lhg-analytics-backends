@@ -426,20 +426,37 @@ export class KpiCacheService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async clearAll(): Promise<void> {
+  async clearAll(): Promise<number> {
     // NUNCA usa FLUSHDB — o Redis é compartilhado com o outro ambiente. Apaga só
     // as chaves do namespace atual.
+    //
+    // Em VÁRIAS PASSADAS: o SCAN do Redis não garante snapshot, então com
+    // escritas concorrentes (um warmup em andamento) uma única passada pode
+    // DEIXAR CHAVES PARA TRÁS — e aí a invalidação fica incompleta, justamente no
+    // caso que mais importa (invalidar depois de corrigir um cálculo). Repete até
+    // uma passada não encontrar nada, com teto para não girar para sempre.
+    let removed = 0;
     if (this.useRedis()) {
       try {
-        const keys = await this.scanKeys(`${this.rk(CACHE_KEY_PREFIX)}:*`);
-        if (keys.length) await this.client!.unlink(...keys);
-        this.logger.log(`Cache Redis limpo (namespace "${this.ns}", ${keys.length} chaves).`);
+        for (let pass = 1; pass <= 5; pass++) {
+          const keys = await this.scanKeys(`${this.rk(CACHE_KEY_PREFIX)}:*`);
+          if (keys.length === 0) break;
+          // UNLINK em lotes: uma lista muito grande pode estourar o limite de
+          // tamanho de requisição do provedor.
+          for (let i = 0; i < keys.length; i += 200) {
+            await this.client!.unlink(...keys.slice(i, i + 200));
+          }
+          removed += keys.length;
+        }
+        this.logger.log(`Cache Redis limpo (namespace "${this.ns}", ${removed} chaves).`);
       } catch (err) {
         this.logRedisFallback('clearAll', err);
       }
     }
+    const inMemory = this.cache.size;
     this.cache.clear();
-    this.logger.log('Cache em memória completamente limpo');
+    this.logger.log(`Cache em memória limpo (${inMemory} entradas)`);
+    return this.useRedis() ? removed : inMemory;
   }
 
   /** SCAN não-bloqueante por padrão (evita KEYS em produção). */
