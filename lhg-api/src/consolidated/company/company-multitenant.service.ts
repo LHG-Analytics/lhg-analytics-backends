@@ -877,9 +877,11 @@ export class CompanyMultitenantService {
           // Giro: soma_locacoes / total_suites
           averageValue = componentSum / totalSuites;
         } else if (field === 'occupancyRateByDate') {
-          // Ocupação: mais complexa, precisa considerar tempo disponível
-          // 18 horas úteis por dia = 18 * 3600 = 64800 segundos
-          const availableSecondsPerDay = 18 * 3600;
+          // Ocupação: o DIA CONTÁBIL vai das 06:00 às 05:59 do dia seguinte,
+          // ou seja, 24 HORAS CHEIAS = 86400 segundos. Antes usava 18h (64800),
+          // o que inflava a taxa em 33% e deixava o consolidado INCOMPARÁVEL com a
+          // visão por unidade (que sempre usou 86400).
+          const availableSecondsPerDay = 24 * 3600;
           const totalAvailableSeconds = totalSuites * availableSecondsPerDay;
           averageValue = (componentSum / totalAvailableSeconds) * 100; // taxa em %
         }
