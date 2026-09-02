@@ -931,26 +931,40 @@ export class CompanyService {
     // SQL para calcular tempo de ocupação por categoria de suíte e data
     // Taxa de ocupação = (tempo ocupado / tempo disponível) × 100
     const occupancyRateBySuiteCategorySQL = `
+      WITH rentals AS (
+        SELECT
+          ca.descricao as suite_category,
+          la.datainicialdaocupacao AS ci,
+          la.datafinaldaocupacao AS co
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'
+          AND la.datainicialdaocupacao <= '${formattedEnd}'
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND ca.id IN (${suiteIdsSqlList})
+      )
+      -- Fatia cada locação pelos DIAS CONTÁBEIS que ela atravessa (06:00 até 05:59
+      -- do dia seguinte). Antes a duração INTEIRA era atribuída ao dia do check-in,
+      -- o que inflava esse dia (chegando a passar de 100%) e subcontava o seguinte.
       SELECT
-        ca.descricao as suite_category,
-        CASE
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
-        END as rental_date,
-        SUM(EXTRACT(EPOCH FROM (la.datafinaldaocupacao - la.datainicialdaocupacao))) as total_occupied_time
-      FROM locacaoapartamento la
-      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-      INNER JOIN apartamento a ON aps.id_apartamento = a.id
-      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE la.datainicialdaocupacao >= '${formattedStart}'
-        AND la.datainicialdaocupacao <= '${formattedEnd}'
-        AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (${suiteIdsSqlList})
-      GROUP BY ca.descricao, CASE
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
-        END
-      ORDER BY rental_date, ca.descricao
+        r.suite_category,
+        (win)::date as rental_date,
+        SUM(
+          GREATEST(
+            EXTRACT(EPOCH FROM (LEAST(r.co, win + INTERVAL '1 day') - GREATEST(r.ci, win))),
+            0
+          )
+        ) as total_occupied_time
+      FROM rentals r
+      CROSS JOIN LATERAL generate_series(
+        date_trunc('day', r.ci - INTERVAL '6 hours') + INTERVAL '6 hours',
+        date_trunc('day', r.co - INTERVAL '6 hours') + INTERVAL '6 hours',
+        INTERVAL '1 day'
+      ) AS win
+      GROUP BY r.suite_category, (win)::date
+      ORDER BY rental_date, r.suite_category
     `;
 
     const suitesByCategorySQL = `
@@ -989,24 +1003,37 @@ export class CompanyService {
 
     // SQL para calcular tempo de ocupação por data (para OccupancyRate correto)
     const occupancyTimeByDateSQL = `
+      WITH rentals AS (
+        SELECT
+          la.datainicialdaocupacao AS ci,
+          la.datafinaldaocupacao AS co
+        FROM locacaoapartamento la
+        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+        INNER JOIN apartamento a ON aps.id_apartamento = a.id
+        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+        WHERE la.datainicialdaocupacao >= '${formattedStart}'
+          AND la.datainicialdaocupacao <= '${formattedEnd}'
+          AND la.fimocupacaotipo = 'FINALIZADA'
+          AND ca.id IN (${suiteIdsSqlList})
+      )
+      -- Fatia cada locação pelos DIAS CONTÁBEIS que ela atravessa (06:00 até 05:59
+      -- do dia seguinte). Antes a duração INTEIRA era atribuída ao dia do check-in,
+      -- o que inflava esse dia (chegando a passar de 100%) e subcontava o seguinte.
       SELECT
-        CASE
-          WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-          ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
-        END as date,
-        SUM(EXTRACT(EPOCH FROM (la.datafinaldaocupacao - la.datainicialdaocupacao))) as total_occupied_time
-      FROM locacaoapartamento la
-      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-      INNER JOIN apartamento a ON aps.id_apartamento = a.id
-      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-      WHERE la.datainicialdaocupacao >= '${formattedStart}'
-        AND la.datainicialdaocupacao <= '${formattedEnd}'
-        AND la.fimocupacaotipo = 'FINALIZADA'
-        AND ca.id IN (${suiteIdsSqlList})
-      GROUP BY CASE
-        WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
-      END
+        (win)::date as date,
+        SUM(
+          GREATEST(
+            EXTRACT(EPOCH FROM (LEAST(r.co, win + INTERVAL '1 day') - GREATEST(r.ci, win))),
+            0
+          )
+        ) as total_occupied_time
+      FROM rentals r
+      CROSS JOIN LATERAL generate_series(
+        date_trunc('day', r.ci - INTERVAL '6 hours') + INTERVAL '6 hours',
+        date_trunc('day', r.co - INTERVAL '6 hours') + INTERVAL '6 hours',
+        INTERVAL '1 day'
+      ) AS win
+      GROUP BY (win)::date
       ORDER BY date
     `;
 

@@ -372,26 +372,37 @@ export function getOccupancyRateByDateSQL(
   );
 
   return `
+    WITH rentals AS (
+      SELECT
+        la.datainicialdaocupacao AS ci,
+        la.datafinaldaocupacao AS co
+      FROM locacaoapartamento la
+      INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
+      INNER JOIN apartamento a ON aps.id_apartamento = a.id
+      INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
+      WHERE la.datainicialdaocupacao >= '${startTimestamp}'
+        AND la.datainicialdaocupacao <= '${endTimestamp}'
+        AND la.fimocupacaotipo = 'FINALIZADA'
+        AND ca.id IN (${categoryIds})
+    )
+    -- Fatia cada locação pelos DIAS CONTÁBEIS que ela atravessa (06:00 até 05:59
+    -- do dia seguinte). Antes a duração INTEIRA ia para o dia do check-in, o que
+    -- inflava esse dia e subcontava o seguinte. Igual ao company.service.ts.
     SELECT
-      CASE
-        WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-        ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
-      END as date,
+      (win)::date as date,
       COALESCE(SUM(
-        EXTRACT(EPOCH FROM (la.datafinaldaocupacao - la.datainicialdaocupacao))
+        GREATEST(
+          EXTRACT(EPOCH FROM (LEAST(r.co, win + INTERVAL '1 day') - GREATEST(r.ci, win))),
+          0
+        )
       ), 0) as total_occupied_seconds
-    FROM locacaoapartamento la
-    INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-    INNER JOIN apartamento a ON aps.id_apartamento = a.id
-    INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-    WHERE la.datainicialdaocupacao >= '${startTimestamp}'
-      AND la.datainicialdaocupacao <= '${endTimestamp}'
-      AND la.fimocupacaotipo = 'FINALIZADA'
-      AND ca.id IN (${categoryIds})
-    GROUP BY CASE
-      WHEN EXTRACT(HOUR FROM la.datainicialdaocupacao) >= 6 THEN DATE(la.datainicialdaocupacao)
-      ELSE DATE(la.datainicialdaocupacao - INTERVAL '1 day')
-    END
+    FROM rentals r
+    CROSS JOIN LATERAL generate_series(
+      date_trunc('day', r.ci - INTERVAL '6 hours') + INTERVAL '6 hours',
+      date_trunc('day', r.co - INTERVAL '6 hours') + INTERVAL '6 hours',
+      INTERVAL '1 day'
+    ) AS win
+    GROUP BY (win)::date
     ORDER BY date
   `;
 }
