@@ -72,6 +72,42 @@ export class CacheController {
     return this.cacheService.getDetailedStatus();
   }
 
+  /**
+   * Invalida TODO o cache do ambiente e reaquece em background.
+   *
+   * Necessário porque o cache agora vive no Redis e SOBREVIVE a deploys: depois de
+   * corrigir um cálculo de KPI, as chaves antigas continuam servindo o número
+   * ERRADO até o TTL vencer (até 12h). O warmup sozinho não resolve — ele só
+   * reescreve os 4 períodos preset, deixando intactas as faixas customizadas.
+   *
+   * Só apaga o namespace do próprio ambiente (prod não derruba o cache de dev).
+   */
+  @Post('clear')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Limpa TODO o cache do ambiente e reaquece em background' })
+  async clearCache(): Promise<{
+    cleared: number;
+    namespace: string;
+    rewarming: boolean;
+    timestamp: string;
+  }> {
+    const before = await this.cacheService.getDetailedStatus();
+    await this.cacheService.clearAll();
+    this.logger.log(`Cache invalidado sob demanda: ${before.summary.total} chaves.`);
+
+    this.runWarmupInternal()
+      .then(() => this.logger.log('Reaquecimento pós-limpeza concluído.'))
+      .catch((error) => this.logger.error('Erro no reaquecimento pós-limpeza:', error));
+
+    return {
+      cleared: before.summary.total,
+      namespace: before.namespace,
+      rewarming: true,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   private buildPeriods(): { name: string; period: CachePeriodEnum; start: Date; end: Date }[] {
     // IMPORTANTE: o frontend consulta SEMPRE por datas explícitas (período CUSTOM)
     // terminando HOJE — ex.: mês atual = 01/mês..hoje; últimos 7 = hoje-7..hoje.
