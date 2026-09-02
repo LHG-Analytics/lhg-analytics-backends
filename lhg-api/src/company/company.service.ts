@@ -437,6 +437,58 @@ export class CompanyService {
   }
 
   /**
+   * Remove dos intervalos de bloqueio (`blocks`) todo trecho coberto por uma
+   * locação (`occupied`) do MESMO apartamento.
+   *
+   * Motivo: a taxa de ocupação é `ocupado / vendável`, e `vendável = capacidade -
+   * bloqueado`. Um apê que estava ALUGADO era, por definição, vendável naquele
+   * intervalo — descontá-lo da capacidade encolhe o denominador e infla a taxa
+   * (chegava a passar de 100%). Na prática isso acontece porque o AUTOMO registra
+   * defeito/limpeza com janelas que se sobrepõem às locações.
+   */
+  private subtractOccupiedFromBlocks(
+    blocks: Array<{ category_name: string; start_date: any; end_date: any }>,
+    occupied: Array<[number, number]>,
+  ): Array<{ category_name: string; start_date: Date; end_date: Date }> {
+    const occ = [...occupied].sort((a, b) => a[0] - b[0]);
+    const out: Array<{ category_name: string; start_date: Date; end_date: Date }> = [];
+
+    for (const block of blocks) {
+      let pieces: Array<[number, number]> = [
+        [new Date(block.start_date).getTime(), new Date(block.end_date).getTime()],
+      ];
+
+      for (const [occStart, occEnd] of occ) {
+        const next: Array<[number, number]> = [];
+        for (const [pieceStart, pieceEnd] of pieces) {
+          // Sem sobreposição: mantém o pedaço inteiro
+          if (occEnd <= pieceStart || occStart >= pieceEnd) {
+            next.push([pieceStart, pieceEnd]);
+            continue;
+          }
+          // Sobreposição: mantém apenas as bordas que sobram
+          if (occStart > pieceStart) next.push([pieceStart, Math.min(occStart, pieceEnd)]);
+          if (occEnd < pieceEnd) next.push([Math.max(occEnd, pieceStart), pieceEnd]);
+        }
+        pieces = next;
+        if (pieces.length === 0) break;
+      }
+
+      for (const [pieceStart, pieceEnd] of pieces) {
+        if (pieceEnd > pieceStart) {
+          out.push({
+            category_name: block.category_name,
+            start_date: new Date(pieceStart),
+            end_date: new Date(pieceEnd),
+          });
+        }
+      }
+    }
+
+    return out;
+  }
+
+  /**
    * Método interno que faz o cálculo real dos KPIs de Company
    * Chamado pelo cache service quando há cache miss
    */
@@ -1228,8 +1280,12 @@ export class CompanyService {
 
         // Tempo disponível = total de suítes × dias × 86400 segundos
         const totalAvailableTime = totalSuites * daysInPeriod * 86400;
+        // Teto de 100%: a duração inteira da locação é atribuída ao dia de início,
+        // então um dia pode acumular mais que a capacidade daquele dia.
         const occupancyRate =
-          totalAvailableTime > 0 ? (totalOccupiedTime / totalAvailableTime) * 100 : 0;
+          totalAvailableTime > 0
+            ? Math.min((totalOccupiedTime / totalAvailableTime) * 100, 100)
+            : 0;
         return Number(occupancyRate.toFixed(2));
       }),
     };
@@ -1325,9 +1381,10 @@ export class CompanyService {
 
             // Tempo disponível = total de suítes na categoria × dias × 86400 segundos
             const totalAvailableTime = totalSuitesInCategory * daysInPeriod * 86400;
+            // Teto de 100% (mesmo motivo do OccupancyRateByDate)
             const occupancyRate =
               totalAvailableTime > 0
-                ? (categoryData.totalOccupiedTime / totalAvailableTime) * 100
+                ? Math.min((categoryData.totalOccupiedTime / totalAvailableTime) * 100, 100)
                 : 0;
             return Number(occupancyRate.toFixed(2));
           }),
@@ -1486,6 +1543,7 @@ export class CompanyService {
     const rentalsQuery = `
       SELECT
         ca.descricao as category_name,
+        a.id as suite_id,
         la.datainicialdaocupacao as check_in,
         la.datafinaldaocupacao as check_out
       FROM locacaoapartamento la
@@ -1539,6 +1597,7 @@ export class CompanyService {
         FROM categoriaapartamento ca
         INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
         WHERE ca.id IN (${suiteIdsSqlList})
+          AND a.dataexclusao IS NULL
           ORDER BY ca.id, a.id
       )
       SELECT
@@ -1549,6 +1608,7 @@ export class CompanyService {
       INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
       INNER JOIN first_suite_per_category fs ON ca.descricao = fs.category_name
       WHERE ca.id IN (${suiteIdsSqlList})
+        AND a.dataexclusao IS NULL
       GROUP BY ca.descricao, fs.first_suite_id
     `;
 
@@ -1864,9 +1924,14 @@ export class CompanyService {
 
       // Taxa de ocupação CORRETA: (tempo ocupado / tempo disponível) × 100
       // Tempo disponível = (suítes × dias × 86400 segundos) - tempo indisponível
-      const totalAvailableTime = totalSuitesInCategory * periodDays * 86400 - unavailableTime;
+      // O SQL já recorta ao período e mescla por suíte; o teto de 100% cobre o
+      // resíduo de locação e bloqueio sobrepostos na origem.
+      const cap = totalSuitesInCategory * periodDays * 86400;
+      const totalAvailableTime = Math.max(cap - Math.min(unavailableTime, cap), 0);
       const occupancyRate =
-        totalAvailableTime > 0 ? (totalOccupiedTime / totalAvailableTime) * 100 : 0;
+        totalAvailableTime > 0
+          ? Math.min((totalOccupiedTime / totalAvailableTime) * 100, 100)
+          : 0;
 
       return {
         [item.suite_category_name]: {
@@ -1939,11 +2004,28 @@ export class CompanyService {
       firstSuiteByCategory[meta.category_name] = Number(meta.first_suite_id);
     });
 
+    // Limites do período — MESMA janela usada no dayCountMap acima. Locações e
+    // indisponibilidades que ultrapassam o período precisam ser RECORTADAS aqui:
+    // sem isso, dias de FORA do período somam tempo em dias-da-semana cujo
+    // daysCount só conta os dias de DENTRO, e o "indisponível" chega a superar a
+    // capacidade física — o denominador colapsa e a taxa vira 0% ou explode.
+    const periodStartBound = moment.tz(startDate, timezone).startOf('day');
+    const periodEndBound = moment.tz(endDate, timezone).endOf('day');
+
+    // Intervalos ocupados por (categoria + suíte) — usados adiante para descontar
+    // do bloqueio o trecho em que o apê estava ALUGADO (logo, era vendável).
+    const occupiedIntervalsByGroup: { [key: string]: Array<[number, number]> } = {};
+
     // Processar locações: distribuir tempo ocupado proporcionalmente por dia
     rentalsData.forEach((rental) => {
-      const checkIn = moment.tz(rental.check_in, timezone);
-      const checkOut = moment.tz(rental.check_out, timezone);
+      const checkIn = moment.max(moment.tz(rental.check_in, timezone), periodStartBound);
+      const checkOut = moment.min(moment.tz(rental.check_out, timezone), periodEndBound);
       const category = rental.category_name;
+      if (!checkOut.isAfter(checkIn)) return;
+
+      const occGroupKey = `${category}||${rental.suite_id}`;
+      if (!occupiedIntervalsByGroup[occGroupKey]) occupiedIntervalsByGroup[occGroupKey] = [];
+      occupiedIntervalsByGroup[occGroupKey].push([checkIn.valueOf(), checkOut.valueOf()]);
 
       // Iterar dia a dia e calcular quanto tempo da locação está em cada dia
       let currentDay = checkIn.clone().startOf('day');
@@ -1970,23 +2052,28 @@ export class CompanyService {
     });
 
     // Agrupar períodos indisponíveis por categoria
+    // Agrupa por CATEGORIA + SUÍTE: mesclar períodos de suítes DIFERENTES como se
+    // fossem um só subcontava o tempo indisponível de categorias com várias suítes.
     const unavailableByCategory: { [key: string]: any[] } = {};
     unavailableTimesData.forEach((unavailable) => {
-      const category = unavailable.category_name;
-      if (!unavailableByCategory[category]) {
-        unavailableByCategory[category] = [];
+      const groupKey = `${unavailable.category_name}||${unavailable.suite_id}`;
+      if (!unavailableByCategory[groupKey]) {
+        unavailableByCategory[groupKey] = [];
       }
-      unavailableByCategory[category].push(unavailable);
+      unavailableByCategory[groupKey].push(unavailable);
     });
 
-    // Mesclar períodos sobrepostos para cada categoria
+    // Mesclar períodos sobrepostos DENTRO de cada (categoria + suíte)
     const mergedUnavailableData: any[] = [];
-    Object.keys(unavailableByCategory).forEach((category) => {
-      const periods = unavailableByCategory[category].sort(
+    Object.keys(unavailableByCategory).forEach((groupKey) => {
+      const periods = unavailableByCategory[groupKey].sort(
         (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
       );
 
       if (periods.length === 0) return;
+
+      // A chave de grupo é "categoria||suíte" — a categoria real vem da linha.
+      const category = periods[0].category_name;
 
       const merged: any[] = [];
       let current = periods[0];
@@ -2011,14 +2098,29 @@ export class CompanyService {
         }
       }
       merged.push(current);
-      mergedUnavailableData.push(...merged);
+
+      // Desconta o tempo em que o apê estava alugado: bloqueio sobreposto a
+      // locação NÃO pode sair da capacidade (senão o denominador encolhe e a
+      // taxa infla — chegava a passar de 100%).
+      const occupiedOfGroup = occupiedIntervalsByGroup[groupKey] || [];
+      mergedUnavailableData.push(
+        ...(occupiedOfGroup.length
+          ? this.subtractOccupiedFromBlocks(merged, occupiedOfGroup)
+          : merged),
+      );
     });
 
     // Processar tempos indisponíveis mesclados: distribuir proporcionalmente por dia
     mergedUnavailableData.forEach((unavailable) => {
-      const startTime = moment.tz(unavailable.start_date, timezone);
-      const endTime = moment.tz(unavailable.end_date, timezone);
+      // Recorta ao período (ver comentário em periodStartBound): um defeito que
+      // termina DEPOIS do fim do período não pode somar tempo de dias de fora.
+      const startTime = moment.max(
+        moment.tz(unavailable.start_date, timezone),
+        periodStartBound,
+      );
+      const endTime = moment.min(moment.tz(unavailable.end_date, timezone), periodEndBound);
       const category = unavailable.category_name;
+      if (!endTime.isAfter(startTime)) return;
 
       // Iterar dia a dia e calcular quanto tempo indisponível está em cada dia
       let currentDay = startTime.clone().startOf('day');
@@ -2068,10 +2170,18 @@ export class CompanyService {
       const ordered: { [key: string]: any } = {};
       dayNames.forEach((day) => {
         const daysCount = dayCountMap[day] || 1;
-        const occupiedTime = data[day]?.occupied || 0;
-        const unavailableTime = data[day]?.unavailable || 0;
-        const availableTime = daysCount * totalSuites * 86400 - unavailableTime;
-        const occupancyRate = availableTime > 0 ? (occupiedTime / availableTime) * 100 : 0;
+        // Capacidade física do dia-da-semana no período: dias × suítes × 24h
+        const capacity = daysCount * totalSuites * 86400;
+        const occupiedTime = Math.min(data[day]?.occupied || 0, capacity);
+        // Guardas: indisponível nunca passa da capacidade e o disponível nunca
+        // fica negativo (senão o denominador colapsa e a taxa explode).
+        const unavailableTime = Math.min(data[day]?.unavailable || 0, capacity);
+        const availableTime = Math.max(capacity - unavailableTime, 0);
+        // Taxa de ocupação é fisicamente limitada a 100%: locação e bloqueio podem
+        // se sobrepor na origem (apê alugado com defeito aberto), então o ocupado
+        // pode exceder o disponível calculado.
+        const occupancyRate =
+          availableTime > 0 ? Math.min((occupiedTime / availableTime) * 100, 100) : 0;
 
         ordered[day] = {
           occupancyRate: Number(occupancyRate.toFixed(2)),
@@ -2109,6 +2219,35 @@ export class CompanyService {
             : 0;
         item[category][day].totalOccupancyRate = Number(totalRate.toFixed(2));
       });
+    });
+
+    // Recalcula a taxa de ocupação da TABELA POR CATEGORIA a partir dos MESMOS
+    // dados já corrigidos usados na tabela por dia da semana. A versão anterior
+    // vinha do SQL, que somava a duração INTEIRA das locações (sem recortar ao
+    // período) e descontava da capacidade bloqueios que se sobrepunham a locações
+    // — por isso estourava 100%. Agora as duas telas batem por construção.
+    const periodDaysForOccupancy = dayNames.reduce(
+      (acc, day) => acc + (dayCountMap[day] || 0),
+      0,
+    );
+    dataTableSuiteCategory.forEach((row) => {
+      const category = Object.keys(row)[0];
+      const dayData = occupancyByCategory[category];
+      if (!dayData) return;
+
+      const totalSuitesInCategory = metadataByCategory[category]?.totalSuites || 1;
+      let occupiedTotal = 0;
+      let unavailableTotal = 0;
+      dayNames.forEach((day) => {
+        occupiedTotal += dayData[day]?.occupied || 0;
+        unavailableTotal += dayData[day]?.unavailable || 0;
+      });
+
+      const capacity = periodDaysForOccupancy * totalSuitesInCategory * 86400;
+      const available = Math.max(capacity - Math.min(unavailableTotal, capacity), 0);
+      const rate =
+        available > 0 ? Math.min((Math.min(occupiedTotal, capacity) / available) * 100, 100) : 0;
+      row[category].occupancyRate = Number(rate.toFixed(2));
     });
 
     // === IMPLEMENTAÇÃO DO DATATABLEGIROBYWEEK ===
