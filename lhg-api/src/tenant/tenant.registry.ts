@@ -423,6 +423,83 @@ export const TENANTS: Record<string, TenantConfig> = {
     bookingChannels: ['GUIA_SCHEDULED', 'GUIA_GO', 'INTERNAL'],
     bookingValidOriginIds: [1, 3], // SISTEMA + GUIA_DE_MOTEIS
   },
+
+  // Getan Vera Cruz (Goiânia) — 5ª unidade GETAN. IDs confirmados no banco
+  // (2026-09-03); A&B idêntico ao PQ Oeste/Novo Mundo. Regras GETAN padrão
+  // (3/6/12 puro, sem terceirização, vistoria não registrada, 0 camareiras com
+  // horário). Ver [[getan-onboarding]].
+  getan_vera_cruz: {
+    slug: 'getan_vera_cruz',
+    unitEnum: 'GETAN_VERA_CRUZ',
+    displayName: 'Getan Vera Cruz',
+    databaseUrlEnv: 'DATABASE_URL_LOCAL_GETAN_VERA_CRUZ',
+    // MASTER POLE(1)/LUXO(2)/LUXO ESP.(3)/MASTER GETE(5)/SUPER LUXO(6)/
+    // SUPER LUXO ESP.(7) — 47 apês. GETE(4) existe mas está sem apartamento.
+    suiteCategoryIds: [1, 2, 3, 5, 6, 7],
+    governance: {
+      camareirasCargoIds: [6], // CAMAREIRA (30)
+      supervisorCargoId: 4, // GERENTE INTERNO (≠ camareira; vistoria vazia → KPI=0)
+      terceirizados: { kind: 'none' },
+      teamSizingCargoIds: [6],
+      excludedEmployeeIds: [],
+    },
+    restaurant: {
+      // A = COZINHA(3); B = BEBIDAS(2) + BEBIDAPREPARO(6, caipirinha/whisky).
+      // DIVERSOS(4, absorvente/calcinha/salgadinho)/EROTICO(5) = "outros".
+      abProductTypeIds: [2, 3, 6],
+      aProductTypeIds: [3],
+      bProductTypeIds: [2, 6],
+      aRankingIds: [3],
+      bRankingIds: [2, 6],
+      aLeastRankingIds: [3],
+      bLeastRankingIds: [2, 6],
+    },
+    rentalTypes: DEFAULT_RENTAL_TYPES, // 3h/6h/12h
+    extendedRentalRules: false,
+    billingRentalType: GETAN_BILLING_RENTAL_TYPE, // 3/6/12 por duração pura
+    bookingChannels: ['GUIA_SCHEDULED', 'GUIA_GO', 'INTERNAL'],
+    bookingValidOriginIds: [1, 3], // SISTEMA + GUIA_DE_MOTEIS
+  },
+
+  // Getan Grid (Goiânia) — 6ª unidade GETAN. ATENÇÃO: taxonomia de produtos MUITO
+  // mais rica que as outras GETAN (comida separada em SANDUICHES/PORÇÕES/PRATOS
+  // ESPECIAIS/PETISCOS e bebida em BEBIDAS/DRINKS), por isso o A&B aqui NÃO segue
+  // o padrão das irmãs. Unidade NOVA: o histórico começa em ago/2026, então o
+  // comparativo com o ano anterior vem zerado. Ver [[getan-onboarding]].
+  getan_grid: {
+    slug: 'getan_grid',
+    unitEnum: 'GETAN_GRID',
+    displayName: 'Getan Grid',
+    databaseUrlEnv: 'DATABASE_URL_LOCAL_GETAN_GRID',
+    suiteCategoryIds: [1, 2, 3], // GRID(21)/LUXO(14)/SUPER LUXO(12) — 47 apês
+    governance: {
+      camareirasCargoIds: [6], // CAMAREIRA (58)
+      supervisorCargoId: 5, // GERENTE (≠ camareira; vistoria vazia → KPI=0)
+      terceirizados: { kind: 'none' },
+      teamSizingCargoIds: [6],
+      excludedEmployeeIds: [],
+    },
+    restaurant: {
+      // A = COZINHA(4) + SANDUICHES(6) + PORÇÕES/CALDOS/MASSAS(9) +
+      //     PRATOS ESPECIAIS(10) + PETISCOS(12)
+      // B = BEBIDAS(2) + DRINKS(8, martini/vodka/whisky)
+      // Fora: SUITE(3, é preservativo), EROTICO(5), DIVERSOS(11),
+      //       CHOCOLATES E DIVERSOS(7, mistura cosmético com chocolate/salgadinho),
+      //       CINZEIRO(13) e INSUMO(14) (ambos sem produto).
+      abProductTypeIds: [2, 4, 6, 8, 9, 10, 12],
+      aProductTypeIds: [4, 6, 9, 10, 12],
+      bProductTypeIds: [2, 8],
+      aRankingIds: [4, 6, 9, 10, 12],
+      bRankingIds: [2, 8],
+      aLeastRankingIds: [4, 6, 9, 10, 12],
+      bLeastRankingIds: [2, 8],
+    },
+    rentalTypes: DEFAULT_RENTAL_TYPES, // 3h/6h/12h
+    extendedRentalRules: false,
+    billingRentalType: GETAN_BILLING_RENTAL_TYPE, // 3/6/12 por duração pura
+    bookingChannels: ['GUIA_SCHEDULED', 'GUIA_GO', 'INTERNAL'],
+    bookingValidOriginIds: [1, 3], // SISTEMA + GUIA_DE_MOTEIS
+  },
 };
 
 export function getTenant(slug: string): TenantConfig | undefined {

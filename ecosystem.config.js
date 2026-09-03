@@ -43,6 +43,9 @@ module.exports = {
           process.env.DATABASE_URL_LOCAL_GETAN_INDEPENDENCIA,
         DATABASE_URL_LOCAL_GETAN_NOVO_MUNDO:
           process.env.DATABASE_URL_LOCAL_GETAN_NOVO_MUNDO,
+        DATABASE_URL_LOCAL_GETAN_VERA_CRUZ:
+          process.env.DATABASE_URL_LOCAL_GETAN_VERA_CRUZ,
+        DATABASE_URL_LOCAL_GETAN_GRID: process.env.DATABASE_URL_LOCAL_GETAN_GRID,
         // Cache Redis (opcional): se ausente, o KpiCacheService usa Map em memória.
         // CACHE_PREFIX separa os ambientes num Redis compartilhado (ex.: prod/dev).
         REDIS_URL: process.env.REDIS_URL,

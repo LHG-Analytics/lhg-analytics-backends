@@ -13,7 +13,9 @@ export interface JwtPayload {
     | 'GETAN_GARAVELO'
     | 'GETAN_PQ_OESTE'
     | 'GETAN_INDEPENDENCIA'
-    | 'GETAN_NOVO_MUNDO'; // Tipos de unidades
+    | 'GETAN_NOVO_MUNDO'
+    | 'GETAN_VERA_CRUZ'
+    | 'GETAN_GRID'; // Tipos de unidades
   role:
     | 'ADMIN'
     | 'GERENTE_GERAL'
