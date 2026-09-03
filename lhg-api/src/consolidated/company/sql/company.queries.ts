@@ -49,6 +49,26 @@ export function getCategoryIds(unit: UnitKey): string {
 }
 
 /**
+ * Conta as suítes ATIVAS da unidade direto no banco.
+ *
+ * Existe porque o UNIT_CONFIGS carrega um totalSuites FIXO, que silenciosamente
+ * fica desatualizado sempre que a unidade mexe no inventário de apartamentos.
+ * Aconteceu de verdade: em ago/2026 o Garavelo excluiu 22 apês e o consolidado
+ * seguiu dividindo por 80 em vez de 58 — giro/revpar/ocupação saíam ~27%
+ * subestimados. A visão por unidade nunca teve o problema porque sempre contou
+ * no banco; agora o consolidado faz o mesmo.
+ */
+export function getSuiteCountSQL(unit: UnitKey): string {
+  const categoryIds = getCategoryIds(unit);
+  return `
+    SELECT COUNT(*)::int AS total_suites
+    FROM apartamento a
+    WHERE a.id_categoriaapartamento IN (${categoryIds})
+      AND a.dataexclusao IS NULL
+  `;
+}
+
+/**
  * Query para BigNumbers - totais do período
  */
 export function getBigNumbersSQL(
