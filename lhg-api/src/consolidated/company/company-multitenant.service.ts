@@ -27,6 +27,7 @@ import {
   getOccupancyRateByDateSQL,
   getGiroByDateSQL,
   getSaleDirectSQL,
+  getSuiteCountSQL,
 } from './sql/company.queries';
 
 interface UnitBigNumbers {
@@ -48,6 +49,8 @@ interface UnitKpiData {
   trevparByDate: Map<string, number>;
   occupancyRateByDate: Map<string, number>;
   giroByDate: Map<string, number>;
+  /** Suítes ativas contadas NO BANCO (não o número fixo do UNIT_CONFIGS). */
+  suiteCount: number;
 }
 
 @Injectable()
@@ -267,6 +270,7 @@ export class CompanyMultitenantService {
             unit,
             getGiroByDateSQL(unit, startDate, endDate),
           ),
+        () => this.databaseService.query(unit, getSuiteCountSQL(unit)),
       ];
 
       const [
@@ -282,7 +286,14 @@ export class CompanyMultitenantService {
         trevparResult,
         occupancyResult,
         giroResult,
+        suiteCountResult,
       ] = await this.concurrencyUtils.executeWithLimit(queryTasks, 5);
+
+      // Suítes ativas do banco. Se a contagem vier vazia/zero (query estranha),
+      // cai no número do UNIT_CONFIGS para não zerar o denominador.
+      const suiteCount =
+        Number(suiteCountResult.rows[0]?.total_suites) ||
+        UNIT_CONFIGS[unit].suiteConfig.totalSuites;
 
       // Processa vendas diretas (igual ao individual: totalAllValue = locação + vendas diretas)
       const sd = saleDirectResult.rows[0] || {};
@@ -486,6 +497,7 @@ export class CompanyMultitenantService {
         trevparByDate,
         occupancyRateByDate,
         giroByDate,
+        suiteCount,
       };
     } catch (error) {
       this.logger.error(
@@ -551,10 +563,8 @@ export class CompanyMultitenantService {
     );
 
     // Calcula total de suítes consolidadas para métricas de média
-    const totalSuites = results.reduce(
-      (sum, r) => sum + UNIT_CONFIGS[r.unit].suiteConfig.totalSuites,
-      0,
-    );
+    // Soma as suítes CONTADAS NO BANCO de cada unidade (ver getSuiteCountSQL).
+    const totalSuites = results.reduce((sum, r) => sum + r.suiteCount, 0);
 
     // Métricas de MÉDIA (Revpar, Trevpar, Ocupação, Giro) precisam de tratamento especial
     // SOMAR componentes primeiro, depois calcular média
@@ -660,10 +670,8 @@ export class CompanyMultitenantService {
       }
     }
 
-    const totalSuites = results.reduce(
-      (sum, r) => sum + UNIT_CONFIGS[r.unit].suiteConfig.totalSuites,
-      0,
-    );
+    // Soma as suítes CONTADAS NO BANCO de cada unidade (ver getSuiteCountSQL).
+    const totalSuites = results.reduce((sum, r) => sum + r.suiteCount, 0);
 
     // --- Cálculos período atual ---
     // Usa daysInSelectedPeriod para calcular Trevpar e Giro do período selecionado
