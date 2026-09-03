@@ -73,6 +73,19 @@ export const UNIT_AB_CONFIGS: Record<UnitKey, UnitABConfig> = {
     aProductTypes: [3],
     bProductTypes: [2, 6],
   },
+  getan_vera_cruz: {
+    // A = COZINHA(3); B = BEBIDAS(2) + BEBIDAPREPARO(6)
+    abProductTypes: [2, 3, 6],
+    aProductTypes: [3],
+    bProductTypes: [2, 6],
+  },
+  getan_grid: {
+    // A = COZINHA(4)+SANDUICHES(6)+PORCOES(9)+PRATOS ESPECIAIS(10)+PETISCOS(12)
+    // B = BEBIDAS(2)+DRINKS(8)
+    abProductTypes: [2, 4, 6, 8, 9, 10, 12],
+    aProductTypes: [4, 6, 9, 10, 12],
+    bProductTypes: [2, 8],
+  },
 };
 
 /**

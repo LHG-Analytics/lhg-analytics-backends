@@ -25,7 +25,9 @@ export type UserUnit =
   | 'GETAN_GARAVELO'
   | 'GETAN_PQ_OESTE'
   | 'GETAN_INDEPENDENCIA'
-  | 'GETAN_NOVO_MUNDO';
+  | 'GETAN_NOVO_MUNDO'
+  | 'GETAN_VERA_CRUZ'
+  | 'GETAN_GRID';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'João Silva' })
@@ -49,7 +51,7 @@ export class CreateUserDto {
   cpf: string;
 
   @ApiProperty({
-    enum: ['LHG', 'LUSH_LAPA', 'LUSH_IPIRANGA', 'TOUT', 'ANDAR_DE_CIMA', 'LIV', 'ALTANA', 'GETAN_GARAVELO', 'GETAN_PQ_OESTE', 'GETAN_INDEPENDENCIA', 'GETAN_NOVO_MUNDO'],
+    enum: ['LHG', 'LUSH_LAPA', 'LUSH_IPIRANGA', 'TOUT', 'ANDAR_DE_CIMA', 'LIV', 'ALTANA', 'GETAN_GARAVELO', 'GETAN_PQ_OESTE', 'GETAN_INDEPENDENCIA', 'GETAN_NOVO_MUNDO', 'GETAN_VERA_CRUZ', 'GETAN_GRID'],
     example: 'LUSH_LAPA',
   })
   @IsEnum(['LHG', 'LUSH_LAPA', 'LUSH_IPIRANGA', 'TOUT', 'ANDAR_DE_CIMA', 'LIV', 'ALTANA', 'GETAN_GARAVELO', 'GETAN_PQ_OESTE', 'GETAN_INDEPENDENCIA', 'GETAN_NOVO_MUNDO'])

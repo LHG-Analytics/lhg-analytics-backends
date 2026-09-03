@@ -12,7 +12,9 @@ export type UnitKey =
   | 'getan_garavelo'
   | 'getan_pq_oeste'
   | 'getan_independencia'
-  | 'getan_novo_mundo';
+  | 'getan_novo_mundo'
+  | 'getan_vera_cruz'
+  | 'getan_grid';
 
 export interface UnitDatabaseConfig {
   key: UnitKey;
@@ -195,6 +197,31 @@ export const UNIT_CONFIGS: Record<
       categoryIds: [2, 3, 5],
       categoryNames: ['LUXO', 'SUPER LUXO', 'MASTER GETE'],
       totalSuites: 53,
+    },
+  },
+  getan_vera_cruz: {
+    name: 'Getan Vera Cruz',
+    envVar: 'DATABASE_URL_LOCAL_GETAN_VERA_CRUZ',
+    suiteConfig: {
+      categoryIds: [1, 2, 3, 5, 6, 7],
+      categoryNames: [
+        'MASTER POLE',
+        'LUXO',
+        'LUXO ESPECIAL',
+        'MASTER GETE',
+        'SUPER LUXO',
+        'SUPER LUXO ESPECIAL',
+      ],
+      totalSuites: 47,
+    },
+  },
+  getan_grid: {
+    name: 'Getan Grid',
+    envVar: 'DATABASE_URL_LOCAL_GETAN_GRID',
+    suiteConfig: {
+      categoryIds: [1, 2, 3],
+      categoryNames: ['GRID', 'LUXO', 'SUPER LUXO'],
+      totalSuites: 47,
     },
   },
 };
