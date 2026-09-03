@@ -164,7 +164,12 @@ export const UNIT_CONFIGS: Record<
         'SUPER LUXO',
         'SUPER LUXO C/ TETO',
       ],
-      totalSuites: 80,
+      // 58 desde ago/2026: 22 apês foram excluídos no AUTOMO (18 do LUXO, que caiu
+      // de 25 para 7; 3 do MASTER GETE; 1 do LUXO ESPECIAL). Estava 80 aqui, o que
+      // inflava o denominador do CONSOLIDADO em 27% (giro/revpar/ocupação saíam
+      // subestimados). A visão por unidade nunca teve o problema — ela conta as
+      // suítes direto no banco.
+      totalSuites: 58,
     },
   },
   getan_pq_oeste: {
@@ -173,7 +178,10 @@ export const UNIT_CONFIGS: Record<
     suiteConfig: {
       categoryIds: [2, 5, 6],
       categoryNames: ['LUXO', 'GETE', 'SUPER LUXO'],
-      totalSuites: 46,
+      // 44 desde 23/08/2026: os apês 45 e 46 (LUXO) foram excluídos no AUTOMO.
+      // Só o CONSOLIDADO usa este número fixo — a visão por unidade conta as
+      // suítes direto no banco (com dataexclusao IS NULL), então já estava certa.
+      totalSuites: 44,
     },
   },
   getan_independencia: {
