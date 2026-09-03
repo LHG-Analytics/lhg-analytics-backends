@@ -26,6 +26,13 @@ module.exports = {
       script: "./lhg-api/dist/main.js",
       env: {
         NODE_ENV: "production",
+        // Fuso do PROCESSO. Critico: o driver pg converte colunas
+        // "timestamp without time zone" usando o fuso do processo, e o AUTOMO
+        // grava hora LOCAL (BRT). Sem isso, rodando em UTC (padrao do Render),
+        // uma locacao das 20:00 chega ao JS como 17:00 — 3h de deslocamento em
+        // TODO agrupamento por dia/dia-da-semana feito em JavaScript (afeta o
+        // Restaurante inteiro e a ocupacao por dia da semana).
+        TZ: "America/Sao_Paulo",
         PORT: 3010, // fixa a porta interna (evita herdar o $PORT do Render, que é do proxy)
         JWT_SECRET: process.env.JWT_SECRET,
         ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
