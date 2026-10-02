@@ -71,7 +71,11 @@ export const UNIT_CONFIGS: Record<
     name: 'Lush Lapa',
     envVar: 'DATABASE_URL_LOCAL_LAPA',
     suiteConfig: {
-      categoryIds: [7, 8, 9, 10, 11, 12],
+      // SUBLIME(13) e SPA SUBLIME(14) entraram em operação em jun/2026 e faltavam
+      // aqui — o consolidado ignorava as 4 suítes E toda a receita delas (232
+      // locações / R$ 233.984 nos 12 meses até set/2026, e crescendo: 95 locações
+      // só em setembro). O backend POR UNIDADE sempre usou as 8 categorias.
+      categoryIds: [7, 8, 9, 10, 11, 12, 13, 14],
       categoryNames: [
         'LUSH',
         'LUSH HIDRO',
@@ -79,8 +83,10 @@ export const UNIT_CONFIGS: Record<
         'LUSH SPA',
         'LUSH SPLASH',
         'LUSH SPA SPLASH',
+        'LUSH SUBLIME',
+        'LUSH SPA SUBLIME',
       ],
-      totalSuites: 39,
+      totalSuites: 43,
     },
   },
   tout: {
