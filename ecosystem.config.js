@@ -73,6 +73,9 @@ module.exports = {
         SUPABASE_URL_USERS: process.env.SUPABASE_URL_USERS,
         JWT_SECRET: process.env.JWT_SECRET,
         JWT_EXPIRATION_TIME: process.env.JWT_EXPIRATION_TIME,
+        // Segredo do token do widget do LHG Help Desk (GET /api/helpdesk/token).
+        // Separado do JWT_SECRET; sem ele o endpoint responde 503.
+        HELPDESK_JWT_SECRET: process.env.HELPDESK_JWT_SECRET,
         PORT_AUTH: 3005,
       },
       env_production: {
