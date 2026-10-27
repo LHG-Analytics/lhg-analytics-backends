@@ -13,9 +13,12 @@ const app = express();
 // A resposta não traz versão, host nem detalhe interno.
 // ============================================================================
 const HEALTH_TIMEOUT_MS = 2000;
+// Os dois alvos são LIVENESS e não tocam banco: o /api/health do auth só
+// responde {status:'ok'} e o /health do lhg-api só lê o registro ESTÁTICO de
+// unidades (sem pool, sem query). As variáveis existem só para os testes.
 const HEALTH_TARGETS = {
-  auth: "http://127.0.0.1:3005/api/health",
-  api: "http://127.0.0.1:3010/health",
+  auth: process.env.HEALTH_AUTH_URL || "http://127.0.0.1:3005/api/health",
+  api: process.env.HEALTH_API_URL || "http://127.0.0.1:3010/health",
 };
 
 function probe(url) {

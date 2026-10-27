@@ -17,17 +17,19 @@ export const READY_TIMEOUT_MS = 2000;
  * - GET /api/health: LIVENESS. Só confirma que o processo responde; não toca o
  *   banco, para uma oscilação do Supabase não fazer o Render reiniciar a
  *   instância em loop.
+ *   Fica FORA do rate limit (o Render e o proxy consultam com frequência).
  * - GET /api/health/ready: READINESS para monitoração (SELECT 1 com timeout).
+ *   Fica DENTRO do rate limit global, como as demais rotas (toca o banco).
  * As respostas não trazem versão, host nem detalhe interno.
  */
 @ApiExcludeController()
 @Public()
-@SkipThrottle()
 @Controller('health')
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
+  @SkipThrottle()
   @Header('Cache-Control', 'no-store')
   liveness() {
     return { status: 'ok' };
