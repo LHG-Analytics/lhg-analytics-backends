@@ -1,0 +1,43 @@
+name: CI
+
+# Build e testes em todo PR para developer (homologação) e master (produção).
+# Usa `pull_request` (nunca `pull_request_target`): o código do PR roda sem
+# acesso a segredos. Não precisa de banco nem de variáveis de ambiente.
+on:
+  pull_request:
+    branches: [developer, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci --no-audit --no-fund
+
+      # build:auth = lhg-utils + prisma generate + tsc do authentication;
+      # build:api  = lhg-utils + tsc do lhg-api. Mesmo comando do Render.
+      - name: Build (authentication e lhg-api)
+        run: npm run build
+
+      - name: Testes do authentication
+        working-directory: authentication
+        run: npx jest --ci
+
+      - name: Proxy (server.mjs) carrega sem erro de sintaxe
+        run: node --check server.mjs
