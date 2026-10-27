@@ -8,17 +8,138 @@ datasource db {
     url      = env("SUPABASE_URL_USERS") // Variável de ambiente configurada no seu .env
 }
 
+// Pessoa (registro mestre). E-mails sempre em minúsculas e sem espaços nas
+// pontas: um trigger normaliza ao gravar (o código antigo nunca recebe erro
+// por maiúsculas) e um CHECK confere. Um endereço pertence a UMA pessoa só,
+// somando User.email e UserEmail.email (triggers na migration 1b). Fase expand: as
+// tabelas filhas apagam em cascata com a pessoa (o DELETE atual continua
+// funcionando) e os campos de autor viram nulo; o Restrict entra numa
+// migration de contract depois que a inativação estiver em produção.
 model User {
-    id            Int            @id @default(autoincrement())
-    email         String         @unique
-    password      String
-    name          String?
-    cpf           String         @unique
-    role          UserRole
-    unit          UserUnit
-    createdAt     DateTime       @default(now())
-    updatedAt     DateTime       @updatedAt
-    refreshTokens RefreshToken[]
+    id              Int            @id @default(autoincrement())
+    // Gerado no banco (gen_random_uuid) para valer também em inserts por SQL.
+    publicId        String         @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+    email           String         @unique
+    // Nulo = conta sem senha (ex.: só Google, etapa futura).
+    password        String?
+    name            String?
+    cpf             String?        @unique
+    // Nulos = sem perfil no Analytics.
+    role            UserRole?
+    unit            UserUnit?
+    status          UserStatus     @default(ACTIVE)
+    deactivatedAt   DateTime?
+    deactivatedById Int?
+    emailVerifiedAt DateTime?
+    createdAt       DateTime       @default(now())
+    updatedAt       DateTime       @updatedAt
+    refreshTokens   RefreshToken[]
+
+    deactivatedBy User?  @relation("UserDeactivatedBy", fields: [deactivatedById], references: [id], onDelete: SetNull)
+    deactivated   User[] @relation("UserDeactivatedBy")
+
+    systemAccesses  SystemAccess[]   @relation("SystemAccessUser")
+    accessesGranted SystemAccess[]   @relation("SystemAccessGrantedBy")
+    accessesRevoked SystemAccess[]   @relation("SystemAccessRevokedBy")
+    systemAccounts  SystemAccount[]
+    emails          UserEmail[]
+    unitAccesses    UserUnitAccess[]
+}
+
+enum UserStatus {
+    ACTIVE
+    INVITED
+    INACTIVE
+}
+
+// Catálogo de sistemas (analytics, cms, rm, supplies, chat-lhg, helpdesk).
+model System {
+    key       String   @id
+    name      String
+    url       String?
+    active    Boolean  @default(true)
+    createdAt DateTime @default(now())
+
+    accesses SystemAccess[]
+    accounts SystemAccount[]
+    events   AuditEvent[]
+}
+
+// Flag de acesso de uma pessoa a um sistema. Revogar = preencher revokedAt
+// (o histórico fica). No máximo 1 acesso ATIVO por (userId, systemKey):
+// índice único parcial "SystemAccess_active_key" criado por SQL na migration
+// (o Prisma não modela índice parcial).
+model SystemAccess {
+    id          Int       @id @default(autoincrement())
+    userId      Int
+    systemKey   String
+    grantedById Int?
+    grantedAt   DateTime  @default(now())
+    revokedById Int?
+    revokedAt   DateTime?
+
+    user      User   @relation("SystemAccessUser", fields: [userId], references: [id], onDelete: Cascade)
+    system    System @relation(fields: [systemKey], references: [key], onDelete: Restrict)
+    grantedBy User?  @relation("SystemAccessGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+    revokedBy User?  @relation("SystemAccessRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+
+    @@index([userId])
+}
+
+// Vínculo da pessoa com o id local dela em cada sistema.
+model SystemAccount {
+    id         Int      @id @default(autoincrement())
+    userId     Int
+    systemKey  String
+    externalId String
+    linkedAt   DateTime @default(now())
+
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    system System @relation(fields: [systemKey], references: [key], onDelete: Restrict)
+
+    @@unique([systemKey, externalId])
+    @@unique([userId, systemKey])
+}
+
+// E-mails secundários da mesma pessoa (normalizados, como User.email).
+model UserEmail {
+    id         Int       @id @default(autoincrement())
+    userId     Int
+    email      String    @unique
+    verifiedAt DateTime?
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+}
+
+// Multiunidade (uso futuro; o lhg-api continua lendo User.unit).
+model UserUnitAccess {
+    userId Int
+    unit   UserUnit
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([userId, unit])
+}
+
+// Trilha de auditoria: só inserção. NUNCA guarda senha, hash ou token.
+// Sem FK para User: o evento sobrevive à pessoa (actor/target são só ids).
+model AuditEvent {
+    id           BigInt   @id @default(autoincrement())
+    at           DateTime @default(now())
+    actorUserId  Int?
+    action       String
+    targetUserId Int?
+    systemKey    String?
+    ip           String?
+    userAgent    String?
+    metadata     Json?
+
+    system System? @relation(fields: [systemKey], references: [key], onDelete: Restrict)
+
+    @@index([targetUserId, at])
+    @@index([action, at])
 }
 
 model RefreshToken {

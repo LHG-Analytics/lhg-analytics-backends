@@ -6,6 +6,8 @@ import {
   IsOptional,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import { normalizeEmailInput } from '../../common/email';
 
 export type UserRole =
   | 'ADMIN'
@@ -36,6 +38,7 @@ export class CreateUserDto {
   name: string;
 
   @ApiProperty({ example: 'joao@email.com' })
+  @Transform(normalizeEmailInput)
   @IsEmail()
   @IsNotEmpty()
   email: string;

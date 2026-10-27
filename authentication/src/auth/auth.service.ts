@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { normalizeEmail } from '../common/email';
 
 @Injectable()
 export class AuthService {
@@ -17,10 +18,11 @@ export class AuthService {
 
   async validateUser(email: string, password: string) {
     const user = await this.prisma.prismaOnline.user.findUnique({
-      where: { email },
+      where: { email: normalizeEmail(email) },
     });
 
-    if (!user) {
+    // Sem senha (conta que só entra por outro meio) = mesmo 401 genérico.
+    if (!user || !user.password) {
       throw new UnauthorizedException('Email ou senha incorretos');
     }
 
