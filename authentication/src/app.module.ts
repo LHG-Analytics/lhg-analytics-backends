@@ -8,6 +8,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { HealthModule } from './health/health.module';
 
 // NOTA (limpeza pós-migração multi-tenant, 2026-07-25): os módulos de KPI
 // (company/bookings/governance/restaurant) e sua infra (cache/database/utils)
@@ -26,6 +27,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
     UsersModule,
     AuthModule,
     HelpdeskModule,
+    HealthModule,
   ],
   providers: [
     PrismaService,
