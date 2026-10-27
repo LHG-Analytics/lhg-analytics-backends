@@ -13,6 +13,7 @@ import { Test } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
 import * as cookieParser from 'cookie-parser';
 import * as request from 'supertest';
+import { AccessService } from '../access/access.service';
 import { AuthController } from '../auth/auth.controller';
 import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -73,7 +74,13 @@ describe('login e cadastro no schema 1b', () => {
         JwtModule.register({ secret: SECRET }),
       ],
       controllers: [AuthController, UsersController],
-      providers: [AuthService, UsersService, PrismaService, LegacyUsersService],
+      providers: [
+        AuthService,
+        AccessService,
+        UsersService,
+        PrismaService,
+        LegacyUsersService,
+      ],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue(logado)
@@ -243,7 +250,7 @@ describe('login e cadastro no schema 1b', () => {
       expect(depois.grantedById).toBeNull();
     });
 
-    it('o DELETE atual (código novo) também funciona', async () => {
+    it('o DELETE atual (código novo, 1b) INATIVA: a linha fica, com status INACTIVE', async () => {
       const criado = await novoUsuario(
         'apagar.novo@example.invalid',
         '90000002007',
@@ -251,7 +258,10 @@ describe('login e cadastro no schema 1b', () => {
       await request(app.getHttpServer())
         .delete(`/api/users/${criado.body.id}`)
         .expect(200);
-      expect(await db.user.count({ where: { id: criado.body.id } })).toBe(0);
+      const depois = await db.user.findUniqueOrThrow({
+        where: { id: criado.body.id },
+      });
+      expect(depois.status).toBe('INACTIVE');
     });
   });
 });
