@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UserStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,6 +13,9 @@ import {
   userInactive,
 } from '../access/access.service';
 
+/** Hash bcrypt ($2a/$2b/$2x/$2y, custo, 53 caracteres de salt+hash). */
+const BCRYPT_HASH = /^\$2[abxy]\$\d{2}\$[./A-Za-z0-9]{53}$/;
+
 /** Quem faz a ação (admin logado) e de onde, para auditoria e autoria. */
 export interface Actor {
   id?: number;
@@ -21,6 +24,8 @@ export interface Actor {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
@@ -162,11 +167,27 @@ export class UsersService {
 
   // Atualizar usuário com validação de senha. NÃO mexe em acessos (flags):
   // isso é só pelo PUT /users/:id/systems.
-  async update(id: number, data: any) {
+  async update(id: number, data: any, actor: Actor = {}) {
     const user = await this.findById(id); // Verifica se o usuário existe
 
-    // Se a senha for fornecida, criptografa antes de atualizar
-    if (data.password) {
+    // Senha: só uma senha NOVA de verdade troca o hash. Ausente, nula, vazia
+    // ou só espaços = inalterada. Um hash bcrypt (a tela de edição devolvendo
+    // o próprio campo password que recebeu do GET) também é IGNORADO: senão a
+    // senha da pessoa viraria o texto do hash e o login dela quebraria.
+    if (typeof data.password !== 'string' || data.password.trim() === '') {
+      delete data.password;
+    } else if (BCRYPT_HASH.test(data.password)) {
+      delete data.password;
+      this.logger.warn(
+        `PATCH /users/${id}: password com formato de hash bcrypt ignorado (senha inalterada)`,
+      );
+      await this.access.audit({
+        action: 'password.hash_echo_ignored',
+        actorUserId: actor.id,
+        targetUserId: id,
+        ctx: actor.ctx,
+      });
+    } else {
       data.password = await bcrypt.hash(data.password, 10);
     }
     if (typeof data.email === 'string') {
