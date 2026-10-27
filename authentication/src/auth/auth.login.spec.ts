@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import * as cookieParser from 'cookie-parser';
 import * as jwt from 'jsonwebtoken';
 import * as request from 'supertest';
+import { AccessService } from '../access/access.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -22,6 +23,10 @@ const usuario = {
   unit: 'LUSH_IPIRANGA',
   role: 'GERENTE_GERAL',
   password: bcrypt.hashSync(SENHA, 4),
+  // Schema 1b: ativo e com o acesso ao Analytics (como todo usuário atual
+  // depois do backfill).
+  status: 'ACTIVE',
+  systemAccesses: [{ id: 1 }],
 };
 
 describe('POST /api/login (regressão)', () => {
@@ -37,6 +42,9 @@ describe('POST /api/login (regressão)', () => {
           ),
         },
         refreshToken: { create: refreshCreate },
+        // Login por e-mail secundário: nenhum cadastrado neste teste.
+        userEmail: { findUnique: jest.fn().mockResolvedValue(null) },
+        auditEvent: { create: jest.fn().mockResolvedValue({}) },
       },
     };
 
@@ -54,6 +62,7 @@ describe('POST /api/login (regressão)', () => {
       controllers: [AuthController],
       providers: [
         AuthService,
+        AccessService,
         { provide: PrismaService, useValue: prismaMock },
       ],
     }).compile();

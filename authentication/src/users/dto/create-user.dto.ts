@@ -1,11 +1,13 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEmail,
   IsNotEmpty,
   IsString,
   IsEnum,
   IsOptional,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   UserRole as PrismaUserRole,
   UserUnit as PrismaUserUnit,
@@ -40,23 +42,42 @@ export class CreateUserDto {
   @IsNotEmpty()
   cpf: string;
 
-  @ApiProperty({ enum: PrismaUserUnit, example: PrismaUserUnit.LUSH_LAPA })
+  // role e unit são obrigatórios só para quem recebe o Analytics (o service
+  // confere: 400 ROLE_UNIT_REQUIRED); para os outros sistemas, opcionais.
+  @ApiPropertyOptional({
+    enum: PrismaUserUnit,
+    example: PrismaUserUnit.LUSH_LAPA,
+  })
+  @IsOptional()
   @IsEnum(PrismaUserUnit)
-  @IsNotEmpty()
-  unit: UserUnit;
+  unit?: UserUnit;
 
-  @ApiProperty({ enum: PrismaUserRole, example: PrismaUserRole.ADMIN })
+  @ApiPropertyOptional({ enum: PrismaUserRole, example: PrismaUserRole.ADMIN })
+  @IsOptional()
   @IsEnum(PrismaUserRole)
-  @IsNotEmpty()
-  role: UserRole;
+  role?: UserRole;
+
+  // Sistemas que a pessoa recebe (nenhum é automático). Ausente = transição:
+  // vale "analytics" se role e unit vierem, ou 400 SYSTEMS_REQUIRED quando
+  // USERS_SYSTEMS_REQUIRED=true.
+  @ApiPropertyOptional({
+    description: 'Chaves de System ativas; [] = sem nenhum acesso',
+    example: ['analytics'],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  systems?: string[];
 
   constructor(
     name: string,
     email: string,
     password: string,
     cpf: string,
-    unit: UserUnit,
-    role: UserRole,
+    unit?: UserUnit,
+    role?: UserRole,
+    systems?: string[],
   ) {
     this.name = name;
     this.email = email;
@@ -64,5 +85,6 @@ export class CreateUserDto {
     this.cpf = cpf;
     this.unit = unit;
     this.role = role;
+    this.systems = systems;
   }
 }

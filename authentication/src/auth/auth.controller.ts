@@ -15,6 +15,7 @@ import { LoginDto } from './dto/login.dto';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Public } from './decorators/public.decorator';
 import { ConfigService } from '@nestjs/config';
+import { AccessService, requestContext } from '../access/access.service';
 
 @ApiTags('Auth')
 @Controller()
@@ -25,6 +26,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
+    private readonly access: AccessService,
   ) {}
 
   private getCookieConfig(isProduction: boolean) {
@@ -54,10 +56,15 @@ export class AuthController {
   @Post('login')
   @Public()
   @HttpCode(HttpStatus.OK)
-  async login(@Body() loginDto: LoginDto, @Res() res: Response) {
+  async login(
+    @Body() loginDto: LoginDto,
+    @Req() req: ExpressRequest,
+    @Res() res: Response,
+  ) {
     const user = await this.authService.validateUser(
       loginDto.email,
       loginDto.password,
+      requestContext(req),
     );
     const { access_token, refresh_token } = await this.authService.login(user);
 
@@ -108,7 +115,7 @@ export class AuthController {
 
     try {
       const { access_token, refresh_token, user } =
-        await this.authService.refreshTokens(refreshToken);
+        await this.authService.refreshTokens(refreshToken, requestContext(req));
 
       const isProduction = this.configService.get('NODE_ENV') === 'production';
       const cookieConfig = this.getCookieConfig(isProduction);
@@ -171,6 +178,10 @@ export class AuthController {
   @Get('me')
   @ApiBearerAuth('JWT-auth')
   async getCurrentUser(@Request() req: any) {
+    // O access token vale 1h: quem foi inativado ou perdeu o acesso ao
+    // Analytics nesse meio-tempo recebe 401.
+    await this.access.assertCanUseAnalytics(req.user.id);
+
     // Converte o exp do JWT (segundos desde epoch) para ISO string
     const expiresAt = req.user.exp
       ? new Date(req.user.exp * 1000).toISOString()

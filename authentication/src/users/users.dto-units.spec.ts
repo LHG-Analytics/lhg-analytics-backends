@@ -12,7 +12,9 @@ import { UsersService } from './users.service';
 // é mockado e os guards liberados; aqui só importa o ValidationPipe).
 describe('POST/PATCH /users: unidades válidas = enum do Prisma', () => {
   let app: INestApplication;
-  const create = jest.fn((dto) => Promise.resolve({ id: 1, ...dto }));
+  const create = jest.fn((dto) =>
+    Promise.resolve({ user: { id: 1, ...dto }, legacyDefault: false }),
+  );
   const update = jest.fn((id, dto) => Promise.resolve({ id, ...dto }));
 
   beforeAll(async () => {

@@ -8,6 +8,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { HealthModule } from './health/health.module';
+import { AccessModule } from './access/access.module';
 
 // NOTA (limpeza pós-migração multi-tenant, 2026-07-25): os módulos de KPI
 // (company/bookings/governance/restaurant) e sua infra (cache/database/utils)
@@ -23,6 +24,7 @@ import { HealthModule } from './health/health.module';
         limit: 100, // 100 requests per minute (global)
       },
     ]),
+    AccessModule,
     UsersModule,
     AuthModule,
     HelpdeskModule,
