@@ -6,30 +6,17 @@ import {
   IsOptional,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  UserRole as PrismaUserRole,
+  UserUnit as PrismaUserUnit,
+} from '@prisma/client';
 import { Transform } from 'class-transformer';
 import { normalizeEmailInput } from '../../common/email';
 
-export type UserRole =
-  | 'ADMIN'
-  | 'GERENTE_GERAL'
-  | 'GERENTE_FINANCEIRO'
-  | 'GERENTE_RESERVAS'
-  | 'GERENTE_RESTAURANTE'
-  | 'GERENTE_OPERACIONAL';
-export type UserUnit =
-  | 'LHG'
-  | 'LUSH_LAPA'
-  | 'LUSH_IPIRANGA'
-  | 'TOUT'
-  | 'ANDAR_DE_CIMA'
-  | 'LIV'
-  | 'ALTANA'
-  | 'GETAN_GARAVELO'
-  | 'GETAN_PQ_OESTE'
-  | 'GETAN_INDEPENDENCIA'
-  | 'GETAN_NOVO_MUNDO'
-  | 'GETAN_VERA_CRUZ'
-  | 'GETAN_GRID';
+// Cargos e unidades vêm do enum do Prisma (schema.online.prisma): uma unidade
+// nova no schema passa a valer aqui sozinha, sem lista escrita à mão.
+export type UserRole = PrismaUserRole;
+export type UserUnit = PrismaUserUnit;
 
 export class CreateUserDto {
   @ApiProperty({ example: 'João Silva' })
@@ -53,33 +40,13 @@ export class CreateUserDto {
   @IsNotEmpty()
   cpf: string;
 
-  @ApiProperty({
-    enum: ['LHG', 'LUSH_LAPA', 'LUSH_IPIRANGA', 'TOUT', 'ANDAR_DE_CIMA', 'LIV', 'ALTANA', 'GETAN_GARAVELO', 'GETAN_PQ_OESTE', 'GETAN_INDEPENDENCIA', 'GETAN_NOVO_MUNDO', 'GETAN_VERA_CRUZ', 'GETAN_GRID'],
-    example: 'LUSH_LAPA',
-  })
-  @IsEnum(['LHG', 'LUSH_LAPA', 'LUSH_IPIRANGA', 'TOUT', 'ANDAR_DE_CIMA', 'LIV', 'ALTANA', 'GETAN_GARAVELO', 'GETAN_PQ_OESTE', 'GETAN_INDEPENDENCIA', 'GETAN_NOVO_MUNDO'])
+  @ApiProperty({ enum: PrismaUserUnit, example: PrismaUserUnit.LUSH_LAPA })
+  @IsEnum(PrismaUserUnit)
   @IsNotEmpty()
   unit: UserUnit;
 
-  @ApiProperty({
-    enum: [
-      'ADMIN',
-      'GERENTE_GERAL',
-      'GERENTE_FINANCEIRO',
-      'GERENTE_RESERVAS',
-      'GERENTE_RESTAURANTE',
-      'GERENTE_OPERACIONAL',
-    ],
-    example: 'ADMIN',
-  })
-  @IsEnum([
-    'ADMIN',
-    'GERENTE_GERAL',
-    'GERENTE_FINANCEIRO',
-    'GERENTE_RESERVAS',
-    'GERENTE_RESTAURANTE',
-    'GERENTE_OPERACIONAL',
-  ])
+  @ApiProperty({ enum: PrismaUserRole, example: PrismaUserRole.ADMIN })
+  @IsEnum(PrismaUserRole)
   @IsNotEmpty()
   role: UserRole;
 
