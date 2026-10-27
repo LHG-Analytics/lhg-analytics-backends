@@ -12,10 +12,10 @@ import {
 } from './trust-proxy';
 
 describe('resolveTrustProxyHops', () => {
-  it('padrão do Render = 3 (borda + balanceador + proxy local)', () => {
-    expect(DEFAULT_TRUST_PROXY_HOPS).toBe(3);
-    expect(resolveTrustProxyHops(undefined)).toBe(3);
-    expect(resolveTrustProxyHops('')).toBe(3);
+  it('padrão do Render = 4 (borda + 2 camadas internas + proxy local)', () => {
+    expect(DEFAULT_TRUST_PROXY_HOPS).toBe(4);
+    expect(resolveTrustProxyHops(undefined)).toBe(4);
+    expect(resolveTrustProxyHops('')).toBe(4);
   });
 
   it('aceita um inteiro >= 0 de TRUST_PROXY_HOPS', () => {
@@ -25,20 +25,22 @@ describe('resolveTrustProxyHops', () => {
 
   it('nunca vira "true": valores inválidos caem no padrão', () => {
     for (const v of ['true', 'abc', '-1', '1.5']) {
-      expect(resolveTrustProxyHops(v)).toBe(3);
+      expect(resolveTrustProxyHops(v)).toBe(4);
     }
   });
 });
 
 // Simula o caminho do Render até o Nest. O supertest conecta de 127.0.0.1,
-// que faz o papel do proxy local; o X-Forwarded-For chega como a borda e o
-// balanceador o deixam: "<cliente>, <borda>, <balanceador>".
+// que faz o papel do proxy local; o X-Forwarded-For chega como a borda e as
+// duas camadas internas o deixam: "<cliente>, <borda>, <camada 1>, <camada 2>".
 const BORDA = '10.0.0.5';
-const BALANCEADOR = '10.0.0.9';
-const xff = (...cadeia: string[]) => [...cadeia, BORDA, BALANCEADOR].join(', ');
+const CAMADA_1 = '10.0.0.9';
+const CAMADA_2 = '10.0.0.13';
+const xff = (...cadeia: string[]) =>
+  [...cadeia, BORDA, CAMADA_1, CAMADA_2].join(', ');
 const LIMITE = 2;
 
-describe('rate limit por IP real (trust proxy = 3)', () => {
+describe('rate limit por IP real (trust proxy = 4)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
