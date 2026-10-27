@@ -27,9 +27,15 @@ export class TenantPoolService implements OnModuleDestroy {
 
     const config: PoolConfig = {
       connectionString,
-      max: 5,
+      // Cada request de KPI dispara muitas queries em paralelo (restaurant=16,
+      // company~22). Com pool 5, faixas grandes serializam 5 de cada vez pelo
+      // link lento até o banco da unidade e estouram. Os bancos AUTOMO têm folga
+      // (max_connections 100–300, uso ~7), então subimos o teto p/ o Promise.all
+      // rodar em paralelo. connectionTimeout maior é rede de segurança; o corte
+      // real por query fica no statement_timeout (2min).
+      max: 20,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+      connectionTimeoutMillis: 30000,
       statement_timeout: 120000,
     };
 
