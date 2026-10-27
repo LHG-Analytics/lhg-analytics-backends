@@ -79,8 +79,12 @@ export class UsersController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(+id, updateUserDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @Request() req: any,
+  ) {
+    return this.usersService.update(+id, updateUserDto, actorOf(req));
   }
 
   // Substitui os acessos ativos da pessoa (concede/revoga, com histórico).
