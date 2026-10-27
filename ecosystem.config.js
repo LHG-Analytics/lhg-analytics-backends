@@ -7,6 +7,27 @@ require("module-alias/register");
 //   auth    — authentication: login/refresh/logout/me/users (:3005)
 // Os 6 backends por unidade foram aposentados (o lhg-api os substitui).
 // ============================================================================
+
+// ============================================================================
+// Limites de memória por processo (isolamento: um pico do lhg-api não pode
+// derrubar a instância inteira, com o login junto).
+// - max-old-space-size: teto do heap do V8. Perto dele o GC fica agressivo e,
+//   se estourar, só o PROCESSO cai (o PM2 o reinicia).
+// - max_memory_restart: o PM2 reinicia SÓ aquele processo quando o RSS passa
+//   do limite, antes de a instância ficar sem memória.
+// Valores-base (medição local em 27/10/2026): auth ~105 MB em repouso;
+// lhg-api ~105 MB em repouso e ~390 MB de pico num warmup PARCIAL (sem as
+// unidades GETAN). Os padrões dão folga de ~4x e cabem numa instância de
+// 4 GB ou mais. Ajuste pelas variáveis abaixo, no Render, conforme a RAM do
+// plano e o gráfico de memória (Metrics).
+// ATENÇÃO: reiniciar o lhg-api limpa o cache em memória (Map); o auto-warmup
+// do boot reaquece sozinho.
+// ============================================================================
+const LHG_API_HEAP_MB = process.env.LHG_API_HEAP_MB || "1536";
+const LHG_API_MAX_MEMORY = process.env.LHG_API_MAX_MEMORY || "1800M";
+const AUTH_HEAP_MB = process.env.AUTH_HEAP_MB || "256";
+const AUTH_MAX_MEMORY = process.env.AUTH_MAX_MEMORY || "400M";
+
 module.exports = {
   apps: [
     {
@@ -24,6 +45,8 @@ module.exports = {
       // Backend multi-tenant unificado — serve /lhg/{unit}/api/... e o Consolidated.
       name: "lhg-api",
       script: "./lhg-api/dist/main.js",
+      node_args: `--max-old-space-size=${LHG_API_HEAP_MB}`,
+      max_memory_restart: LHG_API_MAX_MEMORY,
       env: {
         NODE_ENV: "production",
         // Fuso do PROCESSO. Critico: o driver pg converte colunas
@@ -68,6 +91,8 @@ module.exports = {
     {
       name: "auth",
       script: "./authentication/dist/main.js",
+      node_args: `--max-old-space-size=${AUTH_HEAP_MB}`,
+      max_memory_restart: AUTH_MAX_MEMORY,
       env: {
         NODE_ENV: "production",
         SUPABASE_URL_USERS: process.env.SUPABASE_URL_USERS,
