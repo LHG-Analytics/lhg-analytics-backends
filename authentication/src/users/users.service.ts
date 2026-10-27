@@ -1,36 +1,55 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { emailInUse, isEmailConflict, normalizeEmail } from '../common/email';
+
+// Sistema cuja flag o cadastro pelo Analytics concede.
+const ANALYTICS = 'analytics';
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Criação de usuário com validação de email
-  async create(data: any) {
-    // Verifica se o usuário já existe com o email fornecido
-    const existingUser = await this.prisma.prismaOnline.user.findUnique({
-      where: { email: data.email },
-    });
+  // Criação de usuário com validação de email. A pessoa nasce com a flag
+  // do Analytics (na mesma transação), quem a criou fica como grantedById.
+  async create(data: any, actorId?: number) {
+    const email = normalizeEmail(data.email);
 
-    if (existingUser) {
-      throw new ConflictException('O usuário com este email já existe');
+    // Um e-mail pertence a uma pessoa só: principal OU secundário de alguém.
+    const [existingUser, existingSecondary] = await Promise.all([
+      this.prisma.prismaOnline.user.findUnique({ where: { email } }),
+      this.prisma.prismaOnline.userEmail.findUnique({ where: { email } }),
+    ]);
+
+    if (existingUser || existingSecondary) {
+      throw emailInUse();
     }
 
     // Criptografa a senha antes de salvar
     const hashedPassword = await bcrypt.hash(data.password, 10);
-    const user = await this.prisma.prismaOnline.user.create({
-      data: {
-        ...data,
-        password: hashedPassword,
-      },
-    });
-
-    return user;
+    try {
+      return await this.prisma.prismaOnline.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            ...data,
+            email,
+            password: hashedPassword,
+          },
+        });
+        await tx.systemAccess.create({
+          data: {
+            userId: user.id,
+            systemKey: ANALYTICS,
+            grantedById: actorId ?? null,
+          },
+        });
+        return user;
+      });
+    } catch (error) {
+      // Corrida com outro cadastro do mesmo e-mail (unique/trigger do banco).
+      if (isEmailConflict(error)) throw emailInUse();
+      throw error;
+    }
   }
 
   async findAll() {
@@ -46,7 +65,7 @@ export class UsersService {
   // Buscar usuário por email com validação
   async findByEmail(email: string) {
     const user = await this.prisma.prismaOnline.user.findUnique({
-      where: { email },
+      where: { email: normalizeEmail(email) },
     });
 
     if (!user) {
@@ -77,14 +96,23 @@ export class UsersService {
     if (data.password) {
       data.password = await bcrypt.hash(data.password, 10);
     }
+    if (typeof data.email === 'string') {
+      data.email = normalizeEmail(data.email);
+    }
 
-    return this.prisma.prismaOnline.user.update({
-      where: { id },
-      data: { ...user, ...data },
-    });
+    try {
+      return await this.prisma.prismaOnline.user.update({
+        where: { id },
+        data: { ...user, ...data },
+      });
+    } catch (error) {
+      if (isEmailConflict(error)) throw emailInUse();
+      throw error;
+    }
   }
 
-  // Remover usuário com validação e mensagem de sucesso
+  // Remover usuário com validação e mensagem de sucesso. Os acessos e e-mails
+  // secundários da pessoa saem junto (ON DELETE CASCADE no banco).
   async remove(id: number) {
     const user = await this.findById(id); // Verifica se o usuário existe
 
