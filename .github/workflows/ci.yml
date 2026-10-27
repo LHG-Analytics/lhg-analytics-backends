@@ -41,3 +41,14 @@ jobs:
 
       - name: Proxy (server.mjs) carrega sem erro de sintaxe
         run: node --check server.mjs
+
+      # Testes de integração leves (node:test) do proxy e do lhg-api, em
+      # test/*.test.mjs. Rodam depois do build (usam o lhg-api/dist).
+      - name: Testes do proxy e do lhg-api
+        shell: bash
+        run: |
+          if compgen -G "test/*.test.mjs" > /dev/null; then
+            node --test "test/*.test.mjs"
+          else
+            echo "Nenhum teste em test/*.test.mjs"
+          fi
