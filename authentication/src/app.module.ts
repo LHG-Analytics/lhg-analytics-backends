@@ -3,7 +3,6 @@ import { ConfigModule } from '@nestjs/config';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { HelpdeskModule } from './helpdesk/helpdesk.module';
-import { PrismaService } from './prisma/prisma.service';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
@@ -29,8 +28,10 @@ import { HealthModule } from './health/health.module';
     HelpdeskModule,
     HealthModule,
   ],
+  // O PrismaService vem SÓ do PrismaModule (global): um único PrismaClient e um
+  // único pool de conexões com o banco de usuários. Antes ele também era
+  // registrado aqui, o que criava uma 2ª instância conectada e sem uso.
   providers: [
-    PrismaService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
