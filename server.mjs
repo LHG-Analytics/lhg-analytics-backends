@@ -1,8 +1,44 @@
 import "module-alias/register.js";
+import http from "node:http";
 import express from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
+
+// ============================================================================
+// Health agregado (LIVENESS) — Health Check Path do Render.
+// Responde 200 só se o authentication (:3005) e o lhg-api (:3010) responderem
+// aos seus healthchecks de liveness, que NÃO tocam banco (uma oscilação do
+// Supabase/AUTOMO não pode fazer o Render reiniciar a instância em loop).
+// A resposta não traz versão, host nem detalhe interno.
+// ============================================================================
+const HEALTH_TIMEOUT_MS = 2000;
+const HEALTH_TARGETS = {
+  auth: "http://127.0.0.1:3005/api/health",
+  api: "http://127.0.0.1:3010/health",
+};
+
+function probe(url) {
+  return new Promise((resolve) => {
+    const req = http.get(url, { timeout: HEALTH_TIMEOUT_MS }, (res) => {
+      res.resume(); // descarta o corpo
+      resolve(res.statusCode === 200);
+    });
+    req.on("timeout", () => req.destroy());
+    req.on("error", () => resolve(false));
+  });
+}
+
+app.get("/health", async (_req, res) => {
+  const names = Object.keys(HEALTH_TARGETS);
+  const results = await Promise.all(names.map((n) => probe(HEALTH_TARGETS[n])));
+  const checks = Object.fromEntries(
+    names.map((n, i) => [n, results[i] ? "ok" : "down"])
+  );
+  const ok = results.every(Boolean);
+  res.set("Cache-Control", "no-store");
+  res.status(ok ? 200 : 503).json({ status: ok ? "ok" : "down", checks });
+});
 
 // ============================================================================
 // Topologia pós-migração multi-tenant (2026-07-25) — entrypoint público.
