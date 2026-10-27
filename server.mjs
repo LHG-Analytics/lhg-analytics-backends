@@ -55,10 +55,14 @@ app.get("/health", async (_req, res) => {
 // Este interceptor (registrado ANTES do /auth genérico) manda só os KPIs para o
 // lhg-api; login/refresh/logout/me/users continuam no serviço de autenticação.
 const CONSOLIDATED_KPIS = /^\/(Company|Bookings|Restaurant|Governance)\//;
+// xfwd: anexa ao X-Forwarded-For o endereço de quem chegou ao proxy (o
+// balanceador do Render). O auth usa `trust proxy` = 3 saltos para achar o IP
+// real do cliente (ver authentication/src/common/trust-proxy.ts).
 app.use(
   "/auth/api",
   createProxyMiddleware({
     changeOrigin: true,
+    xfwd: true,
     router: (req) =>
       CONSOLIDATED_KPIS.test(req.url)
         ? "http://localhost:3010"
@@ -74,6 +78,7 @@ app.use(
   createProxyMiddleware({
     target: "http://localhost:3005",
     changeOrigin: true,
+    xfwd: true, // ver comentário do /auth/api acima
     secure: false,
     pathRewrite: {
       "^/auth": "", // remove "/auth" da URL
