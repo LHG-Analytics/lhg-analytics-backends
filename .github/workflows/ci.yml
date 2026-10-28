@@ -1,0 +1,77 @@
+name: CI
+
+# Build e testes em todo PR para developer (homologação) e master (produção).
+# Usa `pull_request` (nunca `pull_request_target`): o código do PR roda sem
+# acesso a segredos. O único banco é um Postgres DESCARTÁVEL do próprio job
+# (service container), usado pelos testes de migration; nenhum banco real.
+on:
+  pull_request:
+    branches: [developer, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # Banco de teste efêmero (só existe durante o job). A senha é fixa e
+      # pública de propósito: o container não é acessível de fora do runner.
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lhg_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci --no-audit --no-fund
+
+      # build:auth = lhg-utils + prisma generate + tsc do authentication;
+      # build:api  = lhg-utils + tsc do lhg-api. Mesmo comando do Render.
+      - name: Build (authentication e lhg-api)
+        run: npm run build
+
+      - name: Testes do authentication
+        working-directory: authentication
+        run: npx jest --ci
+
+      # prisma migrate deploy de verdade, cada caso num schema descartável.
+      - name: Testes de banco do authentication (migrations e cadastro)
+        working-directory: authentication
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lhg_test
+        run: npm run test:db -- --ci
+
+      - name: Proxy (server.mjs) carrega sem erro de sintaxe
+        run: node --check server.mjs
+
+      # Testes de integração leves (node:test) do proxy e do lhg-api, em
+      # test/*.test.mjs. Rodam depois do build (usam o lhg-api/dist).
+      - name: Testes do proxy e do lhg-api
+        shell: bash
+        run: |
+          if compgen -G "test/*.test.mjs" > /dev/null; then
+            node --test "test/*.test.mjs"
+          else
+            echo "Nenhum teste em test/*.test.mjs"
+          fi

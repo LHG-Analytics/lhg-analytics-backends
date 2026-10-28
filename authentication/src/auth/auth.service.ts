@@ -4,6 +4,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { normalizeEmail } from '../common/email';
+import {
+  ANALYTICS,
+  ANALYTICS_ACCESS_INCLUDE,
+  AccessService,
+  RequestContext,
+  analyticsDenial,
+} from '../access/access.service';
+
+const CREDENCIAIS_INVALIDAS = 'Email ou senha incorretos';
 
 @Injectable()
 export class AuthService {
@@ -13,21 +23,54 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly access: AccessService,
   ) {}
 
-  async validateUser(email: string, password: string) {
+  /**
+   * Pessoa pelo e-mail de login: o principal (User.email) ou um secundário
+   * VERIFICADO (UserEmail). Um secundário não verificado não serve para entrar.
+   */
+  private async findByLoginEmail(email: string) {
+    const normalized = normalizeEmail(email);
     const user = await this.prisma.prismaOnline.user.findUnique({
-      where: { email },
+      where: { email: normalized },
+      include: ANALYTICS_ACCESS_INCLUDE,
     });
+    if (user) return user;
 
-    if (!user) {
-      throw new UnauthorizedException('Email ou senha incorretos');
+    const secondary = await this.prisma.prismaOnline.userEmail.findUnique({
+      where: { email: normalized },
+      include: { user: { include: ANALYTICS_ACCESS_INCLUDE } },
+    });
+    return secondary?.verifiedAt ? secondary.user : null;
+  }
+
+  async validateUser(email: string, password: string, ctx?: RequestContext) {
+    const user = await this.findByLoginEmail(email);
+
+    // Sem senha (conta que só entra por outro meio) = mesmo 401 genérico.
+    if (!user || !user.password) {
+      throw new UnauthorizedException(CREDENCIAIS_INVALIDAS);
     }
 
     const passwordValid = await bcrypt.compare(password, user.password);
 
     if (!passwordValid) {
-      throw new UnauthorizedException('Email ou senha incorretos');
+      throw new UnauthorizedException(CREDENCIAIS_INVALIDAS);
+    }
+
+    // Senha certa, mas sem acesso ao Analytics (inativo, sem a flag ou sem
+    // perfil): o MESMO 401 de sempre, e o motivo só na auditoria. A checagem
+    // vem depois da senha para não auditar tentativas de quem não sabe a senha.
+    const denial = analyticsDenial(user);
+    if (denial) {
+      await this.access.audit({
+        action: `login.denied.${denial}`,
+        targetUserId: user.id,
+        systemKey: ANALYTICS,
+        ctx,
+      });
+      throw new UnauthorizedException(CREDENCIAIS_INVALIDAS);
     }
 
     return user;
@@ -71,10 +114,10 @@ export class AuthService {
     return token;
   }
 
-  async refreshTokens(refreshToken: string) {
+  async refreshTokens(refreshToken: string, ctx?: RequestContext) {
     const storedToken = await this.prisma.prismaOnline.refreshToken.findUnique({
       where: { token: refreshToken },
-      include: { user: true },
+      include: { user: { include: ANALYTICS_ACCESS_INCLUDE } },
     });
 
     if (!storedToken) {
@@ -91,6 +134,23 @@ export class AuthService {
 
     if (new Date() > storedToken.expiresAt) {
       throw new UnauthorizedException('Refresh token expirado');
+    }
+
+    // A pessoa perdeu o acesso depois do login (inativada, sem a flag ou sem
+    // perfil): revoga este refresh token e recusa.
+    const denial = analyticsDenial(storedToken.user);
+    if (denial) {
+      await this.prisma.prismaOnline.refreshToken.update({
+        where: { id: storedToken.id },
+        data: { revoked: true },
+      });
+      await this.access.audit({
+        action: `refresh.denied.${denial}`,
+        targetUserId: storedToken.userId,
+        systemKey: ANALYTICS,
+        ctx,
+      });
+      throw new UnauthorizedException('Acesso não permitido');
     }
 
     // Revoga o token atual (rotação)

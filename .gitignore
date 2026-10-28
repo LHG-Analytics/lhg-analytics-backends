@@ -32,6 +32,11 @@ lerna-debug.log*
 !.vscode/extensions.json
 
 .env
+# Variantes locais com conexões/segredos (ex.: .env.homolog.local), em
+# qualquer pasta. Sem barra inicial = vale para todos os subdiretórios.
+.env.*
+.env*.local
+!.env.example
 dist/tsconfig.build.tsbuildinfo
 dist
 node_modules

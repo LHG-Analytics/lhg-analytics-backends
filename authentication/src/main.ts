@@ -8,12 +8,18 @@ import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.int
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 import * as compression from 'compression';
+import { applyTrustProxy } from './common/trust-proxy';
 
 config();
 
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
+
+    // IP real do cliente atrás da borda do Render + proxy local (ver
+    // common/trust-proxy.ts). Sem isso, todo mundo chegava como 127.0.0.1 e
+    // dividia o mesmo balde do rate limit.
+    applyTrustProxy(app);
 
     // Configuração de compressão HTTP
     app.use(compression());

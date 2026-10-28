@@ -1,41 +1,137 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { UserStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { emailInUse, isEmailConflict, normalizeEmail } from '../common/email';
+import {
+  ANALYTICS,
+  AccessService,
+  RequestContext,
+  profileRequired,
+  systemsRequired,
+  userInactive,
+} from '../access/access.service';
+
+/** Hash bcrypt ($2a/$2b/$2x/$2y, custo, 53 caracteres de salt+hash). */
+const BCRYPT_HASH = /^\$2[abxy]\$\d{2}\$[./A-Za-z0-9]{53}$/;
+
+/** Quem faz a ação (admin logado) e de onde, para auditoria e autoria. */
+export interface Actor {
+  id?: number;
+  ctx?: RequestContext;
+}
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(UsersService.name);
 
-  // Criação de usuário com validação de email
-  async create(data: any) {
-    // Verifica se o usuário já existe com o email fornecido
-    const existingUser = await this.prisma.prismaOnline.user.findUnique({
-      where: { email: data.email },
-    });
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: AccessService,
+    private readonly config: ConfigService,
+  ) {}
 
-    if (existingUser) {
-      throw new ConflictException('O usuário com este email já existe');
+  /**
+   * Sem o campo `systems` no cadastro: fase de transição. Com
+   * USERS_SYSTEMS_REQUIRED=true, o campo passa a ser obrigatório.
+   */
+  private systemsRequired(): boolean {
+    const v = this.config.get<string>('USERS_SYSTEMS_REQUIRED');
+    return (
+      String(v ?? '')
+        .trim()
+        .toLowerCase() === 'true'
+    );
+  }
+
+  /**
+   * Criação de usuário. Nenhum acesso é automático: só os sistemas de
+   * `systems` recebem a flag (grantedById = o admin). Sem o campo, na
+   * transição, vale `analytics` se role e unit vierem (é o formato da tela de
+   * cadastro atual), com auditoria `legacyDefault`.
+   */
+  async create(
+    data: any,
+    actor: Actor = {},
+  ): Promise<{ user: any; legacyDefault: boolean }> {
+    const { systems: pedidos, ...dados } = data;
+    const email = normalizeEmail(dados.email);
+
+    // Um e-mail pertence a uma pessoa só: principal OU secundário de alguém.
+    const [existingUser, existingSecondary] = await Promise.all([
+      this.prisma.prismaOnline.user.findUnique({ where: { email } }),
+      this.prisma.prismaOnline.userEmail.findUnique({ where: { email } }),
+    ]);
+    if (existingUser?.status === UserStatus.INACTIVE) throw userInactive();
+    if (existingUser || existingSecondary) throw emailInUse();
+
+    let systems: string[];
+    let legacyDefault = false;
+    if (pedidos === undefined) {
+      if (this.systemsRequired()) throw systemsRequired();
+      systems = [ANALYTICS];
+      legacyDefault = true;
+    } else {
+      systems = await this.access.resolveSystems(pedidos);
+    }
+    if (systems.includes(ANALYTICS) && (!dados.role || !dados.unit)) {
+      throw profileRequired();
     }
 
     // Criptografa a senha antes de salvar
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-    const user = await this.prisma.prismaOnline.user.create({
-      data: {
-        ...data,
-        password: hashedPassword,
-      },
-    });
-
-    return user;
+    const hashedPassword = await bcrypt.hash(dados.password, 10);
+    try {
+      const user = await this.prisma.prismaOnline.$transaction(async (tx) => {
+        const criado = await tx.user.create({
+          data: { ...dados, email, password: hashedPassword },
+        });
+        await this.access.audit(
+          {
+            action: 'user.created',
+            actorUserId: actor.id,
+            targetUserId: criado.id,
+            metadata: { systems, ...(legacyDefault && { legacyDefault }) },
+            ctx: actor.ctx,
+          },
+          tx,
+        );
+        for (const systemKey of systems) {
+          await tx.systemAccess.create({
+            data: {
+              userId: criado.id,
+              systemKey,
+              grantedById: actor.id ?? null,
+            },
+          });
+          await this.access.audit(
+            {
+              action: 'access.granted',
+              actorUserId: actor.id,
+              targetUserId: criado.id,
+              systemKey,
+              ...(legacyDefault && { metadata: { legacyDefault } }),
+              ctx: actor.ctx,
+            },
+            tx,
+          );
+        }
+        return criado;
+      });
+      return { user, legacyDefault };
+    } catch (error) {
+      // Corrida com outro cadastro do mesmo e-mail (unique/trigger do banco).
+      if (isEmailConflict(error)) throw emailInUse();
+      throw error;
+    }
   }
 
-  async findAll() {
+  // Lista só os ativos (a tela atual não muda); inativos só se pedidos.
+  async findAll(includeInactive = false) {
     try {
-      const users = await this.prisma.prismaOnline.user.findMany();
+      const users = await this.prisma.prismaOnline.user.findMany({
+        where: includeInactive ? undefined : { status: UserStatus.ACTIVE },
+      });
       return users;
     } catch (error) {
       console.error('Erro ao buscar usuários:', error);
@@ -46,7 +142,7 @@ export class UsersService {
   // Buscar usuário por email com validação
   async findByEmail(email: string) {
     const user = await this.prisma.prismaOnline.user.findUnique({
-      where: { email },
+      where: { email: normalizeEmail(email) },
     });
 
     if (!user) {
@@ -69,29 +165,173 @@ export class UsersService {
     return user;
   }
 
-  // Atualizar usuário com validação de senha
-  async update(id: number, data: any) {
+  // Atualizar usuário com validação de senha. NÃO mexe em acessos (flags):
+  // isso é só pelo PUT /users/:id/systems.
+  async update(id: number, data: any, actor: Actor = {}) {
     const user = await this.findById(id); // Verifica se o usuário existe
 
-    // Se a senha for fornecida, criptografa antes de atualizar
-    if (data.password) {
+    // Senha: só uma senha NOVA de verdade troca o hash. Ausente, nula, vazia
+    // ou só espaços = inalterada. Um hash bcrypt (a tela de edição devolvendo
+    // o próprio campo password que recebeu do GET) também é IGNORADO: senão a
+    // senha da pessoa viraria o texto do hash e o login dela quebraria.
+    if (typeof data.password !== 'string' || data.password.trim() === '') {
+      delete data.password;
+    } else if (BCRYPT_HASH.test(data.password)) {
+      delete data.password;
+      this.logger.warn(
+        `PATCH /users/${id}: password com formato de hash bcrypt ignorado (senha inalterada)`,
+      );
+      await this.access.audit({
+        action: 'password.hash_echo_ignored',
+        actorUserId: actor.id,
+        targetUserId: id,
+        ctx: actor.ctx,
+      });
+    } else {
       data.password = await bcrypt.hash(data.password, 10);
     }
+    if (typeof data.email === 'string') {
+      data.email = normalizeEmail(data.email);
+    }
 
-    return this.prisma.prismaOnline.user.update({
-      where: { id },
-      data: { ...user, ...data },
-    });
+    try {
+      return await this.prisma.prismaOnline.user.update({
+        where: { id },
+        data: { ...user, ...data },
+      });
+    } catch (error) {
+      if (isEmailConflict(error)) throw emailInUse();
+      throw error;
+    }
   }
 
-  // Remover usuário com validação e mensagem de sucesso
-  async remove(id: number) {
+  // "Remover" = INATIVAR: a pessoa fica no cadastro (status INACTIVE), todas
+  // as sessões caem e a auditoria registra quem fez. Resposta igual à de antes.
+  async remove(id: number, actor: Actor = {}) {
     const user = await this.findById(id); // Verifica se o usuário existe
 
-    await this.prisma.prismaOnline.user.delete({
-      where: { id },
-    });
+    if (user.status !== UserStatus.INACTIVE) {
+      await this.prisma.prismaOnline.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id },
+          data: {
+            status: UserStatus.INACTIVE,
+            deactivatedAt: new Date(),
+            deactivatedById: actor.id ?? null,
+          },
+        });
+        await tx.refreshToken.updateMany({
+          where: { userId: id, revoked: false },
+          data: { revoked: true },
+        });
+        await this.access.audit(
+          {
+            action: 'user.deactivated',
+            actorUserId: actor.id,
+            targetUserId: id,
+            ctx: actor.ctx,
+          },
+          tx,
+        );
+      });
+    }
 
     return { message: `Usuário ${user.email} excluído com sucesso` }; // Mensagem de sucesso
+  }
+
+  // Reativa uma pessoa inativada (os acessos dela não mudam).
+  async reactivate(id: number, actor: Actor = {}) {
+    const user = await this.findById(id);
+
+    if (user.status !== UserStatus.ACTIVE) {
+      await this.prisma.prismaOnline.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id },
+          data: {
+            status: UserStatus.ACTIVE,
+            deactivatedAt: null,
+            deactivatedById: null,
+          },
+        });
+        await this.access.audit(
+          {
+            action: 'user.reactivated',
+            actorUserId: actor.id,
+            targetUserId: id,
+            ctx: actor.ctx,
+          },
+          tx,
+        );
+      });
+    }
+
+    return { message: `Usuário ${user.email} reativado com sucesso` };
+  }
+
+  /**
+   * Substitui o conjunto de acessos ATIVOS da pessoa: concede o que entrou e
+   * revoga o que saiu (revokedAt/revokedById; o histórico fica), com um
+   * AuditEvent por mudança. Revogar o Analytics derruba as sessões.
+   */
+  async setSystems(id: number, pedidos: string[], actor: Actor = {}) {
+    const user = await this.findById(id);
+    const desejados = await this.access.resolveSystems(pedidos);
+    if (desejados.includes(ANALYTICS) && (!user.role || !user.unit)) {
+      throw profileRequired();
+    }
+
+    return this.prisma.prismaOnline.$transaction(async (tx) => {
+      const ativos = await tx.systemAccess.findMany({
+        where: { userId: id, revokedAt: null },
+      });
+      const atuais = new Set(ativos.map((a) => a.systemKey));
+      const revogar = ativos.filter((a) => !desejados.includes(a.systemKey));
+      const conceder = desejados.filter((k) => !atuais.has(k));
+      const agora = new Date();
+
+      for (const acesso of revogar) {
+        await tx.systemAccess.update({
+          where: { id: acesso.id },
+          data: { revokedAt: agora, revokedById: actor.id ?? null },
+        });
+        await this.access.audit(
+          {
+            action: 'access.revoked',
+            actorUserId: actor.id,
+            targetUserId: id,
+            systemKey: acesso.systemKey,
+            ctx: actor.ctx,
+          },
+          tx,
+        );
+      }
+      for (const systemKey of conceder) {
+        await tx.systemAccess.create({
+          data: { userId: id, systemKey, grantedById: actor.id ?? null },
+        });
+        await this.access.audit(
+          {
+            action: 'access.granted',
+            actorUserId: actor.id,
+            targetUserId: id,
+            systemKey,
+            ctx: actor.ctx,
+          },
+          tx,
+        );
+      }
+      if (revogar.some((a) => a.systemKey === ANALYTICS)) {
+        await tx.refreshToken.updateMany({
+          where: { userId: id, revoked: false },
+          data: { revoked: true },
+        });
+      }
+
+      return {
+        systems: [...desejados].sort(),
+        granted: conceder.sort(),
+        revoked: revogar.map((a) => a.systemKey).sort(),
+      };
+    });
   }
 }

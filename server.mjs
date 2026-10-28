@@ -1,8 +1,47 @@
 import "module-alias/register.js";
+import http from "node:http";
 import express from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
+
+// ============================================================================
+// Health agregado (LIVENESS) — Health Check Path do Render.
+// Responde 200 só se o authentication (:3005) e o lhg-api (:3010) responderem
+// aos seus healthchecks de liveness, que NÃO tocam banco (uma oscilação do
+// Supabase/AUTOMO não pode fazer o Render reiniciar a instância em loop).
+// A resposta não traz versão, host nem detalhe interno.
+// ============================================================================
+const HEALTH_TIMEOUT_MS = 2000;
+// Os dois alvos são LIVENESS e não tocam banco: o /api/health do auth só
+// responde {status:'ok'} e o /health do lhg-api só lê o registro ESTÁTICO de
+// unidades (sem pool, sem query). As variáveis existem só para os testes.
+const HEALTH_TARGETS = {
+  auth: process.env.HEALTH_AUTH_URL || "http://127.0.0.1:3005/api/health",
+  api: process.env.HEALTH_API_URL || "http://127.0.0.1:3010/health",
+};
+
+function probe(url) {
+  return new Promise((resolve) => {
+    const req = http.get(url, { timeout: HEALTH_TIMEOUT_MS }, (res) => {
+      res.resume(); // descarta o corpo
+      resolve(res.statusCode === 200);
+    });
+    req.on("timeout", () => req.destroy());
+    req.on("error", () => resolve(false));
+  });
+}
+
+app.get("/health", async (_req, res) => {
+  const names = Object.keys(HEALTH_TARGETS);
+  const results = await Promise.all(names.map((n) => probe(HEALTH_TARGETS[n])));
+  const checks = Object.fromEntries(
+    names.map((n, i) => [n, results[i] ? "ok" : "down"])
+  );
+  const ok = results.every(Boolean);
+  res.set("Cache-Control", "no-store");
+  res.status(ok ? 200 : 503).json({ status: ok ? "ok" : "down", checks });
+});
 
 // ============================================================================
 // Topologia pós-migração multi-tenant (2026-07-25) — entrypoint público.
@@ -16,10 +55,14 @@ const app = express();
 // Este interceptor (registrado ANTES do /auth genérico) manda só os KPIs para o
 // lhg-api; login/refresh/logout/me/users continuam no serviço de autenticação.
 const CONSOLIDATED_KPIS = /^\/(Company|Bookings|Restaurant|Governance)\//;
+// xfwd: anexa ao X-Forwarded-For o endereço de quem chegou ao proxy (o
+// balanceador do Render). O auth usa `trust proxy` = 3 saltos para achar o IP
+// real do cliente (ver authentication/src/common/trust-proxy.ts).
 app.use(
   "/auth/api",
   createProxyMiddleware({
     changeOrigin: true,
+    xfwd: true,
     router: (req) =>
       CONSOLIDATED_KPIS.test(req.url)
         ? "http://localhost:3010"
@@ -35,6 +78,7 @@ app.use(
   createProxyMiddleware({
     target: "http://localhost:3005",
     changeOrigin: true,
+    xfwd: true, // ver comentário do /auth/api acima
     secure: false,
     pathRewrite: {
       "^/auth": "", // remove "/auth" da URL
