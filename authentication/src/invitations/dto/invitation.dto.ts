@@ -17,7 +17,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { normalizeEmailInput } from '../../common/email';
-import { PASSWORD_MIN_LENGTH } from '../../common/password';
+import { MaxBytes, PASSWORD_MIN_LENGTH } from '../../common/password';
 
 /** Validade do convite, escolhida por quem convida. */
 export const VALIDADES = ['7', '14', '30', 'never'] as const;
@@ -96,8 +96,8 @@ export class AcceptByPasswordDto extends InvitationTokenDto {
   @ApiProperty({ description: `Mínimo ${PASSWORD_MIN_LENGTH} caracteres` })
   @IsString()
   @MinLength(PASSWORD_MIN_LENGTH)
-  // bcrypt só usa os primeiros 72 bytes; acima disso o resto seria ignorado.
-  @MaxLength(72)
+  // bcrypt só usa os primeiros 72 BYTES; acima disso o resto seria ignorado.
+  @MaxBytes()
   password: string;
 
   constructor(token: string, password: string) {

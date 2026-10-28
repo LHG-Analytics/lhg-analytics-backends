@@ -14,6 +14,7 @@ import {
 } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import { normalizeEmailInput } from '../../common/email';
+import { MaxBytes } from '../../common/password';
 
 // Cargos e unidades vêm do enum do Prisma (schema.online.prisma): uma unidade
 // nova no schema passa a valer aqui sozinha, sem lista escrita à mão.
@@ -35,6 +36,7 @@ export class CreateUserDto {
   @ApiProperty({ example: 'senha_supersegura' })
   @IsString()
   @IsNotEmpty()
+  @MaxBytes()
   password: string;
 
   // CPF: obrigatório só para quem recebe o Analytics (o service confere:

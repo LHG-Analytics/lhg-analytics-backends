@@ -81,6 +81,7 @@ export class InvitationsController {
   }
 
   @Get()
+  @Header('Cache-Control', 'no-store')
   list() {
     return this.invitations.list();
   }

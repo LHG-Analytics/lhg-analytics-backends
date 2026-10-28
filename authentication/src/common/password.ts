@@ -1,4 +1,5 @@
 import * as bcrypt from 'bcrypt';
+import { ValidateBy } from 'class-validator';
 
 /** Custo do bcrypt para TODO hash novo (e para o rehash transparente). */
 export const BCRYPT_COST = 12;
@@ -41,4 +42,24 @@ export async function compareOrDummy(
     return false;
   }
   return bcrypt.compare(password, hash);
+}
+
+/** O bcrypt só usa os primeiros 72 BYTES (UTF-8) da senha; o resto é ignorado. */
+export const PASSWORD_MAX_BYTES = 72;
+
+/**
+ * Validador: no máximo `max` bytes em UTF-8. Conta bytes, e não caracteres,
+ * porque "ç" ou um emoji ocupam 2 a 4 bytes: 72 caracteres podem passar de 72
+ * bytes, e o que passa do limite do bcrypt seria ignorado em silêncio.
+ */
+export function MaxBytes(max: number = PASSWORD_MAX_BYTES) {
+  return ValidateBy({
+    name: 'maxBytes',
+    validator: {
+      validate: (value: unknown) =>
+        typeof value !== 'string' || Buffer.byteLength(value, 'utf8') <= max,
+      defaultMessage: (args) =>
+        `${args?.property} deve ter no máximo ${max} bytes (UTF-8)`,
+    },
+  });
 }

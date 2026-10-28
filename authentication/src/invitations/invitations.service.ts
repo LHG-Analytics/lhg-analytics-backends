@@ -417,7 +417,7 @@ export class InvitationsService {
         );
         return {
           message: 'Conta criada. Entre com o seu e-mail e a senha escolhida.',
-          email: user.email,
+          emailMasked: maskEmail(user.email),
         };
       });
     } catch (error) {
