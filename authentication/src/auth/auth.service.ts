@@ -1,4 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { UserStatus } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -12,19 +18,122 @@ import {
   RequestContext,
   analyticsDenial,
 } from '../access/access.service';
+import { LoginLockService } from '../access/login-lock.service';
+import { compareOrDummy, hashPassword, needsRehash } from '../common/password';
 
 const CREDENCIAIS_INVALIDAS = 'Email ou senha incorretos';
+const SENHA_ATUAL_INCORRETA = 'Senha atual incorreta';
 
 @Injectable()
 export class AuthService {
   private readonly REFRESH_TOKEN_EXPIRY_DAYS = 7;
+  private readonly logger = new Logger(AuthService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly access: AccessService,
+    private readonly lock: LoginLockService,
   ) {}
+
+  /**
+   * Senha certa com hash de custo menor que 12 (inclusive um $2a$11$
+   * importado): refaz com custo 12, de forma transparente. É melhor-esforço:
+   * uma falha aqui fica no log e NÃO derruba o login.
+   */
+  private async rehashIfNeeded(userId: number, password: string, hash: string) {
+    if (!needsRehash(hash)) return;
+    try {
+      await this.prisma.prismaOnline.user.update({
+        where: { id: userId },
+        data: { password: await hashPassword(password) },
+      });
+    } catch (error) {
+      this.logger.warn(`Rehash da senha falhou (usuário ${userId}): ${error}`);
+    }
+  }
+
+  /**
+   * POST /api/me/password. A senha atual errada conta no MESMO bloqueio do
+   * login. A nova: ≥ 10 caracteres, diferente da atual e sem cara de hash.
+   * Grava com custo 12 (senha única: substitui a anterior), revoga as OUTRAS
+   * sessões (mantém a do refresh token atual) e audita, sem a senha.
+   */
+  async changePassword(
+    userId: number,
+    currentPassword: string,
+    newPassword: string,
+    currentRefreshToken: string | undefined,
+    ctx?: RequestContext,
+  ) {
+    const user = await this.prisma.prismaOnline.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('Sessão inválida');
+    }
+    if (!user.password) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'Esta conta não tem senha (use "Definir senha")',
+        code: 'NO_PASSWORD',
+      });
+    }
+    if (this.lock.isLocked(user)) {
+      await compareOrDummy(currentPassword, null);
+      throw new UnauthorizedException(SENHA_ATUAL_INCORRETA);
+    }
+    if (!(await bcrypt.compare(currentPassword, user.password))) {
+      await this.lock.registerFailure(user.id, 'password_change', ctx);
+      throw new UnauthorizedException(SENHA_ATUAL_INCORRETA);
+    }
+    await this.lock.registerSuccess(user.id, user);
+
+    if (await bcrypt.compare(newPassword, user.password)) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'A nova senha precisa ser diferente da atual',
+        code: 'SAME_PASSWORD',
+      });
+    }
+
+    const atual = currentRefreshToken
+      ? await this.prisma.prismaOnline.refreshToken.findUnique({
+          where: { token: currentRefreshToken },
+          select: { id: true, userId: true },
+        })
+      : null;
+    const manter = atual?.userId === userId ? atual.id : undefined;
+
+    await this.prisma.prismaOnline.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { password: await hashPassword(newPassword) },
+      });
+      await tx.refreshToken.updateMany({
+        where: {
+          userId,
+          revoked: false,
+          ...(manter && { id: { not: manter } }),
+        },
+        data: { revoked: true },
+      });
+      await this.access.audit(
+        {
+          action: 'password.changed',
+          actorUserId: userId,
+          targetUserId: userId,
+          ctx,
+        },
+        tx,
+      );
+    });
+
+    return { message: 'Senha alterada com sucesso' };
+  }
 
   /**
    * Pessoa pelo e-mail de login: o principal (User.email) ou um secundário
@@ -48,16 +157,23 @@ export class AuthService {
   async validateUser(email: string, password: string, ctx?: RequestContext) {
     const user = await this.findByLoginEmail(email);
 
-    // Sem senha (conta que só entra por outro meio) = mesmo 401 genérico.
-    if (!user || !user.password) {
+    // E-mail inexistente, conta sem senha (só entra por outro meio) ou conta
+    // BLOQUEADA: o mesmo 401 genérico, gastando o tempo de um bcrypt, para a
+    // resposta não revelar qual dos casos é (nem pelo tempo).
+    if (!user || !user.password || this.lock.isLocked(user)) {
+      await compareOrDummy(password, null);
       throw new UnauthorizedException(CREDENCIAIS_INVALIDAS);
     }
 
     const passwordValid = await bcrypt.compare(password, user.password);
 
     if (!passwordValid) {
+      await this.lock.registerFailure(user.id, 'login', ctx);
       throw new UnauthorizedException(CREDENCIAIS_INVALIDAS);
     }
+
+    await this.lock.registerSuccess(user.id, user);
+    await this.rehashIfNeeded(user.id, password, user.password);
 
     // Senha certa, mas sem acesso ao Analytics (inativo, sem a flag ou sem
     // perfil): o MESMO 401 de sempre, e o motivo só na auditoria. A checagem

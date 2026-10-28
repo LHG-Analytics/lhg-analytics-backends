@@ -97,6 +97,12 @@ export class UsersController {
     return this.usersService.setSystems(+id, body.systems, actorOf(req));
   }
 
+  // Desbloqueia uma conta bloqueada por tentativas de senha.
+  @Post(':id/unlock')
+  unlock(@Param('id') id: string, @Request() req: any) {
+    return this.usersService.unlock(+id, actorOf(req));
+  }
+
   @Post(':id/reactivate')
   reactivate(@Param('id') id: string, @Request() req: any) {
     return this.usersService.reactivate(+id, actorOf(req));

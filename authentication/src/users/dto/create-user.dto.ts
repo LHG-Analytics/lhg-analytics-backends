@@ -37,10 +37,13 @@ export class CreateUserDto {
   @IsNotEmpty()
   password: string;
 
-  @ApiProperty({ example: '000.000.000-00' })
+  // CPF: obrigatório só para quem recebe o Analytics (o service confere:
+  // 400 CPF_REQUIRED); quando vier, continua único.
+  @ApiPropertyOptional({ example: '000.000.000-00' })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  cpf: string;
+  cpf?: string;
 
   // role e unit são obrigatórios só para quem recebe o Analytics (o service
   // confere: 400 ROLE_UNIT_REQUIRED); para os outros sistemas, opcionais.

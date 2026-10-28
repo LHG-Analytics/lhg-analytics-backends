@@ -2,19 +2,18 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UserStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import * as bcrypt from 'bcrypt';
 import { emailInUse, isEmailConflict, normalizeEmail } from '../common/email';
+import { hashPassword, looksLikeBcryptHash } from '../common/password';
 import {
   ANALYTICS,
   AccessService,
   RequestContext,
+  cpfRequired,
   profileRequired,
   systemsRequired,
   userInactive,
 } from '../access/access.service';
-
-/** Hash bcrypt ($2a/$2b/$2x/$2y, custo, 53 caracteres de salt+hash). */
-const BCRYPT_HASH = /^\$2[abxy]\$\d{2}\$[./A-Za-z0-9]{53}$/;
+import { LoginLockService } from '../access/login-lock.service';
 
 /** Quem faz a ação (admin logado) e de onde, para auditoria e autoria. */
 export interface Actor {
@@ -30,7 +29,15 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly config: ConfigService,
+    private readonly lock: LoginLockService,
   ) {}
+
+  // Desbloqueio manual de uma conta bloqueada por tentativas (ADMIN da LHG).
+  async unlock(id: number, actor: Actor = {}) {
+    const user = await this.findById(id);
+    await this.lock.unlock(id, actor.id, actor.ctx);
+    return { message: `Usuário ${user.email} desbloqueado` };
+  }
 
   /**
    * Sem o campo `systems` no cadastro: fase de transição. Com
@@ -78,9 +85,13 @@ export class UsersService {
     if (systems.includes(ANALYTICS) && (!dados.role || !dados.unit)) {
       throw profileRequired();
     }
+    // CPF: opcional para quem não recebe o Analytics; obrigatório com ele.
+    if (systems.includes(ANALYTICS) && !dados.cpf) {
+      throw cpfRequired();
+    }
 
-    // Criptografa a senha antes de salvar
-    const hashedPassword = await bcrypt.hash(dados.password, 10);
+    // Criptografa a senha antes de salvar (custo 12)
+    const hashedPassword = await hashPassword(dados.password);
     try {
       const user = await this.prisma.prismaOnline.$transaction(async (tx) => {
         const criado = await tx.user.create({
@@ -176,7 +187,7 @@ export class UsersService {
     // senha da pessoa viraria o texto do hash e o login dela quebraria.
     if (typeof data.password !== 'string' || data.password.trim() === '') {
       delete data.password;
-    } else if (BCRYPT_HASH.test(data.password)) {
+    } else if (looksLikeBcryptHash(data.password)) {
       delete data.password;
       this.logger.warn(
         `PATCH /users/${id}: password com formato de hash bcrypt ignorado (senha inalterada)`,
@@ -188,7 +199,7 @@ export class UsersService {
         ctx: actor.ctx,
       });
     } else {
-      data.password = await bcrypt.hash(data.password, 10);
+      data.password = await hashPassword(data.password);
     }
     if (typeof data.email === 'string') {
       data.email = normalizeEmail(data.email);

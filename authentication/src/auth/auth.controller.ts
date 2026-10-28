@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Post,
   Body,
@@ -16,6 +17,8 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Public } from './decorators/public.decorator';
 import { ConfigService } from '@nestjs/config';
 import { AccessService, requestContext } from '../access/access.service';
+import { looksLikeBcryptHash } from '../common/password';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @ApiTags('Auth')
 @Controller()
@@ -195,5 +198,27 @@ export class AuthController {
       role: req.user.role,
       expiresAt,
     };
+  }
+
+  // Trocar a própria senha (senha única). As outras sessões caem; esta fica.
+  @Post('me/password')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('JWT-auth')
+  changePassword(@Body() body: ChangePasswordDto, @Req() req: any) {
+    if (looksLikeBcryptHash(body.newPassword)) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'A nova senha não pode ter o formato de um hash',
+        code: 'PASSWORD_LOOKS_LIKE_HASH',
+      });
+    }
+    return this.authService.changePassword(
+      req.user.id,
+      body.currentPassword,
+      body.newPassword,
+      req.cookies?.refresh_token,
+      requestContext(req),
+    );
   }
 }
