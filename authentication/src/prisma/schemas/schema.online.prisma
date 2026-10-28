@@ -65,12 +65,18 @@ enum UserStatus {
 }
 
 // Catálogo de sistemas (analytics, cms, rm, supplies, chat-lhg, helpdesk).
+// Dados do launcher do HUB: launchUrl (só https, CHECK no banco; preenchida
+// por ambiente quando o sistema for integrado), icon, description e order.
 model System {
-    key       String   @id
-    name      String
-    url       String?
-    active    Boolean  @default(true)
-    createdAt DateTime @default(now())
+    key         String   @id
+    name        String
+    url         String?
+    active      Boolean  @default(true)
+    launchUrl   String?
+    icon        String?
+    description String?
+    order       Int      @default(0)
+    createdAt   DateTime @default(now())
 
     accesses SystemAccess[]
     accounts SystemAccount[]
