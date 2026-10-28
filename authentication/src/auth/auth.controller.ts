@@ -19,6 +19,7 @@ import { ConfigService } from '@nestjs/config';
 import { AccessService, requestContext } from '../access/access.service';
 import { looksLikeBcryptHash } from '../common/password';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { sessionCookieOptions } from './session-cookies';
 
 @ApiTags('Auth')
 @Controller()
@@ -32,28 +33,9 @@ export class AuthController {
     private readonly access: AccessService,
   ) {}
 
-  private getCookieConfig(isProduction: boolean) {
-    const config: {
-      httpOnly: boolean;
-      secure: boolean;
-      sameSite: 'strict' | 'lax' | 'none';
-      path: string;
-      domain?: string;
-    } = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'lax' : 'lax', // 'lax' permite envio em navegação cross-site
-      path: '/',
-    };
-
-    // Em produção, define o domínio para compartilhar cookies entre subdomínios
-    // Ex: .seudominio.com.br permite auth.seudominio.com.br e api.seudominio.com.br
-    const cookieDomain = this.configService.get<string>('COOKIE_DOMAIN');
-    if (cookieDomain) {
-      config.domain = cookieDomain;
-    }
-
-    return config;
+  // Mesma política de cookies do login pelo Google (session-cookies.ts).
+  private getCookieConfig(_isProduction: boolean) {
+    return sessionCookieOptions(this.configService);
   }
 
   @Post('login')

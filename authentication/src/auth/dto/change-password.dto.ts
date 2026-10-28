@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
-import { PASSWORD_MIN_LENGTH } from '../../common/password';
+import { MaxBytes, PASSWORD_MIN_LENGTH } from '../../common/password';
 
 export class ChangePasswordDto {
   @ApiProperty({ description: 'Senha atual' })
@@ -14,8 +14,8 @@ export class ChangePasswordDto {
   })
   @IsString()
   @MinLength(PASSWORD_MIN_LENGTH)
-  // bcrypt só usa os primeiros 72 bytes; acima disso o resto seria ignorado.
-  @MaxLength(72)
+  // bcrypt só usa os primeiros 72 BYTES; acima disso o resto seria ignorado.
+  @MaxBytes()
   newPassword: string;
 
   constructor(currentPassword: string, newPassword: string) {

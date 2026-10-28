@@ -35,6 +35,13 @@ model User {
     // invite_google, migration ou backfill (quem já existia na 1c).
     createdVia      String         @default("admin")
 
+    // Login com Google: o "sub" da conta Google vinculada (único) e quando
+    // vinculou. googleAllowed=false = só e-mail + senha (ex.: contas de fora
+    // da rede).
+    googleSub      String?   @unique
+    googleLinkedAt DateTime?
+    googleAllowed  Boolean   @default(true)
+
     // Bloqueio por tentativas (por conta): erros na janela de 15 min e,
     // depois de 5, bloqueio até lockedUntil. lockLevel conta os bloqueios
     // seguidos (backoff: 15 min, 30, 1 h... até 24 h); zera ao acertar a senha.

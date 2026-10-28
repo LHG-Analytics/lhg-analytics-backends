@@ -154,6 +154,8 @@ describe('1c-C3: convites e aceite por senha', () => {
       expect(texto(linha)).not.toContain(token);
 
       const lista = await comoAdmin(http().get('/api/invitations')).expect(200);
+      // Ajuste (a): a listagem não fica em cache.
+      expect(lista.headers['cache-control']).toBe('no-store');
       const item = lista.body.find((i: any) => i.id === res.body.id);
       expect(item.status).toBe('pending');
       expect(texto(lista.body)).not.toContain(token);
@@ -320,7 +322,9 @@ describe('1c-C3: convites e aceite por senha', () => {
 
       const a = await aceitar(inv.body.token).expect(201);
       expect(a.headers['referrer-policy']).toBe('no-referrer');
-      expect(a.body.email).toBe(e);
+      // Ajuste (b): a resposta do aceite traz o e-mail MASCARADO.
+      expect(a.body.emailMasked).toBe(`${e.slice(0, 2)}***@example.invalid`);
+      expect(a.body).not.toHaveProperty('email');
 
       const u = await db.user.findUniqueOrThrow({
         where: { email: e },
