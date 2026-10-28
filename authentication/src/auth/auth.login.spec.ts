@@ -7,6 +7,7 @@ import * as cookieParser from 'cookie-parser';
 import * as jwt from 'jsonwebtoken';
 import * as request from 'supertest';
 import { AccessService } from '../access/access.service';
+import { LoginLockService } from '../access/login-lock.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -63,6 +64,16 @@ describe('POST /api/login (regressão)', () => {
       providers: [
         AuthService,
         AccessService,
+        // Bloqueio por tentativas: testado de verdade na suíte de banco; aqui,
+        // sem efeito (a regressão é do contrato HTTP do login).
+        {
+          provide: LoginLockService,
+          useValue: {
+            isLocked: () => false,
+            registerFailure: jest.fn(),
+            registerSuccess: jest.fn(),
+          },
+        },
         { provide: PrismaService, useValue: prismaMock },
       ],
     }).compile();
