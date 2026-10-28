@@ -326,8 +326,10 @@ describe('1c-C1: senha única, bloqueio, trocar senha, CPF opcional', () => {
       ).expect(200);
       expect(res.body.message).toBe('Senha alterada com sucesso');
 
-      await http().post('/api/refresh').set('Cookie', atual).expect(200);
+      // A OUTRA sessão tenta primeiro (achado da homologação): ela cai, mas
+      // isso NÃO pode derrubar a sessão atual.
       await http().post('/api/refresh').set('Cookie', outra).expect(401);
+      await http().post('/api/refresh').set('Cookie', atual).expect(200);
       await login('troca@example.invalid', NOVA).expect(200);
       await login('troca@example.invalid', SENHA).expect(401);
       expect(await custo(u.id)).toBe(12);
