@@ -113,13 +113,14 @@ export class AuthService {
         where: { id: userId },
         data: { password: await hashPassword(newPassword) },
       });
-      await tx.refreshToken.updateMany({
+      // As OUTRAS sessões são APAGADAS, não marcadas como revogadas: o refresh
+      // trata um token revogado como reuso (possível roubo) e derruba TODAS as
+      // sessões da pessoa, inclusive a atual. Apagado, ele é só "inválido".
+      await tx.refreshToken.deleteMany({
         where: {
           userId,
-          revoked: false,
           ...(manter && { id: { not: manter } }),
         },
-        data: { revoked: true },
       });
       await this.access.audit(
         {
