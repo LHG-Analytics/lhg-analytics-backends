@@ -19,6 +19,7 @@ import { LoginLockService } from '../access/login-lock.service';
 import { AuthController } from '../auth/auth.controller';
 import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersController } from '../users/users.controller';
 import { UsersService } from '../users/users.service';
@@ -65,6 +66,7 @@ describe('1c-C1: senha única, bloqueio, trocar senha, CPF opcional', () => {
         AuthService,
         AccessService,
         LoginLockService,
+        OidcLogoutService,
         UsersService,
         PrismaService,
         { provide: APP_GUARD, useValue: jwtSimulado },

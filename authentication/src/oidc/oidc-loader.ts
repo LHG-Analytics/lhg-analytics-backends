@@ -9,10 +9,16 @@
  * no Node ele é o import() de verdade (carrega ESM a partir de CommonJS).
  * No Jest, o import() nativo exige `--experimental-vm-modules` (ver o script
  * test:db no package.json).
+ *
+ * O comentário com um valor aleatório deixa o código-fonte ÚNICO: o V8
+ * reaproveita a compilação de um código idêntico, e no Jest (várias suítes
+ * no mesmo processo) o import() herdaria o contexto da 1ª suíte, já
+ * desmontado ("Test environment has been torn down"). Na produção há um
+ * contexto só; o comentário não muda nada.
  */
 const importarNativo = new Function(
   'especificador',
-  'return import(especificador)',
+  `return import(especificador); // ${Math.random()}`,
 ) as (especificador: string) => Promise<any>;
 
 let modulo: Promise<any> | undefined;

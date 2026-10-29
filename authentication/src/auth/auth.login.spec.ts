@@ -8,6 +8,7 @@ import * as jwt from 'jsonwebtoken';
 import * as request from 'supertest';
 import { AccessService } from '../access/access.service';
 import { LoginLockService } from '../access/login-lock.service';
+import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -75,6 +76,11 @@ describe('POST /api/login (regressão)', () => {
           },
         },
         { provide: PrismaService, useValue: prismaMock },
+        // Login central: testado na suíte de banco (1d-D3).
+        {
+          provide: OidcLogoutService,
+          useValue: { encerrarSemFalhar: jest.fn() },
+        },
       ],
     }).compile();
 
