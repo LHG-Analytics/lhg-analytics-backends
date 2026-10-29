@@ -14,6 +14,7 @@ import { Test } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
 import * as request from 'supertest';
 import { AccessService } from '../access/access.service';
+import { LoginLockService } from '../access/login-lock.service';
 import { AuthController } from '../auth/auth.controller';
 import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -61,6 +62,7 @@ describe('PATCH /users/:id: a senha só muda com uma senha nova de verdade', () 
       providers: [
         AuthService,
         AccessService,
+        LoginLockService,
         UsersService,
         PrismaService,
         { provide: APP_GUARD, useValue: jwtSimulado },

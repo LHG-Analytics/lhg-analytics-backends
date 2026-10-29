@@ -1,6 +1,7 @@
 import { OmitType, PartialType } from '@nestjs/mapped-types';
 import { Transform } from 'class-transformer';
 import { IsOptional, IsString } from 'class-validator';
+import { MaxBytes } from '../../common/password';
 import { CreateUserDto } from './create-user.dto';
 
 // O PATCH não mexe em acessos: `systems` fica de fora (é só pelo
@@ -17,5 +18,6 @@ export class UpdateUserDto extends PartialType(
     typeof value === 'string' && value.trim() === '' ? undefined : value,
   )
   @IsString()
+  @MaxBytes()
   password?: string;
 }

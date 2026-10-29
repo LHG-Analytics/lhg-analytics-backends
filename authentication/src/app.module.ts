@@ -9,6 +9,8 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { HealthModule } from './health/health.module';
 import { AccessModule } from './access/access.module';
+import { InvitationsModule } from './invitations/invitations.module';
+import { GoogleModule } from './google/google.module';
 
 // NOTA (limpeza pós-migração multi-tenant, 2026-07-25): os módulos de KPI
 // (company/bookings/governance/restaurant) e sua infra (cache/database/utils)
@@ -28,6 +30,8 @@ import { AccessModule } from './access/access.module';
     UsersModule,
     AuthModule,
     HelpdeskModule,
+    InvitationsModule,
+    GoogleModule,
     HealthModule,
   ],
   // O PrismaService vem SÓ do PrismaModule (global): um único PrismaClient e um

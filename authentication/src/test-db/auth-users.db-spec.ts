@@ -14,6 +14,7 @@ import * as bcrypt from 'bcrypt';
 import * as cookieParser from 'cookie-parser';
 import * as request from 'supertest';
 import { AccessService } from '../access/access.service';
+import { LoginLockService } from '../access/login-lock.service';
 import { AuthController } from '../auth/auth.controller';
 import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -77,6 +78,7 @@ describe('login e cadastro no schema 1b', () => {
       providers: [
         AuthService,
         AccessService,
+        LoginLockService,
         UsersService,
         PrismaService,
         LegacyUsersService,
