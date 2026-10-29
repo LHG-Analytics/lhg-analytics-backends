@@ -11,7 +11,7 @@ const JANELA_MS = 60 * 1000;
  * mesmo IP), por isso o limite maior.
  */
 export const LIMITES = {
-  login: 10, // POST /interaction/:uid/login
+  login: 10, // POST /interaction/:uid/login e POST /conta/senha
   google: 20, // POST /interaction/:uid/google e GET /google/callback
   auth: 60, // GET /auth (e a retomada /auth/:uid)
   token: 300, // POST /token
@@ -21,7 +21,11 @@ export type Regra = keyof typeof LIMITES;
 
 /** Qual regra vale para esta rota (caminho relativo ao /oidc). */
 export function regraDa(method: string, caminho: string): Regra {
-  if (method === 'POST' && /^\/interaction\/[^/]+\/login$/.test(caminho)) {
+  if (
+    method === 'POST' &&
+    (/^\/interaction\/[^/]+\/login$/.test(caminho) ||
+      caminho === '/conta/senha')
+  ) {
     return 'login';
   }
   if (
