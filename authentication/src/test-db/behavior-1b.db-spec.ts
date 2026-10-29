@@ -22,6 +22,7 @@ import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { HelpdeskController } from '../helpdesk/helpdesk.controller';
 import { HelpdeskService } from '../helpdesk/helpdesk.service';
+import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersController } from '../users/users.controller';
 import { UsersService } from '../users/users.service';
@@ -71,6 +72,7 @@ describe('comportamento 1b', () => {
         AuthService,
         AccessService,
         LoginLockService,
+        OidcLogoutService,
         UsersService,
         HelpdeskService,
         PrismaService,
