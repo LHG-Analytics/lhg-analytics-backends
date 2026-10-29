@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { UserStatus } from '@prisma/client';
 import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { cpfInUse, isCpfConflict } from '../common/cpf';
 import { emailInUse, isEmailConflict, normalizeEmail } from '../common/email';
 import { hashPassword, looksLikeBcryptHash } from '../common/password';
 import {
@@ -135,6 +136,7 @@ export class UsersService {
     } catch (error) {
       // Corrida com outro cadastro do mesmo e-mail (unique/trigger do banco).
       if (isEmailConflict(error)) throw emailInUse();
+      if (isCpfConflict(error)) throw cpfInUse();
       throw error;
     }
   }
@@ -214,6 +216,7 @@ export class UsersService {
       });
     } catch (error) {
       if (isEmailConflict(error)) throw emailInUse();
+      if (isCpfConflict(error)) throw cpfInUse();
       throw error;
     }
   }
