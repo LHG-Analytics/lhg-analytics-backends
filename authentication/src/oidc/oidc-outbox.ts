@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
 import { lookup } from 'dns/promises';
+import * as https from 'https';
 import { isIP } from 'net';
 import { importJWK, JWK, SignJWT } from 'jose';
 import { AccessService } from '../access/access.service';
@@ -56,9 +57,62 @@ export function ipPublico(ip: string): boolean {
   return false;
 }
 
+/**
+ * Envia o POST e devolve o status HTTP. Recebe o IP JÁ CONFERIDO pelo
+ * anti-SSRF: a conexão vai SÓ para ele (sem nova resolução de DNS).
+ */
+export type Enviar = (
+  url: string,
+  corpo: string,
+  ip: string,
+) => Promise<number>;
+
+/**
+ * Opções do https.request com o IP PRESO (contra DNS rebinding: o DNS não é
+ * consultado de novo entre a conferência e a conexão). O TLS continua
+ * validando o certificado pelo NOME do host (servername/SNI).
+ */
+export function opcoesComIpFixo(url: string, ip: string): https.RequestOptions {
+  const u = new URL(url);
+  const familia = isIP(ip);
+  return {
+    method: 'POST',
+    host: u.hostname,
+    servername: u.hostname,
+    port: u.port || 443,
+    path: u.pathname + u.search,
+    lookup: (_host, opts, cb) => {
+      // Node pede um endereço ou a lista (all); nos dois casos, só o fixo.
+      if ((opts as { all?: boolean })?.all) {
+        (cb as any)(null, [{ address: ip, family: familia }]);
+      } else {
+        (cb as any)(null, ip, familia);
+      }
+    },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    timeout: TIMEOUT_MS,
+  };
+}
+
+/** Envio real: https.request com o IP preso; não segue redirect; descarta o corpo. */
+export const enviarComIpFixo: Enviar = (url, corpo, ip) =>
+  new Promise((resolve, reject) => {
+    const req = https.request(opcoesComIpFixo(url, ip), (res) => {
+      res.resume(); // só o código: o corpo da resposta é descartado
+      resolve(res.statusCode ?? 0);
+    });
+    req.on('timeout', () => {
+      const e = new Error('timeout');
+      e.name = 'TimeoutError';
+      req.destroy(e);
+    });
+    req.on('error', reject);
+    req.end(corpo);
+  });
+
 export interface OutboxDeps {
-  /** fetch (trocado nos testes pelo receptor de teste). */
-  enviar?: typeof fetch;
+  /** Envio (trocado nos testes pelo receptor de teste). */
+  enviar?: Enviar;
   /** Resolução de DNS (trocada nos testes). */
   resolver?: (host: string) => Promise<string[]>;
   agora?: () => Date;
@@ -78,7 +132,8 @@ type Linha = {
  * Envio do back-channel logout a partir do Outbox. O logout token é gerado
  * NA HORA do envio (nunca fica guardado) e vai no CORPO (POST
  * application/x-www-form-urlencoded, logout_token=...), nunca na URL.
- * Só https para host público, sem seguir redirect, timeout de 5 s. Falha →
+ * Só https para host público, com o IP conferido PRESO na conexão (sem DNS
+ * rebinding), sem seguir redirect, timeout de 5 s. Falha →
  * nova tentativa com espera crescente; passou da janela → status failed,
  * AuditEvent outbox.failed e uma linha de ALERTA no log. Do erro guarda só o
  * código HTTP ou o tipo (nunca o corpo da resposta).
@@ -86,7 +141,7 @@ type Linha = {
 export class OutboxWorker {
   private readonly logger = new Logger('OIDC');
   private chave?: Promise<{ key: any; kid: string }>;
-  private readonly enviar: typeof fetch;
+  private readonly enviar: Enviar;
   private readonly resolver: (host: string) => Promise<string[]>;
   private readonly agora: () => Date;
 
@@ -98,7 +153,7 @@ export class OutboxWorker {
     private readonly maxHoras: number,
     deps: OutboxDeps = {},
   ) {
-    this.enviar = deps.enviar ?? fetch;
+    this.enviar = deps.enviar ?? enviarComIpFixo;
     this.resolver =
       deps.resolver ??
       (async (h) => (await lookup(h, { all: true })).map((r) => r.address));
@@ -171,16 +226,9 @@ export class OutboxWorker {
     }
     if (!ips.length || !ips.every(ipPublico)) return 'ssrf';
     try {
-      const r = await this.enviar(uri, {
-        method: 'POST',
-        redirect: 'manual',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: corpo,
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-      // Só o código: o corpo da resposta é descartado sem ler.
-      await r.body?.cancel().catch(() => undefined);
-      return r.status >= 200 && r.status < 300 ? null : String(r.status);
+      // A conexão vai para o 1º IP conferido, e só para ele.
+      const status = await this.enviar(uri, corpo, ips[0]);
+      return status >= 200 && status < 300 ? null : String(status);
     } catch (e) {
       const nome = (e as Error)?.name;
       return nome === 'TimeoutError' || nome === 'AbortError'

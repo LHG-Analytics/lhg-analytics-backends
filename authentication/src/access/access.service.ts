@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma, UserStatus } from '@prisma/client';
+import { clientIp } from '../common/client-ip';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** Chave do Analytics no catálogo de sistemas. */
@@ -45,13 +46,19 @@ export interface RequestContext {
   userAgent?: string;
 }
 
-/** IP (já resolvido pelo trust proxy) e User-Agent de uma requisição Express. */
+/**
+ * IP REAL (o do proxy do HUB, se a chave conferir; senão o req.ip do trust
+ * proxy, ver common/client-ip.ts) e User-Agent de uma requisição Express.
+ */
 export function requestContext(req: {
   ip?: string;
   headers?: Record<string, unknown>;
 }): RequestContext {
   const ua = req.headers?.['user-agent'];
-  return { ip: req.ip, userAgent: typeof ua === 'string' ? ua : undefined };
+  return {
+    ip: clientIp(req as Parameters<typeof clientIp>[0]),
+    userAgent: typeof ua === 'string' ? ua : undefined,
+  };
 }
 
 export interface AuditInput {

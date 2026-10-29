@@ -6,7 +6,8 @@ import { HelpdeskModule } from './helpdesk/helpdesk.module';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { HubThrottlerGuard } from './common/hub-throttler.guard';
 import { HealthModule } from './health/health.module';
 import { AccessModule } from './access/access.module';
 import { InvitationsModule } from './invitations/invitations.module';
@@ -40,7 +41,7 @@ import { GoogleModule } from './google/google.module';
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: HubThrottlerGuard,
     },
     {
       provide: APP_GUARD,
