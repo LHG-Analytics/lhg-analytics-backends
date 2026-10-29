@@ -441,6 +441,41 @@ describe('1d-D2: login central', () => {
     expect(ev!.metadata).toMatchObject({ clientId: 'sistema', etapa: 'token' });
   });
 
+  it('refresh: reusar um refresh JÁ ROTACIONADO (reuso = possível roubo) → invalid_grant e o grant inteiro revogado, inclusive o refresh novo', async () => {
+    const p = pkce();
+    const u = await pessoa('reusa-refresh');
+    const { final } = await loginSenha(new Pote(), 'hub', u.email, SENHA, p);
+    const t = await codeParaTokens('hub', final!, p.verifier);
+    const r0 = t.body.refresh_token;
+    const r1 = await trocar('hub', {
+      grant_type: 'refresh_token',
+      refresh_token: r0,
+    });
+    expect(r1.status).toBe(200);
+    const grantId = (await db.oidcPayload.findFirst({
+      where: { type: 'RefreshToken', accountId: u.publicId },
+    }))!.grantId!;
+    expect(await db.oidcPayload.count({ where: { grantId } })).toBeGreaterThan(
+      0,
+    );
+
+    // Reuso do r0 (já rotacionado): recusa e revoga o grant.
+    const reuso = await trocar('hub', {
+      grant_type: 'refresh_token',
+      refresh_token: r0,
+    });
+    expect(reuso.status).toBe(400);
+    expect(reuso.body.error).toBe('invalid_grant');
+    expect(await db.oidcPayload.count({ where: { grantId } })).toBe(0);
+
+    // O refresh NOVO (r1) também morreu junto.
+    const depois = await trocar('hub', {
+      grant_type: 'refresh_token',
+      refresh_token: r1.body.refresh_token,
+    });
+    expect(depois.body.error).toBe('invalid_grant');
+  });
+
   it('9. refresh depois de INATIVAR a pessoa → invalid_grant', async () => {
     const p = pkce();
     const u = await pessoa('vai-sair');
