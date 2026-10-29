@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
 import type { NextFunction, Request, Response } from 'express';
 import { AccessService } from '../access/access.service';
-import { safeLaunchUrl } from '../access/launcher.service';
+import { LauncherService, safeLaunchUrl } from '../access/launcher.service';
 import { AuthService } from '../auth/auth.service';
 import { GoogleSettings, readGoogleSettings } from '../google/google.config';
 import { GoogleIdentityProvider } from '../google/google-identity.provider';
@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { OidcAccounts } from './oidc-accounts';
 import { loadClients } from './oidc-clients';
 import { readOidcSettings, OidcSettings } from './oidc.config';
+import { rotasDoHub } from './oidc-hub';
 import { interacoes } from './oidc-interactions';
 import { loadOidcModule } from './oidc-loader';
 import {
@@ -375,6 +376,18 @@ export async function mountOidc(
       caminho,
       paginaMinima,
       urlDaInteracao,
+    }),
+  );
+  // Rotas para o portal: lista de sistemas (Bearer) e troca de senha.
+  express.use(
+    '/oidc',
+    rotasDoHub({
+      provider,
+      prisma,
+      launcher: app.get(LauncherService, { strict: false }),
+      auth: app.get(AuthService, { strict: false }),
+      jwtSecret: get('JWT_SECRET')!,
+      caminho,
     }),
   );
   express.use('/oidc', (req: Request, res: Response) => callback(req, res));

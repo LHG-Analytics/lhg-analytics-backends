@@ -114,3 +114,41 @@ export async function logoutSource(ctx: any, form: string): Promise<void> {
 export async function postLogoutSuccessSource(ctx: any): Promise<void> {
   ctx.body = pagina('Saiu — LHG', `<h1>Você saiu.</h1>`);
 }
+
+/**
+ * Tela "Trocar senha" do login central (o HUB só aponta para ela; a senha
+ * nunca passa pelo HUB). Sem script; o CSRF vai num campo oculto preso à
+ * sessão SSO.
+ */
+export function paginaSenha(p: {
+  acao: string;
+  csrf: string;
+  returnTo: string | null;
+  erro?: string | null;
+}): string {
+  const voltar = p.returnTo
+    ? `<p class="aviso"><a href="${html(p.returnTo)}">Voltar sem trocar</a></p>`
+    : '';
+  return pagina(
+    'Trocar senha — LHG',
+    `<h1>Trocar senha</h1>
+${p.erro ? `<p class="erro" role="alert">${html(p.erro)}</p>` : ''}
+<form method="post" action="${html(p.acao)}" autocomplete="off">
+<input type="hidden" name="csrf" value="${html(p.csrf)}">
+${p.returnTo ? `<input type="hidden" name="return_to" value="${html(p.returnTo)}">` : ''}
+<label for="atual">Senha atual</label><input id="atual" name="senha_atual" type="password" required autocomplete="current-password">
+<label for="nova">Nova senha (mínimo 10 caracteres)</label><input id="nova" name="senha_nova" type="password" required minlength="10" autocomplete="new-password">
+<label for="conf">Confirme a nova senha</label><input id="conf" name="confirmacao" type="password" required minlength="10" autocomplete="new-password">
+<button type="submit">Trocar senha</button></form>
+${voltar}
+<p class="aviso">Ao trocar, as suas outras sessões são encerradas; esta continua.</p>`,
+  );
+}
+
+/** Resultado da troca (quando não há para onde voltar) ou falta de sessão. */
+export function paginaAviso(titulo: string, texto: string): string {
+  return pagina(
+    `${titulo} — LHG`,
+    `<h1>${html(titulo)}</h1><p>${html(texto)}</p>`,
+  );
+}

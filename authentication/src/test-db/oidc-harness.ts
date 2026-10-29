@@ -10,6 +10,7 @@ import * as cookieParser from 'cookie-parser';
 import * as crypto from 'crypto';
 import * as request from 'supertest';
 import { AccessService } from '../access/access.service';
+import { LauncherService } from '../access/launcher.service';
 import { LoginLockService } from '../access/login-lock.service';
 import { AuthController } from '../auth/auth.controller';
 import { AuthService } from '../auth/auth.service';
@@ -73,6 +74,7 @@ export async function subirComoMain(
       GoogleLoginService,
       OidcLogoutService,
       UsersService,
+      LauncherService,
       { provide: GoogleIdentityProvider, useValue: google },
       ...(extras.providers ?? []),
     ],
