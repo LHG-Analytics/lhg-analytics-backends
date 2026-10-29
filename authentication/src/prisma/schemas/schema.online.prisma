@@ -31,6 +31,25 @@ model User {
     deactivatedAt   DateTime?
     deactivatedById Int?
     emailVerifiedAt DateTime?
+    // Origem do cadastro (CHECK no banco): admin, invite_password,
+    // invite_google, migration ou backfill (quem já existia na 1c).
+    createdVia      String         @default("admin")
+
+    // Login com Google: o "sub" da conta Google vinculada (único) e quando
+    // vinculou. googleAllowed=false = só e-mail + senha (ex.: contas de fora
+    // da rede).
+    googleSub      String?   @unique
+    googleLinkedAt DateTime?
+    googleAllowed  Boolean   @default(true)
+
+    // Bloqueio por tentativas (por conta): erros na janela de 15 min e,
+    // depois de 5, bloqueio até lockedUntil. lockLevel conta os bloqueios
+    // seguidos (backoff: 15 min, 30, 1 h... até 24 h); zera ao acertar a senha.
+    failedLoginCount   Int       @default(0)
+    failedLoginFirstAt DateTime?
+    lockedUntil        DateTime?
+    lockLevel          Int       @default(0)
+
     createdAt       DateTime       @default(now())
     updatedAt       DateTime       @updatedAt
     refreshTokens   RefreshToken[]
@@ -44,6 +63,40 @@ model User {
     systemAccounts  SystemAccount[]
     emails          UserEmail[]
     unitAccesses    UserUnitAccess[]
+
+    invitationsSent     Invitation[] @relation("InvitationInvitedBy")
+    invitationsRevoked  Invitation[] @relation("InvitationRevokedBy")
+    invitationsAccepted Invitation[] @relation("InvitationAcceptedUser")
+}
+
+// Convite para criar uma pessoa (uso único). O token do link NUNCA é guardado:
+// só o SHA-256 dele (tokenHash). expiresAt nulo = "nunca expira" (exige
+// neverReason). No máximo 1 convite PENDENTE por e-mail: índice único parcial
+// "Invitation_pending_email_key" criado por SQL na migration.
+model Invitation {
+    id             Int       @id @default(autoincrement())
+    email          String
+    name           String?
+    systems        String[]  @default([])
+    role           UserRole?
+    unit           UserUnit?
+    invitedById    Int?
+    createdAt      DateTime  @default(now())
+    expiresAt      DateTime?
+    neverReason    String?
+    tokenHash      String    @unique
+    linkCreatedAt  DateTime  @default(now())
+    acceptedAt     DateTime?
+    acceptedUserId Int?
+    acceptedMethod String?
+    revokedAt      DateTime?
+    revokedById    Int?
+
+    invitedBy    User? @relation("InvitationInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+    revokedBy    User? @relation("InvitationRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+    acceptedUser User? @relation("InvitationAcceptedUser", fields: [acceptedUserId], references: [id], onDelete: SetNull)
+
+    @@index([email])
 }
 
 enum UserStatus {
@@ -53,12 +106,18 @@ enum UserStatus {
 }
 
 // Catálogo de sistemas (analytics, cms, rm, supplies, chat-lhg, helpdesk).
+// Dados do launcher do HUB: launchUrl (só https, CHECK no banco; preenchida
+// por ambiente quando o sistema for integrado), icon, description e order.
 model System {
-    key       String   @id
-    name      String
-    url       String?
-    active    Boolean  @default(true)
-    createdAt DateTime @default(now())
+    key         String   @id
+    name        String
+    url         String?
+    active      Boolean  @default(true)
+    launchUrl   String?
+    icon        String?
+    description String?
+    order       Int      @default(0)
+    createdAt   DateTime @default(now())
 
     accesses SystemAccess[]
     accounts SystemAccount[]

@@ -16,6 +16,7 @@ import * as bcrypt from 'bcrypt';
 import * as cookieParser from 'cookie-parser';
 import * as request from 'supertest';
 import { AccessService } from '../access/access.service';
+import { LoginLockService } from '../access/login-lock.service';
 import { AuthController } from '../auth/auth.controller';
 import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -69,6 +70,7 @@ describe('comportamento 1b', () => {
       providers: [
         AuthService,
         AccessService,
+        LoginLockService,
         UsersService,
         HelpdeskService,
         PrismaService,
@@ -177,12 +179,15 @@ describe('comportamento 1b', () => {
       expect(await eventos(u.id, 'login.denied.inactive')).toHaveLength(1);
     });
 
-    it('2. senha errada de um inativo não gera auditoria (só quem sabe a senha)', async () => {
+    it('2. senha errada de um inativo não gera login.denied (só quem sabe a senha)', async () => {
       const u = await pessoa('inativa2@example.invalid', {
         status: 'INACTIVE',
       });
       await login('inativa2@example.invalid', 'senha-errada-123').expect(401);
-      expect(await eventos(u.id)).toHaveLength(0);
+      // Desde a 1c, o erro de senha vira login.failed (bloqueio por conta);
+      // o motivo "inativo" continua só para quem acertou a senha.
+      const acoes = (await eventos(u.id)).map((e) => e.action);
+      expect(acoes).toEqual(['login.failed']);
     });
 
     it('3. sem SystemAccess(analytics) → 401', async () => {

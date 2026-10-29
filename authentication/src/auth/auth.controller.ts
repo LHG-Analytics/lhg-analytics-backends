@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Post,
   Body,
@@ -16,6 +17,9 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Public } from './decorators/public.decorator';
 import { ConfigService } from '@nestjs/config';
 import { AccessService, requestContext } from '../access/access.service';
+import { looksLikeBcryptHash } from '../common/password';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { sessionCookieOptions } from './session-cookies';
 
 @ApiTags('Auth')
 @Controller()
@@ -29,28 +33,9 @@ export class AuthController {
     private readonly access: AccessService,
   ) {}
 
-  private getCookieConfig(isProduction: boolean) {
-    const config: {
-      httpOnly: boolean;
-      secure: boolean;
-      sameSite: 'strict' | 'lax' | 'none';
-      path: string;
-      domain?: string;
-    } = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'lax' : 'lax', // 'lax' permite envio em navegação cross-site
-      path: '/',
-    };
-
-    // Em produção, define o domínio para compartilhar cookies entre subdomínios
-    // Ex: .seudominio.com.br permite auth.seudominio.com.br e api.seudominio.com.br
-    const cookieDomain = this.configService.get<string>('COOKIE_DOMAIN');
-    if (cookieDomain) {
-      config.domain = cookieDomain;
-    }
-
-    return config;
+  // Mesma política de cookies do login pelo Google (session-cookies.ts).
+  private getCookieConfig(_isProduction: boolean) {
+    return sessionCookieOptions(this.configService);
   }
 
   @Post('login')
@@ -195,5 +180,27 @@ export class AuthController {
       role: req.user.role,
       expiresAt,
     };
+  }
+
+  // Trocar a própria senha (senha única). As outras sessões caem; esta fica.
+  @Post('me/password')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('JWT-auth')
+  changePassword(@Body() body: ChangePasswordDto, @Req() req: any) {
+    if (looksLikeBcryptHash(body.newPassword)) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'A nova senha não pode ter o formato de um hash',
+        code: 'PASSWORD_LOOKS_LIKE_HASH',
+      });
+    }
+    return this.authService.changePassword(
+      req.user.id,
+      body.currentPassword,
+      body.newPassword,
+      req.cookies?.refresh_token,
+      requestContext(req),
+    );
   }
 }

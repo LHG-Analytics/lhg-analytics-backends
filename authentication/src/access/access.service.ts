@@ -85,6 +85,8 @@ export const profileRequired = () =>
     'ROLE_UNIT_REQUIRED',
     'role e unit são obrigatórios para o acesso ao Analytics',
   );
+export const cpfRequired = () =>
+  erro400('CPF_REQUIRED', 'O CPF é obrigatório para o acesso ao Analytics');
 export const userInactive = () =>
   new ConflictException({
     statusCode: 409,
