@@ -1,22 +1,13 @@
 // 1d-D1: base do provedor OIDC (discovery, JWKS, clientes, desligamento), no
 // banco migrado de verdade. Chaves e segredos de TESTE gerados aqui, na hora:
 // nada disso existe no repositório. Numeração = testes obrigatórios da 1d.
-import { INestApplication, Logger, ValidationPipe } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
-import { Test } from '@nestjs/testing';
+import { INestApplication, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import * as cookieParser from 'cookie-parser';
 import * as crypto from 'crypto';
 import * as request from 'supertest';
-import { AccessService } from '../access/access.service';
-import { LoginLockService } from '../access/login-lock.service';
-import { AuthController } from '../auth/auth.controller';
-import { AuthService } from '../auth/auth.service';
 import { PARTES_PRIVADAS } from '../oidc/oidc.config';
-import { mountOidc } from '../oidc/oidc.mount';
-import { PrismaService } from '../prisma/prisma.service';
 import { apagarSchema, cliente, migrar, novoSchema } from './db-helpers';
+import { subirComoMain } from './oidc-harness';
 
 const ISSUER = 'https://hub.exemplo.invalid/auth/oidc';
 const SENHA = 'senha-de-teste-123';
@@ -54,34 +45,8 @@ describe('1d-D1: base do OIDC', () => {
   const logs: string[] = [];
   const espioes: jest.SpyInstance[] = [];
 
-  /** Sobe o authentication (login + OIDC) com as variáveis de agora. */
-  async function subir(): Promise<{ app: INestApplication; provider: any }> {
-    const moduleRef = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-          ignoreEnvFile: true,
-          load: [() => ({ JWT_SECRET: 'segredo-de-teste-local' })],
-        }),
-        JwtModule.register({ secret: 'segredo-de-teste-local' }),
-      ],
-      controllers: [AuthController],
-      providers: [AuthService, AccessService, LoginLockService, PrismaService],
-    }).compile();
-    const app = moduleRef.createNestApplication();
-    app.use(cookieParser());
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-    const provider = await mountOidc(app);
-    await app.init();
-    return { app, provider };
-  }
+  /** Sobe o authentication (login + OIDC) como o main.ts, com as variáveis de agora. */
+  const subir = () => subirComoMain();
 
   beforeAll(async () => {
     url = novoSchema('td1');

@@ -15,10 +15,19 @@ const importarNativo = new Function(
   'return import(especificador)',
 ) as (especificador: string) => Promise<any>;
 
-let carregado: Promise<any> | undefined;
+let modulo: Promise<any> | undefined;
 
-/** A classe `Provider` do oidc-provider (carregada uma vez só). */
-export function loadOidcProvider(): Promise<any> {
-  carregado ??= importarNativo('oidc-provider').then((m) => m.default ?? m);
-  return carregado;
+/**
+ * O módulo inteiro do oidc-provider (carregado uma vez só): `Provider`,
+ * `errors` e `interactionPolicy`.
+ */
+export function loadOidcModule(): Promise<any> {
+  modulo ??= importarNativo('oidc-provider');
+  return modulo;
+}
+
+/** A classe `Provider` do oidc-provider. */
+export async function loadOidcProvider(): Promise<any> {
+  const m = await loadOidcModule();
+  return m.default ?? m.Provider;
 }

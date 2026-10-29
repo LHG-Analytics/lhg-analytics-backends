@@ -10,6 +10,8 @@ export interface OAuthState {
   verifier: string;
   /** SHA-256 do token do convite, quando o fluxo veio do link do convite. */
   invite?: string;
+  /** uid da interação do login central, quando o fluxo veio do OIDC. */
+  uid?: string;
   exp: number;
 }
 

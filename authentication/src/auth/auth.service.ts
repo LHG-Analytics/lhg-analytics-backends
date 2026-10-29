@@ -156,6 +156,32 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string, ctx?: RequestContext) {
+    const user = await this.checkPassword(email, password, ctx);
+
+    // Senha certa, mas sem acesso ao Analytics (inativo, sem a flag ou sem
+    // perfil): o MESMO 401 de sempre, e o motivo só na auditoria. A checagem
+    // vem depois da senha para não auditar tentativas de quem não sabe a senha.
+    const denial = analyticsDenial(user);
+    if (denial) {
+      await this.access.audit({
+        action: `login.denied.${denial}`,
+        targetUserId: user.id,
+        systemKey: ANALYTICS,
+        ctx,
+      });
+      throw new UnauthorizedException(CREDENCIAIS_INVALIDAS);
+    }
+
+    return user;
+  }
+
+  /**
+   * Só a senha: e-mail + senha certos, com o bloqueio por conta da 1c (o
+   * MESMO contador do login do Analytics) e o rehash. Não olha status nem
+   * flags: quem chama decide (o Analytics e o login central têm regras
+   * próprias). Qualquer falha → o mesmo 401 genérico.
+   */
+  async checkPassword(email: string, password: string, ctx?: RequestContext) {
     const user = await this.findByLoginEmail(email);
 
     // E-mail inexistente, conta sem senha (só entra por outro meio) ou conta
@@ -175,21 +201,6 @@ export class AuthService {
 
     await this.lock.registerSuccess(user.id, user);
     await this.rehashIfNeeded(user.id, password, user.password);
-
-    // Senha certa, mas sem acesso ao Analytics (inativo, sem a flag ou sem
-    // perfil): o MESMO 401 de sempre, e o motivo só na auditoria. A checagem
-    // vem depois da senha para não auditar tentativas de quem não sabe a senha.
-    const denial = analyticsDenial(user);
-    if (denial) {
-      await this.access.audit({
-        action: `login.denied.${denial}`,
-        targetUserId: user.id,
-        systemKey: ANALYTICS,
-        ctx,
-      });
-      throw new UnauthorizedException(CREDENCIAIS_INVALIDAS);
-    }
-
     return user;
   }
 
