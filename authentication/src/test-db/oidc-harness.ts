@@ -21,8 +21,10 @@ import {
   GoogleIdentityProvider,
 } from '../google/google-identity.provider';
 import { GoogleLoginService } from '../google/google-login.service';
+import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { mountOidc } from '../oidc/oidc.mount';
 import { PrismaService } from '../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
 
 export const JWT_TESTE = 'segredo-de-teste-local';
 
@@ -67,6 +69,8 @@ export async function subirComoMain(
       LoginLockService,
       PrismaService,
       GoogleLoginService,
+      OidcLogoutService,
+      UsersService,
       { provide: GoogleIdentityProvider, useValue: google },
     ],
   }).compile();
@@ -81,7 +85,7 @@ export async function subirComoMain(
       transform: true,
     }),
   );
-  const provider = await mountOidc(app);
+  const provider = await mountOidc(app, { iniciarOutbox: false });
   app.enableCors(buildCorsOptions({}));
   await app.init();
   return { app, provider };
@@ -142,4 +146,107 @@ export function local(issuer: string, url: string): string {
   if (url.startsWith(issuer)) return '/oidc' + url.slice(issuer.length);
   if (url.startsWith('/auth/oidc')) return url.slice('/auth'.length);
   return url;
+}
+
+export interface ClienteDeTeste {
+  segredo: string;
+  redirect: string;
+}
+
+/**
+ * Fluxo authorization code + PKCE completo contra o app de teste: autorizar,
+ * login por senha na interação, seguir os redirects e trocar o code.
+ */
+export function fluxo(
+  srv: any,
+  issuer: string,
+  clientes: Record<string, ClienteDeTeste>,
+) {
+  const uidDa = (location: string) =>
+    /\/interaction\/([^/?]+)/.exec(location)![1];
+
+  const autorizar = (pote: Pote, clientId: string, p = pkce()) =>
+    request(srv)
+      .get('/oidc/auth')
+      .set('Cookie', pote.header())
+      .query({
+        client_id: clientId,
+        response_type: 'code',
+        scope: 'openid email profile',
+        redirect_uri: clientes[clientId].redirect,
+        code_challenge: p.challenge,
+        code_challenge_method: 'S256',
+        state: p.state,
+        nonce: p.nonce,
+      })
+      .then((r) => pote.guardar(r));
+
+  async function ateOCliente(pote: Pote, location: string) {
+    let loc = location;
+    for (let i = 0; i < 5 && loc.startsWith(issuer); i++) {
+      const r = pote.guardar(
+        await request(srv).get(local(issuer, loc)).set('Cookie', pote.header()),
+      );
+      loc = r.headers.location;
+    }
+    return new URL(loc);
+  }
+
+  const trocar = (clientId: string, corpo: Record<string, string>) =>
+    request(srv)
+      .post('/oidc/token')
+      .auth(clientId, clientes[clientId].segredo)
+      .type('form')
+      .send(corpo);
+
+  /** Login (com senha, ou SSO se o pote já tem sessão) e troca do code. */
+  async function entrar(
+    pote: Pote,
+    clientId: string,
+    email: string,
+    senha: string,
+  ) {
+    const p = pkce();
+    const a = await autorizar(pote, clientId, p);
+    let final: URL;
+    if (/\/interaction\//.test(a.headers.location)) {
+      const uid = uidDa(a.headers.location);
+      const l = pote.guardar(
+        await request(srv)
+          .post(`/oidc/interaction/${uid}/login`)
+          .set('Cookie', pote.header())
+          .type('form')
+          .send({ email, password: senha }),
+      );
+      final = await ateOCliente(pote, l.headers.location);
+    } else {
+      final = new URL(a.headers.location);
+    }
+    const code = final.searchParams.get('code');
+    if (!code) return { final, tokens: null as any };
+    const t = await trocar(clientId, {
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: clientes[clientId].redirect,
+      code_verifier: p.verifier,
+    });
+    return { final, tokens: t.body };
+  }
+
+  const refresh = (clientId: string, refreshToken: string) =>
+    trocar(clientId, {
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    });
+
+  return { autorizar, entrar, refresh, trocar, uidDa, ateOCliente };
+}
+
+/** Valor do cookie hub_sso (o id da sessão SSO) de um pote. */
+export function sessaoDo(pote: Pote): string | undefined {
+  const par = pote
+    .header()
+    .split('; ')
+    .find((c) => c.startsWith('hub_sso='));
+  return par?.slice('hub_sso='.length);
 }

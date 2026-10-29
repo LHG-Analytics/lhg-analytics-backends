@@ -34,6 +34,7 @@ import {
   InvitationsController,
 } from '../invitations/invitations.controller';
 import { InvitationsService } from '../invitations/invitations.service';
+import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { apagarSchema, cliente, migrar, novoSchema } from './db-helpers';
 
@@ -111,6 +112,7 @@ describe('1c-C4: login com Google', () => {
         AuthService,
         AccessService,
         LoginLockService,
+        OidcLogoutService,
         InvitationsService,
         GoogleLoginService,
         PrismaService,

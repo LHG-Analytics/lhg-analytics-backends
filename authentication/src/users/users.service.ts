@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UserStatus } from '@prisma/client';
+import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { emailInUse, isEmailConflict, normalizeEmail } from '../common/email';
 import { hashPassword, looksLikeBcryptHash } from '../common/password';
@@ -30,6 +31,7 @@ export class UsersService {
     private readonly access: AccessService,
     private readonly config: ConfigService,
     private readonly lock: LoginLockService,
+    private readonly oidcLogout: OidcLogoutService,
   ) {}
 
   // Desbloqueio manual de uma conta bloqueada por tentativas (ADMIN da LHG).
@@ -245,6 +247,9 @@ export class UsersService {
           tx,
         );
       });
+      // Login central: todas as sessões SSO e grants caem, e os clientes que
+      // ela usava recebem o aviso de logout (back-channel).
+      await this.oidcLogout.encerrarSemFalhar(user.publicId, 'inactivation');
     }
 
     return { message: `Usuário ${user.email} excluído com sucesso` }; // Mensagem de sucesso
@@ -291,58 +296,68 @@ export class UsersService {
       throw profileRequired();
     }
 
-    return this.prisma.prismaOnline.$transaction(async (tx) => {
-      const ativos = await tx.systemAccess.findMany({
-        where: { userId: id, revokedAt: null },
+    const resultado = await this.prisma.prismaOnline.$transaction(
+      async (tx) => {
+        const ativos = await tx.systemAccess.findMany({
+          where: { userId: id, revokedAt: null },
+        });
+        const atuais = new Set(ativos.map((a) => a.systemKey));
+        const revogar = ativos.filter((a) => !desejados.includes(a.systemKey));
+        const conceder = desejados.filter((k) => !atuais.has(k));
+        const agora = new Date();
+
+        for (const acesso of revogar) {
+          await tx.systemAccess.update({
+            where: { id: acesso.id },
+            data: { revokedAt: agora, revokedById: actor.id ?? null },
+          });
+          await this.access.audit(
+            {
+              action: 'access.revoked',
+              actorUserId: actor.id,
+              targetUserId: id,
+              systemKey: acesso.systemKey,
+              ctx: actor.ctx,
+            },
+            tx,
+          );
+        }
+        for (const systemKey of conceder) {
+          await tx.systemAccess.create({
+            data: { userId: id, systemKey, grantedById: actor.id ?? null },
+          });
+          await this.access.audit(
+            {
+              action: 'access.granted',
+              actorUserId: actor.id,
+              targetUserId: id,
+              systemKey,
+              ctx: actor.ctx,
+            },
+            tx,
+          );
+        }
+        if (revogar.some((a) => a.systemKey === ANALYTICS)) {
+          await tx.refreshToken.updateMany({
+            where: { userId: id, revoked: false },
+            data: { revoked: true },
+          });
+        }
+
+        return {
+          systems: [...desejados].sort(),
+          granted: conceder.sort(),
+          revoked: revogar.map((a) => a.systemKey).sort(),
+        };
+      },
+    );
+    // Login central: flag revogada → só os clientes daquele sistema perdem o
+    // grant/refresh e recebem o aviso; os outros sistemas continuam.
+    for (const systemKey of resultado.revoked) {
+      await this.oidcLogout.encerrarSemFalhar(user.publicId, 'flag_revoked', {
+        systemKey,
       });
-      const atuais = new Set(ativos.map((a) => a.systemKey));
-      const revogar = ativos.filter((a) => !desejados.includes(a.systemKey));
-      const conceder = desejados.filter((k) => !atuais.has(k));
-      const agora = new Date();
-
-      for (const acesso of revogar) {
-        await tx.systemAccess.update({
-          where: { id: acesso.id },
-          data: { revokedAt: agora, revokedById: actor.id ?? null },
-        });
-        await this.access.audit(
-          {
-            action: 'access.revoked',
-            actorUserId: actor.id,
-            targetUserId: id,
-            systemKey: acesso.systemKey,
-            ctx: actor.ctx,
-          },
-          tx,
-        );
-      }
-      for (const systemKey of conceder) {
-        await tx.systemAccess.create({
-          data: { userId: id, systemKey, grantedById: actor.id ?? null },
-        });
-        await this.access.audit(
-          {
-            action: 'access.granted',
-            actorUserId: actor.id,
-            targetUserId: id,
-            systemKey,
-            ctx: actor.ctx,
-          },
-          tx,
-        );
-      }
-      if (revogar.some((a) => a.systemKey === ANALYTICS)) {
-        await tx.refreshToken.updateMany({
-          where: { userId: id, revoked: false },
-          data: { revoked: true },
-        });
-      }
-
-      return {
-        systems: [...desejados].sort(),
-        granted: conceder.sort(),
-        revoked: revogar.map((a) => a.systemKey).sort(),
-      };
-    });
+    }
+    return resultado;
   }
 }

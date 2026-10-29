@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { UserStatus } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
+import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -35,6 +36,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly access: AccessService,
     private readonly lock: LoginLockService,
+    private readonly oidcLogout: OidcLogoutService,
   ) {}
 
   /**
@@ -59,6 +61,9 @@ export class AuthService {
    * login. A nova: ≥ 10 caracteres, diferente da atual e sem cara de hash.
    * Grava com custo 12 (senha única: substitui a anterior), revoga as OUTRAS
    * sessões (mantém a do refresh token atual) e audita, sem a senha.
+   * No login central, as OUTRAS sessões SSO e os grants delas caem e os
+   * clientes são avisados; a sessão SSO sessaoSso (cookie hub_sso desta
+   * requisição, se houver) continua.
    */
   async changePassword(
     userId: number,
@@ -66,6 +71,7 @@ export class AuthService {
     newPassword: string,
     currentRefreshToken: string | undefined,
     ctx?: RequestContext,
+    sessaoSso?: string,
   ) {
     const user = await this.prisma.prismaOnline.user.findUnique({
       where: { id: userId },
@@ -131,6 +137,9 @@ export class AuthService {
         },
         tx,
       );
+    });
+    await this.oidcLogout.encerrarSemFalhar(user.publicId, 'password_change', {
+      manterSessao: sessaoSso,
     });
 
     return { message: 'Senha alterada com sucesso' };

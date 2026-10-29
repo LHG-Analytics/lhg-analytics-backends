@@ -20,6 +20,7 @@ import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UnitsGuard } from '../auth/guards/units.guard';
+import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersController } from '../users/users.controller';
 import { UsersService } from '../users/users.service';
@@ -79,6 +80,7 @@ describe('login e cadastro no schema 1b', () => {
         AuthService,
         AccessService,
         LoginLockService,
+        OidcLogoutService,
         UsersService,
         PrismaService,
         LegacyUsersService,

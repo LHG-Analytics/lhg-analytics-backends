@@ -20,11 +20,15 @@ import {
   postLogoutSuccessSource,
   renderError,
 } from './oidc-pages';
+import { OidcLogoutService } from './oidc-logout.service';
+import { lerMaxHoras, OutboxWorker } from './oidc-outbox';
 import { limparVencidos, prismaAdapter } from './prisma-adapter';
 
 const SETE_DIAS = 7 * 24 * 60 * 60;
 /** Inatividade máxima da sessão SSO (D2 aprovada). */
 export const INATIVIDADE_MAX = 24 * 60 * 60;
+/** Intervalo do envio dos avisos de logout (Outbox). */
+const OUTBOX_MS = 30 * 1000;
 /** Intervalo da limpeza dos registros vencidos do OidcPayload. */
 const LIMPEZA_MS = 60 * 60 * 1000;
 
@@ -112,6 +116,10 @@ function configuracao(p: {
       introspection: { enabled: false },
       // A revogação entra no D3, só se ele precisar.
       revocation: { enabled: false },
+      // Back-channel: ligado para o id_token levar o sid e o discovery anunciar
+      // o suporte. As URIs NÃO são passadas ao provedor (ele enviaria direto,
+      // sem fila): o envio é do OutboxWorker, com novas tentativas e alerta.
+      backchannelLogout: { enabled: true },
       rpInitiatedLogout: {
         enabled: true,
         logoutSource,
@@ -199,6 +207,26 @@ function origensDosFormularios(
   return origens;
 }
 
+/** Agenda o envio dos avisos de logout do Outbox (uma passada por vez). */
+function agendarOutbox(app: INestApplication, worker: OutboxWorker) {
+  const logger = new Logger('OIDC');
+  let rodando = false;
+  const timer = setInterval(() => {
+    if (rodando) return;
+    rodando = true;
+    worker
+      .rodarUmaVez()
+      .catch((e) =>
+        logger.error(
+          `ALERTA oidc: worker do Outbox falhou (${(e as Error)?.name ?? 'erro'})`,
+        ),
+      )
+      .finally(() => (rodando = false));
+  }, OUTBOX_MS);
+  timer.unref();
+  app.getHttpServer().on('close', () => clearInterval(timer));
+}
+
 /** (Limpeza) agenda a remoção periódica dos registros vencidos. */
 function agendarLimpeza(app: INestApplication, prisma: PrismaClient) {
   const logger = new Logger('OIDC');
@@ -226,7 +254,11 @@ function agendarLimpeza(app: INestApplication, prisma: PrismaClient) {
  * /oidc não herda o CORS das rotas /api nem o body parser do Nest (o provedor
  * lê o corpo cru; as interações têm o parser delas).
  */
-export async function mountOidc(app: INestApplication): Promise<any | null> {
+export async function mountOidc(
+  app: INestApplication,
+  // Os testes desligam o worker do Outbox e o rodam à mão (rodarUmaVez).
+  opcoes: { iniciarOutbox?: boolean } = {},
+): Promise<any | null> {
   const logger = new Logger('OIDC');
   const config = app.get(ConfigService);
   const get = (n: string) => config.get<string>(n);
@@ -276,6 +308,32 @@ export async function mountOidc(app: INestApplication): Promise<any | null> {
     }),
   );
   provider.proxy = true;
+  // O sid vai SEMPRE no id_token (o cliente casa o logout token com a sessão
+  // dele). O provedor só o põe quando a URI de back-channel está cadastrada
+  // NELE, mas aí ele mesmo enviaria, sem fila; as URIs ficam só no banco e
+  // quem envia é o OutboxWorker.
+  provider.Client.prototype.includeSid = () => true;
+
+  // Logout no HUB ("sair de tudo"): depois do end_session e ANTES de a
+  // resposta sair, revoga os grants de todos os clientes da sessão (o
+  // provedor não revoga os que têm refresh próprio) e enfileira os avisos.
+  const logout = app.get(OidcLogoutService, { strict: false });
+  provider.use(async (ctx: any, next: () => Promise<void>) => {
+    await next();
+    if (
+      ctx.oidc?.route === 'end_session_confirm' &&
+      ctx.oidc.params?.logout &&
+      ctx.status === 303
+    ) {
+      try {
+        await logout.aposLogoutCompleto(ctx.oidc.session);
+      } catch (e) {
+        logger.error(
+          `ALERTA oidc: falha ao encerrar o logout (${(e as Error)?.name ?? 'erro'})`,
+        );
+      }
+    }
+  });
   const callback = provider.callback();
   const csp = cspDoOidc(origensDosFormularios(issuer, cl.clients, !!google));
 
@@ -311,13 +369,23 @@ export async function mountOidc(app: INestApplication): Promise<any | null> {
   express.use('/oidc', (req: Request, res: Response) => callback(req, res));
 
   agendarLimpeza(app, prisma);
+  const maxHoras = lerMaxHoras(get('OIDC_OUTBOX_MAX_HORAS'));
+  const worker = new OutboxWorker(
+    prisma,
+    access,
+    s.issuer,
+    s.jwks.keys[0],
+    maxHoras,
+  );
+  if (opcoes.iniciarOutbox !== false) agendarOutbox(app, worker);
 
   logger.log(
     `${s.resumo} clientes=${cl.ativos} ativo(s)` +
       `${cl.semSegredo ? `, ${cl.semSegredo} sem segredo (desligado)` : ''}` +
       `${cl.invalidos ? `, ${cl.invalidos} com redirect inválida (desligado)` : ''}` +
       ` google=${google ? 'ok' : 'desligado'}` +
-      ` tela=${paginaHub ? 'hub(https)' : paginaMinima ? 'mínima(homologação)' : 'NENHUMA'}`,
+      ` tela=${paginaHub ? 'hub(https)' : paginaMinima ? 'mínima(homologação)' : 'NENHUMA'}` +
+      ` outbox=${maxHoras}h`,
   );
   return provider;
 }
