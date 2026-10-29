@@ -14,6 +14,7 @@ import { AccessService } from '../access/access.service';
 import { AuthService } from '../auth/auth.service';
 import {
   EVENTO_BACKCHANNEL,
+  Enviar,
   OutboxWorker,
   esperaMin,
   ipPublico,
@@ -67,15 +68,17 @@ const VARS = {
   OIDC_MINIMAL_LOGIN_PAGE: 'true',
 };
 
-/** Receptor de teste: guarda cada POST e responde o status pedido por host. */
+/**
+ * Receptor de teste: guarda cada POST (com o IP para onde a conexão iria) e
+ * responde o status pedido por host.
+ */
 class Receptor {
-  recebidos: { url: string; corpo: string; init: RequestInit }[] = [];
+  recebidos: { url: string; corpo: string; ip: string }[] = [];
   status = new Map<string, number>();
-  enviar = (async (url: string, init: RequestInit) => {
-    this.recebidos.push({ url, corpo: String(init.body), init });
-    const s = this.status.get(new URL(url).hostname) ?? 200;
-    return new Response(null, { status: s });
-  }) as unknown as typeof fetch;
+  enviar: Enviar = async (url, corpo, ip) => {
+    this.recebidos.push({ url, corpo, ip });
+    return this.status.get(new URL(url).hostname) ?? 200;
+  };
   limpar() {
     this.recebidos = [];
   }
@@ -275,7 +278,8 @@ describe('1d-D3: logout e back-channel', () => {
     );
     for (const r of receptor.recebidos) {
       expect(r.url).not.toContain('logout_token');
-      expect(r.init.redirect).toBe('manual');
+      // (D4) a conexão vai para o IP conferido pelo anti-SSRF.
+      expect(r.ip).toBe('203.0.113.10');
       const aud = r.url === BC.hub ? 'hub' : 'sistema';
       const p = await conferirToken(r.corpo, aud);
       expect(p.sub).toBe(u.publicId);
@@ -504,7 +508,7 @@ describe('1d-D3: logout e back-channel', () => {
     [o] = await outbox(u.publicId);
     expect(o.lastErrorCode).toBe('302');
     expect(receptor.recebidos).toHaveLength(1);
-    expect(receptor.recebidos[0].init.redirect).toBe('manual');
+    expect(receptor.recebidos[0].ip).toBe('203.0.113.10');
   });
 
   it('cliente sem backchannelLogoutUri não entra na fila (mas o grant dele cai do mesmo jeito)', async () => {

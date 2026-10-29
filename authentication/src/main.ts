@@ -8,6 +8,7 @@ import * as cookieParser from 'cookie-parser';
 import * as compression from 'compression';
 import { applyTrustProxy } from './common/trust-proxy';
 import { buildCorsOptions, helmetMiddleware } from './common/http-setup';
+import { resumoDoProxy } from './common/client-ip';
 import { mountOidc } from './oidc/oidc.mount';
 
 config();
@@ -20,6 +21,8 @@ async function bootstrap() {
     // common/trust-proxy.ts). Sem isso, todo mundo chegava como 127.0.0.1 e
     // dividia o mesmo balde do rate limit.
     applyTrustProxy(app);
+    // IP real pelo proxy do HUB: só com HUB_PROXY_KEY (linha sem valores).
+    console.log(`ip: ${resumoDoProxy()}`);
 
     // Configuração de compressão HTTP
     app.use(compression());

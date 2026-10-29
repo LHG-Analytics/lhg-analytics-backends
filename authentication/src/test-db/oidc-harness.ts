@@ -52,6 +52,7 @@ export class GoogleFalso extends GoogleIdentityProvider {
 /** Sobe o app como o main.ts, com as variáveis de agora. */
 export async function subirComoMain(
   google: GoogleIdentityProvider = new GoogleFalso(),
+  extras: { imports?: any[]; providers?: any[]; limitarTaxa?: boolean } = {},
 ): Promise<{ app: INestApplication; provider: any }> {
   const moduleRef = await Test.createTestingModule({
     imports: [
@@ -61,6 +62,7 @@ export async function subirComoMain(
         load: [() => ({ JWT_SECRET: JWT_TESTE })],
       }),
       JwtModule.register({ secret: JWT_TESTE }),
+      ...(extras.imports ?? []),
     ],
     controllers: [AuthController],
     providers: [
@@ -72,6 +74,7 @@ export async function subirComoMain(
       OidcLogoutService,
       UsersService,
       { provide: GoogleIdentityProvider, useValue: google },
+      ...(extras.providers ?? []),
     ],
   }).compile();
   const app = moduleRef.createNestApplication();
@@ -85,7 +88,11 @@ export async function subirComoMain(
       transform: true,
     }),
   );
-  const provider = await mountOidc(app, { iniciarOutbox: false });
+  const provider = await mountOidc(app, {
+    iniciarOutbox: false,
+    // Rate limit só na suíte que o testa (D4).
+    limitarTaxa: extras.limitarTaxa ?? false,
+  });
   app.enableCors(buildCorsOptions({}));
   await app.init();
   return { app, provider };

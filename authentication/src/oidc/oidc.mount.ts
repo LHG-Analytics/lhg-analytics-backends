@@ -22,6 +22,7 @@ import {
 } from './oidc-pages';
 import { OidcLogoutService } from './oidc-logout.service';
 import { lerMaxHoras, OutboxWorker } from './oidc-outbox';
+import { limitadorDoOidc } from './oidc-rate-limit';
 import { limparVencidos, prismaAdapter } from './prisma-adapter';
 
 const SETE_DIAS = 7 * 24 * 60 * 60;
@@ -256,8 +257,9 @@ function agendarLimpeza(app: INestApplication, prisma: PrismaClient) {
  */
 export async function mountOidc(
   app: INestApplication,
-  // Os testes desligam o worker do Outbox e o rodam à mão (rodarUmaVez).
-  opcoes: { iniciarOutbox?: boolean } = {},
+  // Só os testes mudam: o worker do Outbox (rodado à mão) e o rate limit
+  // (as suítes funcionais fazem dezenas de logins do mesmo IP).
+  opcoes: { iniciarOutbox?: boolean; limitarTaxa?: boolean } = {},
 ): Promise<any | null> {
   const logger = new Logger('OIDC');
   const config = app.get(ConfigService);
@@ -347,10 +349,19 @@ export async function mountOidc(
     req.originalUrl = caminho + req.url;
     req.headers['x-forwarded-host'] = issuer.host;
     req.headers['x-forwarded-proto'] = issuer.protocol.replace(':', '');
-    // (e) CSP próprio do /oidc (substitui o do helmet global).
+    // (e) CSP próprio do /oidc (substitui o do helmet global) e cabeçalhos
+    // mais restritos que os do resto do serviço.
     res.setHeader('Content-Security-Policy', csp);
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader(
+      'Permissions-Policy',
+      'camera=(), microphone=(), geolocation=()',
+    );
     next();
   });
+  // Rate limit por IP REAL (o bloqueio principal continua por conta).
+  if (opcoes.limitarTaxa !== false) express.use('/oidc', limitadorDoOidc());
   express.use(
     '/oidc',
     interacoes({
