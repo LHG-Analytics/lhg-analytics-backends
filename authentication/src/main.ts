@@ -9,6 +9,7 @@ import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 import * as compression from 'compression';
 import { applyTrustProxy } from './common/trust-proxy';
+import { mountOidc } from './oidc/oidc.mount';
 
 config();
 
@@ -147,6 +148,17 @@ async function bootstrap() {
     );
 
     app.enableCors(corsOptions);
+
+    // Login central (OIDC) em /oidc. Sem as variáveis OIDC_* (ou se algo
+    // falhar ao montar), SÓ o OIDC fica desligado; o resto do serviço sobe.
+    try {
+      await mountOidc(app);
+    } catch (error) {
+      console.error(
+        '⚠️ OIDC desligado: falha ao montar o provedor',
+        (error as Error)?.name ?? 'erro',
+      );
+    }
 
     const port = process.env.PORT_AUTH || 3005;
     await app.listen(port);
