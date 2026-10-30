@@ -27,6 +27,7 @@ import {
   InvitationsService,
   hashToken,
 } from '../invitations/invitations.service';
+import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { apagarSchema, cliente, migrar, novoSchema } from './db-helpers';
 
@@ -75,6 +76,7 @@ describe('1c-C3: convites e aceite por senha', () => {
         AuthService,
         AccessService,
         LoginLockService,
+        OidcLogoutService,
         InvitationsService,
         PrismaService,
         { provide: APP_GUARD, useValue: jwtSimulado },

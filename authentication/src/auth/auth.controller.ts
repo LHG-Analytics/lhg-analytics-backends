@@ -201,6 +201,10 @@ export class AuthController {
       body.newPassword,
       req.cookies?.refresh_token,
       requestContext(req),
+      // Sessão SSO do login central deste navegador (fica; as outras caem).
+      typeof req.cookies?.hub_sso === 'string'
+        ? req.cookies.hub_sso
+        : undefined,
     );
   }
 }

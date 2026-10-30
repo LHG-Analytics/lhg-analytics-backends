@@ -4,11 +4,12 @@ import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
-import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 import * as compression from 'compression';
 import { applyTrustProxy } from './common/trust-proxy';
+import { buildCorsOptions, helmetMiddleware } from './common/http-setup';
+import { resumoDoProxy } from './common/client-ip';
+import { mountOidc } from './oidc/oidc.mount';
 
 config();
 
@@ -20,6 +21,8 @@ async function bootstrap() {
     // common/trust-proxy.ts). Sem isso, todo mundo chegava como 127.0.0.1 e
     // dividia o mesmo balde do rate limit.
     applyTrustProxy(app);
+    // IP real pelo proxy do HUB: só com HUB_PROXY_KEY (linha sem valores).
+    console.log(`ip: ${resumoDoProxy()}`);
 
     // Configuração de compressão HTTP
     app.use(compression());
@@ -28,23 +31,7 @@ async function bootstrap() {
     app.use(cookieParser());
 
     // Configuração de segurança com Helmet
-    app.use(
-      helmet({
-        contentSecurityPolicy: {
-          directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'"],
-            imgSrc: ["'self'", 'data:', 'https:'],
-          },
-        },
-        hsts: {
-          maxAge: 31536000,
-          includeSubDomains: true,
-          preload: true,
-        },
-      }),
-    );
+    app.use(helmetMiddleware());
 
     // Prefixo interno, o proxy cuidará do "/auth"
     app.setGlobalPrefix('api');
@@ -80,61 +67,6 @@ async function bootstrap() {
       process.exit(1);
     }
 
-    // Origens padrão permitidas
-    const defaultOrigins = [
-      'https://lhg-analytics.vercel.app', // Frontend em produção
-      'http://localhost:3000', // Proxy/Frontend local
-      'http://localhost:3005', // Authentication service (Swagger local)
-    ];
-
-    // Combina origens padrão com origens do ambiente
-    const envOrigins =
-      process.env.ALLOWED_ORIGINS?.split(',')
-        .map((o) => o.trim())
-        .filter(Boolean)
-        .map((o) => {
-          // Adiciona https:// se não tiver protocolo
-          if (!o.match(/^https?:\/\//)) {
-            return `https://${o}`;
-          }
-          return o;
-        }) || [];
-
-    // Adiciona URL do próprio servidor (para Swagger funcionar no Render)
-    const serverUrl = process.env.RENDER_EXTERNAL_URL;
-    const allowedOrigins = [
-      ...new Set([
-        ...defaultOrigins,
-        ...envOrigins,
-        ...(serverUrl ? [serverUrl] : []),
-      ]),
-    ];
-
-    const corsOptions: CorsOptions = {
-      origin: (origin, callback) => {
-        // Permite requisições sem origin (Postman, curl, health checks)
-        if (!origin) {
-          callback(null, true);
-          return;
-        }
-
-        // Verifica se a origin está na lista permitida
-        if (allowedOrigins.includes(origin)) {
-          callback(null, true);
-          return;
-        }
-
-        // Log de CORS rejeitado (para debug)
-        console.warn('⚠️ CORS rejeitou origem:', origin);
-
-        callback(new Error('Not allowed by CORS'), false);
-      },
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-      allowedHeaders: ['Authorization', 'Content-Type'],
-      credentials: true,
-      maxAge: 86400, // 24 horas de cache para preflight
-    };
-
     // Configuração global de validação
     app.useGlobalPipes(
       new ValidationPipe({
@@ -146,7 +78,20 @@ async function bootstrap() {
       }),
     );
 
-    app.enableCors(corsOptions);
+    // Login central (OIDC) em /oidc, montado ANTES do CORS e do body parser
+    // do Nest: o /oidc não herda o CORS das rotas /api e recebe o corpo cru.
+    // Sem as variáveis OIDC_* (ou se algo falhar ao montar), SÓ o OIDC fica
+    // desligado; o resto do serviço sobe.
+    try {
+      await mountOidc(app);
+    } catch (error) {
+      console.error(
+        '⚠️ OIDC desligado: falha ao montar o provedor',
+        (error as Error)?.name ?? 'erro',
+      );
+    }
+
+    app.enableCors(buildCorsOptions());
 
     const port = process.env.PORT_AUTH || 3005;
     await app.listen(port);

@@ -53,7 +53,8 @@ jobs:
 
       - name: Testes do authentication
         working-directory: authentication
-        run: npx jest --ci
+        # --experimental-vm-modules: o oidc-provider é só ESM (ver src/oidc/oidc-loader.ts).
+        run: npm test -- --ci
 
       # prisma migrate deploy de verdade, cada caso num schema descartável.
       - name: Testes de banco do authentication (migrations e cadastro)

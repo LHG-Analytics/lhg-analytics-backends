@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { UserStatus } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
+import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -35,6 +36,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly access: AccessService,
     private readonly lock: LoginLockService,
+    private readonly oidcLogout: OidcLogoutService,
   ) {}
 
   /**
@@ -59,6 +61,9 @@ export class AuthService {
    * login. A nova: ≥ 10 caracteres, diferente da atual e sem cara de hash.
    * Grava com custo 12 (senha única: substitui a anterior), revoga as OUTRAS
    * sessões (mantém a do refresh token atual) e audita, sem a senha.
+   * No login central, as OUTRAS sessões SSO e os grants delas caem e os
+   * clientes são avisados; a sessão SSO sessaoSso (cookie hub_sso desta
+   * requisição, se houver) continua.
    */
   async changePassword(
     userId: number,
@@ -66,6 +71,7 @@ export class AuthService {
     newPassword: string,
     currentRefreshToken: string | undefined,
     ctx?: RequestContext,
+    sessaoSso?: string,
   ) {
     const user = await this.prisma.prismaOnline.user.findUnique({
       where: { id: userId },
@@ -132,6 +138,9 @@ export class AuthService {
         tx,
       );
     });
+    await this.oidcLogout.encerrarSemFalhar(user.publicId, 'password_change', {
+      manterSessao: sessaoSso,
+    });
 
     return { message: 'Senha alterada com sucesso' };
   }
@@ -156,6 +165,32 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string, ctx?: RequestContext) {
+    const user = await this.checkPassword(email, password, ctx);
+
+    // Senha certa, mas sem acesso ao Analytics (inativo, sem a flag ou sem
+    // perfil): o MESMO 401 de sempre, e o motivo só na auditoria. A checagem
+    // vem depois da senha para não auditar tentativas de quem não sabe a senha.
+    const denial = analyticsDenial(user);
+    if (denial) {
+      await this.access.audit({
+        action: `login.denied.${denial}`,
+        targetUserId: user.id,
+        systemKey: ANALYTICS,
+        ctx,
+      });
+      throw new UnauthorizedException(CREDENCIAIS_INVALIDAS);
+    }
+
+    return user;
+  }
+
+  /**
+   * Só a senha: e-mail + senha certos, com o bloqueio por conta da 1c (o
+   * MESMO contador do login do Analytics) e o rehash. Não olha status nem
+   * flags: quem chama decide (o Analytics e o login central têm regras
+   * próprias). Qualquer falha → o mesmo 401 genérico.
+   */
+  async checkPassword(email: string, password: string, ctx?: RequestContext) {
     const user = await this.findByLoginEmail(email);
 
     // E-mail inexistente, conta sem senha (só entra por outro meio) ou conta
@@ -175,21 +210,6 @@ export class AuthService {
 
     await this.lock.registerSuccess(user.id, user);
     await this.rehashIfNeeded(user.id, password, user.password);
-
-    // Senha certa, mas sem acesso ao Analytics (inativo, sem a flag ou sem
-    // perfil): o MESMO 401 de sempre, e o motivo só na auditoria. A checagem
-    // vem depois da senha para não auditar tentativas de quem não sabe a senha.
-    const denial = analyticsDenial(user);
-    if (denial) {
-      await this.access.audit({
-        action: `login.denied.${denial}`,
-        targetUserId: user.id,
-        systemKey: ANALYTICS,
-        ctx,
-      });
-      throw new UnauthorizedException(CREDENCIAIS_INVALIDAS);
-    }
-
     return user;
   }
 

@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { AccessService } from './access.service';
 import { LauncherService } from './launcher.service';
 import { LoginLockService } from './login-lock.service';
+import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { MeController } from './me.controller';
 
 // Global: login, refresh, me, helpdesk e cadastro usam a mesma regra de
@@ -10,7 +11,17 @@ import { MeController } from './me.controller';
 @Global()
 @Module({
   controllers: [MeController],
-  providers: [AccessService, LoginLockService, LauncherService],
-  exports: [AccessService, LoginLockService, LauncherService],
+  providers: [
+    AccessService,
+    LoginLockService,
+    LauncherService,
+    OidcLogoutService,
+  ],
+  exports: [
+    AccessService,
+    LoginLockService,
+    LauncherService,
+    OidcLogoutService,
+  ],
 })
 export class AccessModule {}

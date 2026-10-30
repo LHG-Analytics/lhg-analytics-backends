@@ -119,9 +119,68 @@ model System {
     order       Int      @default(0)
     createdAt   DateTime @default(now())
 
-    accesses SystemAccess[]
-    accounts SystemAccount[]
-    events   AuditEvent[]
+    accesses    SystemAccess[]
+    accounts    SystemAccount[]
+    events      AuditEvent[]
+    oidcClients OidcClient[]
+}
+
+// Estado do provedor OIDC (adapter Prisma do oidc-provider): sessões, grants,
+// codes, tokens, interações… Um registro por (tipo, id); o conteúdo vai em
+// payload. Vencidos são limpos periodicamente.
+model OidcPayload {
+    id         String
+    type       String
+    payload    Json
+    grantId    String?
+    uid        String?
+    accountId  String?
+    expiresAt  DateTime?
+    consumedAt DateTime?
+
+    @@id([id, type])
+    @@index([grantId])
+    @@index([uid])
+    @@index([accountId])
+    @@index([expiresAt])
+}
+
+// Cliente OIDC (um sistema que usa o login central). SEM segredo no banco: o
+// segredo vem de OIDC_CLIENT_SECRET_<CLIENTE>; cliente sem segredo fica
+// desligado. systemKey = a flag exigida (nulo = só exige pessoa ATIVA).
+model OidcClient {
+    clientId               String   @id
+    name                   String
+    systemKey              String?
+    redirectUris           String[] @default([])
+    postLogoutRedirectUris String[] @default([])
+    backchannelLogoutUri   String?
+    active                 Boolean  @default(true)
+    createdAt              DateTime @default(now())
+    updatedAt              DateTime @updatedAt
+
+    system System?  @relation(fields: [systemKey], references: [key], onDelete: Restrict)
+    outbox Outbox[]
+}
+
+// Fila de avisos de logout (back-channel) aos clientes. lastErrorCode guarda só
+// o código HTTP ou o tipo do erro, NUNCA o corpo da resposta.
+model Outbox {
+    id            BigInt   @id @default(autoincrement())
+    clientId      String
+    sub           String
+    sid           String?
+    event         String
+    attempts      Int      @default(0)
+    nextAttemptAt DateTime @default(now())
+    status        String   @default("pending")
+    lastErrorCode String?
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    client OidcClient @relation(fields: [clientId], references: [clientId], onDelete: Restrict)
+
+    @@index([status, nextAttemptAt])
 }
 
 // Flag de acesso de uma pessoa a um sistema. Revogar = preencher revokedAt

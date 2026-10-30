@@ -20,6 +20,7 @@ import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UnitsGuard } from '../auth/guards/units.guard';
+import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersController } from '../users/users.controller';
 import { UsersService } from '../users/users.service';
@@ -79,6 +80,7 @@ describe('login e cadastro no schema 1b', () => {
         AuthService,
         AccessService,
         LoginLockService,
+        OidcLogoutService,
         UsersService,
         PrismaService,
         LegacyUsersService,
@@ -197,6 +199,42 @@ describe('login e cadastro no schema 1b', () => {
       .send({ email: 'Fulano.Trabalho@x.com' })
       .expect(409);
     expect(patch.body.code).toBe('EMAIL_IN_USE');
+  });
+
+  it('CPF que já existe (inclusive de pessoa INATIVA) → 409 CPF_IN_USE, sem ecoar o CPF (antes: 500)', async () => {
+    const res = await novoUsuario(
+      'cpf.repetido@example.invalid',
+      '90000002001',
+    ).expect(409);
+    expect(res.body).toMatchObject({
+      code: 'CPF_IN_USE',
+      message: 'Já existe um usuário com este CPF',
+    });
+    expect(JSON.stringify(res.body)).not.toContain('90000002001');
+    expect(
+      await db.user.count({ where: { email: 'cpf.repetido@example.invalid' } }),
+    ).toBe(0);
+
+    // O dono do CPF inativado: o CPF continua ocupado.
+    await db.user.update({
+      where: { email: 'nova.pessoa@example.invalid' },
+      data: { status: 'INACTIVE' },
+    });
+    const inativo = await novoUsuario(
+      'cpf.de.inativo@example.invalid',
+      '90000002001',
+    ).expect(409);
+    expect(inativo.body.code).toBe('CPF_IN_USE');
+
+    // PATCH para o CPF de outra pessoa: também 409.
+    const outra = await db.user.findUniqueOrThrow({
+      where: { email: 'maria@example.invalid' },
+    });
+    const patch = await request(app.getHttpServer())
+      .patch(`/api/users/${outra.id}`)
+      .send({ cpf: '90000002001' })
+      .expect(409);
+    expect(patch.body.code).toBe('CPF_IN_USE');
   });
 
   describe('compatibilidade: o código ANTIGO no schema novo', () => {
