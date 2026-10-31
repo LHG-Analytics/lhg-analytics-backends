@@ -1,4 +1,9 @@
+import * as crypto from 'crypto';
 import { SEM_CONVITE } from '../google/google-login.service';
+
+/** Fonte do CSP para um trecho inline ('sha256-...'). */
+const sha256 = (s: string) =>
+  `'sha256-${crypto.createHash('sha256').update(s, 'utf8').digest('base64')}'`;
 
 /** Escapa texto para HTML (atributos e conteúdo). */
 export const html = (s: unknown) =>
@@ -16,15 +21,17 @@ export const html = (s: unknown) =>
  * onde um POST de formulário pode terminar redirecionado (o Chrome confere a
  * cadeia de redirects): o próprio issuer, o Google e os clientes (redirect e
  * pós-logout). O script-src não libera nada sozinho ('report-sample' só
- * afeta relatórios): ele existe para o provedor acrescentar o hash do script
- * inline das páginas que se enviam sozinhas (logout sem sessão, form_post).
+ * afeta relatórios): ele existe para acrescentar, por resposta, o hash do
+ * script inline das páginas que se enviam sozinhas (logout sem sessão,
+ * form_post, saída direta com id_token_hint). O style-src libera só o hash
+ * do <style> fixo das páginas, sem 'unsafe-inline'.
  */
 export function cspDoOidc(origensDosFormularios: string[]): string {
   const destinos = [...new Set(origensDosFormularios)].join(' ');
   return [
     "default-src 'none'",
     "script-src 'report-sample'",
-    "style-src 'unsafe-inline'",
+    `style-src ${sha256(ESTILO)}`,
     "img-src 'self' data:",
     `form-action 'self' ${destinos}`.trim(),
     "frame-ancestors 'none'",
@@ -32,19 +39,48 @@ export function cspDoOidc(origensDosFormularios: string[]): string {
   ].join('; ');
 }
 
-const ESTILO = `body{font-family:system-ui,sans-serif;background:#f4f4f5;margin:0;padding:24px}
-main{max-width:360px;margin:40px auto;background:#fff;border-radius:8px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.15)}
-h1{font-size:1.25rem;margin:0 0 16px}label{display:block;margin:12px 0 4px;font-size:.9rem}
-input{width:100%;box-sizing:border-box;padding:8px;font-size:1rem}
-button{width:100%;margin-top:16px;padding:10px;font-size:1rem;cursor:pointer}
-.erro{background:#fee2e2;color:#991b1b;padding:8px;border-radius:4px;font-size:.9rem}
-.aviso{color:#52525b;font-size:.8rem;margin-top:16px}form.inline{margin:0}`;
+/**
+ * Visual do HUB (direção A): fundo roxo #4A3059, cartão claro ou escuro
+ * conforme o aparelho, fonte do sistema (nada externo, por causa do CSP).
+ * Texto FIXO: o hash dele vai no style-src.
+ */
+const ESTILO = `:root{color-scheme:light dark;--roxo:#4A3059;--roxo-claro:#6B4A80;--cartao:#fff;--texto:#1f1a24;--suave:#5f5868;--borda:#d9d2e0;--campo:#fff}
+@media (prefers-color-scheme:dark){:root{--cartao:#221a29;--texto:#f2eef5;--suave:#b6aec0;--borda:#3d3248;--campo:#2b2233}}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--roxo);color:var(--texto);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+main{width:100%;max-width:380px;background:var(--cartao);border-radius:14px;padding:28px 24px;box-shadow:0 12px 32px rgba(0,0,0,.28)}
+.marca{margin:0 0 20px;font-size:.8rem;font-weight:700;letter-spacing:.12em;color:var(--roxo-claro)}
+@media (prefers-color-scheme:dark){.marca{color:#c7a9dc}}
+h1{font-size:1.3rem;margin:0 0 12px;line-height:1.3}p{line-height:1.5;margin:0 0 12px}
+label{display:block;margin:14px 0 6px;font-size:.9rem;color:var(--suave)}
+input{width:100%;padding:10px 12px;font-size:1rem;border:1px solid var(--borda);border-radius:8px;background:var(--campo);color:var(--texto)}
+button{width:100%;margin-top:14px;padding:12px;font-size:1rem;font-weight:600;border-radius:8px;cursor:pointer;border:1px solid var(--roxo);background:var(--roxo);color:#fff}
+button.secundario{background:transparent;color:var(--texto);border-color:var(--borda)}
+button:focus-visible,a:focus-visible{outline:3px solid #c7a9dc;outline-offset:2px}
+a{color:inherit}
+.erro{background:#fde8e8;color:#8f1d1d;padding:10px 12px;border-radius:8px;font-size:.9rem}
+.aviso{color:var(--suave);font-size:.8rem;margin-top:16px}form.inline{margin:0}`;
 
-function pagina(titulo: string, corpo: string): string {
+/** `script` (opcional) já vem pronto; o hash dele vai no CSP da resposta. */
+function pagina(titulo: string, corpo: string, script = ''): string {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer"><title>${html(titulo)}</title>
-<style>${ESTILO}</style></head><body><main>${corpo}</main></body></html>`;
+<style>${ESTILO}</style>${script ? `<script>${script}</script>` : ''}</head><body><main><p class="marca">LHG</p>${corpo}</main></body></html>`;
+}
+
+/**
+ * Acrescenta o hash de um script inline ao script-src do CSP desta resposta
+ * (o mesmo que o provedor faz nas páginas dele). Sem CSP ou sem script-src,
+ * não mexe.
+ */
+function liberarScript(ctx: any, script: string): void {
+  const csp: string | undefined = ctx.response.get('content-security-policy');
+  if (!csp || !/(^|;)\s*script-src\s/.test(csp)) return;
+  ctx.set(
+    'content-security-policy',
+    csp.replace(/(^|;)(\s*script-src\s[^;]*)/, `$1$2 ${sha256(script)}`),
+  );
 }
 
 /** Mensagens da tela: o código vem na URL, o texto sai daqui (nunca da URL). */
@@ -101,18 +137,63 @@ export async function renderError(
   );
 }
 
-/** Confirmação do logout (end_session): o form vem pronto do provedor. */
+const ENVIAR_SAIDA =
+  "document.addEventListener('DOMContentLoaded',function(){document.getElementById('op.logoutForm').submit()});";
+
+/**
+ * Saída DIRETA, sem confirmação: só quando o provedor já VALIDOU o
+ * id_token_hint (assinatura e emissor; aud = cliente cadastrado, que tem de
+ * bater com o client_id, se veio) e a post_logout_redirect_uri (cadastrada
+ * para esse cliente), e o hint é da MESMA pessoa da sessão SSO. Um hint
+ * VENCIDO vale (o provedor ignora o exp no end_session; o id_token dura
+ * 10 min). Sem hint, ou com hint de outra pessoa, a confirmação aparece: um
+ * link solto não derruba a sessão de ninguém sem clique.
+ */
+export function saidaDireta(ctx: any): boolean {
+  const hint = ctx.oidc?.entities?.IdTokenHint?.payload;
+  const client = ctx.oidc?.client;
+  const accountId = ctx.oidc?.session?.accountId;
+  if (!hint || !client || !accountId) return false;
+  const aud: unknown[] = Array.isArray(hint.aud) ? hint.aud : [hint.aud];
+  return (
+    aud.includes(client.clientId) &&
+    hint.sub === accountId &&
+    typeof ctx.oidc.params?.post_logout_redirect_uri === 'string'
+  );
+}
+
+/**
+ * end_session com sessão. O form vem pronto do provedor (xsrf). Com hint
+ * validado: o form se envia sozinho, com logout=yes ("sair de tudo"), e um
+ * botão "Continuar" de reserva para quem não tem JavaScript. Sem hint: a
+ * confirmação.
+ */
 export async function logoutSource(ctx: any, form: string): Promise<void> {
+  if (saidaDireta(ctx)) {
+    const reserva =
+      '<input type="hidden" name="logout" value="yes"/>' +
+      '<noscript><button autofocus type="submit">Continuar</button></noscript></form>';
+    liberarScript(ctx, ENVIAR_SAIDA);
+    ctx.body = pagina(
+      'Saindo — LHG',
+      `<h1>Saindo…</h1><p>Encerrando a sua sessão em todos os sistemas da LHG.</p>${form.replace(/<\/form>\s*$/, reserva)}`,
+      ENVIAR_SAIDA,
+    );
+    return;
+  }
   ctx.body = pagina(
     'Sair — LHG',
-    `<h1>Sair de todos os sistemas da LHG?</h1>${form}
-<button autofocus type="submit" form="op.logoutForm" value="yes" name="logout">Sim, sair</button>
-<button type="submit" form="op.logoutForm">Não, continuar conectado</button>`,
+    `<h1>Sair de todos os sistemas da LHG?</h1><p>A sua sessão será encerrada em todos os sistemas.</p>${form}
+<button autofocus type="submit" form="op.logoutForm" value="yes" name="logout">Sair</button>
+<button class="secundario" type="submit" form="op.logoutForm">Continuar conectado</button>`,
   );
 }
 
 export async function postLogoutSuccessSource(ctx: any): Promise<void> {
-  ctx.body = pagina('Saiu — LHG', `<h1>Você saiu.</h1>`);
+  ctx.body = pagina(
+    'Você saiu — LHG',
+    `<h1>Você saiu.</h1><p>A sua sessão foi encerrada. Pode fechar esta página.</p>`,
+  );
 }
 
 /**
