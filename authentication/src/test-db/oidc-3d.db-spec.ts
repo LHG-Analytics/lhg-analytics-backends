@@ -345,6 +345,20 @@ describe('1d-D3: logout e back-channel', () => {
         `script-src 'report-sample' ${hashDoScript(pag.text)}`,
       );
       expect(csp).not.toContain('unsafe-inline');
+      // Visual do HUB: marca SVG inline, spinner e o texto; o script vem
+      // DEPOIS do formulário e envia na hora (sem esperar evento).
+      expect(pag.text).toContain(
+        '<svg class="marca" role="img" aria-label="LHG | HUB"',
+      );
+      expect(pag.text).toContain('class="spinner"');
+      expect(pag.text).toContain('Saindo do HUB LHG…');
+      expect(pag.text).not.toContain('DOMContentLoaded');
+      expect(pag.text.indexOf('<script>')).toBeGreaterThan(
+        pag.text.indexOf('</form>'),
+      );
+      // Nada de style="…" (o CSP só libera o <style> pelo hash) nem recurso externo.
+      expect(pag.text).not.toMatch(/\sstyle="/);
+      expect(pag.text).not.toMatch(/<(img|link)\b/);
 
       const r = await enviarForm(pote, pag.text);
       expect(r.status).toBe(303);
@@ -451,6 +465,10 @@ describe('1d-D3: logout e back-channel', () => {
       expect(pag.text).toMatch(/name="logout"[^>]*>Sair<\/button>/);
       expect(pag.text).toContain('>Continuar conectado</button>');
       expect(pag.text).toContain('#4A3059');
+      // O mesmo cartão com a marca SVG e o mosaico de fundo (CSS puro).
+      expect(pag.text).toContain('<svg class="marca"');
+      expect(pag.text).toContain('linear-gradient(160deg');
+      expect(pag.text).not.toMatch(/\sstyle="/);
       expect(pag.text).toContain('prefers-color-scheme:dark');
       expect(pag.text).not.toContain('<script');
       expect(pag.text).not.toMatch(/https?:\/\/(?!hub\.exemplo\.invalid)/);
@@ -499,6 +517,7 @@ describe('1d-D3: logout e back-channel', () => {
         .set('Cookie', pote.header());
       expect(ok.text).toContain('Você saiu.');
       expect(ok.text).toContain('#4A3059');
+      expect(ok.text).toContain('<svg class="marca"');
       const e = await request(srv).get('/oidc/auth').query({ client_id: 'x' });
       expect(e.status).toBe(400);
       expect(e.text).toContain('#4A3059');
