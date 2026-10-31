@@ -15,6 +15,7 @@ export const LIMITES = {
   google: 20, // POST /interaction/:uid/google e GET /google/callback
   auth: 60, // GET /auth (e a retomada /auth/:uid)
   token: 300, // POST /token
+  admin: 60, // /hub/admin/* (admin do HUB, por IP real da pessoa)
   outras: 120, // discovery, jwks, session/end, telas
 } as const;
 export type Regra = keyof typeof LIMITES;
@@ -34,6 +35,7 @@ export function regraDa(method: string, caminho: string): Regra {
   ) {
     return 'google';
   }
+  if (/^\/hub\/admin(\/|$)/.test(caminho)) return 'admin';
   if (/^\/auth(\/|$)/.test(caminho)) return 'auth';
   if (caminho === '/token') return 'token';
   return 'outras';

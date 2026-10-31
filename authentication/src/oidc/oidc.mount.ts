@@ -12,7 +12,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { OidcAccounts } from './oidc-accounts';
 import { loadClients } from './oidc-clients';
 import { readOidcSettings, OidcSettings } from './oidc.config';
+import { chaveDoProxy } from '../common/client-ip';
+import { InvitationsService } from '../invitations/invitations.service';
+import { UsersService } from '../users/users.service';
 import { rotasDoHub } from './oidc-hub';
+import { rotasDeAdmin } from './oidc-hub-admin';
 import { interacoes } from './oidc-interactions';
 import { loadOidcModule } from './oidc-loader';
 import {
@@ -389,6 +393,27 @@ export async function mountOidc(
       jwtSecret: get('JWT_SECRET')!,
       caminho,
     }),
+  );
+  // 2g: administração de pessoas e convites pelo portal (Bearer + ADMIN LHG
+  // + x-hub-proxy-key). Sem os serviços no app (ex.: apps de teste mínimos),
+  // as rotas não sobem; o resto do login central segue igual.
+  const opcional = <T>(tipo: new (...a: any[]) => T): T | null => {
+    try {
+      return app.get(tipo, { strict: false });
+    } catch {
+      return null;
+    }
+  };
+  const users = opcional(UsersService);
+  const invitations = opcional(InvitationsService);
+  if (users && invitations) {
+    express.use(
+      '/oidc',
+      rotasDeAdmin({ provider, prisma, users, invitations }),
+    );
+  }
+  logger.log(
+    `oidc: admin do HUB=${!users || !invitations ? 'indisponível' : chaveDoProxy() ? 'ok' : 'FECHADO (sem HUB_PROXY_KEY)'}`,
   );
   express.use('/oidc', (req: Request, res: Response) => callback(req, res));
 
