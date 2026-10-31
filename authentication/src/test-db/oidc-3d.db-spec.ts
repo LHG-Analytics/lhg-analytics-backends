@@ -8,7 +8,7 @@
 import { INestApplication, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { createLocalJWKSet, jwtVerify } from 'jose';
+import { JWK, SignJWT, createLocalJWKSet, importJWK, jwtVerify } from 'jose';
 import * as request from 'supertest';
 import { AccessService } from '../access/access.service';
 import { AuthService } from '../auth/auth.service';
@@ -288,6 +288,224 @@ describe('1d-D3: logout e back-channel', () => {
     expect((await outbox(u.publicId)).every((o) => o.status === 'sent')).toBe(
       true,
     );
+  });
+
+  describe('Sair do HUB sem página de confirmação (id_token_hint validado)', () => {
+    const POS = 'https://hub.exemplo.invalid/';
+    const fim = (pote: Pote, query: Record<string, string>) =>
+      request(srv)
+        .get('/oidc/session/end')
+        .set('Cookie', pote.header())
+        // Como o navegador: erros saem na página HTML (renderError).
+        .set('Accept', 'text/html')
+        .query(query)
+        .then((r) => pote.guardar(r));
+    /** O que o navegador faz sozinho: envia o form da página (xsrf + logout). */
+    const enviarForm = (pote: Pote, pagina: string) => {
+      const campos = Object.fromEntries(
+        [
+          ...pagina.matchAll(
+            /<input type="hidden" name="([^"]+)" value="([^"]*)"/g,
+          ),
+        ].map((m) => [m[1], m[2]]),
+      );
+      return request(srv)
+        .post('/oidc/session/end/confirm')
+        .set('Cookie', pote.header())
+        .type('form')
+        .send(campos)
+        .then((r) => pote.guardar(r));
+    };
+    const hashDoScript = (pagina: string) =>
+      `'sha256-${crypto
+        .createHash('sha256')
+        .update(/<script>([\s\S]*?)<\/script>/.exec(pagina)![1], 'utf8')
+        .digest('base64')}'`;
+
+    it('hint válido: a página se envia sozinha (sem pergunta, sem clique); a sessão SSO e os grants caem, o back-channel é enfileirado e vai ao post_logout', async () => {
+      const u = await pessoa('direto');
+      const pote = new Pote();
+      const hub = await f.entrar(pote, 'hub', u.email, SENHA);
+      const sis = await f.entrar(pote, 'sistema', u.email, SENHA);
+
+      const pag = await fim(pote, {
+        client_id: 'hub',
+        id_token_hint: hub.tokens.id_token,
+        post_logout_redirect_uri: POS,
+      });
+      expect(pag.status).toBe(200);
+      expect(pag.text).not.toContain('Sair de todos os sistemas da LHG?');
+      expect(pag.text).toContain('name="logout" value="yes"');
+      expect(pag.text).toMatch(
+        /<noscript><button[^>]*>Continuar<\/button><\/noscript>/,
+      );
+      // O script inline é liberado SÓ pelo hash dele, sem 'unsafe-inline'.
+      const csp = pag.headers['content-security-policy'];
+      expect(csp).toContain(
+        `script-src 'report-sample' ${hashDoScript(pag.text)}`,
+      );
+      expect(csp).not.toContain('unsafe-inline');
+
+      const r = await enviarForm(pote, pag.text);
+      expect(r.status).toBe(303);
+      expect(r.headers.location).toBe(POS);
+      await new Promise((ok) => setTimeout(ok, 200));
+      expect(
+        await db.oidcPayload.count({
+          where: { type: 'Session', accountId: u.publicId },
+        }),
+      ).toBe(0);
+      expect(
+        (await f.refresh('hub', hub.tokens.refresh_token)).body.error,
+      ).toBe('invalid_grant');
+      expect(
+        (await f.refresh('sistema', sis.tokens.refresh_token)).body.error,
+      ).toBe('invalid_grant');
+      expect((await outbox(u.publicId)).map((o) => o.clientId).sort()).toEqual([
+        'hub',
+        'sistema',
+      ]);
+    });
+
+    it('hint VENCIDO (assinado pelo issuer, exp no passado) também é aceito: saída direta', async () => {
+      const u = await pessoa('vencido');
+      const pote = new Pote();
+      const hub = await f.entrar(pote, 'hub', u.email, SENHA);
+      const agora = Math.floor(Date.now() / 1000);
+      const vencido = await new SignJWT({
+        sid: lerJwt(hub.tokens.id_token).payload.sid,
+      })
+        .setProtectedHeader({ alg: 'RS256', kid: K1.kid })
+        .setIssuer(ISSUER)
+        .setAudience('hub')
+        .setSubject(u.publicId)
+        .setIssuedAt(agora - 3600)
+        .setExpirationTime(agora - 3000)
+        .sign(await importJWK(K1 as JWK, 'RS256'));
+      const pag = await fim(pote, {
+        client_id: 'hub',
+        id_token_hint: vencido,
+        post_logout_redirect_uri: POS,
+      });
+      expect(pag.status).toBe(200);
+      expect(pag.text).toContain('name="logout" value="yes"');
+      expect(pag.text).not.toContain('Sair de todos os sistemas da LHG?');
+      const r = await enviarForm(pote, pag.text);
+      expect(r.status).toBe(303);
+      expect(r.headers.location).toBe(POS);
+    });
+
+    it('hint de OUTRO cliente: recusado (client_id diferente do aud, ou post_logout que não é do cliente do hint); a sessão continua', async () => {
+      const u = await pessoa('outrocli');
+      const pote = new Pote();
+      await f.entrar(pote, 'hub', u.email, SENHA);
+      const sis = await f.entrar(pote, 'sistema', u.email, SENHA);
+      const a = await fim(pote, {
+        client_id: 'hub',
+        id_token_hint: sis.tokens.id_token,
+        post_logout_redirect_uri: POS,
+      });
+      expect(a.status).toBe(400);
+      expect(a.text).toContain('Não foi possível continuar');
+      expect(a.text).not.toContain('name="logout"');
+      const b = await fim(pote, {
+        id_token_hint: sis.tokens.id_token,
+        post_logout_redirect_uri: POS,
+      });
+      expect(b.status).toBe(400);
+      expect(b.text).not.toContain('name="logout"');
+      expect(
+        await db.oidcPayload.count({
+          where: { type: 'Session', accountId: u.publicId },
+        }),
+      ).toBe(1);
+    });
+
+    it('hint válido de OUTRA pessoa: não sai direto (mostra a confirmação)', async () => {
+      const a = await pessoa('dona');
+      const b = await pessoa('alheia');
+      const pote = new Pote();
+      await f.entrar(pote, 'hub', a.email, SENHA);
+      const doB = await f.entrar(new Pote(), 'hub', b.email, SENHA);
+      const pag = await fim(pote, {
+        client_id: 'hub',
+        id_token_hint: doB.tokens.id_token,
+        post_logout_redirect_uri: POS,
+      });
+      expect(pag.status).toBe(200);
+      expect(pag.text).toContain('Sair de todos os sistemas da LHG?');
+      expect(pag.text).not.toContain('<script');
+    });
+
+    it('SEM hint (só client_id, como o CMS): confirmação ESTILIZADA no visual do HUB, em pt, sem script e sem nada externo; CSP sem unsafe-inline', async () => {
+      const u = await pessoa('semhint');
+      const pote = new Pote();
+      await f.entrar(pote, 'hub', u.email, SENHA);
+      const pag = await fim(pote, {
+        client_id: 'hub',
+        post_logout_redirect_uri: POS,
+      });
+      expect(pag.status).toBe(200);
+      expect(pag.text).toContain('<html lang="pt-BR">');
+      expect(pag.text).toContain('Sair de todos os sistemas da LHG?');
+      expect(pag.text).toMatch(/name="logout"[^>]*>Sair<\/button>/);
+      expect(pag.text).toContain('>Continuar conectado</button>');
+      expect(pag.text).toContain('#4A3059');
+      expect(pag.text).toContain('prefers-color-scheme:dark');
+      expect(pag.text).not.toContain('<script');
+      expect(pag.text).not.toMatch(/https?:\/\/(?!hub\.exemplo\.invalid)/);
+      const csp = pag.headers['content-security-policy'];
+      expect(csp).not.toContain('unsafe-inline');
+      expect(csp).toMatch(/script-src 'report-sample'(;|$)/);
+      // O <style> é liberado pelo hash dele.
+      const estilo = /<style>([\s\S]*?)<\/style>/.exec(pag.text)![1];
+      const h = crypto
+        .createHash('sha256')
+        .update(estilo, 'utf8')
+        .digest('base64');
+      expect(csp).toContain(`style-src 'sha256-${h}'`);
+
+      // Clique em "Sair": sai de tudo e vai ao post_logout.
+      const r = await request(srv)
+        .post('/oidc/session/end/confirm')
+        .set('Cookie', pote.header())
+        .type('form')
+        .send({
+          xsrf: /name="xsrf" value="([^"]+)"/.exec(pag.text)![1],
+          logout: 'yes',
+        });
+      expect(r.status).toBe(303);
+      expect(r.headers.location).toBe(POS);
+    });
+
+    it('página de "você saiu" (sem redirect) e de erro também no visual do HUB', async () => {
+      const u = await pessoa('sucesso');
+      const pote = new Pote();
+      await f.entrar(pote, 'hub', u.email, SENHA);
+      const pag = await fim(pote, {});
+      const r = pote.guardar(
+        await request(srv)
+          .post('/oidc/session/end/confirm')
+          .set('Cookie', pote.header())
+          .type('form')
+          .send({
+            xsrf: /name="xsrf" value="([^"]+)"/.exec(pag.text)![1],
+            logout: 'yes',
+          }),
+      );
+      expect(r.status).toBe(303);
+      const ok = await request(srv)
+        .get(local(ISSUER, new URL(r.headers.location, ISSUER).toString()))
+        .set('Cookie', pote.header());
+      expect(ok.text).toContain('Você saiu.');
+      expect(ok.text).toContain('#4A3059');
+      const e = await request(srv).get('/oidc/auth').query({ client_id: 'x' });
+      expect(e.status).toBe(400);
+      expect(e.text).toContain('#4A3059');
+      expect(e.headers['content-security-policy']).not.toContain(
+        'unsafe-inline',
+      );
+    });
   });
 
   it('14. INATIVAR: todas as sessões SSO caem, grants/refresh de todos os clientes revogados, 1 envio por cliente com sessão', async () => {
