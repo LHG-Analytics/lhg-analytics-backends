@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { UserStatus } from '@prisma/client';
+import { Prisma, UserStatus } from '@prisma/client';
 import { OidcLogoutService } from '../oidc/oidc-logout.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { cpfInUse, isCpfConflict } from '../common/cpf';
@@ -22,6 +22,11 @@ export interface Actor {
   id?: number;
   ctx?: RequestContext;
 }
+
+/** Checagem extra DENTRO da transação de uma mudança (ex.: travas do admin). */
+export type ChecagemNaTransacao = (
+  tx: Prisma.TransactionClient,
+) => Promise<void>;
 
 @Injectable()
 export class UsersService {
@@ -223,11 +228,14 @@ export class UsersService {
 
   // "Remover" = INATIVAR: a pessoa fica no cadastro (status INACTIVE), todas
   // as sessões caem e a auditoria registra quem fez. Resposta igual à de antes.
-  async remove(id: number, actor: Actor = {}) {
+  // `antes` (opcional) roda dentro da transação, antes de inativar: as travas
+  // do admin do HUB (ex.: nunca ficar sem nenhum admin da LHG ativo).
+  async remove(id: number, actor: Actor = {}, antes?: ChecagemNaTransacao) {
     const user = await this.findById(id); // Verifica se o usuário existe
 
     if (user.status !== UserStatus.INACTIVE) {
       await this.prisma.prismaOnline.$transaction(async (tx) => {
+        if (antes) await antes(tx);
         await tx.user.update({
           where: { id },
           data: {
@@ -293,17 +301,52 @@ export class UsersService {
    * AuditEvent por mudança. Revogar o Analytics derruba as sessões.
    */
   async setSystems(id: number, pedidos: string[], actor: Actor = {}) {
-    const user = await this.findById(id);
     const desejados = await this.access.resolveSystems(pedidos);
-    if (desejados.includes(ANALYTICS) && (!user.role || !user.unit)) {
-      throw profileRequired();
-    }
+    return this.aplicarSistemas(id, () => desejados, actor);
+  }
+
+  /**
+   * Mudança em DELTA (admin do HUB): concede `conceder` e revoga `revogar`
+   * sobre as flags ATUAIS, lidas com a linha da pessoa travada (FOR UPDATE):
+   * duas mudanças ao mesmo tempo não se sobrescrevem.
+   */
+  async changeSystems(
+    id: number,
+    mudanca: { conceder: string[]; revogar: string[] },
+    actor: Actor = {},
+    antes?: ChecagemNaTransacao,
+  ) {
+    const novos = await this.access.resolveSystems(mudanca.conceder);
+    const sair = new Set(mudanca.revogar);
+    return this.aplicarSistemas(
+      id,
+      (atuais) => [
+        ...new Set([...atuais.filter((k) => !sair.has(k)), ...novos]),
+      ],
+      actor,
+      antes,
+    );
+  }
+
+  private async aplicarSistemas(
+    id: number,
+    calcular: (atuais: string[]) => string[],
+    actor: Actor,
+    antes?: ChecagemNaTransacao,
+  ) {
+    const user = await this.findById(id);
 
     const resultado = await this.prisma.prismaOnline.$transaction(
       async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${id} FOR UPDATE`;
+        if (antes) await antes(tx);
         const ativos = await tx.systemAccess.findMany({
           where: { userId: id, revokedAt: null },
         });
+        const desejados = calcular(ativos.map((a) => a.systemKey));
+        if (desejados.includes(ANALYTICS) && (!user.role || !user.unit)) {
+          throw profileRequired();
+        }
         const atuais = new Set(ativos.map((a) => a.systemKey));
         const revogar = ativos.filter((a) => !desejados.includes(a.systemKey));
         const conceder = desejados.filter((k) => !atuais.has(k));
