@@ -40,18 +40,24 @@ export function cspDoOidc(origensDosFormularios: string[]): string {
 }
 
 /**
- * Visual do HUB (direção A): fundo roxo #4A3059, cartão claro ou escuro
- * conforme o aparelho, fonte do sistema (nada externo, por causa do CSP).
- * Texto FIXO: o hash dele vai no style-src.
+ * Visual do HUB (direção A): fundo em gradiente roxo (#4A3059) com um
+ * mosaico suave feito só com CSS, cartão central claro ou escuro conforme o
+ * aparelho, marca LHG | HUB em SVG inline e fonte do sistema (nada externo,
+ * por causa do CSP). Texto FIXO: o hash dele vai no style-src.
  */
-const ESTILO = `:root{color-scheme:light dark;--roxo:#4A3059;--roxo-claro:#6B4A80;--cartao:#fff;--texto:#1f1a24;--suave:#5f5868;--borda:#d9d2e0;--campo:#fff}
-@media (prefers-color-scheme:dark){:root{--cartao:#221a29;--texto:#f2eef5;--suave:#b6aec0;--borda:#3d3248;--campo:#2b2233}}
+const ESTILO = `:root{color-scheme:light dark;--roxo:#4A3059;--roxo-claro:#6B4A80;--cartao:#fff;--texto:#1f1a24;--suave:#5f5868;--borda:#d9d2e0;--campo:#fff;--marca:#4A3059}
+@media (prefers-color-scheme:dark){:root{--cartao:#221a29;--texto:#f2eef5;--suave:#b6aec0;--borda:#3d3248;--campo:#2b2233;--marca:#d9c2ea}}
 *{box-sizing:border-box}
-body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--roxo);color:var(--texto);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
-main{width:100%;max-width:380px;background:var(--cartao);border-radius:14px;padding:28px 24px;box-shadow:0 12px 32px rgba(0,0,0,.28)}
-.marca{margin:0 0 20px;font-size:.8rem;font-weight:700;letter-spacing:.12em;color:var(--roxo-claro)}
-@media (prefers-color-scheme:dark){.marca{color:#c7a9dc}}
+html{background:#4A3059}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--texto);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;background-color:#4A3059;background-image:linear-gradient(45deg,rgba(255,255,255,.035) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.035) 75%),linear-gradient(45deg,rgba(255,255,255,.035) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.035) 75%),linear-gradient(160deg,#5c3a70 0%,#4A3059 45%,#2c1a37 100%);background-size:56px 56px,56px 56px,100% 100%;background-position:0 0,28px 28px,0 0;background-attachment:fixed}
+main{width:100%;max-width:380px;background:var(--cartao);border-radius:16px;padding:28px 24px;box-shadow:0 18px 48px rgba(20,8,28,.45)}
+.marca{display:block;margin:0 0 22px;color:var(--marca);height:24px;width:auto}
 h1{font-size:1.3rem;margin:0 0 12px;line-height:1.3}p{line-height:1.5;margin:0 0 12px}
+.saindo{text-align:center;padding:12px 0 4px}.saindo .marca{margin:0 auto 22px}
+.spinner{width:40px;height:40px;margin:4px auto 18px;border-radius:50%;border:4px solid var(--borda);border-top-color:var(--roxo-claro);animation:girar .8s linear infinite}
+@media (prefers-color-scheme:dark){.spinner{border-top-color:#c7a9dc}}
+@media (prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}}
+@keyframes girar{to{transform:rotate(360deg)}}
 label{display:block;margin:14px 0 6px;font-size:.9rem;color:var(--suave)}
 input{width:100%;padding:10px 12px;font-size:1rem;border:1px solid var(--borda);border-radius:8px;background:var(--campo);color:var(--texto)}
 button{width:100%;margin-top:14px;padding:12px;font-size:1rem;font-weight:600;border-radius:8px;cursor:pointer;border:1px solid var(--roxo);background:var(--roxo);color:#fff}
@@ -61,12 +67,24 @@ a{color:inherit}
 .erro{background:#fde8e8;color:#8f1d1d;padding:10px 12px;border-radius:8px;font-size:.9rem}
 .aviso{color:var(--suave);font-size:.8rem;margin-top:16px}form.inline{margin:0}`;
 
-/** `script` (opcional) já vem pronto; o hash dele vai no CSP da resposta. */
-function pagina(titulo: string, corpo: string, script = ''): string {
+/** Marca "LHG | HUB" em SVG inline (sem imagem nem fonte externa). */
+const MARCA = `<svg class="marca" role="img" aria-label="LHG | HUB" viewBox="0 0 124 24" width="124" height="24"><text x="0" y="19" font-size="20" font-weight="800" letter-spacing="1.5" fill="currentColor">LHG</text><rect x="58" y="3" width="2" height="18" rx="1" fill="currentColor" opacity=".4"/><text x="70" y="19" font-size="20" font-weight="400" letter-spacing="1.5" fill="currentColor">HUB</text></svg>`;
+
+/**
+ * Página do /oidc no visual do HUB. `script` (opcional) já vem pronto e vai
+ * no FIM do corpo (roda assim que o formulário existe); o hash dele vai no
+ * CSP da resposta. `classe` vai no cartão.
+ */
+function pagina(
+  titulo: string,
+  corpo: string,
+  script = '',
+  classe = '',
+): string {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="referrer" content="no-referrer"><title>${html(titulo)}</title>
-<style>${ESTILO}</style>${script ? `<script>${script}</script>` : ''}</head><body><main><p class="marca">LHG</p>${corpo}</main></body></html>`;
+<meta name="referrer" content="no-referrer"><meta name="color-scheme" content="light dark"><title>${html(titulo)}</title>
+<style>${ESTILO}</style></head><body><main${classe ? ` class="${classe}"` : ''}>${MARCA}${corpo}</main>${script ? `<script>${script}</script>` : ''}</body></html>`;
 }
 
 /**
@@ -137,8 +155,8 @@ export async function renderError(
   );
 }
 
-const ENVIAR_SAIDA =
-  "document.addEventListener('DOMContentLoaded',function(){document.getElementById('op.logoutForm').submit()});";
+// No fim do corpo: o formulário já existe, o envio é imediato (sem esperar).
+const ENVIAR_SAIDA = "document.getElementById('op.logoutForm').submit();";
 
 /**
  * Saída DIRETA, sem confirmação: só quando o provedor já VALIDOU o
@@ -175,9 +193,10 @@ export async function logoutSource(ctx: any, form: string): Promise<void> {
       '<noscript><button autofocus type="submit">Continuar</button></noscript></form>';
     liberarScript(ctx, ENVIAR_SAIDA);
     ctx.body = pagina(
-      'Saindo — LHG',
-      `<h1>Saindo…</h1><p>Encerrando a sua sessão em todos os sistemas da LHG.</p>${form.replace(/<\/form>\s*$/, reserva)}`,
+      'Saindo — HUB LHG',
+      `<div class="spinner" aria-hidden="true"></div><h1 role="status">Saindo do HUB LHG…</h1>${form.replace(/<\/form>\s*$/, reserva)}`,
       ENVIAR_SAIDA,
+      'saindo',
     );
     return;
   }
