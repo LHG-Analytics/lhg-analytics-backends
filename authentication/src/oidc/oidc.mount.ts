@@ -17,6 +17,7 @@ import { InvitationsService } from '../invitations/invitations.service';
 import { UsersService } from '../users/users.service';
 import { rotasDoHub } from './oidc-hub';
 import { rotasDeAdmin } from './oidc-hub-admin';
+import { rotaDeSair } from './oidc-hub-sair';
 import { interacoes } from './oidc-interactions';
 import { loadOidcModule } from './oidc-loader';
 import {
@@ -415,6 +416,8 @@ export async function mountOidc(
   logger.log(
     `oidc: admin do HUB=${!users || !invitations ? 'indisponível' : chaveDoProxy() ? 'ok' : 'FECHADO (sem HUB_PROXY_KEY)'}`,
   );
+  // "Sair" do portal servidor → servidor (sem a página do end_session).
+  express.use('/oidc', rotaDeSair({ provider, prisma, logout, access }));
   express.use('/oidc', (req: Request, res: Response) => callback(req, res));
 
   agendarLimpeza(app, prisma);

@@ -66,6 +66,7 @@ describe('rate limit do /oidc: regra por rota', () => {
     ['PUT', '/hub/admin/pessoas/x/sistemas', 'admin'],
     ['GET', '/hub/admin', 'admin'],
     ['GET', '/hub/systems', 'outras'],
+    ['POST', '/hub/sair', 'sair'],
     ['GET', '/.well-known/openid-configuration', 'outras'],
     ['GET', '/interaction/abc', 'outras'],
   ])('%s %s → %s', (m, c, regra) => {
