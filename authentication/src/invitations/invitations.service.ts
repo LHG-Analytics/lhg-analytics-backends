@@ -350,6 +350,26 @@ export class InvitationsService {
   }
 
   /**
+   * Página de aceite do login central (/oidc/convite): o mesmo que o check,
+   * mais o nome do convite e os sistemas com o nome amigável do catálogo.
+   * Convite que não serve → o MESMO erro único (INVITE_INVALID).
+   */
+  async resumoPorToken(token: string) {
+    const inv = await this.validoPorToken(token, this.prisma.prismaOnline);
+    const catalogo = await this.prisma.prismaOnline.system.findMany({
+      where: { key: { in: inv.systems } },
+      select: { key: true, name: true },
+    });
+    const nomes = new Map(catalogo.map((s) => [s.key, s.name]));
+    return {
+      nome: inv.name,
+      emailMasked: maskEmail(inv.email),
+      sistemas: inv.systems.map((k) => nomes.get(k) ?? k),
+      expiresAt: inv.expiresAt,
+    };
+  }
+
+  /**
    * POST /api/invitations/accept/password: cria a pessoa com a senha ÚNICA
    * (custo 12) e as flags do convite, e marca o convite como aceito. O link
    * não chegou por e-mail (1c), então o e-mail NÃO fica verificado.
