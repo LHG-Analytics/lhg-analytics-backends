@@ -11,6 +11,7 @@ import { GoogleLoginService } from '../google/google-login.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { OidcAccounts } from './oidc-accounts';
 import { loadClients } from './oidc-clients';
+import { rotasDoConvite } from './oidc-convite';
 import { readOidcSettings, OidcSettings } from './oidc.config';
 import { chaveDoProxy } from '../common/client-ip';
 import { InvitationsService } from '../invitations/invitations.service';
@@ -407,6 +408,20 @@ export async function mountOidc(
   };
   const users = opcional(UsersService);
   const invitations = opcional(InvitationsService);
+  // Página de aceite do convite (o link é INVITE_LINK_BASE_URL#<token>).
+  if (invitations) {
+    const portal =
+      safeLaunchUrl(get('HUB_BASE_URL')) ??
+      safeLaunchUrl(get('INVITE_LINK_BASE_URL'));
+    express.use(
+      '/oidc',
+      rotasDoConvite({
+        invitations,
+        caminho,
+        entrar: portal ? `${new URL(portal).origin}/entrar` : null,
+      }),
+    );
+  }
   if (users && invitations) {
     express.use(
       '/oidc',

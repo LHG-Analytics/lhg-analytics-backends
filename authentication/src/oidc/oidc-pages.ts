@@ -65,7 +65,12 @@ button.secundario{background:transparent;color:var(--texto);border-color:var(--b
 button:focus-visible,a:focus-visible{outline:3px solid #c7a9dc;outline-offset:2px}
 a{color:inherit}
 .erro{background:#fde8e8;color:#8f1d1d;padding:10px 12px;border-radius:8px;font-size:.9rem}
-.aviso{color:var(--suave);font-size:.8rem;margin-top:16px}form.inline{margin:0}`;
+.aviso{color:var(--suave);font-size:.8rem;margin-top:16px}form.inline{margin:0}
+[hidden]{display:none!important}
+a.botao{display:block;box-sizing:border-box;width:100%;margin-top:14px;padding:12px;font-size:1rem;font-weight:600;text-align:center;text-decoration:none;border-radius:8px;border:1px solid var(--borda);color:var(--texto)}
+.ou{text-align:center;color:var(--suave);font-size:.85rem;margin:18px 0 0}
+.dados{margin:0 0 6px;padding:12px 14px;border:1px solid var(--borda);border-radius:10px;font-size:.92rem}
+.dados dt{color:var(--suave);font-size:.8rem;margin-top:8px}.dados dt:first-child{margin-top:0}.dados dd{margin:2px 0 0;font-weight:600}`;
 
 /** Marca "LHG | HUB" em SVG inline (sem imagem nem fonte externa). */
 const MARCA = `<svg class="marca" role="img" aria-label="LHG | HUB" viewBox="0 0 124 24" width="124" height="24"><text x="0" y="19" font-size="20" font-weight="800" letter-spacing="1.5" fill="currentColor">LHG</text><rect x="58" y="3" width="2" height="18" rx="1" fill="currentColor" opacity=".4"/><text x="70" y="19" font-size="20" font-weight="400" letter-spacing="1.5" fill="currentColor">HUB</text></svg>`;
@@ -94,11 +99,17 @@ function pagina(
  */
 function liberarScript(ctx: any, script: string): void {
   const csp: string | undefined = ctx.response.get('content-security-policy');
-  if (!csp || !/(^|;)\s*script-src\s/.test(csp)) return;
-  ctx.set(
-    'content-security-policy',
-    csp.replace(/(^|;)(\s*script-src\s[^;]*)/, `$1$2 ${sha256(script)}`),
-  );
+  const novo = cspComScript(csp, script);
+  if (novo) ctx.set('content-security-policy', novo);
+}
+
+/** O CSP `csp` com o hash de `script` no script-src (ou null, se não houver). */
+export function cspComScript(
+  csp: string | undefined,
+  script: string,
+): string | null {
+  if (!csp || !/(^|;)\s*script-src\s/.test(csp)) return null;
+  return csp.replace(/(^|;)(\s*script-src\s[^;]*)/, `$1$2 ${sha256(script)}`);
 }
 
 /** Mensagens da tela: o código vem na URL, o texto sai daqui (nunca da URL). */
@@ -250,5 +261,84 @@ export function paginaAviso(titulo: string, texto: string): string {
   return pagina(
     `${titulo} — LHG`,
     `<h1>${html(titulo)}</h1><p>${html(texto)}</p>`,
+  );
+}
+
+// ── Aceite do convite (/oidc/convite) ───────────────────────────────────
+
+/**
+ * Lê o token do FRAGMENTO (#<token> ou #token=<token>; o fragmento nunca vai
+ * ao servidor nem aos logs), apaga o fragmento da barra e envia o token por
+ * POST (corpo), também nunca em query string.
+ */
+export const ABRIR_CONVITE =
+  "(function(){var h=location.hash.slice(1),t=h.indexOf('token=')===0?h.slice(6):h;try{t=decodeURIComponent(t)}catch(e){t=''}try{history.replaceState(null,'',location.pathname)}catch(e){}if(t){var f=document.getElementById('convite');f.elements.token.value=t;f.submit()}else{document.getElementById('abrindo').hidden=true;document.getElementById('sem-token').hidden=false}})();";
+
+/** GET /convite: só abre o convite (o token está no fragmento). */
+export function paginaConviteAbrindo(acao: string): string {
+  return pagina(
+    'Convite — HUB LHG',
+    `<div id="abrindo"><div class="spinner" aria-hidden="true"></div><h1 role="status">Abrindo o seu convite…</h1></div>
+<div id="sem-token" hidden><h1>Link de convite incompleto</h1><p>Abra o link exatamente como chegou no e-mail ou na mensagem. Se não der certo, peça um novo convite ao suporte técnico.</p></div>
+<noscript><p class="erro">Para abrir o convite, ative o JavaScript do navegador.</p></noscript>
+<form id="convite" method="post" action="${html(acao)}"><input type="hidden" name="token" value=""></form>`,
+    ABRIR_CONVITE,
+    'saindo',
+  );
+}
+
+const dataBr = (d: Date | null) =>
+  d
+    ? d.toLocaleDateString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+    : 'sem data de validade';
+
+/** POST /convite: os dados do convite e as duas formas de aceitar. */
+export function paginaConvite(p: {
+  acaoSenha: string;
+  token: string;
+  nome: string | null;
+  emailMasked: string;
+  sistemas: string[];
+  expiresAt: Date | null;
+  entrar: string | null;
+  erro?: string | null;
+  minimo: number;
+}): string {
+  return pagina(
+    'Convite — HUB LHG',
+    `<h1>${p.nome ? `Olá, ${html(p.nome)}` : 'Você foi convidado'}</h1>
+<p>Você recebeu acesso ao HUB LHG. Confira e escolha como vai entrar.</p>
+<dl class="dados"><dt>E-mail</dt><dd>${html(p.emailMasked)}</dd>
+<dt>Sistemas</dt><dd>${p.sistemas.length ? p.sistemas.map(html).join(', ') : 'Nenhum por enquanto'}</dd>
+<dt>Convite válido até</dt><dd>${html(dataBr(p.expiresAt))}</dd></dl>
+${p.erro ? `<p class="erro" role="alert">${html(p.erro)}</p>` : ''}
+<form method="post" action="${html(p.acaoSenha)}" autocomplete="off">
+<input type="hidden" name="token" value="${html(p.token)}">
+<label for="senha">Crie uma senha (mínimo ${p.minimo} caracteres)</label><input id="senha" name="senha" type="password" required minlength="${p.minimo}" autocomplete="new-password">
+<label for="confirmacao">Confirme a senha</label><input id="confirmacao" name="confirmacao" type="password" required minlength="${p.minimo}" autocomplete="new-password">
+<button type="submit">Definir senha</button></form>
+${
+  p.entrar
+    ? `<p class="ou">ou</p><a class="botao" href="${html(p.entrar)}">Entrar com Google</a>
+<p class="aviso">Com o Google, use a conta do e-mail do convite.</p>`
+    : ''
+}`,
+  );
+}
+
+/** Convite que não serve (não revela o motivo: vencido, usado ou revogado). */
+export function paginaConviteInvalido(entrar: string | null): string {
+  return pagina(
+    'Convite — HUB LHG',
+    `<h1>Este convite não vale mais</h1><p>Ele pode ter vencido, já ter sido usado ou ter sido cancelado. Peça um novo convite ao suporte técnico.</p>${
+      entrar
+        ? `<p class="aviso">Se você já criou a sua conta, é só <a href="${html(entrar)}">entrar no HUB</a>.</p>`
+        : ''
+    }`,
   );
 }
