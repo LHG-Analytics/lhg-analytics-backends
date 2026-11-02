@@ -11,6 +11,7 @@ import { GoogleLoginService } from '../google/google-login.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { OidcAccounts } from './oidc-accounts';
 import { loadClients } from './oidc-clients';
+import { rotasDoConvite } from './oidc-convite';
 import { readOidcSettings, OidcSettings } from './oidc.config';
 import { chaveDoProxy } from '../common/client-ip';
 import { InvitationsService } from '../invitations/invitations.service';
@@ -18,7 +19,6 @@ import { UsersService } from '../users/users.service';
 import { rotasDoHub } from './oidc-hub';
 import { rotasDeAdmin } from './oidc-hub-admin';
 import { rotaDeSair } from './oidc-hub-sair';
-import { rotasDoConvite } from './oidc-convite';
 import { interacoes } from './oidc-interactions';
 import { loadOidcModule } from './oidc-loader';
 import {
