@@ -11,12 +11,14 @@ import { GoogleLoginService } from '../google/google-login.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { OidcAccounts } from './oidc-accounts';
 import { loadClients } from './oidc-clients';
+import { rotasDoConvite } from './oidc-convite';
 import { readOidcSettings, OidcSettings } from './oidc.config';
 import { chaveDoProxy } from '../common/client-ip';
 import { InvitationsService } from '../invitations/invitations.service';
 import { UsersService } from '../users/users.service';
 import { rotasDoHub } from './oidc-hub';
 import { rotasDeAdmin } from './oidc-hub-admin';
+import { rotaDeSair } from './oidc-hub-sair';
 import { interacoes } from './oidc-interactions';
 import { loadOidcModule } from './oidc-loader';
 import {
@@ -406,6 +408,20 @@ export async function mountOidc(
   };
   const users = opcional(UsersService);
   const invitations = opcional(InvitationsService);
+  // Página de aceite do convite (o link é INVITE_LINK_BASE_URL#<token>).
+  if (invitations) {
+    const portal =
+      safeLaunchUrl(get('HUB_BASE_URL')) ??
+      safeLaunchUrl(get('INVITE_LINK_BASE_URL'));
+    express.use(
+      '/oidc',
+      rotasDoConvite({
+        invitations,
+        caminho,
+        entrar: portal ? `${new URL(portal).origin}/entrar` : null,
+      }),
+    );
+  }
   if (users && invitations) {
     express.use(
       '/oidc',
@@ -415,6 +431,8 @@ export async function mountOidc(
   logger.log(
     `oidc: admin do HUB=${!users || !invitations ? 'indisponível' : chaveDoProxy() ? 'ok' : 'FECHADO (sem HUB_PROXY_KEY)'}`,
   );
+  // "Sair" do portal servidor → servidor (sem a página do end_session).
+  express.use('/oidc', rotaDeSair({ provider, prisma, logout, access }));
   express.use('/oidc', (req: Request, res: Response) => callback(req, res));
 
   agendarLimpeza(app, prisma);
