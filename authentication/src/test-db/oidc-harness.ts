@@ -14,7 +14,7 @@ import { LauncherService } from '../access/launcher.service';
 import { LoginLockService } from '../access/login-lock.service';
 import { AuthController } from '../auth/auth.controller';
 import { AuthService } from '../auth/auth.service';
-import { buildCorsOptions, helmetMiddleware } from '../common/http-setup';
+import { buildCorsDelegate, helmetMiddleware } from '../common/http-setup';
 import { GoogleSettings } from '../google/google.config';
 import {
   AuthorizationParams,
@@ -53,7 +53,12 @@ export class GoogleFalso extends GoogleIdentityProvider {
 /** Sobe o app como o main.ts, com as variáveis de agora. */
 export async function subirComoMain(
   google: GoogleIdentityProvider = new GoogleFalso(),
-  extras: { imports?: any[]; providers?: any[]; limitarTaxa?: boolean } = {},
+  extras: {
+    imports?: any[];
+    providers?: any[];
+    controllers?: any[];
+    limitarTaxa?: boolean;
+  } = {},
 ): Promise<{ app: INestApplication; provider: any }> {
   const moduleRef = await Test.createTestingModule({
     imports: [
@@ -65,7 +70,7 @@ export async function subirComoMain(
       JwtModule.register({ secret: JWT_TESTE }),
       ...(extras.imports ?? []),
     ],
-    controllers: [AuthController],
+    controllers: [AuthController, ...(extras.controllers ?? [])],
     providers: [
       AuthService,
       AccessService,
@@ -95,7 +100,7 @@ export async function subirComoMain(
     // Rate limit só na suíte que o testa (D4).
     limitarTaxa: extras.limitarTaxa ?? false,
   });
-  app.enableCors(buildCorsOptions({}));
+  app.enableCors(buildCorsDelegate({}));
   await app.init();
   return { app, provider };
 }
