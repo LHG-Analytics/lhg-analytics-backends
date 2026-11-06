@@ -225,3 +225,43 @@ describe('CORS: /api/hub/* fica fora do CORS do navegador', () => {
     expect(typeof opcoesDe('/api/hubx').origin).toBe('function');
   });
 });
+
+describe('ANALYTICS_BACKEND_URL (front e backend em hosts diferentes)', () => {
+  const FRONT = 'https://analytics-front.exemplo.invalid';
+  const BACK = 'https://analytics.exemplo.invalid';
+
+  it('com a variável: redirect_uri no BACKEND; publicOrigin = front (destinos e CSRF)', () => {
+    const s = settings({
+      ANALYTICS_PUBLIC_URL: `${FRONT}/`,
+      ANALYTICS_BACKEND_URL: `${BACK}/qualquer`,
+    });
+    expect(s.ativo).toBe(true);
+    expect(s.publicOrigin).toBe(FRONT);
+    expect(s.backendOrigin).toBe(BACK);
+    expect(s.separados).toBe(true);
+    expect(s.redirectUri).toBe(`${BACK}/auth/api/hub/callback`);
+    expect(resumoHubCliente(s).linha).toContain('backend separado do front');
+  });
+
+  it('sem a variável: comportamento anterior (tudo no host de ANALYTICS_PUBLIC_URL)', () => {
+    const s = settings({ ANALYTICS_PUBLIC_URL: FRONT });
+    expect(s.backendOrigin).toBe(FRONT);
+    expect(s.separados).toBe(false);
+    expect(s.redirectUri).toBe(`${FRONT}/auth/api/hub/callback`);
+    expect(resumoHubCliente(s).linha).toContain('mesmo host do front');
+  });
+
+  it('variável inválida (http, com credenciais) → DESLIGADO, sem valores na linha', () => {
+    for (const v of [
+      'http://analytics.exemplo.invalid',
+      'https://u:p@analytics.exemplo.invalid',
+      'lixo',
+    ]) {
+      const s = settings({ ANALYTICS_BACKEND_URL: v });
+      expect(s.ativo).toBe(false);
+      expect(resumoHubCliente(s).linha).toBe(
+        'hub-cliente: DESLIGADO (ANALYTICS_BACKEND_URL inválida)',
+      );
+    }
+  });
+});

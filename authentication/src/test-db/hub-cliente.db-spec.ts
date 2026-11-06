@@ -705,6 +705,103 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
     }
   });
 
+  // Front e backend em hosts diferentes (o front não repassa /auth/* ao
+  // backend): o callback e os cookies an_hub_* ficam no BACKEND (o mesmo
+  // cliente cadastrado), e os destinos e o CSRF do logout usam o FRONT.
+  describe('ANALYTICS_BACKEND_URL: front ≠ backend', () => {
+    const FRONT = 'https://analytics-front.exemplo.invalid';
+    beforeAll(() => {
+      process.env.ANALYTICS_PUBLIC_URL = FRONT;
+      process.env.ANALYTICS_BACKEND_URL = PUBLICO; // o host do callback cadastrado
+    });
+    afterAll(() => {
+      process.env.ANALYTICS_PUBLIC_URL = PUBLICO;
+      delete process.env.ANALYTICS_BACKEND_URL;
+    });
+
+    it('redirect_uri continua no BACKEND; depois do login, o returnTo volta ao FRONT; cookies an_hub_* host-only no backend', async () => {
+      const ini = await request(srv).get('/api/hub/login').expect(302);
+      expect(
+        new URL(ini.headers.location).searchParams.get('redirect_uri'),
+      ).toBe(CALLBACK);
+      const u = await pessoa();
+      const { cb } = await entrarPeloHub(new Pote(), u.email, '/relatorios');
+      expect(cb.status).toBe(302);
+      expect(cb.headers.location).toBe(`${FRONT}/relatorios`);
+      const idt = cookie(cb, COOKIE_IDT)!;
+      expect(atributos(idt)).toEqual(
+        expect.arrayContaining([
+          'path=/auth/api/hub',
+          'httponly',
+          'samesite=lax',
+          'secure',
+        ]),
+      );
+      expect(atributos(idt).some((a) => a.startsWith('domain='))).toBe(false);
+      // A sessão (access_token/refresh_token) é a de sempre (mesmos atributos do POST /api/login).
+      const senha = await request(srv)
+        .post('/api/login')
+        .send({ email: u.email, password: SENHA })
+        .expect(200);
+      expect(atributos(cookie(cb, 'access_token'))).toEqual(
+        atributos(cookie(senha, 'access_token')),
+      );
+    });
+
+    it('erro volta ao /login do FRONT (?hub_error=…)', async () => {
+      const u = await pessoa({ systems: ['cms'] });
+      const { cb } = await entrarPeloHub(new Pote(), u.email);
+      expect(cb.headers.location).toBe(
+        `${FRONT}/login?hub_error=access_denied`,
+      );
+    });
+
+    it('logout (form POST do front): Origin do FRONT aceito (303); Origin do backend ou outro → 403; Referer do front também vale', async () => {
+      const u = await pessoa();
+      const pote = new Pote();
+      await entrarPeloHub(pote, u.email);
+      for (const origem of [PUBLICO, 'https://atacante.invalid']) {
+        const r = await request(srv)
+          .post('/api/hub/logout')
+          .set('Origin', origem)
+          .set('Cookie', pote.header());
+        expect(r.status).toBe(403);
+      }
+      const cabecalho = pote.header();
+      const ok = pote.guardar(
+        await request(srv)
+          .post('/api/hub/logout')
+          .set('Origin', FRONT)
+          .set('Cookie', cabecalho),
+      );
+      expect(ok.status).toBe(303);
+      expect(
+        new URL(ok.headers.location).searchParams.get('id_token_hint'),
+      ).toBeTruthy();
+      expect(
+        (await request(srv).post('/api/refresh').set('Cookie', cabecalho))
+          .status,
+      ).toBe(401);
+      const p2 = new Pote();
+      await entrarPeloHub(p2, u.email);
+      expect(
+        (
+          await request(srv)
+            .post('/api/hub/logout')
+            .set('Referer', `${FRONT}/painel`)
+            .set('Cookie', p2.header())
+        ).status,
+      ).toBe(303);
+    });
+  });
+
+  it('compatibilidade: sem ANALYTICS_BACKEND_URL, tudo volta ao host de ANALYTICS_PUBLIC_URL (comportamento anterior)', async () => {
+    expect(process.env.ANALYTICS_BACKEND_URL).toBeUndefined();
+    const u = await pessoa();
+    const { cb } = await entrarPeloHub(new Pote(), u.email, '/relatorios');
+    expect(cb.headers.location).toBe(`${PUBLICO}/relatorios`);
+  });
+
   it('17. varredura dos logs: nenhum code, token, segredo ou cookie', () => {
     expect(sensiveis.size).toBeGreaterThan(10);
     const tudo = logs.join('\n');

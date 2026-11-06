@@ -11,8 +11,18 @@ export interface HubClientSettings {
   issuer: string;
   clientId: string;
   clientSecret: string;
-  /** Origem do front (sem caminho): de onde saem o redirect_uri e os destinos. */
+  /**
+   * Origem do FRONT (sem caminho): destino após o login, /login?hub_error e o
+   * Origin aceito no logout.
+   */
   publicOrigin: string;
+  /**
+   * Origem onde ficam as rotas /auth/api/hub/* (o callback e os cookies
+   * an_hub_*): ANALYTICS_BACKEND_URL, ou o próprio front se ela não existir.
+   */
+  backendOrigin: string;
+  /** Front e backend em hosts diferentes (ANALYTICS_BACKEND_URL ≠ front). */
+  separados: boolean;
   redirectUri: string;
   portalUrl: string;
   /** ANALYTICS_LOGIN_LOCAL=off pedido (vale só com o cliente ATIVO). */
@@ -60,6 +70,11 @@ export function readHubClientSettings(
   const clientSecret = get('HUB_OIDC_CLIENT_SECRET')?.trim() ?? '';
   const publico = urlSegura(get('ANALYTICS_PUBLIC_URL'), permitirLocalhost);
   const portal = urlSegura(get('HUB_PORTAL_URL'), permitirLocalhost);
+  // Opcional: o host do backend, quando o front não repassa /auth/* a ele.
+  const backendBruto = get('ANALYTICS_BACKEND_URL')?.trim();
+  const backend = backendBruto
+    ? urlSegura(backendBruto, permitirLocalhost)
+    : null;
   const loginLocalOffPedido =
     (get('ANALYTICS_LOGIN_LOCAL') ?? '').trim().toLowerCase() === 'off';
 
@@ -70,8 +85,11 @@ export function readHubClientSettings(
     motivo = `HUB_OIDC_CLIENT_SECRET ausente/curto (< ${MIN_SEGREDO})`;
   else if (!publico) motivo = 'ANALYTICS_PUBLIC_URL ausente/inválida';
   else if (!portal) motivo = 'HUB_PORTAL_URL ausente/inválida';
+  else if (backendBruto && !backend) motivo = 'ANALYTICS_BACKEND_URL inválida';
   const ativo = motivo === null;
   const publicOrigin = publico ? publico.origin : '';
+  // Sem ANALYTICS_BACKEND_URL: tudo no host do front (comportamento anterior).
+  const backendOrigin = backend ? backend.origin : publicOrigin;
   return {
     ativo,
     motivo,
@@ -79,7 +97,9 @@ export function readHubClientSettings(
     clientId,
     clientSecret,
     publicOrigin,
-    redirectUri: publicOrigin ? `${publicOrigin}${CALLBACK_PATH}` : '',
+    backendOrigin,
+    separados: !!backendOrigin && backendOrigin !== publicOrigin,
+    redirectUri: backendOrigin ? `${backendOrigin}${CALLBACK_PATH}` : '',
     portalUrl: portal ? portal.toString() : '',
     loginLocalOffPedido,
     // Recusa o "off" sem o cliente ativo: ninguém fica sem login.
@@ -93,7 +113,7 @@ export function resumoHubCliente(s: HubClientSettings): {
   alerta: string | null;
 } {
   const linha = s.ativo
-    ? `hub-cliente: ATIVO (client_id=${s.clientId}, login local=${s.loginLocalFechado ? 'FECHADO' : 'aberto'})`
+    ? `hub-cliente: ATIVO (client_id=${s.clientId}, callback=${s.separados ? 'backend separado do front' : 'mesmo host do front'}, login local=${s.loginLocalFechado ? 'FECHADO' : 'aberto'})`
     : `hub-cliente: DESLIGADO (${s.motivo})`;
   const alerta =
     s.loginLocalOffPedido && !s.ativo
