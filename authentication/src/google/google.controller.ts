@@ -33,6 +33,7 @@ import {
   InvitationsService,
   hashToken,
 } from '../invitations/invitations.service';
+import { readHubClientSettings } from '../hub-client/hub-client.settings';
 import { GoogleSettings, readGoogleSettings } from './google.config';
 import { GoogleIdentityProvider } from './google-identity.provider';
 import { GoogleLoginService, GoogleRefusal } from './google-login.service';
@@ -80,6 +81,18 @@ export class GoogleController implements OnModuleInit {
     else this.logger.warn(s.resumo);
   }
 
+  /**
+   * Login só pelo HUB (ANALYTICS_LOGIN_LOCAL=off, com o cliente ativo): o
+   * Google antigo fica recusado (o Google acontece dentro do HUB).
+   */
+  private fechadoPeloHub(res: Response, s: GoogleSettings) {
+    const hub = readHubClientSettings((n) => this.config.get<string>(n));
+    if (!hub.loginLocalFechado) return null;
+    if (s.postLoginRedirect) return this.voltar(res, s, 'disabled');
+    res.clearCookie(OAUTH_COOKIE, sessionCookieOptions(this.config));
+    return res.redirect(302, `${hub.publicOrigin}/login`);
+  }
+
   private voltar(res: Response, s: GoogleSettings, erro?: string) {
     res.clearCookie(OAUTH_COOKIE, sessionCookieOptions(this.config));
     if (!s.postLoginRedirect) {
@@ -120,6 +133,8 @@ export class GoogleController implements OnModuleInit {
   @Header('Referrer-Policy', 'no-referrer')
   start(@Res() res: Response) {
     const s = this.settings();
+    const fechado = this.fechadoPeloHub(res, s);
+    if (fechado) return fechado;
     if (!s.enabled) return this.voltar(res, s, 'disabled');
     return res.redirect(302, this.iniciar(res, s));
   }
@@ -157,6 +172,8 @@ export class GoogleController implements OnModuleInit {
     @Res() res: Response,
   ) {
     const s = this.settings();
+    const fechado = this.fechadoPeloHub(res, s);
+    if (fechado) return fechado;
     if (!s.enabled) return this.voltar(res, s, 'disabled');
     const ctx = requestContext(req);
 
