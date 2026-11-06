@@ -208,3 +208,20 @@ describe('6. id_token: recusas', () => {
     ).rejects.toBeInstanceOf(TokenInvalido);
   });
 });
+
+describe('CORS: /api/hub/* fica fora do CORS do navegador', () => {
+  it('delegado: /api/hub/* → origin false; o resto mantém as regras', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { buildCorsDelegate } = require('../common/http-setup');
+    const d = buildCorsDelegate({});
+    const opcoesDe = (url: string) => {
+      let o: any;
+      d({ url }, (_e: unknown, op: unknown) => (o = op));
+      return o;
+    };
+    expect(opcoesDe('/api/hub/logout')).toEqual({ origin: false });
+    expect(opcoesDe('/api/hub/callback?code=x')).toEqual({ origin: false });
+    expect(typeof opcoesDe('/api/login').origin).toBe('function');
+    expect(typeof opcoesDe('/api/hubx').origin).toBe('function');
+  });
+});

@@ -81,3 +81,25 @@ export function buildCorsOptions(env: NodeJS.ProcessEnv = process.env) {
   };
   return corsOptions;
 }
+
+/**
+ * CORS por requisição: as rotas do Analytics como CLIENTE do HUB
+ * (/api/hub/*) são navegação (callback, logout por formulário) ou chamada
+ * servidor a servidor (back-channel), então ficam FORA do CORS do navegador
+ * (sem cabeçalhos CORS e sem o erro de origem). As demais seguem as regras
+ * de buildCorsOptions.
+ */
+export function buildCorsDelegate(env: NodeJS.ProcessEnv = process.env) {
+  const opcoes = buildCorsOptions(env);
+  return (
+    req: { url?: string },
+    callback: (err: Error | null, options?: CorsOptions) => void,
+  ) => {
+    const caminho = (req.url ?? '').split('?')[0];
+    if (/^\/api\/hub(\/|$)/.test(caminho)) {
+      callback(null, { origin: false });
+      return;
+    }
+    callback(null, opcoes);
+  };
+}

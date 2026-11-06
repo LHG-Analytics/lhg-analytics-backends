@@ -7,7 +7,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
 import * as compression from 'compression';
 import { applyTrustProxy } from './common/trust-proxy';
-import { buildCorsOptions, helmetMiddleware } from './common/http-setup';
+import { buildCorsDelegate, helmetMiddleware } from './common/http-setup';
 import { resumoDoProxy } from './common/client-ip';
 import { mountOidc } from './oidc/oidc.mount';
 
@@ -91,7 +91,7 @@ async function bootstrap() {
       );
     }
 
-    app.enableCors(buildCorsOptions());
+    app.enableCors(buildCorsDelegate());
 
     const port = process.env.PORT_AUTH || 3005;
     await app.listen(port);

@@ -14,7 +14,7 @@ import { LauncherService } from '../access/launcher.service';
 import { LoginLockService } from '../access/login-lock.service';
 import { AuthController } from '../auth/auth.controller';
 import { AuthService } from '../auth/auth.service';
-import { buildCorsOptions, helmetMiddleware } from '../common/http-setup';
+import { buildCorsDelegate, helmetMiddleware } from '../common/http-setup';
 import { GoogleSettings } from '../google/google.config';
 import {
   AuthorizationParams,
@@ -100,7 +100,7 @@ export async function subirComoMain(
     // Rate limit só na suíte que o testa (D4).
     limitarTaxa: extras.limitarTaxa ?? false,
   });
-  app.enableCors(buildCorsOptions({}));
+  app.enableCors(buildCorsDelegate({}));
   await app.init();
   return { app, provider };
 }
