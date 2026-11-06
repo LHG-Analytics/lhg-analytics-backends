@@ -53,7 +53,12 @@ export class GoogleFalso extends GoogleIdentityProvider {
 /** Sobe o app como o main.ts, com as variáveis de agora. */
 export async function subirComoMain(
   google: GoogleIdentityProvider = new GoogleFalso(),
-  extras: { imports?: any[]; providers?: any[]; limitarTaxa?: boolean } = {},
+  extras: {
+    imports?: any[];
+    providers?: any[];
+    controllers?: any[];
+    limitarTaxa?: boolean;
+  } = {},
 ): Promise<{ app: INestApplication; provider: any }> {
   const moduleRef = await Test.createTestingModule({
     imports: [
@@ -65,7 +70,7 @@ export async function subirComoMain(
       JwtModule.register({ secret: JWT_TESTE }),
       ...(extras.imports ?? []),
     ],
-    controllers: [AuthController],
+    controllers: [AuthController, ...(extras.controllers ?? [])],
     providers: [
       AuthService,
       AccessService,
