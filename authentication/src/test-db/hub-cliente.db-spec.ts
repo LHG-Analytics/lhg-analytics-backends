@@ -16,6 +16,7 @@ import {
   HUB_CLIENT_BUSCAR,
   HubClientController,
 } from '../hub-client/hub-client.controller';
+import { PADRAO_RETURN_TO } from '../hub-client/hub-client.settings';
 import { EVENTO_BACKCHANNEL } from '../hub-client/hub-oidc';
 import { InvitationsService } from '../invitations/invitations.service';
 import { OutboxWorker } from '../oidc/oidc-outbox';
@@ -108,11 +109,19 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
       .filter((x) => !x.startsWith('expires='))
       .sort();
 
-  /** Login completo pelo HUB: /api/hub/login → provedor (senha) → /api/hub/callback. */
-  async function entrarPeloHub(pote: Pote, email: string, returnTo?: string) {
+  /**
+   * Login completo pelo HUB: /api/hub/login → provedor (senha) → /api/hub/callback.
+   * `consultaCrua` ("?returnTo=%2F…") vai na URL exatamente como o front manda.
+   */
+  async function entrarPeloHub(
+    pote: Pote,
+    email: string,
+    returnTo?: string,
+    consultaCrua?: string,
+  ) {
     const ini = pote.guardar(
       await request(srv)
-        .get('/api/hub/login')
+        .get(`/api/hub/login${consultaCrua ?? ''}`)
         .query(returnTo ? { returnTo } : {})
         .set('Cookie', pote.header()),
     );
@@ -331,16 +340,76 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
     expect(a.headers['cache-control']).toBe('no-store');
   });
 
-  it('4. returnTo: aceito só caminho relativo seguro (//x → /)', async () => {
+  it('4. returnTo: aceito só caminho relativo seguro (//x, javascript:, \\ → destino padrão)', async () => {
     const u = await pessoa();
+    for (const inseguro of [
+      '//x.invalid',
+      'javascript:alert(1)',
+      'https://x.invalid/general',
+      '/\\x.invalid',
+    ]) {
+      expect(
+        (await entrarPeloHub(new Pote(), u.email, inseguro)).cb.headers
+          .location,
+      ).toBe(`${PUBLICO}${PADRAO_RETURN_TO}`);
+    }
+  });
+
+  it('4b. sem returnTo: volta à página inicial real do front (/general?menu=general&set=ultimos_7_dias)', async () => {
+    const u = await pessoa();
+    const { cb } = await entrarPeloHub(new Pote(), u.email);
+    expect(cb.headers.location).toBe(
+      `${PUBLICO}/general?menu=general&set=ultimos_7_dias`,
+    );
+  });
+
+  it('4c. returnTo com query string (codificado na URL) volta EXATAMENTE para o mesmo caminho', async () => {
+    const u = await pessoa();
+    // Como o front manda: returnTo=%2Fgeneral%3Fmenu%3Dgeneral%26set%3Dultimos_7_dias
+    const { cb } = await entrarPeloHub(
+      new Pote(),
+      u.email,
+      undefined,
+      '?returnTo=%2Fgeneral%3Fmenu%3Dgeneral%26set%3Dultimos_7_dias',
+    );
+    expect(cb.headers.location).toBe(
+      `${PUBLICO}/general?menu=general&set=ultimos_7_dias`,
+    );
+    // Inseguro codificado (%2F%2F = //) também cai no padrão.
     expect(
-      (await entrarPeloHub(new Pote(), u.email, '//x.invalid')).cb.headers
-        .location,
-    ).toBe(`${PUBLICO}/`);
+      (
+        await entrarPeloHub(
+          new Pote(),
+          u.email,
+          undefined,
+          '?returnTo=%2F%2Fx.invalid%2Fgeneral',
+        )
+      ).cb.headers.location,
+    ).toBe(`${PUBLICO}${PADRAO_RETURN_TO}`);
+    const outro = '/bookings?menu=bookings&set=ultimos_30_dias&x=a%26b';
     expect(
-      (await entrarPeloHub(new Pote(), u.email, 'javascript:alert(1)')).cb
-        .headers.location,
-    ).toBe(`${PUBLICO}/`);
+      (await entrarPeloHub(new Pote(), u.email, outro)).cb.headers.location,
+    ).toBe(`${PUBLICO}${outro}`);
+  });
+
+  it('4d. ANALYTICS_DEFAULT_RETURN_TO: caminho válido vira o padrão; inválido é ignorado (padrão fixo)', async () => {
+    const u = await pessoa();
+    try {
+      process.env.ANALYTICS_DEFAULT_RETURN_TO = '/painel?aba=1&b=2';
+      expect(
+        (await entrarPeloHub(new Pote(), u.email)).cb.headers.location,
+      ).toBe(`${PUBLICO}/painel?aba=1&b=2`);
+      expect(
+        (await entrarPeloHub(new Pote(), u.email, '//x.invalid')).cb.headers
+          .location,
+      ).toBe(`${PUBLICO}/painel?aba=1&b=2`);
+      process.env.ANALYTICS_DEFAULT_RETURN_TO = 'https://x.invalid/';
+      expect(
+        (await entrarPeloHub(new Pote(), u.email)).cb.headers.location,
+      ).toBe(`${PUBLICO}${PADRAO_RETURN_TO}`);
+    } finally {
+      delete process.env.ANALYTICS_DEFAULT_RETURN_TO;
+    }
   });
 
   it('5. callback sem cookie de fluxo, com state errado ou com code reusado → hub_error=falha, sem cookies de sessão', async () => {

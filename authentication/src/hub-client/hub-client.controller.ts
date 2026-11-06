@@ -144,7 +144,7 @@ export class HubClientController implements OnModuleInit {
       state: aleatorio(),
       nonce: aleatorio(),
       codeVerifier: aleatorio(),
-      returnTo: returnToSeguro(req.query.returnTo),
+      returnTo: returnToSeguro(req.query.returnTo, s.defaultReturnTo),
     };
     let destino: string;
     try {
@@ -245,7 +245,7 @@ export class HubClientController implements OnModuleInit {
     });
     return res.redirect(
       302,
-      `${s.publicOrigin}${returnToSeguro(fluxo.returnTo)}`,
+      `${s.publicOrigin}${returnToSeguro(fluxo.returnTo, s.defaultReturnTo)}`,
     );
   }
 
