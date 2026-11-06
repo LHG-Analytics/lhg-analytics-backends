@@ -113,7 +113,8 @@ export class HubClientController implements OnModuleInit {
   private cookieHub(s: HubClientSettings, maxAge: number) {
     return {
       httpOnly: true,
-      secure: s.publicOrigin.startsWith('https:'),
+      // Os cookies an_hub_* são do host do callback (o backend), host-only.
+      secure: s.backendOrigin.startsWith('https:'),
       sameSite: 'lax' as const,
       path: HUB_COOKIE_PATH,
       maxAge,
