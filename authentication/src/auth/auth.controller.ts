@@ -20,6 +20,7 @@ import { AccessService, requestContext } from '../access/access.service';
 import { looksLikeBcryptHash } from '../common/password';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { sessionCookieOptions } from './session-cookies';
+import { readHubClientSettings } from '../hub-client/hub-client.settings';
 
 @ApiTags('Auth')
 @Controller()
@@ -46,6 +47,20 @@ export class AuthController {
     @Req() req: ExpressRequest,
     @Res() res: Response,
   ) {
+    // Login só pelo HUB (ANALYTICS_LOGIN_LOCAL=off, com o cliente ativo):
+    // recusa SEM conferir a senha, para não consumir o bloqueio por conta.
+    if (
+      readHubClientSettings((n) => this.configService.get<string>(n))
+        .loginLocalFechado
+    ) {
+      await this.access.audit({
+        action: 'login.blocked.hub',
+        ctx: requestContext(req),
+      });
+      return res
+        .status(HttpStatus.FORBIDDEN)
+        .json({ code: 'LOGIN_PELO_HUB', message: 'Entre pelo HUB LHG.' });
+    }
     const user = await this.authService.validateUser(
       loginDto.email,
       loginDto.password,
