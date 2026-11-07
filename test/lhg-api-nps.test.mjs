@@ -1,6 +1,7 @@
 // API servidor-a-servidor do NPS no lhg-api:
 //   A: GET /nps/v1/estadia (suite ou raiz)   B: GET /nps/v1/checkouts
 //   C: GET /nps/v1/contato (só a chave de escopo 'contato', a do Chat LHG)
+//   D: POST /nps/v1/confirmar-cpf (3 primeiros dígitos, conferidos no banco)
 // HMAC e escopo, validação das consultas, regras (com um pool FALSO, sem banco)
 // e o HTTP de ponta a ponta. Segredos e telefones de TESTE, gerados/fictícios.
 // Rodar depois do build: node --test test/
@@ -19,6 +20,10 @@ const svc = require("../lhg-api/dist/nps/nps.service.js");
 const { NpsController } = require("../lhg-api/dist/nps/nps.controller.js");
 const { NpsHmacGuard } = require("../lhg-api/dist/nps/nps-hmac.guard.js");
 const { TenantPoolService } = require("../lhg-api/dist/database/tenant-pool.service.js");
+const tent = require("../lhg-api/dist/nps/nps-tentativas.service.js");
+
+/** Serviço com as tentativas do Endpoint D em memória (sem Redis). */
+const servico = (pool, t = new tent.NpsTentativasService()) => new svc.NpsService(pool, t);
 
 const segredo = () => crypto.randomBytes(32).toString("hex");
 const S1 = segredo();
@@ -33,13 +38,13 @@ const E164_FICTICIO = "+5511900000001";
 // 201 (suíte ATUAL da cadeia 4990 depois da troca... ver SQL_SUITE_ATUAL_DA_CADEIA).
 function poolFalso() {
   const chamadas = [];
-  const suites = { 101: 11, 102: 12, 103: 13, 201: 21 };
-  const ativas = { 11: { ref: "5001", inicio: "2026-11-07T09:30:00.000" } };
+  const suites = { 101: 11, 102: 12, 103: 13, 104: 14, 201: 21 };
+  const ativas = { 11: { ref: "5001", inicio: "2026-11-07T09:30:00.000" }, 14: { ref: "5003", inicio: "2026-11-07T11:00:00.000" } };
   const ultimas = {
     12: { ref: "5002", inicio: "2026-11-07T08:00:00.000", fim: "2026-11-07T10:00:00.000" },
   };
-  const cadeias = { 5001: { raiz: "4990", tem_reserva: true }, 5002: { raiz: "5002", tem_reserva: false } };
-  const suiteAtual = { 4990: 101, 5001: 101, 5002: 102, 7000: 555 };
+  const cadeias = { 5001: { raiz: "4990", tem_reserva: true }, 5002: { raiz: "5002", tem_reserva: false }, 5003: { raiz: "5003", tem_reserva: false } };
+  const suiteAtual = { 4990: 101, 5001: 101, 5002: 102, 5003: 104, 7000: 555 };
   const checkouts = [
     { ref: "6001", suite: 101, inicio: "2026-11-07T08:00:00.000", fim: "2026-11-07T10:00:00.000", raiz: "6000", tipo_origem: "RESERVA_API", reserva_canal_ref: "0f5e2a9c-0000-4000-8000-000000000001", tem_contato: true },
     { ref: "6002", suite: 102, inicio: "2026-11-07T08:30:00.000", fim: "2026-11-07T10:00:00.000", raiz: null, tipo_origem: null, reserva_canal_ref: null, tem_contato: false },
@@ -54,10 +59,17 @@ function poolFalso() {
     8005: { finalizada: false, liberada: false, tipo_origem: null, celular: null, telefone1: null, telefone2: null },
     8006: { finalizada: true, liberada: true, tipo_origem: "GUIA_DE_MOTEIS", celular: "+55 11 90000-0002", telefone1: null, telefone2: null },
   };
+  // Prefixos ACEITOS por raiz (o banco já tirou inválidos e genéricos). Fictícios.
+  const cpfs = { 4990: ["123", "456"], 5002: [], 5003: [] };
   return {
     chamadas,
     async queryWithParams(slug, sql, params) {
       chamadas.push({ slug, sql, params });
+      if (sql === svc.SQL_TEM_CPF) return [{ tem_cpf: (cpfs[params[0]] ?? []).length > 0 }];
+      if (sql === svc.SQL_CONFIRMAR_CPF) {
+        const p = cpfs[params[0]] ?? [];
+        return [{ tem_cpf: p.length > 0, confere: p.includes(params[2]) }];
+      }
       if (sql === svc.SQL_SUITE) {
         const id = suites[params[0]];
         assert.ok(Array.isArray(params[1]) && params[1].length > 0, "categorias da unidade");
@@ -161,6 +173,27 @@ describe("HMAC e escopo (nps-hmac)", () => {
   });
 });
 
+describe("HMAC com corpo (POST)", () => {
+  const chaves = new Map([["k1", { segredo: S1, escopo: "nps" }]]);
+  const ts = String(Math.floor(AGORA_MS / 1000));
+  const CAM = "/nps/v1/confirmar-cpf";
+  const corpo = Buffer.from(JSON.stringify({ unidade: "lush_ipiranga", raiz: "4990", prefixo3: "123" }));
+  const v = (o) => hmac.verificarNps({ chaves, keyId: "k1", timestamp: ts, metodo: "POST", caminho: CAM, agoraMs: AGORA_MS, ...o });
+
+  test("assinatura sobre os BYTES do corpo: Buffer e o mesmo texto dão a mesma assinatura", () => {
+    const a = hmac.assinarNps(S1, "POST", CAM, ts, corpo);
+    assert.equal(a, hmac.assinarNps(S1, "POST", CAM, ts, corpo.toString("utf8")));
+    assert.equal(v({ assinatura: a, corpo }).ok, true);
+  });
+
+  test("corpo adulterado (outro prefixo, espaço a mais) ou ausente → assinatura", () => {
+    const a = hmac.assinarNps(S1, "POST", CAM, ts, corpo);
+    assert.equal(v({ assinatura: a, corpo: Buffer.from(corpo.toString().replace("123", "124")) }).motivo, "assinatura");
+    assert.equal(v({ assinatura: a, corpo: Buffer.concat([corpo, Buffer.from(" ")]) }).motivo, "assinatura");
+    assert.equal(v({ assinatura: a, corpo: "" }).motivo, "assinatura");
+  });
+});
+
 describe("consultas (nps-estadia)", () => {
   test("A: janela padrão 120 min, limite na hora LOCAL do Automo (sem fuso)", () => {
     const c = consulta(101);
@@ -219,6 +252,34 @@ describe("consultas (nps-estadia)", () => {
     assert.match(est.lerConsultaContato({ unidade: "?", locacao: "1" }, AGORA_MS).erro, /unidade/);
   });
 
+  test("D: corpo {unidade, raiz, prefixo3 (texto), janela_min?} → consulta pela raiz, com a hora DESTE servidor", () => {
+    const ler = (b) => est.lerConsultaConfirmarCpf(b, AGORA_MS);
+    const ok = ler({ unidade: "lush_ipiranga", raiz: "4990", prefixo3: "012" });
+    assert.ok(ok.ok, ok.erro);
+    assert.equal(ok.consulta.prefixo, "012"); // zero à esquerda preservado
+    assert.equal(ok.consulta.estadia.raiz, "4990");
+    assert.equal(ok.consulta.estadia.suite, null);
+    assert.equal(ok.consulta.estadia.janelaMin, 120);
+    assert.equal(ok.consulta.estadia.limiteLocal, "2026-11-07 10:00:00.000");
+    assert.equal(ok.consulta.estadia.limiteGenericoLocal, "2026-09-08 12:00:00.000");
+    assert.equal(ler({ unidade: "lush_ipiranga", raiz: 4990, prefixo3: "012" }).consulta.estadia.raiz, "4990");
+    assert.equal(ler({ unidade: "lush_ipiranga", raiz: "4990", prefixo3: "012", janela_min: 60 }).consulta.estadia.janelaMin, 60);
+    for (const [b, re] of [
+      [{ unidade: "lush_ipiranga", raiz: "4990", prefixo3: 12 }, /prefixo3/], // número perde o zero à esquerda: recusado
+      [{ unidade: "lush_ipiranga", raiz: "4990", prefixo3: "12" }, /prefixo3/],
+      [{ unidade: "lush_ipiranga", raiz: "4990", prefixo3: "1234" }, /prefixo3/],
+      [{ unidade: "lush_ipiranga", raiz: "4990", prefixo3: "12a" }, /prefixo3/],
+      [{ unidade: "lush_ipiranga", raiz: "49a", prefixo3: "123" }, /raiz/],
+      [{ unidade: "lush_ipiranga", prefixo3: "123" }, /raiz/],
+      [{ unidade: "x", raiz: "4990", prefixo3: "123" }, /unidade/],
+      [{ unidade: "lush_ipiranga", raiz: "4990", prefixo3: "123", janela_min: 999 }, /janela_min/],
+      [null, /prefixo3/],
+      [["4990"], /prefixo3/],
+    ]) {
+      assert.match(ler(b).erro, re);
+    }
+  });
+
   test("celular brasileiro → E.164; fixo, curto ou lixo → null (o mesmo padrão do SQL do B)", () => {
     const casos = [
       ["(11) 90000-0001", "+5511900000001"],
@@ -251,10 +312,80 @@ describe("consultas (nps-estadia)", () => {
   });
 });
 
+describe("tentativas do Endpoint D (NpsTentativasService)", () => {
+  const delRedis = process.env.REDIS_URL;
+  test("memória: 3 erros bloqueiam por 4h; acerto zera; o bloqueio vence", async () => {
+    delete process.env.REDIS_URL;
+    let agora = AGORA_MS;
+    const t = new tent.NpsTentativasService();
+    t.agora = () => agora;
+    t.onModuleInit();
+    assert.equal(tent.NPS_CPF_MAX_ERROS, 3);
+    assert.equal(tent.NPS_CPF_BLOQUEIO_S, 14400);
+    assert.deepEqual(await t.situacao("u:1"), { bloqueado: false, retryAfter: 0, restantes: 3 });
+    assert.deepEqual(await t.registrarErro("u:1"), { bloqueado: false, retryAfter: 0, restantes: 2 });
+    await t.limpar("u:1"); // acerto
+    assert.equal((await t.situacao("u:1")).restantes, 3);
+    await t.registrarErro("u:1");
+    await t.registrarErro("u:1");
+    assert.deepEqual(await t.registrarErro("u:1"), { bloqueado: true, retryAfter: 14400, restantes: 0 });
+    assert.equal((await t.situacao("u:2")).bloqueado, false); // outra raiz não é afetada
+    agora += 3600_000;
+    assert.deepEqual(await t.situacao("u:1"), { bloqueado: true, retryAfter: 10800, restantes: 0 });
+    agora += 3 * 3600_000 + 1000;
+    assert.deepEqual(await t.situacao("u:1"), { bloqueado: false, retryAfter: 0, restantes: 3 });
+  });
+
+  test("memória: erros esparsos expiram depois de 4h (não acumulam para sempre)", async () => {
+    let agora = AGORA_MS;
+    const t = new tent.NpsTentativasService();
+    t.agora = () => agora;
+    await t.registrarErro("u:9");
+    await t.registrarErro("u:9");
+    agora += 4 * 3600_000 + 1;
+    assert.deepEqual(await t.registrarErro("u:9"), { bloqueado: false, retryAfter: 0, restantes: 2 });
+  });
+
+  test("Redis (falso): INCR + EXPIRE no 1º erro, SET EX 4h no bloqueio, chaves com namespace e SEM prefixo/CPF", async () => {
+    const dados = new Map();
+    const ttls = new Map();
+    const ops = [];
+    const redis = {
+      async incr(k) { ops.push(["incr", k]); const n = Number(dados.get(k) ?? 0) + 1; dados.set(k, String(n)); return n; },
+      async expire(k, s) { ops.push(["expire", k, s]); ttls.set(k, s); return 1; },
+      async set(k, v, ex, s) { ops.push(["set", k, v, ex, s]); dados.set(k, v); ttls.set(k, s); return "OK"; },
+      async del(k) { ops.push(["del", k]); dados.delete(k); return 1; },
+      async get(k) { return dados.get(k) ?? null; },
+      async ttl(k) { return dados.has(k) ? ttls.get(k) ?? -1 : -2; },
+    };
+    const t = new tent.NpsTentativasService();
+    t.client = redis;
+    t.redisReady = true;
+    assert.equal((await t.registrarErro("lush_ipiranga:4990")).restantes, 2);
+    assert.equal((await t.registrarErro("lush_ipiranga:4990")).restantes, 1);
+    assert.deepEqual(await t.registrarErro("lush_ipiranga:4990"), { bloqueado: true, retryAfter: 14400, restantes: 0 });
+    assert.deepEqual(await t.situacao("lush_ipiranga:4990"), { bloqueado: true, retryAfter: 14400, restantes: 0 });
+    assert.deepEqual(ops.filter((o) => o[0] === "expire").map((o) => o[2]), [14400]); // só no 1º erro
+    const set = ops.find((o) => o[0] === "set");
+    assert.deepEqual(set.slice(2), ["1", "EX", 14400]);
+    for (const [, k] of ops) assert.match(k, /^[A-Za-z0-9_-]+:nps:cpf:(erros|bloq):lush_ipiranga:4990$/);
+  });
+
+  test("Redis caindo no meio → cai no Map, sem derrubar a conferência", async () => {
+    const t = new tent.NpsTentativasService();
+    t.client = { async incr() { throw new Error("ECONNRESET"); }, async ttl() { throw new Error("x"); }, async get() { throw new Error("x"); } };
+    t.redisReady = true;
+    assert.deepEqual(await t.registrarErro("u:3"), { bloqueado: false, retryAfter: 0, restantes: 2 });
+    assert.equal((await t.situacao("u:3")).restantes, 2);
+    if (delRedis === undefined) delete process.env.REDIS_URL;
+    else process.env.REDIS_URL = delRedis;
+  });
+});
+
 describe("regras (NpsService, pool falso)", () => {
   test("A, suíte ATIVA → raiz da cadeia (troca de suíte), início e tem_reserva", async () => {
     const pool = poolFalso();
-    const r = await new svc.NpsService(pool).estadia(consulta(101));
+    const r = await servico(pool).estadia(consulta(101));
     assert.deepEqual(r, {
       unidade: "lush_ipiranga",
       suite: 101,
@@ -264,17 +395,22 @@ describe("regras (NpsService, pool falso)", () => {
       inicio: "2026-11-07T09:30:00-03:00",
       fim: null,
       tem_reserva: true,
+      tem_cpf: true,
     });
     assert.ok(!pool.chamadas.some((c) => c.sql === svc.SQL_ULTIMA_FINALIZADA));
+    // tem_cpf procura genéricos desde 60 dias antes do agora, na hora local
+    assert.deepEqual(pool.chamadas.find((c) => c.sql === svc.SQL_TEM_CPF).params, ["4990", "2026-09-08 12:00:00.000"]);
     assert.ok(!pool.chamadas.some((c) => c.sql === svc.SQL_SUITE_ATUAL_DA_CADEIA));
   });
 
   test("A, finalizada DENTRO da janela → finalizada_recente; FORA → nenhuma", async () => {
-    const dentro = await new svc.NpsService(poolFalso()).estadia(consulta(102, 120));
+    const dentro = await servico(poolFalso()).estadia(consulta(102, 120));
     assert.equal(dentro.estado, "finalizada_recente");
     assert.equal(dentro.locacao_raiz_ref, "5002");
     assert.equal(dentro.fim, "2026-11-07T10:00:00-03:00");
-    const fora = await new svc.NpsService(poolFalso()).estadia(consulta(102, 60));
+    assert.equal(dentro.tem_reserva, false);
+    assert.equal(dentro.tem_cpf, false); // estadia sem CPF aceito → o NPS vai direto ao C4
+    const fora = await servico(poolFalso()).estadia(consulta(102, 60));
     assert.deepEqual(fora, {
       unidade: "lush_ipiranga",
       suite: 102,
@@ -284,31 +420,32 @@ describe("regras (NpsService, pool falso)", () => {
       inicio: null,
       fim: null,
       tem_reserva: false,
+      tem_cpf: false,
     });
   });
 
   test("A, suíte sem locação → nenhuma; suíte inexistente → null", async () => {
-    assert.equal((await new svc.NpsService(poolFalso()).estadia(consulta(103))).estado, "nenhuma");
-    assert.equal(await new svc.NpsService(poolFalso()).estadia(consulta(999)), null);
+    assert.equal((await servico(poolFalso()).estadia(consulta(103))).estado, "nenhuma");
+    assert.equal(await servico(poolFalso()).estadia(consulta(999)), null);
   });
 
   test("A por RAIZ → responde pela suíte ATUAL da cadeia (troca de suíte); raiz desconhecida → null", async () => {
     const pool = poolFalso();
-    const r = await new svc.NpsService(pool).estadia(consultaRaiz("4990"));
+    const r = await servico(pool).estadia(consultaRaiz("4990"));
     assert.equal(r.suite, 101);
     assert.equal(r.estado, "ativa");
     assert.equal(r.locacao_raiz_ref, "4990");
     assert.deepEqual(pool.chamadas[0].params, ["4990"]);
-    assert.equal((await new svc.NpsService(poolFalso()).estadia(consultaRaiz("5002"))).estado, "finalizada_recente");
-    assert.equal(await new svc.NpsService(poolFalso()).estadia(consultaRaiz("123")), null);
+    assert.equal((await servico(poolFalso()).estadia(consultaRaiz("5002"))).estado, "finalizada_recente");
+    assert.equal(await servico(poolFalso()).estadia(consultaRaiz("123")), null);
     // a cadeia termina num apartamento que não é suíte da unidade → null
-    assert.equal(await new svc.NpsService(poolFalso()).estadia(consultaRaiz("7000")), null);
+    assert.equal(await servico(poolFalso()).estadia(consultaRaiz("7000")), null);
   });
 
   test("B: itens com raiz, suíte final, horas com ms, origem (BALCAO sem reserva), id no canal e tem_contato; paginação", async () => {
     const ler = (q) => est.lerConsultaCheckouts({ unidade: "lush_ipiranga", desde: "2026-11-07T09:00:00-03:00", ...q }, AGORA_MS).consulta;
     const pool = poolFalso();
-    const p1 = await new svc.NpsService(pool).checkouts(ler({ limite: "2" }));
+    const p1 = await servico(pool).checkouts(ler({ limite: "2" }));
     assert.deepEqual(pool.chamadas[0].params.slice(0, 3), ["2026-11-07 09:00:00.000", -1, 2]);
     assert.deepEqual(p1.itens[0], {
       locacao_raiz_ref: "6000",
@@ -328,14 +465,14 @@ describe("regras (NpsService, pool falso)", () => {
     assert.deepEqual(p1.proximo, { desde: "2026-11-07T10:00:00.000-03:00", apos_ref: "6002" });
     for (const i of p1.itens) assert.deepEqual(Object.keys(i).filter((k) => /cel|tel|fone|nome|mail|cpf/i.test(k)), []);
 
-    const p2 = await new svc.NpsService(poolFalso()).checkouts(ler({ desde: p1.proximo.desde, apos_ref: p1.proximo.apos_ref, limite: "2" }));
+    const p2 = await servico(poolFalso()).checkouts(ler({ desde: p1.proximo.desde, apos_ref: p1.proximo.apos_ref, limite: "2" }));
     assert.deepEqual(p2.itens.map((i) => i.locacao_ref), ["6003"]);
     assert.equal(p2.itens[0].fim, "2026-11-07T11:15:30.456-03:00");
     assert.equal(p2.proximo, null);
   });
 
   test("C: entregue em E.164 só para FINALIZADA na janela com celular; senão o motivo", async () => {
-    const c = (loc) => new svc.NpsService(poolFalso()).contato(est.lerConsultaContato({ unidade: "lush_ipiranga", locacao: loc }, AGORA_MS).consulta);
+    const c = (loc) => servico(poolFalso()).contato(est.lerConsultaContato({ unidade: "lush_ipiranga", locacao: loc }, AGORA_MS).consulta);
     assert.deepEqual(await c("8001"), { ok: true, celular: E164_FICTICIO, origem_reserva: "RESERVA_API" });
     assert.deepEqual(await c("8006"), { ok: true, celular: "+5511900000002", origem_reserva: "GUIA_DE_MOTEIS" });
     assert.deepEqual(await c("8002"), { ok: false, motivo: "sem_contato" }); // só fixo
@@ -343,6 +480,36 @@ describe("regras (NpsService, pool falso)", () => {
     assert.deepEqual(await c("8004"), { ok: false, motivo: "fora_da_janela" });
     assert.deepEqual(await c("8005"), { ok: false, motivo: "nao_encontrada" }); // TRANSFERIDA
     assert.deepEqual(await c("9999"), { ok: false, motivo: "nao_encontrada" });
+  });
+
+  const D = (raiz, prefixo3) => {
+    const r = est.lerConsultaConfirmarCpf({ unidade: "lush_ipiranga", raiz, prefixo3 }, AGORA_MS);
+    assert.ok(r.ok, r.erro);
+    return r.consulta;
+  };
+
+  test("D: confere qualquer CPF aceito da estadia; 3 erros bloqueiam a RAIZ; acerto zera os erros", async () => {
+    const pool = poolFalso();
+    const s = servico(pool);
+    assert.deepEqual(await s.confirmarCpf(D("4990", "456")), { ok: true }); // o do acompanhante também vale
+    const sql = pool.chamadas.find((c) => c.sql === svc.SQL_CONFIRMAR_CPF);
+    assert.deepEqual(sql.params, ["4990", "2026-09-08 12:00:00.000", "456"]);
+    assert.deepEqual(await s.confirmarCpf(D("4990", "999")), { ok: false, tentativas_restantes: 2 });
+    assert.deepEqual(await s.confirmarCpf(D("4990", "123")), { ok: true }); // acerto zera
+    assert.deepEqual(await s.confirmarCpf(D("4990", "999")), { ok: false, tentativas_restantes: 2 });
+    assert.deepEqual(await s.confirmarCpf(D("4990", "998")), { ok: false, tentativas_restantes: 1 });
+    assert.deepEqual(await s.confirmarCpf(D("4990", "997")), { ok: false, bloqueado: true, retry_after: 14400 });
+    // bloqueada: nem o certo passa, e o banco nem é consultado
+    const n = pool.chamadas.length;
+    assert.deepEqual(await s.confirmarCpf(D("4990", "123")), { ok: false, bloqueado: true, retry_after: 14400 });
+    assert.equal(pool.chamadas.length, n);
+  });
+
+  test("D: estadia sem CPF aceito → sem_cpf (não conta tentativa); raiz que não é a da suíte atual → sem_estadia", async () => {
+    const s = servico(poolFalso());
+    for (let i = 0; i < 5; i++) assert.deepEqual(await s.confirmarCpf(D("5003", "123")), { ok: false, sem_cpf: true });
+    assert.deepEqual(await s.confirmarCpf(D("5001", "123")), { ok: false, sem_estadia: true }); // não é a raiz
+    assert.deepEqual(await s.confirmarCpf(D("123", "123")), { ok: false, sem_estadia: true }); // raiz desconhecida
   });
 
   test("nenhuma query usa o relógio do banco (réplica ~9 min adiantada) e todas são parametrizadas", () => {
@@ -364,6 +531,18 @@ describe("regras (NpsService, pool falso)", () => {
     assert.match(svc.SQL_CONTATO, /pp\.id = r\.id_cliente/);
     assert.match(svc.SQL_CONTATO, /pe\.id = pp\.id_pessoa/);
     assert.match(svc.SQL_CONTATO, /CASE WHEN alvo\.liberada THEN pe\.telefone1 END/);
+    // D/tem_cpf: comparação NO banco, saída só booleana; genéricos fora; raiz precisa ser raiz
+    for (const sql of [svc.SQL_TEM_CPF, svc.SQL_CONFIRMAR_CPF]) {
+      assert.doesNotMatch(sql, /now\(|current_(timestamp|date|time)|localtime/i);
+      assert.match(sql, /id_locacaoorigem IS NULL/);
+      assert.match(sql, /\$2::timestamp/);
+      assert.match(sql, /genericos AS/);
+      assert.match(sql, /NOT IN \(SELECT id_pessoa FROM genericos\)/);
+      const saida = sql.slice(sql.lastIndexOf(")") + 1);
+      assert.doesNotMatch(saida, /identificador|\bcpf\b/); // o CPF não está no SELECT final
+    }
+    assert.match(svc.SQL_CONFIRMAR_CPF, /left\(cpf, 3\) = \$3::text\) AS confere/);
+    assert.ok(!svc.SQL_CONFIRMAR_CPF.includes("$4"));
   });
 });
 
@@ -378,10 +557,11 @@ describe("HTTP de ponta a ponta (/nps/v1/*)", () => {
     class TesteNpsModule {}
     Module({
       controllers: [NpsController],
-      providers: [svc.NpsService, NpsHmacGuard, { provide: TenantPoolService, useValue: pool }],
+      providers: [svc.NpsService, NpsHmacGuard, tent.NpsTentativasService, { provide: TenantPoolService, useValue: pool }],
     })(TesteNpsModule);
     const guardar = (...a) => logs.push(a.map(String).join(" "));
     app = await NestFactory.create(TesteNpsModule, {
+      rawBody: true,
       logger: { log: guardar, warn: guardar, error: guardar, debug: () => {}, verbose: () => {} },
     });
     await app.listen(0, "127.0.0.1");
@@ -474,6 +654,49 @@ describe("HTTP de ponta a ponta (/nps/v1/*)", () => {
     assert.equal((await comoChat("/nps/v1/contato?unidade=lush_ipiranga&locacao=abc")).status, 400);
   });
 
+  const postar = (corpo, { id = "k1", seg = S1, assinado, ts = Math.floor(Date.now() / 1000) } = {}) => {
+    const bruto = typeof corpo === "string" ? corpo : JSON.stringify(corpo);
+    return fetch(base + "/nps/v1/confirmar-cpf", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-LHG-Key-Id": id,
+        "X-LHG-Timestamp": String(ts),
+        "X-LHG-Signature": hmac.assinarNps(seg, "POST", "/nps/v1/confirmar-cpf", String(ts), assinado ?? bruto),
+      },
+      body: bruto,
+    });
+  };
+
+  test("D (chave do NPS): 200 {ok}; corpo adulterado → 401; chave do Chat LHG → 403; no-store", async () => {
+    const ok = await postar({ unidade: "lush_ipiranga", raiz: "4990", prefixo3: "123" });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await ok.json(), { ok: true });
+    const original = JSON.stringify({ unidade: "lush_ipiranga", raiz: "4990", prefixo3: "999" });
+    const r = await postar(original.replace("999", "123"), { assinado: original });
+    assert.equal(r.status, 401);
+    // JSON equivalente com outro espaçamento = outros bytes = outra assinatura
+    assert.equal((await postar(original.replace(",", ", "), { assinado: original })).status, 401);
+    assert.equal((await postar({ unidade: "lush_ipiranga", raiz: "4990", prefixo3: "123" }, { id: "chat", seg: SC })).status, 403);
+  });
+
+  test("D: erros contam, 3º bloqueia (distinguível) e nem o certo passa; sem_cpf; sem_estadia → 404; 400", async () => {
+    const corpo = (p, raiz = "4990") => ({ unidade: "lush_ipiranga", raiz, prefixo3: p });
+    assert.deepEqual(await (await postar(corpo("901"))).json(), { ok: false, tentativas_restantes: 2 });
+    assert.deepEqual(await (await postar(corpo("902"))).json(), { ok: false, tentativas_restantes: 1 });
+    assert.deepEqual(await (await postar(corpo("903"))).json(), { ok: false, bloqueado: true, retry_after: 14400 });
+    const b = await (await postar(corpo("123"))).json();
+    assert.equal(b.bloqueado, true);
+    assert.ok(b.retry_after > 14000 && b.retry_after <= 14400);
+    assert.deepEqual(await (await postar(corpo("123", "5003"))).json(), { ok: false, sem_cpf: true });
+    const sem = await postar(corpo("123", "5001"));
+    assert.equal(sem.status, 404);
+    assert.deepEqual(await sem.json(), { ok: false, motivo: "sem_estadia" });
+    assert.equal((await postar(corpo("12"))).status, 400);
+    assert.equal((await postar("isto não é json")).status, 400);
+  });
+
   test("auditoria: chave, unidade e resultado no log; nenhum segredo, assinatura ou TELEFONE", () => {
     const tudo = logs.join("\n");
     assert.match(tudo, /nps\.estadia key=k1 unidade=lush_ipiranga suite=101 estado=ativa/);
@@ -483,6 +706,17 @@ describe("HTTP de ponta a ponta (/nps/v1/*)", () => {
     assert.match(tudo, /nps\.contato key=chat unidade=lush_ipiranga locacao=8004 resultado=fora_da_janela/);
     assert.match(tudo, /nps\.recusado motivo=escopo key=k1 rota=contato/);
     assert.match(tudo, /nps\.recusado motivo=assinatura key=k1/);
+    assert.match(tudo, /nps\.confirmar_cpf key=k1 unidade=lush_ipiranga raiz=4990 resultado=confere/);
+    assert.match(tudo, /nps\.confirmar_cpf key=k1 unidade=lush_ipiranga raiz=4990 resultado=nao_confere restantes=1/);
+    assert.match(tudo, /nps\.confirmar_cpf key=k1 unidade=lush_ipiranga raiz=4990 resultado=bloqueado/);
+    assert.match(tudo, /nps\.confirmar_cpf key=k1 unidade=lush_ipiranga raiz=5003 resultado=sem_cpf/);
+    assert.match(tudo, /nps\.recusado motivo=escopo key=chat rota=nps/);
+    // o PREFIXO nunca vai para o log
+    // (tira a raiz e o contador, que são números legítimos da linha, e procura os prefixos usados)
+    for (const linha of logs.filter((l) => l.includes("confirmar_cpf"))) {
+      const resto = linha.replace(/raiz=\d+/, "").replace(/restantes=\d/, "");
+      assert.doesNotMatch(resto, /prefix|\b(123|456|90[1-3]|99[7-9]|12)\b/);
+    }
     for (const s of [S1, S2, SC]) assert.ok(!tudo.includes(s));
     assert.doesNotMatch(tudo, /[0-9a-f]{64}/);
     assert.ok(!tudo.includes(E164_FICTICIO) && !tudo.includes("900000001") && !tudo.includes("90000-0001"));

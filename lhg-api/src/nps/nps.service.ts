@@ -7,9 +7,11 @@
  */
 import { Injectable } from '@nestjs/common';
 import { TenantPoolService } from '../database/tenant-pool.service';
+import { NpsTentativasService, SituacaoTentativas } from './nps-tentativas.service';
 import {
   CELULAR_BR_DIGITOS,
   ConsultaCheckouts,
+  ConsultaConfirmarCpf,
   ConsultaContato,
   ConsultaEstadia,
   celularE164,
@@ -29,7 +31,19 @@ export interface RespostaEstadia {
   inicio: string | null;
   fim: string | null;
   tem_reserva: boolean;
+  /**
+   * A estadia tem CPF válido (e não genérico) ligado: o NPS pode pedir os 3
+   * primeiros dígitos (Endpoint D). false → ir direto ao C4. Sem expor nada.
+   */
+  tem_cpf: boolean;
 }
+
+export type ResultadoConfirmarCpf =
+  | { ok: true }
+  | { ok: false; tentativas_restantes: number }
+  | { ok: false; bloqueado: true; retry_after: number }
+  | { ok: false; sem_cpf: true }
+  | { ok: false; sem_estadia: true };
 
 export interface CheckoutNps {
   locacao_raiz_ref: string;
@@ -125,6 +139,65 @@ export const SQL_CADEIA = `
            WHERE r.id_locacaoapartamento IN (SELECT id_apartamentostate FROM c) AND r.cancelada IS NULL
          ) AS tem_reserva`;
 
+// CPFs da ESTADIA (cadeia a partir da raiz $1, que precisa ser raiz), só no
+// banco: pessoas ligadas à cadeia (col_locacaoapartamento_cliente → pessoapapel
+// → pessoa.identificador), CPF com dígitos verificadores válidos e SEM dígitos
+// repetidos. "Genérico" = a mesma pessoa em estadias SIMULTÂNEAS de cadeias
+// diferentes desde $2 (CPF da recepção): não vale. Entrada pelo índice de
+// datainicialdaocupacao (não há índice em col_locacaoapartamento_cliente.id_cliente).
+// 0 CPFs em mais de um cadastro (levantamento de 07/11/2026): pessoa = CPF.
+const CPF_CTES = `
+  cadeia AS (
+    SELECT id_apartamentostate AS id, 0 AS n FROM locacaoapartamento
+    WHERE id_apartamentostate = $1::int AND id_locacaoorigem IS NULL
+    UNION ALL
+    SELECT l.id_apartamentostate, c.n + 1 FROM locacaoapartamento l JOIN cadeia c ON l.id_locacaoorigem = c.id
+    WHERE c.n < 50
+  ), pessoas AS (
+    SELECT DISTINCT pp.id_pessoa, regexp_replace(coalesce(pe.identificador, ''), '[^0-9]', '', 'g') AS cpf
+    FROM cadeia c
+    JOIN col_locacaoapartamento_cliente lc ON lc.id_locacaoapartamento = c.id
+    JOIN pessoapapel pp ON pp.id = lc.id_cliente
+    JOIN pessoa pe ON pe.id = pp.id_pessoa
+  ), validos AS (
+    SELECT p.id_pessoa, p.cpf FROM pessoas p
+    WHERE p.cpf ~ '^[0-9]{11}$' AND p.cpf !~ '^([0-9])\\1{10}$'
+      AND ((SELECT sum(substr(p.cpf, i, 1)::int * (11 - i)) FROM generate_series(1, 9) i) * 10 % 11) % 10
+          = substr(p.cpf, 10, 1)::int
+      AND ((SELECT sum(substr(p.cpf, i, 1)::int * (12 - i)) FROM generate_series(1, 10) i) * 10 % 11) % 10
+          = substr(p.cpf, 11, 1)::int
+  ), usos AS (
+    SELECT pp.id_pessoa, la.id_apartamentostate AS loc, la.id_locacaoorigem AS origem,
+           la.datainicialdaocupacao AS ini, coalesce(la.datafinaldaocupacao, 'infinity'::timestamp) AS fim
+    FROM locacaoapartamento la
+    JOIN col_locacaoapartamento_cliente lc ON lc.id_locacaoapartamento = la.id_apartamentostate
+    JOIN pessoapapel pp ON pp.id = lc.id_cliente
+    WHERE la.datainicialdaocupacao >= $2::timestamp AND coalesce(la.fimocupacaotipo, '') <> 'CANCELADA'
+      AND pp.id_pessoa IN (SELECT id_pessoa FROM validos)
+  ), sobe AS (
+    SELECT id_pessoa, loc, loc AS atual, origem, ini, fim, 0 AS n FROM usos
+    UNION ALL
+    SELECT s.id_pessoa, s.loc, l.id_apartamentostate, l.id_locacaoorigem, s.ini, s.fim, s.n + 1
+    FROM sobe s JOIN locacaoapartamento l ON l.id_apartamentostate = s.origem
+    WHERE s.n < 50
+  ), usos_raiz AS (
+    SELECT DISTINCT ON (id_pessoa, loc) id_pessoa, atual AS raiz, ini, fim FROM sobe ORDER BY id_pessoa, loc, n DESC
+  ), genericos AS (
+    SELECT DISTINCT a.id_pessoa FROM usos_raiz a
+    JOIN usos_raiz b ON b.id_pessoa = a.id_pessoa AND a.raiz < b.raiz AND a.ini < b.fim AND b.ini < a.fim
+  ), aceitos AS (
+    SELECT v.cpf FROM validos v WHERE v.id_pessoa NOT IN (SELECT id_pessoa FROM genericos)
+  )`;
+
+/** tem_cpf da estadia (Endpoint A). $1 = raiz, $2 = início da busca de genéricos. */
+export const SQL_TEM_CPF = `WITH RECURSIVE ${CPF_CTES}
+  SELECT EXISTS (SELECT 1 FROM aceitos) AS tem_cpf`;
+
+/** Endpoint D: confere os 3 primeiros dígitos ($3) SÓ no banco; devolve booleanos. */
+export const SQL_CONFIRMAR_CPF = `WITH RECURSIVE ${CPF_CTES}
+  SELECT EXISTS (SELECT 1 FROM aceitos) AS tem_cpf,
+         EXISTS (SELECT 1 FROM aceitos WHERE left(cpf, 3) = $3::text) AS confere`;
+
 // Endpoint B. Página por (fim, ref) > ($1, $2) — com $2 = -1 vale fim >= $1.
 // Só FINALIZADA (a TRANSFERIDA não tem check-out) e só suítes da unidade.
 // A reserva é a da cadeia, de preferência a ligada à locação final. O telefone
@@ -211,7 +284,10 @@ export const SQL_CONTATO = `
 
 @Injectable()
 export class NpsService {
-  constructor(private readonly pool: TenantPoolService) {}
+  constructor(
+    private readonly pool: TenantPoolService,
+    private readonly tentativas: NpsTentativasService,
+  ) {}
 
   /** null = a suíte (ou a cadeia da raiz) não existe nesta unidade. */
   async estadia(c: ConsultaEstadia): Promise<RespostaEstadia | null> {
@@ -255,6 +331,7 @@ export class NpsService {
           inicio: null,
           fim: null,
           tem_reserva: false,
+          tem_cpf: false,
         };
       }
       estado = 'finalizada_recente';
@@ -266,15 +343,52 @@ export class NpsService {
       SQL_CADEIA,
       [loc.ref],
     );
+    const raiz = cadeia?.raiz ?? loc.ref;
+    const [cpf] = await this.pool.queryWithParams<{ tem_cpf: boolean }>(slug, SQL_TEM_CPF, [
+      raiz,
+      c.limiteGenericoLocal,
+    ]);
     return {
       ...base,
       estado,
-      locacao_raiz_ref: cadeia?.raiz ?? loc.ref,
+      locacao_raiz_ref: raiz,
       locacao_ref: loc.ref,
       inicio: deLocalAutomo(loc.inicio),
       fim: deLocalAutomo(loc.fim),
       tem_reserva: !!cadeia?.tem_reserva,
+      tem_cpf: !!cpf?.tem_cpf,
     };
+  }
+
+  /**
+   * Endpoint D. Ordem: bloqueio da raiz → estadia ainda vale (regra do A, pela
+   * suíte ATUAL da cadeia, com a MESMA raiz) → conferência no banco. Só conta
+   * tentativa quando há CPF para conferir e o prefixo não bate.
+   */
+  async confirmarCpf(c: ConsultaConfirmarCpf): Promise<ResultadoConfirmarCpf> {
+    const chave = `${c.estadia.tenant.slug}:${c.estadia.raiz}`;
+    const antes: SituacaoTentativas = await this.tentativas.situacao(chave);
+    if (antes.bloqueado) return { ok: false, bloqueado: true, retry_after: antes.retryAfter };
+
+    const e = await this.estadia(c.estadia);
+    if (!e || e.estado === 'nenhuma' || e.locacao_raiz_ref !== c.estadia.raiz) {
+      return { ok: false, sem_estadia: true };
+    }
+
+    const [r] = await this.pool.queryWithParams<{ tem_cpf: boolean; confere: boolean }>(
+      c.estadia.tenant.slug,
+      SQL_CONFIRMAR_CPF,
+      [c.estadia.raiz, c.estadia.limiteGenericoLocal, c.prefixo],
+    );
+    if (!r?.tem_cpf) return { ok: false, sem_cpf: true };
+    if (r.confere) {
+      await this.tentativas.limpar(chave);
+      return { ok: true };
+    }
+    const depois = await this.tentativas.registrarErro(chave);
+    return depois.bloqueado
+      ? { ok: false, bloqueado: true, retry_after: depois.retryAfter }
+      : { ok: false, tentativas_restantes: depois.restantes };
   }
 
   async checkouts(c: ConsultaCheckouts): Promise<RespostaCheckouts> {

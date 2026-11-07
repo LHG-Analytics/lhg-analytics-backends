@@ -67,7 +67,7 @@ interface CacheEnvelope {
  *  3) "local"
  * Assim, mesmo um Redis compartilhado nunca mistura os ambientes.
  */
-function resolveNamespace(): string {
+export function resolveNamespace(): string {
   const explicit = (process.env.CACHE_PREFIX || '').trim();
   if (explicit) return explicit.replace(/[^a-zA-Z0-9_-]/g, '_');
   const renderUrl = (process.env.RENDER_EXTERNAL_URL || '').trim();
