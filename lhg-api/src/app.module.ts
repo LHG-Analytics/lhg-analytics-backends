@@ -16,6 +16,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { CompanyModule } from './company/company.module';
 import { ConsolidatedModule } from './consolidated/consolidated.module';
 import { PainelModule } from './painel/painel.module';
+import { NpsModule } from './nps/nps.module';
 
 @Module({
   imports: [
@@ -30,6 +31,8 @@ import { PainelModule } from './painel/painel.module';
     // /consolidated/api/... precisam registrar antes das paramétricas
     // /:unit/api/... (senão ':unit' captura o segmento 'consolidated').
     ConsolidatedModule,
+    // API servidor-a-servidor do NPS LHG (HMAC; desligada sem NPS_HMAC_KEYS).
+    NpsModule,
     RestaurantModule,
     GovernanceModule,
     BookingsModule,
