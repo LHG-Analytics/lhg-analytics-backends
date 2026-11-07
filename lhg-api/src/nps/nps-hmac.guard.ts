@@ -38,8 +38,8 @@ export class NpsHmacGuard implements CanActivate {
       assinatura: req.headers?.['x-lhg-signature'],
       metodo: req.method,
       caminho: req.originalUrl ?? req.url,
-      // Só há rotas GET (sem corpo) por enquanto.
-      corpo: '',
+      // Corpo BRUTO (main.ts: rawBody), byte a byte como chegou; GET → vazio.
+      corpo: Buffer.isBuffer(req.rawBody) ? req.rawBody : '',
       agoraMs: Date.now(),
     });
     if (!r.ok && r.motivo === 'sem_config') throw new NotFoundException();

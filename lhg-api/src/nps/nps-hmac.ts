@@ -54,10 +54,11 @@ export function lerChavesNps(bruto: string | undefined): {
   return { chaves, invalidas };
 }
 
-const sha256hex = (s: string) => crypto.createHash('sha256').update(s, 'utf8').digest('hex');
+/** Hash do corpo BRUTO (os bytes exatos recebidos), ou de um texto em UTF-8. */
+const sha256hex = (s: string | Buffer) => crypto.createHash('sha256').update(s).digest('hex');
 
 /** Texto assinado: método, caminho canônico, timestamp e o hash do corpo. */
-export function textoCanonico(metodo: string, caminho: string, timestamp: string, corpo = ''): string {
+export function textoCanonico(metodo: string, caminho: string, timestamp: string, corpo: string | Buffer = ''): string {
   return [metodo.toUpperCase(), caminho, timestamp, sha256hex(corpo)].join('\n');
 }
 
@@ -66,7 +67,7 @@ export function assinarNps(
   metodo: string,
   caminho: string,
   timestamp: string,
-  corpo = '',
+  corpo: string | Buffer = '',
 ): string {
   return crypto
     .createHmac('sha256', segredo)
@@ -86,7 +87,7 @@ export function verificarNps(p: {
   assinatura: unknown;
   metodo: string;
   caminho: string;
-  corpo?: string;
+  corpo?: string | Buffer;
   agoraMs: number;
 }): ResultadoHmac {
   if (p.chaves.size === 0) return { ok: false, motivo: 'sem_config' };
