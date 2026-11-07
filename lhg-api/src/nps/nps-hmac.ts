@@ -7,9 +7,11 @@
  * começando em /nps/ (ex.: /nps/v1/estadia?unidade=...). Pelo proxy público o
  * cliente chama /lhg/nps/..., mas assina /nps/... (o proxy tira o /lhg).
  *
- * As chaves vêm SÓ do ambiente (NPS_HMAC_KEYS="id1:segredo1,id2:segredo2"):
- * duas chaves ativas permitem rotação sem parada. O repo é público: nenhum
- * segredo no código, nos testes ou em log.
+ * As chaves vêm SÓ do ambiente (NPS_HMAC_KEYS="id1:segredo1,id2:segredo2:contato"):
+ * duas chaves ativas permitem rotação sem parada. O 3º campo opcional é o
+ * ESCOPO: "nps" (padrão: estadia e check-outs) ou "contato" (só o celular, para
+ * o Chat LHG). Uma chave nunca acessa as rotas do outro escopo (403). O repo é
+ * público: nenhum segredo no código, nos testes ou em log.
  */
 import * as crypto from 'crypto';
 
@@ -20,22 +22,34 @@ export const NPS_MIN_SEGREDO = 32;
 
 const ID_VALIDO = /^[A-Za-z0-9_-]{1,32}$/;
 
+export type EscopoNps = 'nps' | 'contato';
+const ESCOPOS: readonly EscopoNps[] = ['nps', 'contato'];
+
+export interface ChaveNps {
+  segredo: string;
+  escopo: EscopoNps;
+}
+
 /** Lê NPS_HMAC_KEYS. Entradas inválidas são ignoradas (e contadas, sem valores). */
 export function lerChavesNps(bruto: string | undefined): {
-  chaves: Map<string, string>;
+  chaves: Map<string, ChaveNps>;
   invalidas: number;
 } {
-  const chaves = new Map<string, string>();
+  const chaves = new Map<string, ChaveNps>();
   let invalidas = 0;
   for (const item of (bruto ?? '').split(',').map((s) => s.trim()).filter(Boolean)) {
-    const i = item.indexOf(':');
-    const id = i > 0 ? item.slice(0, i).trim() : '';
-    const segredo = i > 0 ? item.slice(i + 1).trim() : '';
-    if (!ID_VALIDO.test(id) || segredo.length < NPS_MIN_SEGREDO || chaves.has(id)) {
+    const [id = '', segredo = '', escopo = 'nps', ...resto] = item.split(':').map((s) => s.trim());
+    if (
+      !ID_VALIDO.test(id) ||
+      segredo.length < NPS_MIN_SEGREDO ||
+      !ESCOPOS.includes(escopo as EscopoNps) ||
+      resto.length > 0 ||
+      chaves.has(id)
+    ) {
       invalidas++;
       continue;
     }
-    chaves.set(id, segredo);
+    chaves.set(id, { segredo, escopo: escopo as EscopoNps });
   }
   return { chaves, invalidas };
 }
@@ -61,10 +75,12 @@ export function assinarNps(
 }
 
 export type MotivoRecusa = 'sem_config' | 'cabecalhos' | 'caminho' | 'chave' | 'relogio' | 'assinatura';
-export type ResultadoHmac = { ok: true; keyId: string } | { ok: false; motivo: MotivoRecusa };
+export type ResultadoHmac =
+  | { ok: true; keyId: string; escopo: EscopoNps }
+  | { ok: false; motivo: MotivoRecusa };
 
 export function verificarNps(p: {
-  chaves: Map<string, string>;
+  chaves: Map<string, ChaveNps>;
   keyId: unknown;
   timestamp: unknown;
   assinatura: unknown;
@@ -85,15 +101,15 @@ export function verificarNps(p: {
     return { ok: false, motivo: 'cabecalhos' };
   }
   if (!p.caminho.startsWith('/nps/')) return { ok: false, motivo: 'caminho' };
-  const segredo = p.chaves.get(keyId);
-  if (!segredo) return { ok: false, motivo: 'chave' };
+  const chave = p.chaves.get(keyId);
+  if (!chave) return { ok: false, motivo: 'chave' };
   if (Math.abs(p.agoraMs / 1000 - Number(timestamp)) > NPS_HMAC_TOLERANCIA_S) {
     return { ok: false, motivo: 'relogio' };
   }
-  const esperado = Buffer.from(assinarNps(segredo, p.metodo, p.caminho, timestamp, p.corpo ?? ''), 'hex');
+  const esperado = Buffer.from(assinarNps(chave.segredo, p.metodo, p.caminho, timestamp, p.corpo ?? ''), 'hex');
   const recebido = Buffer.from(assinatura.toLowerCase(), 'hex');
   if (recebido.length !== esperado.length || !crypto.timingSafeEqual(recebido, esperado)) {
     return { ok: false, motivo: 'assinatura' };
   }
-  return { ok: true, keyId };
+  return { ok: true, keyId, escopo: chave.escopo };
 }
