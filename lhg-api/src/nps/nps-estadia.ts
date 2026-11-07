@@ -22,6 +22,8 @@ export const CHECKOUTS_LIMITE_PADRAO = 500;
 export const CHECKOUTS_LIMITE_MAX = 1000;
 /** Endpoint C: o celular só sai para check-out nas últimas 72h (validade do convite). */
 export const CONTATO_JANELA_H = 72;
+/** Endpoint D: CPF "genérico" = com estadias simultâneas nos últimos N dias. */
+export const CPF_GENERICO_DIAS = 60;
 
 const ISO_COM_FUSO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
 const REF = /^\d{1,12}$/;
@@ -34,6 +36,14 @@ export interface ConsultaEstadia {
   janelaMin: number;
   /** Início da janela pós-check-out, na hora local do Automo (sem fuso). */
   limiteLocal: string;
+  /** Desde quando procurar estadias simultâneas do mesmo CPF (genérico). */
+  limiteGenericoLocal: string;
+}
+
+export interface ConsultaConfirmarCpf {
+  estadia: ConsultaEstadia & { raiz: string };
+  /** Os 3 primeiros dígitos digitados (nunca vão para o log). */
+  prefixo: string;
 }
 
 export interface ConsultaCheckouts {
@@ -128,8 +138,35 @@ export function lerConsultaEstadia(q: Record<string, unknown>, agoraServidorMs: 
       raiz: raizTxt ?? null,
       janelaMin,
       limiteLocal: paraLocalAutomo(agoraMs - janelaMin * 60_000),
+      limiteGenericoLocal: paraLocalAutomo(agoraMs - CPF_GENERICO_DIAS * 86_400_000),
     },
   };
+}
+
+/**
+ * Endpoint D (corpo JSON): {unidade, raiz, prefixo3, janela_min?}. A hora é a
+ * deste servidor (a janela é a mesma regra do A).
+ */
+export function lerConsultaConfirmarCpf(
+  corpo: unknown,
+  agoraServidorMs: number,
+): Leitura<ConsultaConfirmarCpf> {
+  const b = (corpo && typeof corpo === 'object' && !Array.isArray(corpo) ? corpo : {}) as Record<string, unknown>;
+  const prefixo = typeof b.prefixo3 === 'string' ? b.prefixo3 : '';
+  if (!/^\d{3}$/.test(prefixo)) return { ok: false, erro: 'prefixo3 inválido (3 dígitos, como texto)' };
+  const raiz = typeof b.raiz === 'number' && Number.isSafeInteger(b.raiz) ? String(b.raiz) : b.raiz;
+  if (typeof raiz !== 'string' || !REF.test(raiz)) return { ok: false, erro: 'raiz inválida' };
+  const lido = lerConsultaEstadia(
+    {
+      unidade: b.unidade,
+      raiz,
+      agora: new Date(agoraServidorMs).toISOString(),
+      ...(b.janela_min === undefined ? {} : { janela_min: String(b.janela_min) }),
+    },
+    agoraServidorMs,
+  );
+  if (!lido.ok) return lido;
+  return { ok: true, consulta: { estadia: { ...lido.consulta, raiz }, prefixo } };
 }
 
 export function lerConsultaCheckouts(

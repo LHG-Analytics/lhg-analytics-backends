@@ -6,15 +6,21 @@
  *   d'água. Usado pelo job do WhatsApp e pela reconciliação.
  * - Endpoint C: GET /nps/v1/contato — o celular do hóspede, SÓ para a chave do
  *   Chat LHG (escopo 'contato'). O número nunca vai para o log.
- * A e B não devolvem dados pessoais.
+ * - Endpoint D: POST /nps/v1/confirmar-cpf — os 3 primeiros dígitos de um CPF
+ *   da estadia batem? Conferido NO BANCO; devolve só booleanos. O prefixo nunca
+ *   vai para o log. 3 erros bloqueiam a raiz por 4h.
+ * A, B e D não devolvem dados pessoais.
  */
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   Header,
+  HttpCode,
   Logger,
   NotFoundException,
+  Post,
   Query,
   Req,
   ServiceUnavailableException,
@@ -23,8 +29,8 @@ import {
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { EscopoDaRota, NpsHmacGuard } from './nps-hmac.guard';
-import { lerConsultaCheckouts, lerConsultaContato, lerConsultaEstadia } from './nps-estadia';
-import { NpsService, RespostaCheckouts, RespostaEstadia } from './nps.service';
+import { lerConsultaCheckouts, lerConsultaConfirmarCpf, lerConsultaContato, lerConsultaEstadia } from './nps-estadia';
+import { NpsService, RespostaCheckouts, RespostaEstadia, ResultadoConfirmarCpf } from './nps.service';
 
 @ApiExcludeController()
 @Controller('nps/v1')
@@ -94,5 +100,31 @@ export class NpsController {
     );
     if (!r.ok) throw new NotFoundException({ motivo: r.motivo });
     return { celular: r.celular, origem_reserva: r.origem_reserva };
+  }
+
+  @Post('confirmar-cpf')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Header('Cache-Control', 'no-store')
+  async confirmarCpf(@Body() corpo: unknown, @Req() req: any): Promise<ResultadoConfirmarCpf> {
+    const lido = lerConsultaConfirmarCpf(corpo, Date.now());
+    if (!lido.ok) throw new BadRequestException(lido.erro);
+    const { consulta } = lido;
+    const r = await this.banco(() => this.nps.confirmarCpf(consulta));
+    // Auditoria SEM o prefixo: chave, unidade, raiz e resultado.
+    const resultado = r.ok
+      ? 'confere'
+      : 'bloqueado' in r
+        ? 'bloqueado'
+        : 'sem_cpf' in r
+          ? 'sem_cpf'
+          : 'sem_estadia' in r
+            ? 'sem_estadia'
+            : `nao_confere restantes=${r.tentativas_restantes}`;
+    this.logger.log(
+      `nps.confirmar_cpf key=${req.npsKeyId} unidade=${consulta.estadia.tenant.slug} raiz=${consulta.estadia.raiz} resultado=${resultado}`,
+    );
+    if (!r.ok && 'sem_estadia' in r) throw new NotFoundException({ ok: false, motivo: 'sem_estadia' });
+    return r;
   }
 }
