@@ -2,6 +2,7 @@
 //   A: GET /nps/v1/estadia (suite ou raiz)   B: GET /nps/v1/checkouts
 //   C: GET /nps/v1/contato (só a chave de escopo 'contato', a do Chat LHG)
 //   D: POST /nps/v1/confirmar-cpf (3 primeiros dígitos, conferidos no banco)
+//   E: GET /nps/v1/suites   F: GET /nps/v1/hospede (escopo 'nps_pessoal', com ator)
 // HMAC e escopo, validação das consultas, regras (com um pool FALSO, sem banco)
 // e o HTTP de ponta a ponta. Segredos e telefones de TESTE, gerados/fictícios.
 // Rodar depois do build: node --test test/
@@ -29,6 +30,10 @@ const segredo = () => crypto.randomBytes(32).toString("hex");
 const S1 = segredo();
 const S2 = segredo();
 const SC = segredo(); // chave do Chat LHG (escopo contato)
+const SP = segredo(); // chave do painel interno (escopo nps_pessoal)
+// Nomes FICTÍCIOS.
+const NOME_A = "Pessoa Ficticia Alfa";
+const NOME_B = "Pessoa Ficticia Beta";
 // Telefone FICTÍCIO (faixa de teste), no formato em que o Automo grava.
 const TEL_FICTICIO = "(11) 90000-0001";
 const E164_FICTICIO = "+5511900000001";
@@ -65,6 +70,23 @@ function poolFalso() {
     chamadas,
     async queryWithParams(slug, sql, params) {
       chamadas.push({ slug, sql, params });
+      if (sql === svc.SQL_SUITES) {
+        assert.ok(Array.isArray(params[0]) && params[0].length > 0);
+        return [
+          { suite: 101, categoria_id: 17, categoria_nome: "Lush Spa", categoria_sigla: "LS" },
+          { suite: 102, categoria_id: 10, categoria_nome: "Lush Pop", categoria_sigla: null },
+        ];
+      }
+      if (sql === svc.SQL_HOSPEDE) {
+        const vazio = { nome: null, papel: null };
+        if (params[0] === "4990") return [
+          { existe: true, liberada: true, nome: NOME_A, papel: "reserva" },
+          { existe: true, liberada: true, nome: NOME_B, papel: "acompanhante" },
+        ];
+        if (params[0] === "6000") return [{ existe: true, liberada: true, nome: NOME_A, papel: "hospede" }];
+        if (params[0] === "5002") return [{ existe: true, liberada: false, ...vazio }];
+        return [{ existe: false, liberada: false, ...vazio }];
+      }
       if (sql === svc.SQL_TEM_CPF) return [{ tem_cpf: (cpfs[params[0]] ?? []).length > 0 }];
       if (sql === svc.SQL_CONFIRMAR_CPF) {
         const p = cpfs[params[0]] ?? [];
@@ -144,12 +166,13 @@ describe("HMAC e escopo (nps-hmac)", () => {
   });
 
   test("assinatura correta → ok com o escopo da chave (e a 2ª chave também vale: rotação)", () => {
-    assert.deepEqual(hmac.verificarNps(base()), { ok: true, keyId: "k1", escopo: "nps" });
+    assert.deepEqual(hmac.verificarNps(base()), { ok: true, keyId: "k1", escopo: "nps", ator: null });
     assert.equal(hmac.verificarNps(base({ keyId: "k2", assinatura: hmac.assinarNps(S2, "GET", CAM, ts) })).ok, true);
     assert.deepEqual(hmac.verificarNps(base({ keyId: "chat", assinatura: hmac.assinarNps(SC, "GET", CAM, ts) })), {
       ok: true,
       keyId: "chat",
       escopo: "contato",
+      ator: null,
     });
     assert.equal(hmac.verificarNps(base({ assinatura: base().assinatura.toUpperCase() })).ok, true);
   });
@@ -191,6 +214,42 @@ describe("HMAC com corpo (POST)", () => {
     assert.equal(v({ assinatura: a, corpo: Buffer.from(corpo.toString().replace("123", "124")) }).motivo, "assinatura");
     assert.equal(v({ assinatura: a, corpo: Buffer.concat([corpo, Buffer.from(" ")]) }).motivo, "assinatura");
     assert.equal(v({ assinatura: a, corpo: "" }).motivo, "assinatura");
+  });
+});
+
+describe("HMAC com X-LHG-Ator (assinado)", () => {
+  const chaves = new Map([["p", { segredo: SP, escopo: "nps_pessoal" }]]);
+  const ts = String(Math.floor(AGORA_MS / 1000));
+  const CAM = "/nps/v1/hospede?unidade=lush_ipiranga&raiz=4990";
+  const v = (o) => hmac.verificarNps({ chaves, keyId: "p", timestamp: ts, metodo: "GET", caminho: CAM, agoraMs: AGORA_MS, ...o });
+
+  test("texto canônico: o ator é a 5ª linha; sem ator, continua com 4 (compatível)", () => {
+    const vazio = crypto.createHash("sha256").update("").digest("hex");
+    assert.equal(hmac.textoCanonico("GET", CAM, ts, "", "u-42"), `GET\n${CAM}\n${ts}\n${vazio}\nu-42`);
+    assert.equal(hmac.textoCanonico("GET", CAM, ts), `GET\n${CAM}\n${ts}\n${vazio}`);
+  });
+
+  test("ator assinado → ok com o ator; trocado, retirado ou acrescentado → assinatura", () => {
+    const comAtor = hmac.assinarNps(SP, "GET", CAM, ts, "", "u-42");
+    assert.deepEqual(v({ assinatura: comAtor, ator: "u-42" }), { ok: true, keyId: "p", escopo: "nps_pessoal", ator: "u-42" });
+    assert.equal(v({ assinatura: comAtor, ator: "u-43" }).motivo, "assinatura");
+    assert.equal(v({ assinatura: comAtor }).motivo, "assinatura");
+    const semAtor = hmac.assinarNps(SP, "GET", CAM, ts);
+    assert.equal(v({ assinatura: semAtor }).ator, null);
+    assert.equal(v({ assinatura: semAtor, ator: "u-42" }).motivo, "assinatura");
+  });
+
+  test("ator fora do formato (e-mail, espaço, vazio, longo demais) → cabecalhos", () => {
+    const a = hmac.assinarNps(SP, "GET", CAM, ts);
+    for (const ruim of ["fulano@exemplo.invalid", "Fulano Tal", "", "x".repeat(65), ["u-1"]]) {
+      assert.equal(v({ assinatura: a, ator: ruim }).motivo, "cabecalhos", String(ruim));
+    }
+  });
+
+  test("escopo nps_pessoal é lido de NPS_HMAC_KEYS", () => {
+    const { chaves: c, invalidas } = hmac.lerChavesNps(`k1:${S1},painel:${SP}:nps_pessoal`);
+    assert.equal(invalidas, 0);
+    assert.equal(c.get("painel").escopo, "nps_pessoal");
   });
 });
 
@@ -278,6 +337,25 @@ describe("consultas (nps-estadia)", () => {
     ]) {
       assert.match(ler(b).erro, re);
     }
+  });
+
+  test("C: finalidade=retorno_avaliacao amplia a janela para 30 dias; outra finalidade → erro", () => {
+    const ler = (q) => est.lerConsultaContato({ unidade: "lush_ipiranga", locacao: "8001", ...q }, AGORA_MS);
+    assert.equal(ler({}).consulta.finalidade, null);
+    assert.equal(ler({}).consulta.limiteLocal, "2026-11-04 12:00:00.000");
+    assert.equal(ler({ finalidade: "retorno_avaliacao" }).consulta.finalidade, "retorno_avaliacao");
+    assert.equal(ler({ finalidade: "retorno_avaliacao" }).consulta.limiteLocal, "2026-10-08 12:00:00.000");
+    assert.match(ler({ finalidade: "marketing" }).erro, /finalidade/);
+  });
+
+  test("E e F: unidade; F com raiz numérica e janela de 180 dias", () => {
+    assert.equal(est.lerConsultaSuites({ unidade: "lush_ipiranga" }).consulta.tenant.slug, "lush_ipiranga");
+    assert.match(est.lerConsultaSuites({}).erro, /unidade/);
+    const f = est.lerConsultaHospede({ unidade: "lush_ipiranga", raiz: "4990" }, AGORA_MS);
+    assert.equal(f.consulta.raiz, "4990");
+    assert.equal(f.consulta.limiteLocal, "2026-05-11 12:00:00.000");
+    assert.match(est.lerConsultaHospede({ unidade: "lush_ipiranga", raiz: "x" }, AGORA_MS).erro, /raiz/);
+    assert.match(est.lerConsultaHospede({ unidade: "?", raiz: "1" }, AGORA_MS).erro, /unidade/);
   });
 
   test("celular brasileiro → E.164; fixo, curto ou lixo → null (o mesmo padrão do SQL do B)", () => {
@@ -512,6 +590,36 @@ describe("regras (NpsService, pool falso)", () => {
     assert.deepEqual(await s.confirmarCpf(D("123", "123")), { ok: false, sem_estadia: true }); // raiz desconhecida
   });
 
+  test("E: suítes com categoria; cache de 1h por unidade", async () => {
+    const pool = poolFalso();
+    const s = servico(pool);
+    let agora = AGORA_MS;
+    s.agora = () => agora;
+    const r1 = await s.suites(est.lerConsultaSuites({ unidade: "lush_ipiranga" }).consulta.tenant);
+    assert.equal(r1.cache, false);
+    assert.deepEqual(r1.suites[0], { suite: 101, categoria_id: 17, categoria_nome: "Lush Spa", categoria_sigla: "LS" });
+    assert.equal(r1.suites[1].categoria_sigla, null);
+    agora += 59 * 60_000;
+    assert.equal((await s.suites(r1.suites && est.lerConsultaSuites({ unidade: "lush_ipiranga" }).consulta.tenant)).cache, true);
+    agora += 2 * 60_000;
+    assert.equal((await s.suites(est.lerConsultaSuites({ unidade: "lush_ipiranga" }).consulta.tenant)).cache, false);
+    assert.equal(pool.chamadas.filter((c) => c.sql === svc.SQL_SUITES).length, 2);
+  });
+
+  test("F: nomes com papel; fora da janela; raiz desconhecida", async () => {
+    const F = (raiz) => servico(poolFalso()).hospede(est.lerConsultaHospede({ unidade: "lush_ipiranga", raiz }, AGORA_MS).consulta);
+    assert.deepEqual(await F("4990"), { ok: true, pessoas: [{ nome: NOME_A, papel: "reserva" }, { nome: NOME_B, papel: "acompanhante" }] });
+    assert.deepEqual(await F("6000"), { ok: true, pessoas: [{ nome: NOME_A, papel: "hospede" }] });
+    assert.deepEqual(await F("5002"), { ok: false, motivo: "fora_da_janela" });
+    assert.deepEqual(await F("123"), { ok: false, motivo: "nao_encontrada" });
+  });
+
+  test("C variante: a janela de 30 dias chega ao SQL como parâmetro", async () => {
+    const pool = poolFalso();
+    await servico(pool).contato(est.lerConsultaContato({ unidade: "lush_ipiranga", locacao: "8001", finalidade: "retorno_avaliacao" }, AGORA_MS).consulta);
+    assert.equal(pool.chamadas.find((c) => c.sql === svc.SQL_CONTATO).params[2], "2026-10-08 12:00:00.000");
+  });
+
   test("nenhuma query usa o relógio do banco (réplica ~9 min adiantada) e todas são parametrizadas", () => {
     const todas = [svc.SQL_SUITE, svc.SQL_SUITE_ATUAL_DA_CADEIA, svc.SQL_ATIVA, svc.SQL_ULTIMA_FINALIZADA, svc.SQL_CADEIA, svc.SQL_CHECKOUTS, svc.SQL_CONTATO];
     for (const sql of todas) {
@@ -542,6 +650,14 @@ describe("regras (NpsService, pool falso)", () => {
       assert.doesNotMatch(saida, /identificador|\bcpf\b/); // o CPF não está no SELECT final
     }
     assert.match(svc.SQL_CONFIRMAR_CPF, /left\(cpf, 3\) = \$3::text\) AS confere/);
+    // E sem dado pessoal; F: raiz precisa ser raiz, janela por parâmetro, nome só se liberada, só nome+papel
+    assert.doesNotMatch(svc.SQL_SUITES, /pessoa|now\(/i);
+    assert.match(svc.SQL_SUITES, /dataexclusao IS NULL/);
+    assert.doesNotMatch(svc.SQL_HOSPEDE, /now\(|current_/i);
+    assert.match(svc.SQL_HOSPEDE, /id_locacaoorigem IS NULL/);
+    assert.match(svc.SQL_HOSPEDE, /\$2::timestamp/);
+    assert.match(svc.SQL_HOSPEDE, /WHERE s\.liberada/);
+    assert.doesNotMatch(svc.SQL_HOSPEDE, /identificador|telefone|celular|email|nascimento/);
     assert.ok(!svc.SQL_CONFIRMAR_CPF.includes("$4"));
   });
 });
@@ -585,6 +701,18 @@ describe("HTTP de ponta a ponta (/nps/v1/*)", () => {
       },
     });
   const comoChat = (cam) => chamar(cam, { id: "chat", seg: SC });
+  /** GET com X-LHG-Ator (assinado como 5ª linha, ou com outro ator para simular adulteração). */
+  const comAtor = (cam, { id = "painel", seg = SP, ator = "u-42", atorAssinado = ator, enviarAtor = true } = {}) => {
+    const ts = String(Math.floor(Date.now() / 1000));
+    return fetch(base + cam, {
+      headers: {
+        "X-LHG-Key-Id": id,
+        "X-LHG-Timestamp": ts,
+        "X-LHG-Signature": hmac.assinarNps(seg, "GET", cam, ts, "", atorAssinado ?? undefined),
+        ...(enviarAtor ? { "X-LHG-Ator": ator } : {}),
+      },
+    });
+  };
 
   test("sem NPS_HMAC_KEYS: módulo DESLIGADO (404), mesmo com assinatura", async () => {
     delete process.env.NPS_HMAC_KEYS;
@@ -592,7 +720,7 @@ describe("HTTP de ponta a ponta (/nps/v1/*)", () => {
   });
 
   test("A assinado → 200; sem cabeçalhos / outra chave / adulterado / atrasado / caminho do proxy → 401", async () => {
-    process.env.NPS_HMAC_KEYS = `k1:${S1},k2:${S2},chat:${SC}:contato`;
+    process.env.NPS_HMAC_KEYS = `k1:${S1},k2:${S2},chat:${SC}:contato,painel:${SP}:nps_pessoal`;
     const cam = caminho(101);
     const ok = await chamar(cam);
     assert.equal(ok.status, 200);
@@ -697,6 +825,62 @@ describe("HTTP de ponta a ponta (/nps/v1/*)", () => {
     assert.equal((await postar("isto não é json")).status, 400);
   });
 
+  test("E (chave do NPS) → 200 com as suítes; chave do painel ou do Chat LHG → 403", async () => {
+    const r = await chamar("/nps/v1/suites?unidade=lush_ipiranga");
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    assert.equal(j.unidade, "lush_ipiranga");
+    assert.deepEqual(j.suites[0], { suite: 101, categoria_id: 17, categoria_nome: "Lush Spa", categoria_sigla: "LS" });
+    assert.equal(j.cache, undefined); // o indicador de cache fica só no log
+    assert.equal((await comoChat("/nps/v1/suites?unidade=lush_ipiranga")).status, 403);
+    assert.equal((await comAtor("/nps/v1/suites?unidade=lush_ipiranga")).status, 403);
+    assert.equal((await chamar("/nps/v1/suites?unidade=x")).status, 400);
+  });
+
+  test("F: só a chave nps_pessoal, com ator ASSINADO; no-store; 404 com motivo", async () => {
+    const cam = "/nps/v1/hospede?unidade=lush_ipiranga&raiz=4990";
+    const ok = await comAtor(cam);
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await ok.json(), {
+      unidade: "lush_ipiranga",
+      raiz: "4990",
+      pessoas: [{ nome: NOME_A, papel: "reserva" }, { nome: NOME_B, papel: "acompanhante" }],
+    });
+    assert.equal((await comAtor(cam, { id: "k1", seg: S1 })).status, 403); // chave do NPS
+    assert.equal((await comAtor(cam, { id: "chat", seg: SC })).status, 403); // chave do Chat LHG
+    assert.equal((await comAtor(cam, { atorAssinado: "u-99" })).status, 401); // ator trocado
+    assert.equal((await comAtor(cam, { enviarAtor: false })).status, 401); // ator retirado
+    assert.equal((await comAtor(cam, { ator: "fulano@exemplo.invalid" })).status, 401); // fora do formato
+    const sem = await comAtor(cam, { enviarAtor: false, atorAssinado: null });
+    assert.equal(sem.status, 400); // assinado sem ator, mas a rota exige
+    assert.equal((await sem.json()).message, "X-LHG-Ator obrigatório");
+    const fora = await comAtor("/nps/v1/hospede?unidade=lush_ipiranga&raiz=5002");
+    assert.equal(fora.status, 404);
+    assert.equal((await fora.json()).motivo, "fora_da_janela");
+    assert.equal((await (await comAtor("/nps/v1/hospede?unidade=lush_ipiranga&raiz=123")).json()).motivo, "nao_encontrada");
+    assert.equal((await comAtor(caminho(101))).status, 403); // a chave do painel não acessa o A
+  });
+
+  test("C variante: só a chave do Chat LHG, ator obrigatório e assinado, 10/min", async () => {
+    const cam = "/nps/v1/contato?unidade=lush_ipiranga&locacao=8001&finalidade=retorno_avaliacao";
+    const semAtor = await comoChat(cam);
+    assert.equal(semAtor.status, 400);
+    assert.equal((await semAtor.json()).message, "X-LHG-Ator obrigatório");
+    const ok = await comAtor(cam, { id: "chat", seg: SC });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), { celular: E164_FICTICIO, origem_reserva: "RESERVA_API" });
+    assert.equal((await comAtor(cam, { id: "chat", seg: SC, atorAssinado: "u-1" })).status, 401);
+    assert.equal((await comAtor(cam, { id: "painel", seg: SP })).status, 403);
+    assert.equal((await comoChat(cam.replace("retorno_avaliacao", "marketing"))).status, 400);
+    const status = [];
+    for (let i = 0; i < 10; i++) status.push((await comAtor(cam, { id: "chat", seg: SC })).status);
+    assert.equal(status.filter((x) => x === 200).length, 9); // 1 + 9 = 10 no minuto
+    assert.equal(status[9], 429);
+    // o C do convite (sem finalidade) não entra nesse limite
+    assert.equal((await comoChat("/nps/v1/contato?unidade=lush_ipiranga&locacao=8001")).status, 200);
+  });
+
   test("auditoria: chave, unidade e resultado no log; nenhum segredo, assinatura ou TELEFONE", () => {
     const tudo = logs.join("\n");
     assert.match(tudo, /nps\.estadia key=k1 unidade=lush_ipiranga suite=101 estado=ativa/);
@@ -711,13 +895,20 @@ describe("HTTP de ponta a ponta (/nps/v1/*)", () => {
     assert.match(tudo, /nps\.confirmar_cpf key=k1 unidade=lush_ipiranga raiz=4990 resultado=bloqueado/);
     assert.match(tudo, /nps\.confirmar_cpf key=k1 unidade=lush_ipiranga raiz=5003 resultado=sem_cpf/);
     assert.match(tudo, /nps\.recusado motivo=escopo key=chat rota=nps/);
+    assert.match(tudo, /nps\.suites key=k1 unidade=lush_ipiranga suites=2 cache=(sim|nao)/);
+    assert.match(tudo, /nps\.hospede key=painel unidade=lush_ipiranga raiz=4990 ator=u-42 resultado=entregue pessoas=2/);
+    assert.match(tudo, /nps\.hospede key=painel unidade=lush_ipiranga raiz=5002 ator=u-42 resultado=fora_da_janela/);
+    assert.match(tudo, /nps\.contato key=chat unidade=lush_ipiranga locacao=8001 finalidade=retorno_avaliacao ator=u-42 resultado=entregue/);
+    assert.match(tudo, /nps\.recusado motivo=escopo key=painel rota=nps/);
+    // nenhum NOME no log
+    assert.ok(!tudo.includes(NOME_A) && !tudo.includes(NOME_B) && !tudo.includes("Ficticia"));
     // o PREFIXO nunca vai para o log
     // (tira a raiz e o contador, que são números legítimos da linha, e procura os prefixos usados)
     for (const linha of logs.filter((l) => l.includes("confirmar_cpf"))) {
       const resto = linha.replace(/raiz=\d+/, "").replace(/restantes=\d/, "");
       assert.doesNotMatch(resto, /prefix|\b(123|456|90[1-3]|99[7-9]|12)\b/);
     }
-    for (const s of [S1, S2, SC]) assert.ok(!tudo.includes(s));
+    for (const s of [S1, S2, SC, SP]) assert.ok(!tudo.includes(s));
     assert.doesNotMatch(tudo, /[0-9a-f]{64}/);
     assert.ok(!tudo.includes(E164_FICTICIO) && !tudo.includes("900000001") && !tudo.includes("90000-0001"));
   });
