@@ -40,6 +40,8 @@ export class NpsHmacGuard implements CanActivate {
       caminho: req.originalUrl ?? req.url,
       // Corpo BRUTO (main.ts: rawBody), byte a byte como chegou; GET → vazio.
       corpo: Buffer.isBuffer(req.rawBody) ? req.rawBody : '',
+      // Ator assinado (5ª linha do texto canônico) quando o cabeçalho vem.
+      ator: req.headers?.['x-lhg-ator'],
       agoraMs: Date.now(),
     });
     if (!r.ok && r.motivo === 'sem_config') throw new NotFoundException();
@@ -57,6 +59,7 @@ export class NpsHmacGuard implements CanActivate {
       throw new ForbiddenException('Proibido');
     }
     req.npsKeyId = r.keyId;
+    req.npsAtor = r.ator;
     return true;
   }
 }
