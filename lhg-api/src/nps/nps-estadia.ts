@@ -22,6 +22,12 @@ export const CHECKOUTS_LIMITE_PADRAO = 500;
 export const CHECKOUTS_LIMITE_MAX = 1000;
 /** Endpoint C: o celular só sai para check-out nas últimas 72h (validade do convite). */
 export const CONTATO_JANELA_H = 72;
+/** Variante do C (finalidade=retorno_avaliacao, botão do painel): 30 dias. */
+export const CONTATO_RETORNO_DIAS = 30;
+export const FINALIDADES_CONTATO = ['retorno_avaliacao'] as const;
+export type FinalidadeContato = (typeof FINALIDADES_CONTATO)[number];
+/** Endpoint F (nome do hóspede): até 180 dias depois do check-out. */
+export const HOSPEDE_JANELA_DIAS = 180;
 /** Endpoint D: CPF "genérico" = com estadias simultâneas nos últimos N dias. */
 export const CPF_GENERICO_DIAS = 60;
 
@@ -58,7 +64,16 @@ export interface ConsultaCheckouts {
 export interface ConsultaContato {
   tenant: TenantConfig;
   locacao: string;
-  /** Check-out mais antigo aceito (agora deste servidor − 72h), hora local do Automo. */
+  /** null = o C do convite (72h); 'retorno_avaliacao' = botão do painel (30 dias, com ator). */
+  finalidade: FinalidadeContato | null;
+  /** Check-out mais antigo aceito (agora deste servidor − janela), hora local do Automo. */
+  limiteLocal: string;
+}
+
+export interface ConsultaHospede {
+  tenant: TenantConfig;
+  raiz: string;
+  /** Check-out mais antigo aceito (agora deste servidor − 180 dias), hora local do Automo. */
   limiteLocal: string;
 }
 
@@ -206,12 +221,32 @@ export function lerConsultaContato(q: Record<string, unknown>, agoraServidorMs: 
   if (!tenant) return { ok: false, erro: 'unidade inválida' };
   const locacao = texto(q.locacao) ?? '';
   if (!REF.test(locacao)) return { ok: false, erro: 'locacao inválida' };
+  const finTxt = texto(q.finalidade);
+  if (finTxt !== undefined && !(FINALIDADES_CONTATO as readonly string[]).includes(finTxt)) {
+    return { ok: false, erro: 'finalidade inválida' };
+  }
+  const finalidade = (finTxt ?? null) as FinalidadeContato | null;
+  const janelaMs = finalidade ? CONTATO_RETORNO_DIAS * 86_400_000 : CONTATO_JANELA_H * 3_600_000;
   return {
     ok: true,
-    consulta: {
-      tenant,
-      locacao,
-      limiteLocal: paraLocalAutomo(agoraServidorMs - CONTATO_JANELA_H * 3_600_000),
-    },
+    consulta: { tenant, locacao, finalidade, limiteLocal: paraLocalAutomo(agoraServidorMs - janelaMs) },
+  };
+}
+
+/** Endpoint E: só a unidade. */
+export function lerConsultaSuites(q: Record<string, unknown>): Leitura<{ tenant: TenantConfig }> {
+  const tenant = getTenant(texto(q.unidade) ?? '');
+  return tenant ? { ok: true, consulta: { tenant } } : { ok: false, erro: 'unidade inválida' };
+}
+
+/** Endpoint F: unidade + raiz da cadeia; janela de 180 dias pelo relógio deste servidor. */
+export function lerConsultaHospede(q: Record<string, unknown>, agoraServidorMs: number): Leitura<ConsultaHospede> {
+  const tenant = getTenant(texto(q.unidade) ?? '');
+  if (!tenant) return { ok: false, erro: 'unidade inválida' };
+  const raiz = texto(q.raiz) ?? '';
+  if (!REF.test(raiz)) return { ok: false, erro: 'raiz inválida' };
+  return {
+    ok: true,
+    consulta: { tenant, raiz, limiteLocal: paraLocalAutomo(agoraServidorMs - HOSPEDE_JANELA_DIAS * 86_400_000) },
   };
 }

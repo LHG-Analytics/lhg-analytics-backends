@@ -7,11 +7,13 @@
  */
 import { Injectable } from '@nestjs/common';
 import { TenantPoolService } from '../database/tenant-pool.service';
+import { TenantConfig } from '../tenant/tenant.interfaces';
 import { NpsTentativasService, SituacaoTentativas } from './nps-tentativas.service';
 import {
   CELULAR_BR_DIGITOS,
   ConsultaCheckouts,
   ConsultaConfirmarCpf,
+  ConsultaHospede,
   ConsultaContato,
   ConsultaEstadia,
   celularE164,
@@ -44,6 +46,28 @@ export type ResultadoConfirmarCpf =
   | { ok: false; bloqueado: true; retry_after: number }
   | { ok: false; sem_cpf: true }
   | { ok: false; sem_estadia: true };
+
+export interface SuiteNps {
+  suite: number;
+  categoria_id: number;
+  /** categoriaapartamento.nomeexibicao (ex.: "Lush Spa"), ou a descricao se vazia. */
+  categoria_nome: string;
+  categoria_sigla: string | null;
+}
+
+export interface RespostaSuites {
+  unidade: string;
+  suites: SuiteNps[];
+}
+
+export type PapelHospede = 'reserva' | 'acompanhante' | 'hospede';
+
+export type ResultadoHospede =
+  | { ok: true; pessoas: { nome: string; papel: PapelHospede }[] }
+  | { ok: false; motivo: 'nao_encontrada' | 'fora_da_janela' };
+
+/** Cache do Endpoint E (por unidade, por processo). */
+export const SUITES_CACHE_MS = 3600_000;
 
 export interface CheckoutNps {
   locacao_raiz_ref: string;
@@ -198,6 +222,59 @@ export const SQL_CONFIRMAR_CPF = `WITH RECURSIVE ${CPF_CTES}
   SELECT EXISTS (SELECT 1 FROM aceitos) AS tem_cpf,
          EXISTS (SELECT 1 FROM aceitos WHERE left(cpf, 3) = $3::text) AS confere`;
 
+// Endpoint E: suítes ATIVAS das categorias de suíte da unidade, com a categoria.
+export const SQL_SUITES = `
+  SELECT a.numero AS suite, ca.id AS categoria_id,
+         coalesce(nullif(trim(ca.nomeexibicao), ''), ca.descricao) AS categoria_nome,
+         nullif(trim(ca.sigla), '') AS categoria_sigla
+  FROM apartamento a
+  JOIN categoriaapartamento ca ON ca.id = a.id_categoriaapartamento
+  WHERE a.dataexclusao IS NULL AND a.id_categoriaapartamento = ANY($1::int[])
+  ORDER BY a.numero`;
+
+// Endpoint F: nomes das pessoas da ESTADIA (cadeia a partir da raiz $1, que
+// precisa ser raiz). Liberado se a cadeia ainda está aberta ou terminou a partir
+// de $2 (180 dias); fora disso, o nome nem é lido. Papel: com reserva na
+// cadeia, o cliente da reserva é 'reserva' e os demais 'acompanhante'; sem
+// reserva (balcão), todos 'hospede' (a coluna ordem NÃO indica o titular).
+export const SQL_HOSPEDE = `
+  WITH RECURSIVE cadeia AS (
+    SELECT id_apartamentostate AS id, 0 AS n FROM locacaoapartamento
+    WHERE id_apartamentostate = $1::int AND id_locacaoorigem IS NULL
+    UNION ALL
+    SELECT l.id_apartamentostate, c.n + 1 FROM locacaoapartamento l JOIN cadeia c ON l.id_locacaoorigem = c.id
+    WHERE c.n < 50
+  ), situacao AS (
+    SELECT count(*) > 0 AS existe,
+           coalesce(bool_or(l.datafinaldaocupacao IS NULL) OR max(l.datafinaldaocupacao) >= $2::timestamp, false)
+             AS liberada
+    FROM cadeia c JOIN locacaoapartamento l ON l.id_apartamentostate = c.id
+  ), res AS (
+    SELECT DISTINCT pp.id_pessoa FROM cadeia c
+    JOIN reserva r ON r.id_locacaoapartamento = c.id AND r.cancelada IS NULL
+    JOIN pessoapapel pp ON pp.id = r.id_cliente
+  ), todas AS (
+    SELECT id_pessoa, min(ordem) AS ordem FROM (
+      SELECT pp.id_pessoa, lc.ordem FROM cadeia c
+      JOIN col_locacaoapartamento_cliente lc ON lc.id_locacaoapartamento = c.id
+      JOIN pessoapapel pp ON pp.id = lc.id_cliente
+      UNION ALL
+      SELECT id_pessoa, -1 FROM res
+    ) z GROUP BY id_pessoa
+  )
+  SELECT s.existe, s.liberada, x.nome, x.papel
+  FROM situacao s
+  LEFT JOIN LATERAL (
+    SELECT trim(pe.nome) AS nome,
+           CASE WHEN NOT EXISTS (SELECT 1 FROM res) THEN 'hospede'
+                WHEN t.id_pessoa IN (SELECT id_pessoa FROM res) THEN 'reserva'
+                ELSE 'acompanhante' END AS papel,
+           t.ordem
+    FROM todas t JOIN pessoa pe ON pe.id = t.id_pessoa
+    WHERE s.liberada AND coalesce(trim(pe.nome), '') <> ''
+  ) x ON true
+  ORDER BY (x.papel = 'reserva') DESC, x.ordem`;
+
 // Endpoint B. Página por (fim, ref) > ($1, $2) — com $2 = -1 vale fim >= $1.
 // Só FINALIZADA (a TRANSFERIDA não tem check-out) e só suítes da unidade.
 // A reserva é a da cadeia, de preferência a ligada à locação final. O telefone
@@ -284,6 +361,10 @@ export const SQL_CONTATO = `
 
 @Injectable()
 export class NpsService {
+  private suitesCache = new Map<string, { ate: number; resposta: RespostaSuites }>();
+  /** Relógio do cache (substituível nos testes). */
+  agora = () => Date.now();
+
   constructor(
     private readonly pool: TenantPoolService,
     private readonly tentativas: NpsTentativasService,
@@ -389,6 +470,46 @@ export class NpsService {
     return depois.bloqueado
       ? { ok: false, bloqueado: true, retry_after: depois.retryAfter }
       : { ok: false, tentativas_restantes: depois.restantes };
+  }
+
+  /** Endpoint E. Cache de 1h por unidade (as suítes quase nunca mudam). */
+  async suites(tenant: TenantConfig): Promise<RespostaSuites & { cache: boolean }> {
+    const guardado = this.suitesCache.get(tenant.slug);
+    if (guardado && guardado.ate > this.agora()) return { ...guardado.resposta, cache: true };
+    const linhas = await this.pool.queryWithParams<{
+      suite: number;
+      categoria_id: number;
+      categoria_nome: string;
+      categoria_sigla: string | null;
+    }>(tenant.slug, SQL_SUITES, [tenant.suiteCategoryIds]);
+    const resposta: RespostaSuites = {
+      unidade: tenant.slug,
+      suites: linhas.map((l) => ({
+        suite: Number(l.suite),
+        categoria_id: Number(l.categoria_id),
+        categoria_nome: l.categoria_nome,
+        categoria_sigla: l.categoria_sigla ?? null,
+      })),
+    };
+    this.suitesCache.set(tenant.slug, { ate: this.agora() + SUITES_CACHE_MS, resposta });
+    return { ...resposta, cache: false };
+  }
+
+  /** Endpoint F. Só nomes e papel; nada mais da pessoa sai do banco. */
+  async hospede(c: ConsultaHospede): Promise<ResultadoHospede> {
+    const linhas = await this.pool.queryWithParams<{
+      existe: boolean;
+      liberada: boolean;
+      nome: string | null;
+      papel: PapelHospede | null;
+    }>(c.tenant.slug, SQL_HOSPEDE, [c.raiz, c.limiteLocal]);
+    const s = linhas[0];
+    if (!s?.existe) return { ok: false, motivo: 'nao_encontrada' };
+    if (!s.liberada) return { ok: false, motivo: 'fora_da_janela' };
+    return {
+      ok: true,
+      pessoas: linhas.filter((l) => l.nome && l.papel).map((l) => ({ nome: l.nome!, papel: l.papel! })),
+    };
   }
 
   async checkouts(c: ConsultaCheckouts): Promise<RespostaCheckouts> {
