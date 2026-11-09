@@ -11,14 +11,31 @@ export interface HubClientSettings {
   issuer: string;
   clientId: string;
   clientSecret: string;
-  /** Origem do front (sem caminho): de onde saem o redirect_uri e os destinos. */
+  /**
+   * Origem do FRONT (sem caminho): destino após o login, /login?hub_error e o
+   * Origin aceito no logout.
+   */
   publicOrigin: string;
+  /**
+   * Origem onde ficam as rotas /auth/api/hub/* (o callback e os cookies
+   * an_hub_*): ANALYTICS_BACKEND_URL, ou o próprio front se ela não existir.
+   */
+  backendOrigin: string;
+  /** Front e backend em hosts diferentes (ANALYTICS_BACKEND_URL ≠ front). */
+  separados: boolean;
   redirectUri: string;
   portalUrl: string;
   /** ANALYTICS_LOGIN_LOCAL=off pedido (vale só com o cliente ATIVO). */
   loginLocalOffPedido: boolean;
   /** A porta antiga (POST /api/login e Google antigo) está FECHADA. */
   loginLocalFechado: boolean;
+  /**
+   * Destino depois do login quando o returnTo falta ou é inseguro:
+   * ANALYTICS_DEFAULT_RETURN_TO (caminho relativo), ou PADRAO_RETURN_TO.
+   */
+  defaultReturnTo: string;
+  /** ANALYTICS_DEFAULT_RETURN_TO veio, mas inválida (usa o padrão + ALERTA). */
+  defaultReturnToInvalido: boolean;
 }
 
 /** Caminho público do callback (o navegador vê /auth/api/...). */
@@ -27,6 +44,12 @@ export const CALLBACK_PATH = '/auth/api/hub/callback';
 export const HUB_COOKIE_PATH = '/auth/api/hub';
 /** Segredo do cliente: mínimo de caracteres. */
 export const MIN_SEGREDO = 32;
+/**
+ * Destino padrão = a RAIZ do front: ela decide a página pelo PERFIL (admin →
+ * /general…; gerente → /<módulo>/<unidade>…; src/app/page.tsx do front). Um
+ * caminho fixo (ex.: /general, que é do admin) erraria para os demais perfis.
+ */
+export const PADRAO_RETURN_TO = '/';
 
 function urlSegura(
   valor: string | undefined,
@@ -60,6 +83,13 @@ export function readHubClientSettings(
   const clientSecret = get('HUB_OIDC_CLIENT_SECRET')?.trim() ?? '';
   const publico = urlSegura(get('ANALYTICS_PUBLIC_URL'), permitirLocalhost);
   const portal = urlSegura(get('HUB_PORTAL_URL'), permitirLocalhost);
+  // Opcional: o host do backend, quando o front não repassa /auth/* a ele.
+  const backendBruto = get('ANALYTICS_BACKEND_URL')?.trim();
+  const backend = backendBruto
+    ? urlSegura(backendBruto, permitirLocalhost)
+    : null;
+  const padraoBruto = get('ANALYTICS_DEFAULT_RETURN_TO')?.trim();
+  const padrao = padraoBruto ? caminhoSeguro(padraoBruto) : null;
   const loginLocalOffPedido =
     (get('ANALYTICS_LOGIN_LOCAL') ?? '').trim().toLowerCase() === 'off';
 
@@ -70,8 +100,11 @@ export function readHubClientSettings(
     motivo = `HUB_OIDC_CLIENT_SECRET ausente/curto (< ${MIN_SEGREDO})`;
   else if (!publico) motivo = 'ANALYTICS_PUBLIC_URL ausente/inválida';
   else if (!portal) motivo = 'HUB_PORTAL_URL ausente/inválida';
+  else if (backendBruto && !backend) motivo = 'ANALYTICS_BACKEND_URL inválida';
   const ativo = motivo === null;
   const publicOrigin = publico ? publico.origin : '';
+  // Sem ANALYTICS_BACKEND_URL: tudo no host do front (comportamento anterior).
+  const backendOrigin = backend ? backend.origin : publicOrigin;
   return {
     ativo,
     motivo,
@@ -79,11 +112,16 @@ export function readHubClientSettings(
     clientId,
     clientSecret,
     publicOrigin,
-    redirectUri: publicOrigin ? `${publicOrigin}${CALLBACK_PATH}` : '',
+    backendOrigin,
+    separados: !!backendOrigin && backendOrigin !== publicOrigin,
+    redirectUri: backendOrigin ? `${backendOrigin}${CALLBACK_PATH}` : '',
     portalUrl: portal ? portal.toString() : '',
     loginLocalOffPedido,
     // Recusa o "off" sem o cliente ativo: ninguém fica sem login.
     loginLocalFechado: loginLocalOffPedido && ativo,
+    // Inválida não desliga o cliente: usa o padrão e avisa no boot.
+    defaultReturnTo: padrao ?? PADRAO_RETURN_TO,
+    defaultReturnToInvalido: !!padraoBruto && !padrao,
   };
 }
 
@@ -93,22 +131,45 @@ export function resumoHubCliente(s: HubClientSettings): {
   alerta: string | null;
 } {
   const linha = s.ativo
-    ? `hub-cliente: ATIVO (client_id=${s.clientId}, login local=${s.loginLocalFechado ? 'FECHADO' : 'aberto'})`
+    ? `hub-cliente: ATIVO (client_id=${s.clientId}, callback=${s.separados ? 'backend separado do front' : 'mesmo host do front'}, login local=${s.loginLocalFechado ? 'FECHADO' : 'aberto'})`
     : `hub-cliente: DESLIGADO (${s.motivo})`;
-  const alerta =
-    s.loginLocalOffPedido && !s.ativo
-      ? 'ALERTA hub-cliente: ANALYTICS_LOGIN_LOCAL=off RECUSADO (o cliente do HUB está desligado); o login antigo continua aberto'
-      : null;
-  return { linha, alerta };
+  const alertas: string[] = [];
+  if (s.loginLocalOffPedido && !s.ativo)
+    alertas.push(
+      'ALERTA hub-cliente: ANALYTICS_LOGIN_LOCAL=off RECUSADO (o cliente do HUB está desligado); o login antigo continua aberto',
+    );
+  if (s.defaultReturnToInvalido)
+    alertas.push(
+      'ALERTA hub-cliente: ANALYTICS_DEFAULT_RETURN_TO inválida (não é caminho relativo seguro); usando o destino padrão',
+    );
+  return { linha, alerta: alertas.length ? alertas.join('\n') : null };
 }
 
-/** returnTo: só caminho relativo seguro (até 512); qualquer outra coisa vira "/". */
-export function returnToSeguro(v: unknown): string {
-  if (typeof v !== 'string' || !v || v.length > 512) return '/';
-  if (!v.startsWith('/') || v.startsWith('//') || v.startsWith('/\\'))
-    return '/';
+/**
+ * Caminho relativo seguro (até 512), com a query string e o #fragmento
+ * preservados; null para qualquer outra coisa (//host, URL absoluta, \,
+ * caracteres de controle, esquema disfarçado).
+ */
+export function caminhoSeguro(v: unknown): string | null {
+  if (typeof v !== 'string' || !v || v.length > 512) return null;
+  if (!v.startsWith('/') || v.startsWith('//')) return null;
   // eslint-disable-next-line no-control-regex
-  if (/[\u0000-\u001f\u007f\\]/.test(v)) return '/';
-  if (/^\/[a-z][a-z0-9+.-]*:/i.test(v)) return '/';
+  if (/[\u0000-\u001f\u007f\\]/.test(v)) return null;
+  if (/^\/[a-z][a-z0-9+.-]*:/i.test(v)) return null;
+  // Última trava: resolvido contra uma origem qualquer, não pode sair dela.
+  const base = 'https://front.invalid';
+  try {
+    if (new URL(v, base).origin !== base) return null;
+  } catch {
+    return null;
+  }
   return v;
+}
+
+/** returnTo: o caminho seguro, ou o destino padrão (falta ou inseguro). */
+export function returnToSeguro(
+  v: unknown,
+  padrao: string = PADRAO_RETURN_TO,
+): string {
+  return caminhoSeguro(v) ?? padrao;
 }

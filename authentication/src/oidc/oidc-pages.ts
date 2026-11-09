@@ -26,6 +26,34 @@ export const html = (s: unknown) =>
  * form_post, saída direta com id_token_hint). O style-src libera só o hash
  * do <style> fixo das páginas, sem 'unsafe-inline'.
  */
+/**
+ * Origens https EXATAS (sem caminho, sem curinga), separadas por vírgula.
+ * Qualquer item inválido é ignorado: nunca vira "*" nem "https:".
+ */
+export function origensHttpsExatas(bruto: string | undefined): string[] {
+  const out: string[] = [];
+  for (const item of (bruto ?? '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)) {
+    try {
+      const u = new URL(item);
+      if (
+        u.protocol === 'https:' &&
+        !u.username &&
+        !u.password &&
+        u.hostname &&
+        !u.hostname.includes('*')
+      ) {
+        out.push(u.origin);
+      }
+    } catch {
+      /* ignora */
+    }
+  }
+  return out;
+}
+
 export function cspDoOidc(origensDosFormularios: string[]): string {
   const destinos = [...new Set(origensDosFormularios)].join(' ');
   return [
@@ -93,6 +121,22 @@ function pagina(
 }
 
 /**
+ * Página SEM nada visível: só o fundo (o mesmo das outras telas) e o corpo,
+ * sem cartão, marca nem texto. Para o envio automático da saída, que dura um
+ * instante e não deve aparecer.
+ */
+function paginaInvisivel(
+  titulo: string,
+  corpo: string,
+  script: string,
+): string {
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer"><meta name="color-scheme" content="light dark"><title>${html(titulo)}</title>
+<style>${ESTILO}</style></head><body>${corpo}<script>${script}</script></body></html>`;
+}
+
+/**
  * Acrescenta o hash de um script inline ao script-src do CSP desta resposta
  * (o mesmo que o provedor faz nas páginas dele). Sem CSP ou sem script-src,
  * não mexe.
@@ -136,13 +180,59 @@ export function paginaLogin(p: {
     'Entrar — LHG',
     `<h1>Entrar</h1>
 ${p.erro ? `<p class="erro" role="alert">${html(p.erro)}</p>` : ''}
-<form method="post" action="${html(p.acao)}/login" autocomplete="on">
+<form id="form-entrar" method="post" action="${html(p.acao)}/login" autocomplete="on">
 <label for="email">E-mail</label><input id="email" name="email" type="email" required autocomplete="username">
 <label for="password">Senha</label><input id="password" name="password" type="password" required autocomplete="current-password">
-<button type="submit">Entrar</button></form>
+<button id="botao-entrar" type="submit">Entrar</button>
+<p id="aviso-entrar" class="erro" role="status" hidden></p></form>
 ${p.google ? `<form class="inline" method="post" action="${html(p.acao)}/google"><button type="submit">Entrar com Google</button></form>` : ''}
 <form class="inline" method="post" action="${html(p.acao)}/abort"><button type="submit">Cancelar</button></form>
-<p class="aviso">Tela mínima de homologação.</p>`,
+<p class="aviso">Tela mínima de homologação.</p>
+<script>${SCRIPT_ENTRAR}</script>`,
+  );
+}
+
+/** Sem resposta do servidor depois disto, o "Entrar" volta e avisa. */
+export const ENTRAR_LIMITE_MS = 20000;
+
+/**
+ * "Entrar" INATIVO do 1º envio até a página trocar (padrão de mercado):
+ * - o 1º submit SEGUE sem interferência; o botão é desligado no próximo tique
+ *   (setTimeout 0, com o formulário já serializado), com aria-disabled e
+ *   pointer-events:none: o 2º clique não gera NENHUM evento;
+ * - o Enter nos campos é barrado no keydown, sem tocar no envio em curso;
+ * - libera no pageshow (voltar pelo histórico/bfcache) ou depois de
+ *   ENTRAR_LIMITE_MS sem resposta, com "Demorou mais que o normal. Tente de novo."
+ * Nenhum preventDefault/stopPropagation no meio da navegação do 1º envio.
+ * Texto FIXO: o hash dele entra no script-src da resposta (cspComScript).
+ */
+export const SCRIPT_ENTRAR = [
+  "(function(){var f=document.getElementById('form-entrar'),b=document.getElementById('botao-entrar'),a=document.getElementById('aviso-entrar');",
+  'if(!f||!b)return;var t=b.textContent,enviando=false,relogio=0;',
+  "function travar(){b.disabled=true;b.setAttribute('aria-disabled','true');b.style.pointerEvents='none';b.textContent='Entrando…'}",
+  "function liberar(msg){enviando=false;clearTimeout(relogio);b.disabled=false;b.removeAttribute('aria-disabled');b.style.pointerEvents='';b.textContent=t;if(a){a.textContent=msg||'';a.hidden=!msg}}",
+  // o 1º submit segue; só os seguintes (antes do 1º tique) são descartados
+  "f.addEventListener('submit',function(e){if(enviando){e.preventDefault();return}enviando=true;if(a)a.hidden=true;setTimeout(travar,0);",
+  `relogio=setTimeout(function(){liberar('Demorou mais que o normal. Tente de novo.')},${ENTRAR_LIMITE_MS})});`,
+  "f.addEventListener('keydown',function(e){if(enviando&&e.key==='Enter')e.preventDefault()});",
+  "window.addEventListener('pageshow',function(){liberar('')})})();",
+].join('');
+
+/** "Voltar" da interação perdida (history.back), com hash no script-src. */
+export const SCRIPT_VOLTAR =
+  "document.getElementById('voltar').addEventListener('click',function(){history.back()});";
+
+/**
+ * Interação perdida SEM destino conhecido (b2): em vez do beco sem saída,
+ * os botões "Ir para o HUB LHG" (portal, se configurado) e "Voltar".
+ */
+export function paginaInteracaoPerdida(portal: string | null): string {
+  return pagina(
+    'Login — LHG',
+    `<h1>Não foi possível continuar</h1><p>Sua sessão de login expirou ou já foi concluída.</p>
+${portal ? `<p><a class="botao" href="${html(portal)}">Ir para o HUB LHG</a></p>` : ''}
+<p><button id="voltar" class="secundario" type="button">Voltar</button></p>
+<script>${SCRIPT_VOLTAR}</script>`,
   );
 }
 
@@ -193,8 +283,9 @@ export function saidaDireta(ctx: any): boolean {
 
 /**
  * end_session com sessão. O form vem pronto do provedor (xsrf). Com hint
- * validado: o form se envia sozinho, com logout=yes ("sair de tudo"), e um
- * botão "Continuar" de reserva para quem não tem JavaScript. Sem hint: a
+ * validado: o form se envia sozinho, com logout=yes ("sair de tudo"), numa
+ * página INVISÍVEL (só o fundo: nada de "Saindo…" na tela), e um botão
+ * "Continuar" de reserva para quem não tem JavaScript. Sem hint: a
  * confirmação.
  */
 export async function logoutSource(ctx: any, form: string): Promise<void> {
@@ -203,11 +294,10 @@ export async function logoutSource(ctx: any, form: string): Promise<void> {
       '<input type="hidden" name="logout" value="yes"/>' +
       '<noscript><button autofocus type="submit">Continuar</button></noscript></form>';
     liberarScript(ctx, ENVIAR_SAIDA);
-    ctx.body = pagina(
+    ctx.body = paginaInvisivel(
       'Saindo — HUB LHG',
-      `<div class="spinner" aria-hidden="true"></div><h1 role="status">Saindo do HUB LHG…</h1>${form.replace(/<\/form>\s*$/, reserva)}`,
+      form.replace(/<\/form>\s*$/, reserva),
       ENVIAR_SAIDA,
-      'saindo',
     );
     return;
   }

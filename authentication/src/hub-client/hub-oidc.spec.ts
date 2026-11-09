@@ -4,6 +4,7 @@ import {
   readHubClientSettings,
   resumoHubCliente,
   returnToSeguro,
+  PADRAO_RETURN_TO,
 } from './hub-client.settings';
 import {
   HubOidc,
@@ -100,22 +101,76 @@ describe('hub-cliente: configuração', () => {
 });
 
 describe('4. returnTo seguro', () => {
+  const P = PADRAO_RETURN_TO;
+  it('padrão = a raiz do front (que decide pelo perfil)', () => {
+    expect(P).toBe('/'); // a raiz do front decide o destino pelo perfil
+  });
+
   it.each([
-    ['/relatorios', '/relatorios'],
-    ['/relatorios?x=1#a', '/relatorios?x=1#a'],
-    ['//x', '/'],
-    ['/\\x', '/'],
-    ['https://x', '/'],
-    ['javascript:alert(1)', '/'],
-    ['/javascript:alert(1)', '/'],
-    ['/a\nb', '/'],
-    ['relatorios', '/'],
-    ['/' + 'a'.repeat(600), '/'],
-    [undefined, '/'],
-    [['/a'], '/'],
+    ['/', '/'],
+    ['/painel', '/painel'],
+    ['/painel?x=1#a', '/painel?x=1#a'],
+    // a query string volta EXATAMENTE como veio
+    [
+      '/general?menu=general&set=ultimos_7_dias',
+      '/general?menu=general&set=ultimos_7_dias',
+    ],
+    ['/general?menu=a%26b&set=x%3Dy', '/general?menu=a%26b&set=x%3Dy'],
+    ['/a?next=https://x.invalid', '/a?next=https://x.invalid'],
+    ['//x', P],
+    ['//x.invalid/general?menu=general', P],
+    ['/\\x', P],
+    ['/a\\b', P],
+    ['/a?x=\\', P],
+    ['https://x', P],
+    ['javascript:alert(1)', P],
+    ['/javascript:alert(1)', P],
+    ['/a\nb', P],
+    ['/\tx.invalid', P],
+    ['relatorios', P],
+    ['?menu=general', P],
+    ['/' + 'a'.repeat(600), P],
+    ['', P],
+    [undefined, P],
+    [['/a'], P],
+    [{ a: '/x' }, P],
   ])('%p → %p', (v, esperado) => {
     expect(returnToSeguro(v)).toBe(esperado);
   });
+
+  it('o padrão pode ser outro (ANALYTICS_DEFAULT_RETURN_TO já validada)', () => {
+    expect(returnToSeguro(undefined, '/outro')).toBe('/outro');
+    expect(returnToSeguro('//x', '/outro')).toBe('/outro');
+    expect(returnToSeguro('/painel', '/outro')).toBe('/painel');
+  });
+});
+
+describe('ANALYTICS_DEFAULT_RETURN_TO (destino padrão depois do login)', () => {
+  it('sem a variável: a raiz do front', () => {
+    const s = settings();
+    expect(s.defaultReturnTo).toBe(PADRAO_RETURN_TO);
+    expect(s.defaultReturnToInvalido).toBe(false);
+    expect(resumoHubCliente(s).alerta).toBeNull();
+  });
+
+  it('caminho relativo válido (com query): usado como está', () => {
+    const s = settings({ ANALYTICS_DEFAULT_RETURN_TO: ' /painel?a=1&b=2 ' });
+    expect(s.defaultReturnTo).toBe('/painel?a=1&b=2');
+    expect(s.ativo).toBe(true);
+  });
+
+  it.each(['https://x.invalid/', '//x.invalid', '/a\\b', 'general', '/a\nb'])(
+    'inválida (%p): usa o padrão, o cliente segue ATIVO e o boot mostra ALERTA sem o valor',
+    (v) => {
+      const s = settings({ ANALYTICS_DEFAULT_RETURN_TO: v });
+      expect(s.ativo).toBe(true);
+      expect(s.defaultReturnTo).toBe(PADRAO_RETURN_TO);
+      expect(s.defaultReturnToInvalido).toBe(true);
+      expect(resumoHubCliente(s).alerta).toBe(
+        'ALERTA hub-cliente: ANALYTICS_DEFAULT_RETURN_TO inválida (não é caminho relativo seguro); usando o destino padrão',
+      );
+    },
+  );
 });
 
 describe('cookies cifrados (JWE dir/A256GCM, chave derivada)', () => {
@@ -223,5 +278,45 @@ describe('CORS: /api/hub/* fica fora do CORS do navegador', () => {
     expect(opcoesDe('/api/hub/callback?code=x')).toEqual({ origin: false });
     expect(typeof opcoesDe('/api/login').origin).toBe('function');
     expect(typeof opcoesDe('/api/hubx').origin).toBe('function');
+  });
+});
+
+describe('ANALYTICS_BACKEND_URL (front e backend em hosts diferentes)', () => {
+  const FRONT = 'https://analytics-front.exemplo.invalid';
+  const BACK = 'https://analytics.exemplo.invalid';
+
+  it('com a variável: redirect_uri no BACKEND; publicOrigin = front (destinos e CSRF)', () => {
+    const s = settings({
+      ANALYTICS_PUBLIC_URL: `${FRONT}/`,
+      ANALYTICS_BACKEND_URL: `${BACK}/qualquer`,
+    });
+    expect(s.ativo).toBe(true);
+    expect(s.publicOrigin).toBe(FRONT);
+    expect(s.backendOrigin).toBe(BACK);
+    expect(s.separados).toBe(true);
+    expect(s.redirectUri).toBe(`${BACK}/auth/api/hub/callback`);
+    expect(resumoHubCliente(s).linha).toContain('backend separado do front');
+  });
+
+  it('sem a variável: comportamento anterior (tudo no host de ANALYTICS_PUBLIC_URL)', () => {
+    const s = settings({ ANALYTICS_PUBLIC_URL: FRONT });
+    expect(s.backendOrigin).toBe(FRONT);
+    expect(s.separados).toBe(false);
+    expect(s.redirectUri).toBe(`${FRONT}/auth/api/hub/callback`);
+    expect(resumoHubCliente(s).linha).toContain('mesmo host do front');
+  });
+
+  it('variável inválida (http, com credenciais) → DESLIGADO, sem valores na linha', () => {
+    for (const v of [
+      'http://analytics.exemplo.invalid',
+      'https://u:p@analytics.exemplo.invalid',
+      'lixo',
+    ]) {
+      const s = settings({ ANALYTICS_BACKEND_URL: v });
+      expect(s.ativo).toBe(false);
+      expect(resumoHubCliente(s).linha).toBe(
+        'hub-cliente: DESLIGADO (ANALYTICS_BACKEND_URL inválida)',
+      );
+    }
   });
 });

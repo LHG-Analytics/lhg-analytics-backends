@@ -18,11 +18,14 @@ import { InvitationsService } from '../invitations/invitations.service';
 import { UsersService } from '../users/users.service';
 import { rotasDoHub } from './oidc-hub';
 import { rotasDeAdmin } from './oidc-hub-admin';
+import { escopoDeSaida, rotaDeSairDoCliente } from './oidc-cliente-sair';
 import { rotaDeSair } from './oidc-hub-sair';
 import { interacoes } from './oidc-interactions';
+import { MemoriaDeInteracoes, hostReservado } from './oidc-interacao-memoria';
 import { loadOidcModule } from './oidc-loader';
 import {
   cspDoOidc,
+  origensHttpsExatas,
   logoutSource,
   postLogoutSuccessSource,
   renderError,
@@ -89,6 +92,8 @@ function configuracao(p: {
   contas: OidcAccounts;
   policy: unknown;
   urlDaInteracao: (uid: string) => string;
+  /** Chamado quando o provedor cria uma interação (uid → client_id). */
+  aoCriarInteracao?: (uid: string, clientId: unknown) => void;
 }) {
   const cookie = {
     httpOnly: true,
@@ -166,7 +171,13 @@ function configuracao(p: {
     loadExistingGrant: p.contas.loadExistingGrant,
     interactions: {
       policy: p.policy,
-      url: (_ctx: unknown, i: { uid: string }) => p.urlDaInteracao(i.uid),
+      url: (
+        _ctx: unknown,
+        i: { uid: string; params?: { client_id?: unknown } },
+      ) => {
+        p.aoCriarInteracao?.(i.uid, i.params?.client_id);
+        return p.urlDaInteracao(i.uid);
+      },
     },
   };
 }
@@ -197,12 +208,20 @@ function politica(interactionPolicy: any) {
 }
 
 /** Origens para onde um formulário do /oidc pode terminar (CSP form-action). */
-function origensDosFormularios(
+export function origensDosFormularios(
   issuer: URL,
   clients: Record<string, any>[],
   google: boolean,
+  // Destinos FINAIS conhecidos depois do callback de um cliente (ex.: o front
+  // do Analytics, para onde o callback dele redireciona). O form-action vale
+  // também para os redirecionamentos depois do envio do form de login (o
+  // Chrome confere a cadeia toda até a página final): um host final fora
+  // desta lista deixa o login parado em "Entrando…", sem erro na tela. Não há
+  // página intermediária: todo sistema novo cujo callback termina noutro host
+  // entra em OIDC_FORM_ACTION_EXTRA.
+  extras: string[] = [],
 ) {
-  const origens = [issuer.origin];
+  const origens = [issuer.origin, ...extras];
   if (google) origens.push('https://accounts.google.com');
   for (const c of clients) {
     for (const u of [
@@ -301,6 +320,30 @@ export async function mountOidc(
     return `${u}${u.includes('?') ? '&' : '?'}erro=${encodeURIComponent(erro)}`;
   };
 
+  // Interação vencida/concluída (ex.: 2º envio do form): saída pelo sistema
+  // dono do uid. uid → client_id em memória (60 min); destino do BANCO.
+  const memoria = new MemoriaDeInteracoes();
+  const portalBase =
+    safeLaunchUrl(get('HUB_BASE_URL')) ??
+    safeLaunchUrl(get('INVITE_LINK_BASE_URL')) ??
+    safeLaunchUrl(get('HUB_PORTAL_URL'));
+  const portalDoHub = portalBase ? `${new URL(portalBase).origin}/` : null;
+  const destinoDaInteracaoPerdida = async (uid: string | null) => {
+    const clientId = memoria.clienteDe(uid);
+    if (!clientId) return null; // b2
+    // O próprio portal (client 'hub'): a raiz do portal, que recomeça o login sozinho.
+    if (clientId === 'hub') return portalDoHub;
+    const c = await prisma.oidcClient
+      .findUnique({
+        where: { clientId },
+        select: { system: { select: { launchUrl: true, active: true } } },
+      })
+      .catch(() => null);
+    const url = c?.system?.active ? safeLaunchUrl(c.system.launchUrl) : null;
+    // b1 só com https válido e host real (o seed de homologação usa *.invalid).
+    return url && !hostReservado(url) ? url : null;
+  };
+
   const oidc = await loadOidcModule();
   const Provider = oidc.default ?? oidc.Provider;
   const contas = new OidcAccounts(prisma, access, oidc.errors);
@@ -314,6 +357,7 @@ export async function mountOidc(
       contas,
       policy: politica(oidc.interactionPolicy),
       urlDaInteracao,
+      aoCriarInteracao: (uid, clientId) => memoria.registrar(uid, clientId),
     }),
   );
   provider.proxy = true;
@@ -344,7 +388,13 @@ export async function mountOidc(
     }
   });
   const callback = provider.callback();
-  const csp = cspDoOidc(origensDosFormularios(issuer, cl.clients, !!google));
+  const csp = cspDoOidc(
+    origensDosFormularios(issuer, cl.clients, !!google, [
+      // o front do Analytics (homolog: analytics-front-dev; prod: analytics-front)
+      ...origensHttpsExatas(get('ANALYTICS_PUBLIC_URL')),
+      ...origensHttpsExatas(get('OIDC_FORM_ACTION_EXTRA')),
+    ]),
+  );
 
   express.use('/oidc', (req: Request, res: Response, next: NextFunction) => {
     // O provedor monta as URLs a partir do caminho de montagem e do host da
@@ -382,6 +432,8 @@ export async function mountOidc(
       caminho,
       paginaMinima,
       urlDaInteracao,
+      destinoDaInteracaoPerdida,
+      portalDoHub,
     }),
   );
   // Rotas para o portal: lista de sistemas (Bearer) e troca de senha.
@@ -433,6 +485,14 @@ export async function mountOidc(
   );
   // "Sair" do portal servidor → servidor (sem a página do end_session).
   express.use('/oidc', rotaDeSair({ provider, prisma, logout, access }));
+  // "Sair" de qualquer cliente servidor → servidor (client_secret_basic +
+  // id_token_hint): nenhuma página no navegador.
+  const escopo = escopoDeSaida(get('OIDC_CLIENTE_SAIR_ESCOPO'));
+  express.use(
+    '/oidc',
+    rotaDeSairDoCliente({ provider, prisma, logout, access, escopo }),
+  );
+  logger.log(`oidc: saída do cliente (/cliente/sair) com escopo=${escopo}`);
   express.use('/oidc', (req: Request, res: Response) => callback(req, res));
 
   agendarLimpeza(app, prisma);

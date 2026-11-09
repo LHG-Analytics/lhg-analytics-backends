@@ -9,6 +9,7 @@ import * as crypto from 'crypto';
 import * as request from 'supertest';
 import { MAX_FAILURES } from '../access/login-lock.service';
 import { INATIVIDADE_MAX, ttlDaSessao } from '../oidc/oidc.mount';
+import { SCRIPT_ENTRAR } from '../oidc/oidc-pages';
 import { limparVencidos } from '../oidc/prisma-adapter';
 import { apagarSchema, cliente, migrar, novoSchema } from './db-helpers';
 import {
@@ -241,7 +242,15 @@ describe('1d-D2: login central', () => {
       `action="/auth/oidc/interaction/${uidDa(a.headers.location)}/login"`,
     );
     expect(t.headers['cache-control']).toBe('no-store');
-    expect(t.text).not.toContain('<script');
+    // Só o script FIXO que trava o "Entrar" no 1º envio, liberado por hash no CSP.
+    expect(t.text.match(/<script/g)).toHaveLength(1);
+    expect(t.text).toContain(`<script>${SCRIPT_ENTRAR}</script>`);
+    expect(t.headers['content-security-policy']).toMatch(
+      /script-src 'report-sample' 'sha256-[A-Za-z0-9+/=]+'/,
+    );
+    expect(t.headers['content-security-policy']).not.toContain(
+      "'unsafe-inline'",
+    );
   });
 
   it('7 e (a) (f) 11. senha certa → code → tokens pelo /token (corpo do formulário); id_token RS256 com o kid da 1ª chave e só sub/email/email_verified/name', async () => {
