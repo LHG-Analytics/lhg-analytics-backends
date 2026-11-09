@@ -26,6 +26,34 @@ export const html = (s: unknown) =>
  * form_post, saída direta com id_token_hint). O style-src libera só o hash
  * do <style> fixo das páginas, sem 'unsafe-inline'.
  */
+/**
+ * Origens https EXATAS (sem caminho, sem curinga), separadas por vírgula.
+ * Qualquer item inválido é ignorado: nunca vira "*" nem "https:".
+ */
+export function origensHttpsExatas(bruto: string | undefined): string[] {
+  const out: string[] = [];
+  for (const item of (bruto ?? '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)) {
+    try {
+      const u = new URL(item);
+      if (
+        u.protocol === 'https:' &&
+        !u.username &&
+        !u.password &&
+        u.hostname &&
+        !u.hostname.includes('*')
+      ) {
+        out.push(u.origin);
+      }
+    } catch {
+      /* ignora */
+    }
+  }
+  return out;
+}
+
 export function cspDoOidc(origensDosFormularios: string[]): string {
   const destinos = [...new Set(origensDosFormularios)].join(' ');
   return [
@@ -182,6 +210,27 @@ export const SCRIPT_VOLTAR =
  * Interação perdida SEM destino conhecido (b2): em vez do beco sem saída,
  * os botões "Ir para o HUB LHG" (portal, se configurado) e "Voltar".
  */
+/**
+ * Continuação do login por GET (a "página intermediária"). O form-action do
+ * CSP vale também para os REDIRECIONAMENTOS depois de um envio de formulário
+ * (o Chrome confere a cadeia toda): o login termina no host do sistema (ex.:
+ * o front do Analytics), que não está — nem tem como estar, a lista é aberta
+ * — no form-action. Responder 200 com esta página ENCERRA a cadeia do
+ * formulário; a navegação seguinte é um GET comum, fora do form-action.
+ * O destino vem do provedor (returnTo da interação) ou do banco (launchUrl).
+ */
+export function paginaContinuar(destino: string): string {
+  return pagina(
+    'Entrando — LHG',
+    `<h1>Entrando…</h1><p><a id="continuar" class="botao" href="${html(destino)}">Continuar</a></p>
+<script>${SCRIPT_CONTINUAR}</script>`,
+  );
+}
+
+/** Segue para o href do "Continuar" sem deixar a página no histórico. Hash no CSP. */
+export const SCRIPT_CONTINUAR =
+  "location.replace(document.getElementById('continuar').href);";
+
 export function paginaInteracaoPerdida(portal: string | null): string {
   return pagina(
     'Login — LHG',

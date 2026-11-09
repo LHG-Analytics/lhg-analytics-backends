@@ -6,6 +6,9 @@ import {
 } from './oidc-interacao-memoria';
 import {
   ENTRAR_LIMITE_MS,
+  SCRIPT_CONTINUAR,
+  origensHttpsExatas,
+  paginaContinuar,
   SCRIPT_ENTRAR,
   SCRIPT_VOLTAR,
   cspComScript,
@@ -118,5 +121,39 @@ describe('telas: Entrar travado no 1º envio e interação perdida com saída', 
       /http-equiv="refresh"|\.submit\(\)|location\.(href|replace|assign)/,
     );
     expect(paginaInteracaoPerdida(null)).not.toContain('Ir para o HUB LHG');
+  });
+});
+
+describe('form-action: origens extras (front do Analytics, lista por variável)', () => {
+  it('só https exatas; lixo, http, curinga e credenciais são ignorados', () => {
+    expect(
+      origensHttpsExatas(
+        ' https://analytics-front-dev.lhgmoteis.com.br/ , https://analytics-front.lhgmoteis.com.br/x?y=1,http://a.test,https://*.lhgmoteis.com.br,https://u:p@x.test,lixo,,',
+      ),
+    ).toEqual([
+      'https://analytics-front-dev.lhgmoteis.com.br',
+      'https://analytics-front.lhgmoteis.com.br',
+    ]);
+    expect(origensHttpsExatas(undefined)).toEqual([]);
+  });
+
+  it('as origens entram no form-action sem afrouxar o resto', () => {
+    const csp = cspDoOidc([
+      'https://analytics-dev.lhgmoteis.com.br',
+      ...origensHttpsExatas('https://analytics-front-dev.lhgmoteis.com.br'),
+    ]);
+    expect(csp).toContain(
+      "form-action 'self' https://analytics-dev.lhgmoteis.com.br https://analytics-front-dev.lhgmoteis.com.br",
+    );
+    expect(csp).not.toMatch(/form-action[^;]*(\*|https:\s|https:;)/);
+  });
+
+  it('página intermediária: continua por GET para o destino (escapado), script com hash', () => {
+    const p = paginaContinuar('https://x.test/a?b=1&c="2"');
+    expect(p).toContain('href="https://x.test/a?b=1&amp;c=&quot;2&quot;"');
+    expect(p).toContain(`<script>${SCRIPT_CONTINUAR}</script>`);
+    expect(cspComScript(cspDoOidc([]), SCRIPT_CONTINUAR)).toContain(
+      hash(SCRIPT_CONTINUAR),
+    );
   });
 });

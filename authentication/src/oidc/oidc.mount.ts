@@ -24,6 +24,7 @@ import { MemoriaDeInteracoes, hostReservado } from './oidc-interacao-memoria';
 import { loadOidcModule } from './oidc-loader';
 import {
   cspDoOidc,
+  origensHttpsExatas,
   logoutSource,
   postLogoutSuccessSource,
   renderError,
@@ -206,12 +207,17 @@ function politica(interactionPolicy: any) {
 }
 
 /** Origens para onde um formulário do /oidc pode terminar (CSP form-action). */
-function origensDosFormularios(
+export function origensDosFormularios(
   issuer: URL,
   clients: Record<string, any>[],
   google: boolean,
+  // Destinos FINAIS conhecidos depois do callback de um cliente (ex.: o front
+  // do Analytics, para onde o callback dele redireciona). A página
+  // intermediária (oidc-interactions: seguir) já encerra a cadeia do form;
+  // isto é uma 2ª camada, para navegadores sem Sec-Fetch-Dest.
+  extras: string[] = [],
 ) {
-  const origens = [issuer.origin];
+  const origens = [issuer.origin, ...extras];
   if (google) origens.push('https://accounts.google.com');
   for (const c of clients) {
     for (const u of [
@@ -378,7 +384,13 @@ export async function mountOidc(
     }
   });
   const callback = provider.callback();
-  const csp = cspDoOidc(origensDosFormularios(issuer, cl.clients, !!google));
+  const csp = cspDoOidc(
+    origensDosFormularios(issuer, cl.clients, !!google, [
+      // o front do Analytics (homolog: analytics-front-dev; prod: analytics-front)
+      ...origensHttpsExatas(get('ANALYTICS_PUBLIC_URL')),
+      ...origensHttpsExatas(get('OIDC_FORM_ACTION_EXTRA')),
+    ]),
+  );
 
   express.use('/oidc', (req: Request, res: Response, next: NextFunction) => {
     // O provedor monta as URLs a partir do caminho de montagem e do host da
