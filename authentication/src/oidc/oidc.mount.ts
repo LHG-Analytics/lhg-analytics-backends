@@ -18,6 +18,7 @@ import { InvitationsService } from '../invitations/invitations.service';
 import { UsersService } from '../users/users.service';
 import { rotasDoHub } from './oidc-hub';
 import { rotasDeAdmin } from './oidc-hub-admin';
+import { escopoDeSaida, rotaDeSairDoCliente } from './oidc-cliente-sair';
 import { rotaDeSair } from './oidc-hub-sair';
 import { interacoes } from './oidc-interactions';
 import { MemoriaDeInteracoes, hostReservado } from './oidc-interacao-memoria';
@@ -484,6 +485,14 @@ export async function mountOidc(
   );
   // "Sair" do portal servidor → servidor (sem a página do end_session).
   express.use('/oidc', rotaDeSair({ provider, prisma, logout, access }));
+  // "Sair" de qualquer cliente servidor → servidor (client_secret_basic +
+  // id_token_hint): nenhuma página no navegador.
+  const escopo = escopoDeSaida(get('OIDC_CLIENTE_SAIR_ESCOPO'));
+  express.use(
+    '/oidc',
+    rotaDeSairDoCliente({ provider, prisma, logout, access, escopo }),
+  );
+  logger.log(`oidc: saída do cliente (/cliente/sair) com escopo=${escopo}`);
   express.use('/oidc', (req: Request, res: Response) => callback(req, res));
 
   agendarLimpeza(app, prisma);
