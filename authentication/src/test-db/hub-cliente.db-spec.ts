@@ -366,12 +366,10 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
     }
   });
 
-  it('4b. sem returnTo: volta à página inicial real do front (/general?menu=general&set=ultimos_7_dias)', async () => {
+  it('4b. sem returnTo: volta à RAIZ do front, que decide a página pelo perfil', async () => {
     const u = await pessoa();
     const { cb } = await entrarPeloHub(new Pote(), u.email);
-    expect(cb.headers.location).toBe(
-      `${PUBLICO}/general?menu=general&set=ultimos_7_dias`,
-    );
+    expect(cb.headers.location).toBe(`${PUBLICO}/`);
   });
 
   it('4c. returnTo com query string (codificado na URL) volta EXATAMENTE para o mesmo caminho', async () => {
