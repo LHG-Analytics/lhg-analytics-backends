@@ -44,8 +44,12 @@ export const CALLBACK_PATH = '/auth/api/hub/callback';
 export const HUB_COOKIE_PATH = '/auth/api/hub';
 /** Segredo do cliente: mínimo de caracteres. */
 export const MIN_SEGREDO = 32;
-/** Página inicial real do front (não existe /relatorios). */
-export const PADRAO_RETURN_TO = '/general?menu=general&set=ultimos_7_dias';
+/**
+ * Destino padrão = a RAIZ do front: ela decide a página pelo PERFIL (admin →
+ * /general…; gerente → /<módulo>/<unidade>…; src/app/page.tsx do front). Um
+ * caminho fixo (ex.: /general, que é do admin) erraria para os demais perfis.
+ */
+export const PADRAO_RETURN_TO = '/';
 
 function urlSegura(
   valor: string | undefined,
