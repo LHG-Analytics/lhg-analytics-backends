@@ -5,6 +5,7 @@ import {
   hostReservado,
 } from './oidc-interacao-memoria';
 import {
+  ENTRAR_LIMITE_MS,
   SCRIPT_ENTRAR,
   SCRIPT_VOLTAR,
   cspComScript,
@@ -88,6 +89,23 @@ describe('telas: Entrar travado no 1º envio e interação perdida com saída', 
     expect(SCRIPT_ENTRAR).toContain('b.disabled=true');
     expect(SCRIPT_ENTRAR).toContain('Entrando…');
     expect(SCRIPT_ENTRAR).toContain("addEventListener('pageshow'");
+    // o 1º envio segue: o botão só é desligado no próximo tique, já serializado
+    expect(SCRIPT_ENTRAR).toContain('setTimeout(travar,0)');
+    // o 2º clique não gera evento; o Enter é barrado no keydown
+    expect(SCRIPT_ENTRAR).toContain("b.setAttribute('aria-disabled','true')");
+    expect(SCRIPT_ENTRAR).toContain("b.style.pointerEvents='none'");
+    expect(SCRIPT_ENTRAR).toContain(
+      "addEventListener('keydown',function(e){if(enviando&&e.key==='Enter')e.preventDefault()}",
+    );
+    // sem resposta em 20 s: libera e avisa
+    expect(ENTRAR_LIMITE_MS).toBe(20000);
+    expect(SCRIPT_ENTRAR).toContain('},20000)');
+    expect(SCRIPT_ENTRAR).toContain(
+      'Demorou mais que o normal. Tente de novo.',
+    );
+    expect(p).toContain('id="aviso-entrar"');
+    // o script é JavaScript válido
+    expect(() => new Function(SCRIPT_ENTRAR)).not.toThrow();
   });
 
   it('interação perdida (b2): "Ir para o HUB LHG" (portal) + "Voltar"; sem envio automático', () => {

@@ -139,7 +139,8 @@ ${p.erro ? `<p class="erro" role="alert">${html(p.erro)}</p>` : ''}
 <form id="form-entrar" method="post" action="${html(p.acao)}/login" autocomplete="on">
 <label for="email">E-mail</label><input id="email" name="email" type="email" required autocomplete="username">
 <label for="password">Senha</label><input id="password" name="password" type="password" required autocomplete="current-password">
-<button id="botao-entrar" type="submit">Entrar</button></form>
+<button id="botao-entrar" type="submit">Entrar</button>
+<p id="aviso-entrar" class="erro" role="status" hidden></p></form>
 ${p.google ? `<form class="inline" method="post" action="${html(p.acao)}/google"><button type="submit">Entrar com Google</button></form>` : ''}
 <form class="inline" method="post" action="${html(p.acao)}/abort"><button type="submit">Cancelar</button></form>
 <p class="aviso">Tela mínima de homologação.</p>
@@ -147,16 +148,31 @@ ${p.google ? `<form class="inline" method="post" action="${html(p.acao)}/google"
   );
 }
 
+/** Sem resposta do servidor depois disto, o "Entrar" volta e avisa. */
+export const ENTRAR_LIMITE_MS = 20000;
+
 /**
- * Trava o "Entrar" depois do 1º envio (clique ou Enter: os dois disparam o
- * submit do form), para um 2º POST não cair na interação já concluída.
- * Libera no pageshow (voltar pelo histórico/bfcache). Texto FIXO: o hash dele
- * entra no script-src da resposta (cspComScript).
+ * "Entrar" INATIVO do 1º envio até a página trocar (padrão de mercado):
+ * - o 1º submit SEGUE sem interferência; o botão é desligado no próximo tique
+ *   (setTimeout 0, com o formulário já serializado), com aria-disabled e
+ *   pointer-events:none: o 2º clique não gera NENHUM evento;
+ * - o Enter nos campos é barrado no keydown, sem tocar no envio em curso;
+ * - libera no pageshow (voltar pelo histórico/bfcache) ou depois de
+ *   ENTRAR_LIMITE_MS sem resposta, com "Demorou mais que o normal. Tente de novo."
+ * Nenhum preventDefault/stopPropagation no meio da navegação do 1º envio.
+ * Texto FIXO: o hash dele entra no script-src da resposta (cspComScript).
  */
-export const SCRIPT_ENTRAR =
-  "(function(){var f=document.getElementById('form-entrar'),b=document.getElementById('botao-entrar');if(!f||!b)return;var t=b.textContent;" +
-  "f.addEventListener('submit',function(e){if(f.dataset.enviado){e.preventDefault();return}f.dataset.enviado='1';b.disabled=true;b.textContent='Entrando…'});" +
-  "window.addEventListener('pageshow',function(){delete f.dataset.enviado;b.disabled=false;b.textContent=t})})();";
+export const SCRIPT_ENTRAR = [
+  "(function(){var f=document.getElementById('form-entrar'),b=document.getElementById('botao-entrar'),a=document.getElementById('aviso-entrar');",
+  'if(!f||!b)return;var t=b.textContent,enviando=false,relogio=0;',
+  "function travar(){b.disabled=true;b.setAttribute('aria-disabled','true');b.style.pointerEvents='none';b.textContent='Entrando…'}",
+  "function liberar(msg){enviando=false;clearTimeout(relogio);b.disabled=false;b.removeAttribute('aria-disabled');b.style.pointerEvents='';b.textContent=t;if(a){a.textContent=msg||'';a.hidden=!msg}}",
+  // o 1º submit segue; só os seguintes (antes do 1º tique) são descartados
+  "f.addEventListener('submit',function(e){if(enviando){e.preventDefault();return}enviando=true;if(a)a.hidden=true;setTimeout(travar,0);",
+  `relogio=setTimeout(function(){liberar('Demorou mais que o normal. Tente de novo.')},${ENTRAR_LIMITE_MS})});`,
+  "f.addEventListener('keydown',function(e){if(enviando&&e.key==='Enter')e.preventDefault()});",
+  "window.addEventListener('pageshow',function(){liberar('')})})();",
+].join('');
 
 /** "Voltar" da interação perdida (history.back), com hash no script-src. */
 export const SCRIPT_VOLTAR =
