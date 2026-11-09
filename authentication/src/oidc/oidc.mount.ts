@@ -212,9 +212,12 @@ export function origensDosFormularios(
   clients: Record<string, any>[],
   google: boolean,
   // Destinos FINAIS conhecidos depois do callback de um cliente (ex.: o front
-  // do Analytics, para onde o callback dele redireciona). A página
-  // intermediária (oidc-interactions: seguir) já encerra a cadeia do form;
-  // isto é uma 2ª camada, para navegadores sem Sec-Fetch-Dest.
+  // do Analytics, para onde o callback dele redireciona). O form-action vale
+  // também para os redirecionamentos depois do envio do form de login (o
+  // Chrome confere a cadeia toda até a página final): um host final fora
+  // desta lista deixa o login parado em "Entrando…", sem erro na tela. Não há
+  // página intermediária: todo sistema novo cujo callback termina noutro host
+  // entra em OIDC_FORM_ACTION_EXTRA.
   extras: string[] = [],
 ) {
   const origens = [issuer.origin, ...extras];
