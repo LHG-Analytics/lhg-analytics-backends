@@ -12,6 +12,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import * as crypto from 'crypto';
 import { Request, Response } from 'express';
 import {
   ANALYTICS,
@@ -70,6 +71,19 @@ type Fluxo = {
 };
 type ErroHub = 'access_denied' | 'inactive' | 'indisponivel' | 'falha';
 
+/** Quanto tempo o resultado de um callback vale para uma chamada repetida. */
+export const CALLBACK_DUPLICADO_MS = 2 * 60 * 1000;
+const CALLBACK_DUPLICADO_MAX = 5000;
+
+/** Resultado da troca do code de um callback (sem tokens além do id_token). */
+type ResultadoCallback =
+  | { tipo: 'ok'; userId: number; idToken: string }
+  | { tipo: 'negado'; userId: number; negado: string }
+  | { tipo: 'falha'; motivo: string; codigo: ErroHub };
+
+const hash = (v: string) =>
+  crypto.createHash('sha256').update(v).digest('base64url');
+
 /**
  * O Analytics como CLIENTE do HUB (login central): code + PKCE pelo servidor.
  * O navegador nunca vê code, tokens do HUB, verifier ou segredo. Depois do
@@ -86,6 +100,17 @@ export class HubClientController implements OnModuleInit {
   private cache: { chave: string; oidc: HubOidc } | null = null;
   /** jti já usados no back-channel (o authentication roda em 1 processo). */
   private readonly jtis = new Map<string, number>();
+  /**
+   * Callbacks recentes, pelo hash do state (o do cookie do fluxo, cifrado):
+   * o navegador às vezes manda o MESMO callback duas vezes (visto no Safari).
+   * Um code só troca uma vez; a 2ª chamada espera a 1ª e responde igual.
+   */
+  /** Relógio (os testes avançam o tempo). */
+  agora: () => number = Date.now;
+  private readonly callbacks = new Map<
+    string,
+    { em: number; code: string; p: Promise<ResultadoCallback> }
+  >();
 
   constructor(
     private readonly config: ConfigService,
@@ -240,11 +265,104 @@ export class HubClientController implements OnModuleInit {
     }
     if (typeof q.code !== 'string' || !q.code) return falhou('sem_code');
 
+    // Callback repetido (mesmo state do cookie do fluxo E mesmo code, em até
+    // 2 min): espera o resultado da 1ª chamada e responde igual, sem trocar o
+    // code de novo (a 2ª troca daria invalid_grant e a tela de erro).
+    const chaveCb = hash(fluxo.state);
+    const code = hash(q.code);
+    const agora = this.agora();
+    const anterior = this.callbacks.get(chaveCb);
+    const duplicado =
+      !!anterior &&
+      anterior.code === code &&
+      agora - anterior.em < CALLBACK_DUPLICADO_MS;
+    let r: ResultadoCallback;
+    if (duplicado) {
+      r = await anterior.p;
+      await this.access.audit({
+        action: 'hub.login.duplicado',
+        targetUserId: r.tipo === 'falha' ? undefined : r.userId,
+        systemKey: ANALYTICS,
+        metadata: { resultado: r.tipo },
+        ctx,
+      });
+    } else {
+      const p = this.trocarCode(s, q.code, fluxo);
+      this.lembrarCallback(chaveCb, { em: agora, code, p });
+      r = await p;
+    }
+
+    if (r.tipo === 'falha') {
+      return duplicado
+        ? this.erro(res, s, r.codigo)
+        : falhou(r.motivo, r.codigo);
+    }
+    if (r.tipo === 'negado') {
+      if (!duplicado) {
+        await this.access.audit({
+          action: `hub.login.denied.${r.negado}`,
+          targetUserId: r.userId,
+          systemKey: ANALYTICS,
+          ctx,
+        });
+      }
+      return this.erro(
+        res,
+        s,
+        r.negado === 'inactive' ? 'inactive' : 'access_denied',
+      );
+    }
+
+    const user = await this.prisma.prismaOnline.user.findUniqueOrThrow({
+      where: { id: r.userId },
+    });
+    setSessionCookies(res, this.config, await this.auth.login(user));
+    this.limparCookieHub(res, s, COOKIE_VOLTA);
+    res.cookie(
+      COOKIE_IDT,
+      await cifrar({ t: r.idToken }, chave),
+      this.cookieHub(s, REFRESH_TOKEN_MAX_AGE),
+    );
+    if (!duplicado) {
+      await this.access.audit({
+        action: 'hub.login',
+        actorUserId: user.id,
+        targetUserId: user.id,
+        systemKey: ANALYTICS,
+        ctx,
+      });
+    }
+    return res.redirect(
+      302,
+      `${s.publicOrigin}${returnToSeguro(fluxo.returnTo, s.defaultReturnTo)}`,
+    );
+  }
+
+  /** Guarda o callback (e limpa os vencidos; teto de tamanho). */
+  private lembrarCallback(
+    chave: string,
+    v: { em: number; code: string; p: Promise<ResultadoCallback> },
+  ) {
+    for (const [k, x] of this.callbacks) {
+      if (v.em - x.em >= CALLBACK_DUPLICADO_MS) this.callbacks.delete(k);
+    }
+    while (this.callbacks.size >= CALLBACK_DUPLICADO_MAX) {
+      this.callbacks.delete(this.callbacks.keys().next().value!);
+    }
+    this.callbacks.set(chave, v);
+  }
+
+  /** Troca o code, valida o id_token e acha a pessoa. Nunca lança. */
+  private async trocarCode(
+    s: HubClientSettings,
+    code: string,
+    fluxo: Fluxo,
+  ): Promise<ResultadoCallback> {
     let sub: string;
     let idToken: string;
     try {
       const o = this.oidc(s);
-      idToken = await o.trocarCode(q.code, fluxo.codeVerifier);
+      idToken = await o.trocarCode(code, fluxo.codeVerifier);
       const claims = await o.validarIdToken(idToken, fluxo.nonce);
       sub = claims.sub!;
     } catch (e) {
@@ -253,47 +371,25 @@ export class HubClientController implements OnModuleInit {
           ? e.message
           : `rede_${(e as Error)?.name ?? 'erro'}`;
       this.logger.warn(`hub-cliente: callback recusado (${motivo})`);
-      return falhou(motivo);
+      return { tipo: 'falha', motivo, codigo: 'falha' };
     }
-
-    const user = await this.prisma.prismaOnline.user.findUnique({
-      where: { publicId: sub },
-      include: ANALYTICS_ACCESS_INCLUDE,
-    });
-    if (!user) return falhou('sem_usuario');
-    const negado = analyticsDenial(user);
-    if (negado) {
-      await this.access.audit({
-        action: `hub.login.denied.${negado}`,
-        targetUserId: user.id,
-        systemKey: ANALYTICS,
-        ctx,
+    try {
+      const user = await this.prisma.prismaOnline.user.findUnique({
+        where: { publicId: sub },
+        include: ANALYTICS_ACCESS_INCLUDE,
       });
-      return this.erro(
-        res,
-        s,
-        negado === 'inactive' ? 'inactive' : 'access_denied',
-      );
+      if (!user)
+        return { tipo: 'falha', motivo: 'sem_usuario', codigo: 'falha' };
+      const negado = analyticsDenial(user);
+      if (negado) return { tipo: 'negado', userId: user.id, negado };
+      return { tipo: 'ok', userId: user.id, idToken };
+    } catch (e) {
+      return {
+        tipo: 'falha',
+        motivo: `banco_${(e as Error)?.name ?? 'erro'}`,
+        codigo: 'indisponivel',
+      };
     }
-
-    setSessionCookies(res, this.config, await this.auth.login(user));
-    this.limparCookieHub(res, s, COOKIE_VOLTA);
-    res.cookie(
-      COOKIE_IDT,
-      await cifrar({ t: idToken }, chave),
-      this.cookieHub(s, REFRESH_TOKEN_MAX_AGE),
-    );
-    await this.access.audit({
-      action: 'hub.login',
-      actorUserId: user.id,
-      targetUserId: user.id,
-      systemKey: ANALYTICS,
-      ctx,
-    });
-    return res.redirect(
-      302,
-      `${s.publicOrigin}${returnToSeguro(fluxo.returnTo, s.defaultReturnTo)}`,
-    );
   }
 
   // ── POST /api/hub/logout ───────────────────────────────────────────────
