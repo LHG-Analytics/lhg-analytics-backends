@@ -15,6 +15,7 @@ import {
   COOKIE_IDT,
   COOKIE_VOLTA,
   HUB_CLIENT_BUSCAR,
+  CALLBACK_DUPLICADO_MS,
   HubClientController,
 } from '../hub-client/hub-client.controller';
 import { PADRAO_RETURN_TO } from '../hub-client/hub-client.settings';
@@ -430,17 +431,29 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
     }
   });
 
-  it('5. callback sem cookie de fluxo, com state errado ou com code reusado → hub_error=falha, sem cookies de sessão', async () => {
+  it('5. callback sem cookie de fluxo, com state errado ou com code reusado DEPOIS de 2 min → hub_error=falha, sem cookies de sessão (dentro de 2 min, o repetido vira duplicado e entra)', async () => {
     const u = await pessoa();
     const pote = new Pote();
     const { final, cabecalho, cb } = await entrarPeloHub(pote, u.email);
     expect(cb.status).toBe(302);
-    // code reusado (mesmo cookie de fluxo, repetido por um atacante)
-    const de_novo = await request(srv)
+    // code reusado DENTRO de 2 min (o navegador repetiu): duplicado, entra
+    const ctl = app.get(HubClientController);
+    const repetido = await request(srv)
       .get(`/api/hub/callback${final.search}`)
       .set('Cookie', cabecalho);
-    expect(hubErro(de_novo)).toBe('falha');
-    expect(cookie(de_novo, 'access_token')).toBeUndefined();
+    expect(hubErro(repetido)).toBeNull();
+    // code reusado DEPOIS de 2 min (mesmo cookie de fluxo, por um atacante): falha
+    const base = Date.now();
+    ctl.agora = () => base + CALLBACK_DUPLICADO_MS + 1000;
+    try {
+      const de_novo = await request(srv)
+        .get(`/api/hub/callback${final.search}`)
+        .set('Cookie', cabecalho);
+      expect(hubErro(de_novo)).toBe('falha');
+      expect(cookie(de_novo, 'access_token')).toBeUndefined();
+    } finally {
+      ctl.agora = Date.now;
+    }
     // sem cookie de fluxo: agora RECOMEÇA (ver 5b), sem sessão
     const sem = await request(srv).get(`/api/hub/callback${final.search}`);
     expect(new URL(sem.headers.location).pathname).toBe('/auth/api/hub/login');
@@ -688,6 +701,119 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
           .set('Cookie', p2.header())
       ).status,
     ).toBe(303);
+  });
+
+  /** Login no HUB até o callback, SEM chamá-lo (para os casos de callback repetido). */
+  async function ateOCallbackComSenha(pote: Pote, email: string) {
+    const ini = pote.guardar(
+      await request(srv).get('/api/hub/login').set('Cookie', pote.header()),
+    );
+    const a = pote.guardar(
+      await request(srv)
+        .get(local(ISSUER, ini.headers.location))
+        .set('Cookie', pote.header()),
+    );
+    const uid = f.uidDa(a.headers.location);
+    const l = pote.guardar(
+      await request(srv)
+        .post(`/oidc/interaction/${uid}/login`)
+        .set('Cookie', pote.header())
+        .type('form')
+        .send({ email, password: SENHA }),
+    );
+    const final = await f.ateOCliente(pote, l.headers.location);
+    expect(final.origin + final.pathname).toBe(CALLBACK);
+    return { busca: final.search, cabecalho: pote.header(), final };
+  }
+  const callback = (busca: string, cabecalho: string) =>
+    request(srv).get(`/api/hub/callback${busca}`).set('Cookie', cabecalho);
+  const eventos = async (userId: number | null, desde: Date) =>
+    (
+      await db.auditEvent.findMany({
+        where: {
+          action: { startsWith: 'hub.login' },
+          at: { gte: desde },
+          ...(userId
+            ? { OR: [{ targetUserId: userId }, { targetUserId: null }] }
+            : {}),
+        },
+        orderBy: { id: 'asc' },
+      })
+    ).map((e) => [
+      e.action,
+      (e.metadata as any)?.resultado ?? (e.metadata as any)?.motivo ?? null,
+    ]);
+
+  it('callback REPETIDO ao mesmo tempo (visto no Safari): as DUAS respostas entram logadas; 1 hub.login + 1 hub.login.duplicado, nenhum hub.login.failed', async () => {
+    const u = await pessoa();
+    const desde = new Date();
+    const { busca, cabecalho } = await ateOCallbackComSenha(
+      new Pote(),
+      u.email,
+    );
+    const [r1, r2] = await Promise.all([
+      callback(busca, cabecalho),
+      callback(busca, cabecalho),
+    ]);
+    for (const r of [r1, r2]) {
+      expect(r.status).toBe(302);
+      expect(r.headers.location).toBe(`${PUBLICO}/`);
+      expect(valor(cookie(r, 'access_token'))).toBeTruthy();
+      expect(valor(cookie(r, 'refresh_token'))).toBeTruthy();
+      expect(valor(cookie(r, COOKIE_IDT))).toBeTruthy();
+    }
+    expect((await eventos(u.id, desde)).sort()).toEqual([
+      ['hub.login', null],
+      ['hub.login.duplicado', 'ok'],
+    ]);
+  });
+
+  it('callback REPETIDO em sequência (o 2º com o cookie do fluxo antigo): entra logado, sem trocar o code de novo (sem invalid_grant)', async () => {
+    const u = await pessoa();
+    const desde = new Date();
+    const { busca, cabecalho } = await ateOCallbackComSenha(
+      new Pote(),
+      u.email,
+    );
+    const r1 = await callback(busca, cabecalho);
+    const r2 = await callback(busca, cabecalho);
+    for (const r of [r1, r2]) {
+      expect(r.status).toBe(302);
+      expect(r.headers.location).toBe(`${PUBLICO}/`);
+      expect(valor(cookie(r, 'access_token'))).toBeTruthy();
+    }
+    expect(await eventos(u.id, desde)).toEqual([
+      ['hub.login', null],
+      ['hub.login.duplicado', 'ok'],
+    ]);
+  });
+
+  it('mesmo state com OUTRO code não reaproveita o resultado (vai ao provedor e falha); falha repetida falha igual, sem 2º hub.login.failed', async () => {
+    const u = await pessoa();
+    const { busca, cabecalho } = await ateOCallbackComSenha(
+      new Pote(),
+      u.email,
+    );
+    const ok = await callback(busca, cabecalho);
+    expect(hubErro(ok)).toBeNull();
+    const outro = new URLSearchParams(busca);
+    outro.set('code', 'code-forjado-' + n);
+    const desde = new Date();
+    const [f1, f2] = await Promise.all([
+      callback('?' + outro.toString(), cabecalho),
+      callback('?' + outro.toString(), cabecalho),
+    ]);
+    // O 2º "outro code" com o mesmo state: o 1º já ocupou a chave do state,
+    // então um deles reaproveita a FALHA do outro (nunca o sucesso anterior).
+    for (const r of [f1, f2]) {
+      expect(r.status).toBe(302);
+      expect(hubErro(r)).toBe('falha');
+      expect(cookie(r, 'access_token')).toBeUndefined();
+    }
+    const ev = await eventos(null, desde);
+    expect(ev.filter(([a]) => a === 'hub.login.failed')).toHaveLength(1);
+    expect(ev.filter(([a]) => a === 'hub.login')).toHaveLength(0);
+    expect(ev).toContainEqual(['hub.login.duplicado', 'falha']);
   });
 
   it('9b. saída no servidor FALHOU (5xx ou rede) → reserva: 303 ao end_session antigo (id_token_hint, client_id, post_logout)', async () => {
