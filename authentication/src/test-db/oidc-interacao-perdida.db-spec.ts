@@ -1,6 +1,6 @@
 // Interação vencida ou já concluída no login central (ex.: o form de login
 // enviado DUAS vezes): em vez do beco sem saída, b1 = 303 para o launchUrl do
-// sistema dono do uid (do BANCO, nunca da URL; client 'hub' → portal /entrar);
+// sistema dono do uid (do BANCO, nunca da URL; client 'hub' → a raiz do portal);
 // b2 = página com "Ir para o HUB LHG" e "Voltar". E a tela mínima trava o
 // "Entrar" no 1º envio (script inline com hash no CSP). No banco migrado de
 // verdade, com o app montado como o main.ts. Segredos de TESTE gerados aqui.
@@ -156,13 +156,13 @@ describe('Login central: interação perdida com saída (b1/b2) e Entrar travado
     expect(g.headers.location).toBe(LAUNCH_CMS);
   });
 
-  it("b1 do client 'hub': o portal /entrar", async () => {
+  it("b1 do client 'hub': a raiz do portal (ele recomeça o login sozinho)", async () => {
     const pote = new Pote();
     const uid = await abrir(pote, 'hub');
     // sem o cookie da interação (ex.: outra aba/navegador): a interação "some"
     const r = await enviar(new Pote(), uid, 'x@example.invalid');
     expect(r.status).toBe(303);
-    expect(r.headers.location).toBe(`${PORTAL}/entrar`);
+    expect(r.headers.location).toBe(`${PORTAL}/`);
   });
 
   it('b2: uid desconhecido → 400 com "Ir para o HUB LHG" e "Voltar", sem laço automático', async () => {
