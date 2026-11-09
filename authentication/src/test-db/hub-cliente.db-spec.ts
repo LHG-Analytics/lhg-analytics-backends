@@ -13,6 +13,7 @@ import { GoogleController } from '../google/google.controller';
 import {
   COOKIE_FLUXO,
   COOKIE_IDT,
+  COOKIE_VOLTA,
   HUB_CLIENT_BUSCAR,
   HubClientController,
 } from '../hub-client/hub-client.controller';
@@ -332,7 +333,17 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
         'httponly',
         'samesite=lax',
         'secure',
-        'max-age=600',
+        'max-age=3600', // 60 min: o TTL da interação no HUB
+      ]),
+    );
+    // o returnTo também fica num cookie à parte (24 h), para o recomeço
+    expect(atributos(cookie(a, COOKIE_VOLTA))).toEqual(
+      expect.arrayContaining([
+        'path=/auth/api/hub',
+        'httponly',
+        'samesite=lax',
+        'secure',
+        'max-age=86400',
       ]),
     );
     expect(valor(fl)!.split('.')).toHaveLength(5);
@@ -423,9 +434,10 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
       .set('Cookie', cabecalho);
     expect(hubErro(de_novo)).toBe('falha');
     expect(cookie(de_novo, 'access_token')).toBeUndefined();
-    // sem cookie de fluxo
+    // sem cookie de fluxo: agora RECOMEÇA (ver 5b), sem sessão
     const sem = await request(srv).get(`/api/hub/callback${final.search}`);
-    expect(hubErro(sem)).toBe('falha');
+    expect(new URL(sem.headers.location).pathname).toBe('/auth/api/hub/login');
+    expect(cookie(sem, 'access_token')).toBeUndefined();
     // state errado
     const ini = await request(srv).get('/api/hub/login');
     const fl = cookie(ini, COOKIE_FLUXO)!.split(';')[0];
@@ -437,7 +449,135 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
     const motivos = (
       await db.auditEvent.findMany({ where: { action: 'hub.login.failed' } })
     ).map((e) => (e.metadata as any)?.motivo);
-    expect(motivos).toEqual(expect.arrayContaining(['fluxo_ausente', 'state']));
+    expect(motivos).toEqual(expect.arrayContaining(['state']));
+  });
+
+  /** Segue o authorize com a sessão do provedor já aberta (SSO) até o callback. */
+  async function ateOCallback(pote: Pote, authorize: string) {
+    const a = pote.guardar(
+      await request(srv)
+        .get(local(ISSUER, authorize))
+        .set('Cookie', pote.header()),
+    );
+    return f.ateOCliente(pote, a.headers.location);
+  }
+  const semCookie = (cabecalho: string, nome: string) =>
+    cabecalho
+      .split('; ')
+      .filter((c) => !c.startsWith(`${nome}=`))
+      .join('; ');
+
+  it('5b. fluxo VENCIDO no callback: recomeça sozinho (returnTo recuperado), o SSO volta sem senha e entra; auditoria fluxo_recomecado', async () => {
+    const u = await pessoa();
+    const pote = new Pote();
+    const destino = '/reservations?menu=reservations&set=ultimos_7_dias';
+    // 1ª ida: login no provedor; na volta, o cookie do fluxo "venceu" (some).
+    const ini = pote.guardar(
+      await request(srv)
+        .get('/api/hub/login')
+        .query({ returnTo: destino })
+        .set('Cookie', pote.header()),
+    );
+    const a = pote.guardar(
+      await request(srv)
+        .get(local(ISSUER, ini.headers.location))
+        .set('Cookie', pote.header()),
+    );
+    const uid = f.uidDa(a.headers.location);
+    const l = pote.guardar(
+      await request(srv)
+        .post(`/oidc/interaction/${uid}/login`)
+        .set('Cookie', pote.header())
+        .type('form')
+        .send({ email: u.email, password: SENHA }),
+    );
+    const final = await f.ateOCliente(pote, l.headers.location);
+    expect(final.origin + final.pathname).toBe(CALLBACK);
+    const r1 = pote.guardar(
+      await request(srv)
+        .get(`/api/hub/callback${final.search}`)
+        .set('Cookie', semCookie(pote.header(), COOKIE_FLUXO)),
+    );
+    expect(r1.status).toBe(302);
+    const recomeco = new URL(r1.headers.location);
+    expect(recomeco.origin + recomeco.pathname).toBe(
+      `${PUBLICO}/auth/api/hub/login`,
+    );
+    expect(recomeco.searchParams.get('returnTo')).toBe(destino); // recuperado do an_hub_rt
+    expect(recomeco.searchParams.get('recomeco')).toBe('1');
+    expect(cookie(r1, 'access_token')).toBeUndefined();
+    const aud = await db.auditEvent.findFirst({
+      where: { action: 'hub.login.fluxo_recomecado' },
+      orderBy: { id: 'desc' },
+    });
+    expect(aud?.metadata).toEqual({
+      motivo: 'fluxo_ausente',
+      returnTo: 'recuperado',
+    });
+
+    // 2ª ida (o recomeço): o state leva a marca anti-laço; o SSO volta sem pedir senha.
+    const r2 = pote.guardar(
+      await request(srv)
+        .get(`/api/hub/login${recomeco.search}`)
+        .set('Cookie', pote.header()),
+    );
+    expect(new URL(r2.headers.location).searchParams.get('state')).toMatch(
+      /\.r$/,
+    );
+    const final2 = await ateOCallback(pote, r2.headers.location);
+    expect(final2.origin + final2.pathname).toBe(CALLBACK);
+    const cb = pote.guardar(
+      await request(srv)
+        .get(`/api/hub/callback${final2.search}`)
+        .set('Cookie', pote.header()),
+    );
+    expect(cb.status).toBe(302);
+    expect(cb.headers.location).toBe(`${PUBLICO}${destino}`);
+    expect(cookie(cb, 'access_token')).toBeTruthy();
+    // o cookie do returnTo é limpo depois do login
+    expect(cookie(cb, COOKIE_VOLTA)).toMatch(/expires=thu, 01 jan 1970/i);
+    for (const c of [cookie(cb, 'access_token'), cookie(cb, 'refresh_token')])
+      sensiveis.add(valor(c)!);
+  });
+
+  it('5c. anti-laço: fluxo ausente de novo NUM RECOMEÇO (state com a marca) → hub_error=falha, sem novo recomeço', async () => {
+    const r = await request(srv).get('/api/hub/callback?code=x&state=abc.r');
+    expect(hubErro(r)).toBe('falha');
+    expect(cookie(r, 'access_token')).toBeUndefined();
+    const motivos = (
+      await db.auditEvent.findMany({ where: { action: 'hub.login.failed' } })
+    ).map((e) => (e.metadata as any)?.motivo);
+    expect(motivos).toContain('fluxo_ausente_apos_recomeco');
+    // mesmo sem NENHUM cookie (navegador bloqueando), a marca vem na URL: não há laço
+    const r2 = await request(srv).get('/api/hub/login?recomeco=1');
+    const st = new URL(r2.headers.location).searchParams.get('state')!;
+    expect(st.endsWith('.r')).toBe(true);
+    expect(
+      hubErro(
+        await request(srv).get(
+          `/api/hub/callback?code=x&state=${encodeURIComponent(st)}`,
+        ),
+      ),
+    ).toBe('falha');
+  });
+
+  it('5d. fluxo ausente: sem o cookie do returnTo → recomeça para o destino PADRÃO; provedor negou → access_denied (sem recomeço)', async () => {
+    const r = await request(srv).get('/api/hub/callback?code=x&state=abc');
+    const u = new URL(r.headers.location);
+    expect(u.pathname).toBe('/auth/api/hub/login');
+    expect(u.searchParams.get('returnTo')).toBe(PADRAO_RETURN_TO);
+    const aud = await db.auditEvent.findFirst({
+      where: { action: 'hub.login.fluxo_recomecado' },
+      orderBy: { id: 'desc' },
+    });
+    expect(aud?.metadata).toEqual({
+      motivo: 'fluxo_ausente',
+      returnTo: 'padrao',
+    });
+    const negado = await request(srv).get(
+      '/api/hub/callback?error=access_denied&state=abc',
+    );
+    expect(hubErro(negado)).toBe('access_denied');
   });
 
   it('7. pessoa SEM a flag analytics: o provedor devolve access_denied → hub_error=access_denied', async () => {
