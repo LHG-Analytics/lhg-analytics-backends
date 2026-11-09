@@ -102,8 +102,8 @@ describe('hub-cliente: configuração', () => {
 
 describe('4. returnTo seguro', () => {
   const P = PADRAO_RETURN_TO;
-  it('padrão = página inicial real do front', () => {
-    expect(P).toBe('/general?menu=general&set=ultimos_7_dias');
+  it('padrão = a raiz do front (que decide pelo perfil)', () => {
+    expect(P).toBe('/'); // a raiz do front decide o destino pelo perfil
   });
 
   it.each([
@@ -146,7 +146,7 @@ describe('4. returnTo seguro', () => {
 });
 
 describe('ANALYTICS_DEFAULT_RETURN_TO (destino padrão depois do login)', () => {
-  it('sem a variável: a página inicial real do front', () => {
+  it('sem a variável: a raiz do front', () => {
     const s = settings();
     expect(s.defaultReturnTo).toBe(PADRAO_RETURN_TO);
     expect(s.defaultReturnToInvalido).toBe(false);
