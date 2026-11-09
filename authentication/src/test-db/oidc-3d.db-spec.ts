@@ -345,13 +345,12 @@ describe('1d-D3: logout e back-channel', () => {
         `script-src 'report-sample' ${hashDoScript(pag.text)}`,
       );
       expect(csp).not.toContain('unsafe-inline');
-      // Visual do HUB: marca SVG inline, spinner e o texto; o script vem
-      // DEPOIS do formulário e envia na hora (sem esperar evento).
-      expect(pag.text).toContain(
-        '<svg class="marca" role="img" aria-label="LHG | HUB"',
-      );
-      expect(pag.text).toContain('class="spinner"');
-      expect(pag.text).toContain('Saindo do HUB LHG…');
+      // INVISÍVEL: só o fundo, sem cartão, marca, spinner nem texto; o
+      // script vem DEPOIS do formulário e envia na hora (sem esperar evento).
+      expect(pag.text).not.toContain('<main');
+      expect(pag.text).not.toContain('class="marca"');
+      expect(pag.text).not.toContain('class="spinner"');
+      expect(pag.text).not.toContain('Saindo do HUB LHG…');
       expect(pag.text).not.toContain('DOMContentLoaded');
       expect(pag.text.indexOf('<script>')).toBeGreaterThan(
         pag.text.indexOf('</form>'),

@@ -121,6 +121,22 @@ function pagina(
 }
 
 /**
+ * Página SEM nada visível: só o fundo (o mesmo das outras telas) e o corpo,
+ * sem cartão, marca nem texto. Para o envio automático da saída, que dura um
+ * instante e não deve aparecer.
+ */
+function paginaInvisivel(
+  titulo: string,
+  corpo: string,
+  script: string,
+): string {
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer"><meta name="color-scheme" content="light dark"><title>${html(titulo)}</title>
+<style>${ESTILO}</style></head><body>${corpo}<script>${script}</script></body></html>`;
+}
+
+/**
  * Acrescenta o hash de um script inline ao script-src do CSP desta resposta
  * (o mesmo que o provedor faz nas páginas dele). Sem CSP ou sem script-src,
  * não mexe.
@@ -210,27 +226,6 @@ export const SCRIPT_VOLTAR =
  * Interação perdida SEM destino conhecido (b2): em vez do beco sem saída,
  * os botões "Ir para o HUB LHG" (portal, se configurado) e "Voltar".
  */
-/**
- * Continuação do login por GET (a "página intermediária"). O form-action do
- * CSP vale também para os REDIRECIONAMENTOS depois de um envio de formulário
- * (o Chrome confere a cadeia toda): o login termina no host do sistema (ex.:
- * o front do Analytics), que não está — nem tem como estar, a lista é aberta
- * — no form-action. Responder 200 com esta página ENCERRA a cadeia do
- * formulário; a navegação seguinte é um GET comum, fora do form-action.
- * O destino vem do provedor (returnTo da interação) ou do banco (launchUrl).
- */
-export function paginaContinuar(destino: string): string {
-  return pagina(
-    'Entrando — LHG',
-    `<h1>Entrando…</h1><p><a id="continuar" class="botao" href="${html(destino)}">Continuar</a></p>
-<script>${SCRIPT_CONTINUAR}</script>`,
-  );
-}
-
-/** Segue para o href do "Continuar" sem deixar a página no histórico. Hash no CSP. */
-export const SCRIPT_CONTINUAR =
-  "location.replace(document.getElementById('continuar').href);";
-
 export function paginaInteracaoPerdida(portal: string | null): string {
   return pagina(
     'Login — LHG',
@@ -288,8 +283,9 @@ export function saidaDireta(ctx: any): boolean {
 
 /**
  * end_session com sessão. O form vem pronto do provedor (xsrf). Com hint
- * validado: o form se envia sozinho, com logout=yes ("sair de tudo"), e um
- * botão "Continuar" de reserva para quem não tem JavaScript. Sem hint: a
+ * validado: o form se envia sozinho, com logout=yes ("sair de tudo"), numa
+ * página INVISÍVEL (só o fundo: nada de "Saindo…" na tela), e um botão
+ * "Continuar" de reserva para quem não tem JavaScript. Sem hint: a
  * confirmação.
  */
 export async function logoutSource(ctx: any, form: string): Promise<void> {
@@ -298,11 +294,10 @@ export async function logoutSource(ctx: any, form: string): Promise<void> {
       '<input type="hidden" name="logout" value="yes"/>' +
       '<noscript><button autofocus type="submit">Continuar</button></noscript></form>';
     liberarScript(ctx, ENVIAR_SAIDA);
-    ctx.body = pagina(
+    ctx.body = paginaInvisivel(
       'Saindo — HUB LHG',
-      `<div class="spinner" aria-hidden="true"></div><h1 role="status">Saindo do HUB LHG…</h1>${form.replace(/<\/form>\s*$/, reserva)}`,
+      form.replace(/<\/form>\s*$/, reserva),
       ENVIAR_SAIDA,
-      'saindo',
     );
     return;
   }
