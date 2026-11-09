@@ -727,12 +727,20 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
   }
   const callback = (busca: string, cabecalho: string) =>
     request(srv).get(`/api/hub/callback${busca}`).set('Cookie', cabecalho);
-  const eventos = async (userId: number | null, desde: Date) =>
+  // Marco pelo ID da auditoria (não pelo relógio: o do banco e o do app diferem por ms).
+  const ultimoEvento = async () =>
+    (
+      await db.auditEvent.findFirst({
+        orderBy: { id: 'desc' },
+        select: { id: true },
+      })
+    )?.id ?? BigInt(0);
+  const eventos = async (userId: number | null, desde: bigint) =>
     (
       await db.auditEvent.findMany({
         where: {
           action: { startsWith: 'hub.login' },
-          at: { gte: desde },
+          id: { gt: desde },
           ...(userId
             ? { OR: [{ targetUserId: userId }, { targetUserId: null }] }
             : {}),
@@ -746,7 +754,7 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
 
   it('callback REPETIDO ao mesmo tempo (visto no Safari): as DUAS respostas entram logadas; 1 hub.login + 1 hub.login.duplicado, nenhum hub.login.failed', async () => {
     const u = await pessoa();
-    const desde = new Date();
+    const desde = await ultimoEvento();
     const { busca, cabecalho } = await ateOCallbackComSenha(
       new Pote(),
       u.email,
@@ -770,7 +778,7 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
 
   it('callback REPETIDO em sequência (o 2º com o cookie do fluxo antigo): entra logado, sem trocar o code de novo (sem invalid_grant)', async () => {
     const u = await pessoa();
-    const desde = new Date();
+    const desde = await ultimoEvento();
     const { busca, cabecalho } = await ateOCallbackComSenha(
       new Pote(),
       u.email,
@@ -798,7 +806,7 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
     expect(hubErro(ok)).toBeNull();
     const outro = new URLSearchParams(busca);
     outro.set('code', 'code-forjado-' + n);
-    const desde = new Date();
+    const desde = await ultimoEvento();
     const [f1, f2] = await Promise.all([
       callback('?' + outro.toString(), cabecalho),
       callback('?' + outro.toString(), cabecalho),
