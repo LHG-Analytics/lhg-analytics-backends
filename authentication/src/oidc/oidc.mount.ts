@@ -321,9 +321,8 @@ export async function mountOidc(
   const destinoDaInteracaoPerdida = async (uid: string | null) => {
     const clientId = memoria.clienteDe(uid);
     if (!clientId) return null; // b2
-    // O próprio portal (client 'hub'): a tela /entrar.
-    if (clientId === 'hub')
-      return portalBase ? `${new URL(portalBase).origin}/entrar` : null;
+    // O próprio portal (client 'hub'): a raiz do portal, que recomeça o login sozinho.
+    if (clientId === 'hub') return portalDoHub;
     const c = await prisma.oidcClient
       .findUnique({
         where: { clientId },
