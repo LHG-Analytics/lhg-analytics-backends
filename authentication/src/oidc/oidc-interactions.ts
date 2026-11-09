@@ -21,9 +21,11 @@ import {
 import {
   mensagemDeErro,
   paginaLogin,
+  SCRIPT_CONTINUAR,
   SCRIPT_ENTRAR,
   SCRIPT_VOLTAR,
   cspComScript,
+  paginaContinuar,
   paginaInteracaoPerdida,
 } from './oidc-pages';
 
@@ -100,11 +102,39 @@ export function interacoes(d: InteracoesDeps): Router {
    * sessão do HUB viva, entra sem senha); b2 = página com "Ir para o HUB LHG"
    * e "Voltar". Nunca redireciona em laço: a página não se reenvia sozinha.
    */
-  const invalida = async (res: Response, uid: string | null) => {
+  /**
+   * Segue para `destino`. Navegação de DOCUMENTO (envio de formulário no
+   * navegador: Sec-Fetch-Dest=document) recebe a página intermediária (200 +
+   * GET), que encerra a cadeia do formulário — senão o form-action do CSP
+   * bloqueia, em silêncio, o redirecionamento final para o host do sistema e a
+   * tela fica parada em "Entrando…". fetch/servidor seguem com o 303.
+   */
+  const seguir = (req: Request, res: Response, destino: string) => {
+    if (req.headers['sec-fetch-dest'] !== 'document') {
+      return res.redirect(303, destino);
+    }
+    comScript(res, SCRIPT_CONTINUAR);
+    return res.status(200).type('html').send(paginaContinuar(destino));
+  };
+
+  /** interactionFinished, mas pela página intermediária quando é navegação. */
+  const concluir = async (
+    req: Request,
+    res: Response,
+    resultado: Record<string, unknown>,
+    opcoes?: { mergeWithLastSubmission?: boolean },
+  ) =>
+    seguir(
+      req,
+      res,
+      await d.provider.interactionResult(req, res, resultado, opcoes),
+    );
+
+  const invalida = async (req: Request, res: Response, uid: string | null) => {
     const destino = d.destinoDaInteracaoPerdida
       ? await d.destinoDaInteracaoPerdida(uid)
       : null;
-    if (destino) return res.redirect(303, destino);
+    if (destino) return seguir(req, res, destino);
     comScript(res, SCRIPT_VOLTAR);
     return res
       .status(400)
@@ -130,7 +160,7 @@ export function interacoes(d: InteracoesDeps): Router {
       if (!d.paginaMinima)
         return res.status(404).json({ message: 'Not Found' });
       const i = await interacao(req, res, req.params.uid);
-      if (!i) return invalida(res, req.params.uid);
+      if (!i) return invalida(req, res, req.params.uid);
       const erro = typeof req.query.erro === 'string' ? req.query.erro : '';
       comScript(res, SCRIPT_ENTRAR);
       res.type('html').send(
@@ -148,7 +178,7 @@ export function interacoes(d: InteracoesDeps): Router {
     corpo,
     seguro(async (req, res) => {
       const i = await interacao(req, res, req.params.uid);
-      if (!i) return invalida(res, req.params.uid);
+      if (!i) return invalida(req, res, req.params.uid);
       const { email, password } = req.body ?? {};
       if (
         typeof email !== 'string' ||
@@ -177,13 +207,13 @@ export function interacoes(d: InteracoesDeps): Router {
           metadata: { clientId: i.params?.client_id ?? null, etapa: 'login' },
           ctx,
         });
-        return d.provider.interactionFinished(req, res, {
+        return concluir(req, res, {
           error: 'access_denied',
           error_description: 'acesso não permitido',
         });
       }
       await auditarLogin(user.id, 'password', i, req);
-      return d.provider.interactionFinished(
+      return concluir(
         req,
         res,
         { login: { accountId: user.publicId, amr: ['pwd'] } },
@@ -196,8 +226,8 @@ export function interacoes(d: InteracoesDeps): Router {
     '/interaction/:uid/abort',
     seguro(async (req, res) => {
       const i = await interacao(req, res, req.params.uid);
-      if (!i) return invalida(res, req.params.uid);
-      return d.provider.interactionFinished(req, res, {
+      if (!i) return invalida(req, res, req.params.uid);
+      return concluir(req, res, {
         error: 'access_denied',
         error_description: 'login cancelado',
       });
@@ -208,7 +238,7 @@ export function interacoes(d: InteracoesDeps): Router {
     '/interaction/:uid/google',
     seguro(async (req, res) => {
       const i = await interacao(req, res, req.params.uid);
-      if (!i) return invalida(res, req.params.uid);
+      if (!i) return invalida(req, res, req.params.uid);
       if (!d.google) return voltar(res, i.uid, 'google_off');
       const st = {
         state: randomToken(),
@@ -242,11 +272,11 @@ export function interacoes(d: InteracoesDeps): Router {
       const st = verifyState(req.cookies?.[OIDC_GOOGLE_COOKIE], d.jwtSecret);
       const state = typeof req.query.state === 'string' ? req.query.state : '';
       if (!d.google || !st?.uid || !sameString(st.state, state)) {
-        return invalida(res, st?.uid ?? null);
+        return invalida(req, res, st?.uid ?? null);
       }
       // A interação do cookie TEM de ser a do estado assinado (uid forjado → recusa).
       const i = await interacao(req, res, st.uid);
-      if (!i) return invalida(res, st.uid);
+      if (!i) return invalida(req, res, st.uid);
       const code = typeof req.query.code === 'string' ? req.query.code : '';
       if (req.query.error || !code) return voltar(res, i.uid, 'cancelled');
 
@@ -268,7 +298,7 @@ export function interacoes(d: InteracoesDeps): Router {
           ctx,
         );
         await auditarLogin(user.id, 'google', i, req);
-        return d.provider.interactionFinished(
+        return concluir(
           req,
           res,
           { login: { accountId: user.publicId, amr: ['google'] } },
