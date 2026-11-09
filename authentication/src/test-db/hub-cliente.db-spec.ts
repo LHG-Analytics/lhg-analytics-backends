@@ -704,7 +704,7 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
         post_logout_redirect_uri: PORTAL,
       });
     expect(pag.status).toBe(200);
-    expect(pag.text).toContain('Saindo do HUB LHG');
+    expect(pag.text).toContain('name="logout" value="yes"'); // saída direta (invisível)
     expect(pag.text).not.toContain('Sair de todos os sistemas da LHG?');
   });
 

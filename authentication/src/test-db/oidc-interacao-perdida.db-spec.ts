@@ -9,11 +9,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { JWK } from 'jose';
 import * as request from 'supertest';
-import {
-  SCRIPT_CONTINUAR,
-  SCRIPT_ENTRAR,
-  SCRIPT_VOLTAR,
-} from '../oidc/oidc-pages';
+import { SCRIPT_ENTRAR, SCRIPT_VOLTAR } from '../oidc/oidc-pages';
 import { apagarSchema, cliente, migrar, novoSchema } from './db-helpers';
 import { Pote, fluxo, subirComoMain } from './oidc-harness';
 
@@ -169,11 +165,10 @@ describe('Login central: interação perdida com saída (b1/b2) e Entrar travado
     expect(r.headers.location).toBe(`${PORTAL}/`);
   });
 
-  // O form-action do CSP vale para os redirecionamentos depois de um envio de
-  // formulário: o login (que termina no host do sistema) ficaria parado em
-  // "Entrando…". Navegação de documento recebe a página intermediária (200 +
-  // GET); fetch/servidor seguem com o 303.
-  it('envio do form pelo navegador (Sec-Fetch-Dest=document) → 200 com a página intermediária; o form-action continua restrito', async () => {
+  // Sem página intermediária: o login, o Cancelar e o b1 respondem 303 direto,
+  // mesmo numa navegação do navegador (Sec-Fetch-Dest=document). O host final
+  // de cada sistema tem de estar no form-action (OIDC_FORM_ACTION_EXTRA).
+  it('envio do form pelo navegador (Sec-Fetch-Dest=document) → 303 direto, sem página intermediária', async () => {
     const u = await pessoa();
     const pote = new Pote();
     const uid = await abrir(pote, 'cms');
@@ -184,43 +179,30 @@ describe('Login central: interação perdida com saída (b1/b2) e Entrar travado
       .set('Sec-Fetch-Mode', 'navigate')
       .type('form')
       .send({ email: u.email, password: SENHA });
-    expect(r.status).toBe(200);
-    expect(r.headers.location).toBeUndefined();
-    const href = /id="continuar"[^>]*href="([^"]+)"/.exec(r.text)?.[1];
-    expect(href).toMatch(new RegExp(`^${ISSUER}/auth/`)); // o returnTo da interação
-    expect(r.text).toContain(`<script>${SCRIPT_CONTINUAR}</script>`);
-    const csp = r.headers['content-security-policy'];
-    expect(csp).toContain(sha(SCRIPT_CONTINUAR));
-    expect(csp).toMatch(/form-action 'self'/); // continua restrito
-    expect(csp).not.toContain("'unsafe-inline'");
-    // e o login seguiu: a continuação leva ao cliente com o code
-    const fim = await f.ateOCliente(pote, href!.replace(/&amp;/g, '&'));
+    expect(r.status).toBe(303);
+    expect(r.text).not.toContain('Entrando');
+    expect(r.headers.location).toMatch(new RegExp(`^${ISSUER}/auth/`)); // o returnTo da interação
+    const fim = await f.ateOCliente(pote, r.headers.location);
     expect(fim.searchParams.get('code')).toBeTruthy();
   });
 
-  it('cancelar (abort) e o b1 também usam a página intermediária na navegação; sem Sec-Fetch-Dest, 303', async () => {
+  it('cancelar (abort) e o b1 numa navegação também são 303 direto', async () => {
     const pote = new Pote();
     const uid = await abrir(pote, 'cms');
     const ab = await request(srv)
       .post(`/oidc/interaction/${uid}/abort`)
       .set('Cookie', pote.header())
       .set('Sec-Fetch-Dest', 'document');
-    expect(ab.status).toBe(200);
-    expect(ab.text).toContain('id="continuar"');
-    // b1 (interação perdida, uid conhecido) numa navegação → continua ao launchUrl
+    expect(ab.status).toBe(303);
+    expect(ab.text).not.toContain('id="continuar"');
     const uid2 = await abrir(new Pote(), 'cms');
     const b1 = await request(srv)
       .post(`/oidc/interaction/${uid2}/login`)
       .set('Sec-Fetch-Dest', 'document')
       .type('form')
       .send({ email: 'x@example.invalid', password: SENHA });
-    expect(b1.status).toBe(200);
-    expect(b1.text).toContain(`href="${LAUNCH_CMS}"`);
-    // fetch/servidor (sem Sec-Fetch-Dest=document): 303 como antes
-    const uid3 = await abrir(new Pote(), 'cms');
-    const s3 = await enviar(new Pote(), uid3, 'x@example.invalid');
-    expect(s3.status).toBe(303);
-    expect(s3.headers.location).toBe(LAUNCH_CMS);
+    expect(b1.status).toBe(303);
+    expect(b1.headers.location).toBe(LAUNCH_CMS);
   });
 
   it('b2: uid desconhecido → 400 com "Ir para o HUB LHG" e "Voltar", sem laço automático', async () => {
