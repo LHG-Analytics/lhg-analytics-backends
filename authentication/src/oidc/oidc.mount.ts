@@ -20,6 +20,7 @@ import { rotasDoHub } from './oidc-hub';
 import { rotasDeAdmin } from './oidc-hub-admin';
 import { rotaDeSair } from './oidc-hub-sair';
 import { interacoes } from './oidc-interactions';
+import { MemoriaDeInteracoes, hostReservado } from './oidc-interacao-memoria';
 import { loadOidcModule } from './oidc-loader';
 import {
   cspDoOidc,
@@ -89,6 +90,8 @@ function configuracao(p: {
   contas: OidcAccounts;
   policy: unknown;
   urlDaInteracao: (uid: string) => string;
+  /** Chamado quando o provedor cria uma interação (uid → client_id). */
+  aoCriarInteracao?: (uid: string, clientId: unknown) => void;
 }) {
   const cookie = {
     httpOnly: true,
@@ -166,7 +169,13 @@ function configuracao(p: {
     loadExistingGrant: p.contas.loadExistingGrant,
     interactions: {
       policy: p.policy,
-      url: (_ctx: unknown, i: { uid: string }) => p.urlDaInteracao(i.uid),
+      url: (
+        _ctx: unknown,
+        i: { uid: string; params?: { client_id?: unknown } },
+      ) => {
+        p.aoCriarInteracao?.(i.uid, i.params?.client_id);
+        return p.urlDaInteracao(i.uid);
+      },
     },
   };
 }
@@ -301,6 +310,31 @@ export async function mountOidc(
     return `${u}${u.includes('?') ? '&' : '?'}erro=${encodeURIComponent(erro)}`;
   };
 
+  // Interação vencida/concluída (ex.: 2º envio do form): saída pelo sistema
+  // dono do uid. uid → client_id em memória (60 min); destino do BANCO.
+  const memoria = new MemoriaDeInteracoes();
+  const portalBase =
+    safeLaunchUrl(get('HUB_BASE_URL')) ??
+    safeLaunchUrl(get('INVITE_LINK_BASE_URL')) ??
+    safeLaunchUrl(get('HUB_PORTAL_URL'));
+  const portalDoHub = portalBase ? `${new URL(portalBase).origin}/` : null;
+  const destinoDaInteracaoPerdida = async (uid: string | null) => {
+    const clientId = memoria.clienteDe(uid);
+    if (!clientId) return null; // b2
+    // O próprio portal (client 'hub'): a tela /entrar.
+    if (clientId === 'hub')
+      return portalBase ? `${new URL(portalBase).origin}/entrar` : null;
+    const c = await prisma.oidcClient
+      .findUnique({
+        where: { clientId },
+        select: { system: { select: { launchUrl: true, active: true } } },
+      })
+      .catch(() => null);
+    const url = c?.system?.active ? safeLaunchUrl(c.system.launchUrl) : null;
+    // b1 só com https válido e host real (o seed de homologação usa *.invalid).
+    return url && !hostReservado(url) ? url : null;
+  };
+
   const oidc = await loadOidcModule();
   const Provider = oidc.default ?? oidc.Provider;
   const contas = new OidcAccounts(prisma, access, oidc.errors);
@@ -314,6 +348,7 @@ export async function mountOidc(
       contas,
       policy: politica(oidc.interactionPolicy),
       urlDaInteracao,
+      aoCriarInteracao: (uid, clientId) => memoria.registrar(uid, clientId),
     }),
   );
   provider.proxy = true;
@@ -382,6 +417,8 @@ export async function mountOidc(
       caminho,
       paginaMinima,
       urlDaInteracao,
+      destinoDaInteracaoPerdida,
+      portalDoHub,
     }),
   );
   // Rotas para o portal: lista de sistemas (Bearer) e troca de senha.

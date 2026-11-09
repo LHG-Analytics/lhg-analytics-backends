@@ -136,13 +136,43 @@ export function paginaLogin(p: {
     'Entrar — LHG',
     `<h1>Entrar</h1>
 ${p.erro ? `<p class="erro" role="alert">${html(p.erro)}</p>` : ''}
-<form method="post" action="${html(p.acao)}/login" autocomplete="on">
+<form id="form-entrar" method="post" action="${html(p.acao)}/login" autocomplete="on">
 <label for="email">E-mail</label><input id="email" name="email" type="email" required autocomplete="username">
 <label for="password">Senha</label><input id="password" name="password" type="password" required autocomplete="current-password">
-<button type="submit">Entrar</button></form>
+<button id="botao-entrar" type="submit">Entrar</button></form>
 ${p.google ? `<form class="inline" method="post" action="${html(p.acao)}/google"><button type="submit">Entrar com Google</button></form>` : ''}
 <form class="inline" method="post" action="${html(p.acao)}/abort"><button type="submit">Cancelar</button></form>
-<p class="aviso">Tela mínima de homologação.</p>`,
+<p class="aviso">Tela mínima de homologação.</p>
+<script>${SCRIPT_ENTRAR}</script>`,
+  );
+}
+
+/**
+ * Trava o "Entrar" depois do 1º envio (clique ou Enter: os dois disparam o
+ * submit do form), para um 2º POST não cair na interação já concluída.
+ * Libera no pageshow (voltar pelo histórico/bfcache). Texto FIXO: o hash dele
+ * entra no script-src da resposta (cspComScript).
+ */
+export const SCRIPT_ENTRAR =
+  "(function(){var f=document.getElementById('form-entrar'),b=document.getElementById('botao-entrar');if(!f||!b)return;var t=b.textContent;" +
+  "f.addEventListener('submit',function(e){if(f.dataset.enviado){e.preventDefault();return}f.dataset.enviado='1';b.disabled=true;b.textContent='Entrando…'});" +
+  "window.addEventListener('pageshow',function(){delete f.dataset.enviado;b.disabled=false;b.textContent=t})})();";
+
+/** "Voltar" da interação perdida (history.back), com hash no script-src. */
+export const SCRIPT_VOLTAR =
+  "document.getElementById('voltar').addEventListener('click',function(){history.back()});";
+
+/**
+ * Interação perdida SEM destino conhecido (b2): em vez do beco sem saída,
+ * os botões "Ir para o HUB LHG" (portal, se configurado) e "Voltar".
+ */
+export function paginaInteracaoPerdida(portal: string | null): string {
+  return pagina(
+    'Login — LHG',
+    `<h1>Não foi possível continuar</h1><p>Sua sessão de login expirou ou já foi concluída.</p>
+${portal ? `<p><a class="botao" href="${html(portal)}">Ir para o HUB LHG</a></p>` : ''}
+<p><button id="voltar" class="secundario" type="button">Voltar</button></p>
+<script>${SCRIPT_VOLTAR}</script>`,
   );
 }
 

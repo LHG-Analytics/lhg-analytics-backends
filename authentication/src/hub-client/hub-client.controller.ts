@@ -47,11 +47,20 @@ import {
 
 /** fetch usado para falar com o provedor (os testes injetam outro). */
 export const HUB_CLIENT_BUSCAR = 'HUB_CLIENT_BUSCAR';
-/** Cookie do fluxo (state, nonce, verifier, returnTo), cifrado, 10 min. */
+/** Cookie do fluxo (state, nonce, verifier, returnTo), cifrado, 60 min. */
 export const COOKIE_FLUXO = 'an_hub_flow';
+/**
+ * Cookie só com o returnTo (cifrado, 24 h): sobrevive ao vencimento do fluxo,
+ * para o recomeço automático devolver a pessoa à página que ela pediu.
+ */
+export const COOKIE_VOLTA = 'an_hub_rt';
+/** Marca no state do authorize que este fluxo JÁ é um recomeço (anti-laço). */
+export const MARCA_RECOMECO = '.r';
 /** Cookie do id_token (para o id_token_hint do "Sair"), cifrado, 7 dias. */
 export const COOKIE_IDT = 'an_hub_idt';
-const FLUXO_MS = 10 * 60 * 1000;
+/** 60 min = o TTL da interação no HUB: enquanto o provedor aceita a senha, o fluxo vale. */
+export const FLUXO_MS = 60 * 60 * 1000;
+const VOLTA_MS = 24 * 60 * 60 * 1000;
 
 type Fluxo = {
   state: string;
@@ -140,8 +149,11 @@ export class HubClientController implements OnModuleInit {
     res.setHeader('Cache-Control', 'no-store');
     const s = this.settings();
     if (!s.ativo) return this.naoEncontrado(res);
+    // recomeco=1: veio do callback sem fluxo; o state leva a marca para que um
+    // 2º fluxo ausente vire erro (anti-laço que vale mesmo sem cookies).
+    const recomeco = req.query.recomeco === '1';
     const fluxo: Fluxo = {
-      state: aleatorio(),
+      state: aleatorio() + (recomeco ? MARCA_RECOMECO : ''),
       nonce: aleatorio(),
       codeVerifier: aleatorio(),
       returnTo: returnToSeguro(req.query.returnTo, s.defaultReturnTo),
@@ -159,6 +171,11 @@ export class HubClientController implements OnModuleInit {
       COOKIE_FLUXO,
       await cifrar(fluxo, chaveDosCookies(s.clientSecret)),
       this.cookieHub(s, FLUXO_MS),
+    );
+    res.cookie(
+      COOKIE_VOLTA,
+      await cifrar({ r: fluxo.returnTo }, chaveDosCookies(s.clientSecret)),
+      this.cookieHub(s, VOLTA_MS),
     );
     return res.redirect(302, destino);
   }
@@ -183,7 +200,36 @@ export class HubClientController implements OnModuleInit {
       });
       return this.erro(res, s, codigo);
     };
-    if (!fluxo) return falhou('fluxo_ausente');
+    if (!fluxo) {
+      // O provedor negou: não adianta recomeçar.
+      if (q.error === 'access_denied') {
+        return falhou('provedor_access_denied', 'access_denied');
+      }
+      // Já era um recomeço (marca no state, que vem na URL): erro, sem laço.
+      if (typeof q.state === 'string' && q.state.endsWith(MARCA_RECOMECO)) {
+        return falhou('fluxo_ausente_apos_recomeco');
+      }
+      // Fluxo vencido/perdido (ex.: a tela do HUB ficou aberta tempo demais):
+      // recomeça sozinho. A sessão do HUB já existe, então o SSO volta sem senha.
+      const volta = await decifrar<{ r: string }>(
+        req.cookies?.[COOKIE_VOLTA],
+        chave,
+      );
+      const returnTo = returnToSeguro(volta?.r, s.defaultReturnTo);
+      await this.access.audit({
+        action: 'hub.login.fluxo_recomecado',
+        systemKey: ANALYTICS,
+        metadata: {
+          motivo: 'fluxo_ausente',
+          returnTo: volta ? 'recuperado' : 'padrao',
+        },
+        ctx,
+      });
+      return res.redirect(
+        302,
+        `${s.backendOrigin}${HUB_COOKIE_PATH}/login?returnTo=${encodeURIComponent(returnTo)}&recomeco=1`,
+      );
+    }
     if (typeof q.state !== 'string' || q.state !== fluxo.state) {
       return falhou('state');
     }
@@ -231,6 +277,7 @@ export class HubClientController implements OnModuleInit {
     }
 
     setSessionCookies(res, this.config, await this.auth.login(user));
+    this.limparCookieHub(res, s, COOKIE_VOLTA);
     res.cookie(
       COOKIE_IDT,
       await cifrar({ t: idToken }, chave),

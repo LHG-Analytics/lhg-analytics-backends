@@ -21,7 +21,10 @@ import {
 import {
   mensagemDeErro,
   paginaLogin,
-  paginaSessaoInvalida,
+  SCRIPT_ENTRAR,
+  SCRIPT_VOLTAR,
+  cspComScript,
+  paginaInteracaoPerdida,
 } from './oidc-pages';
 
 /** Cookie do estado do Google DENTRO do login central (separado do da 1c). */
@@ -42,6 +45,13 @@ export interface InteracoesDeps {
   paginaMinima: boolean;
   /** Para onde mandar a pessoa para a tela de login (com o uid e o erro). */
   urlDaInteracao: (uid: string, erro?: string) => string;
+  /**
+   * Interação vencida ou já concluída: o launchUrl do sistema do uid (do
+   * banco, nunca da URL), ou null quando o uid é desconhecido (b2).
+   */
+  destinoDaInteracaoPerdida?: (uid: string | null) => Promise<string | null>;
+  /** Portal do HUB para o botão "Ir para o HUB LHG" (b2), ou null. */
+  portalDoHub?: string | null;
 }
 
 /**
@@ -75,8 +85,32 @@ export function interacoes(d: InteracoesDeps): Router {
     }
   }
 
-  const invalida = (res: Response) =>
-    res.status(400).type('html').send(paginaSessaoInvalida());
+  /** Põe o hash do script inline da página no script-src desta resposta. */
+  const comScript = (res: Response, script: string) => {
+    const csp = cspComScript(
+      res.getHeader('Content-Security-Policy') as string | undefined,
+      script,
+    );
+    if (csp) res.setHeader('Content-Security-Policy', csp);
+  };
+
+  /**
+   * Interação vencida ou já concluída (ex.: o 2º envio do form): b1 = 303 para
+   * o launchUrl do sistema dono do uid (recomeça pelo login do sistema; com a
+   * sessão do HUB viva, entra sem senha); b2 = página com "Ir para o HUB LHG"
+   * e "Voltar". Nunca redireciona em laço: a página não se reenvia sozinha.
+   */
+  const invalida = async (res: Response, uid: string | null) => {
+    const destino = d.destinoDaInteracaoPerdida
+      ? await d.destinoDaInteracaoPerdida(uid)
+      : null;
+    if (destino) return res.redirect(303, destino);
+    comScript(res, SCRIPT_VOLTAR);
+    return res
+      .status(400)
+      .type('html')
+      .send(paginaInteracaoPerdida(d.portalDoHub ?? null));
+  };
 
   const voltar = (res: Response, uid: string, erro?: string) =>
     res.redirect(303, d.urlDaInteracao(uid, erro));
@@ -96,8 +130,9 @@ export function interacoes(d: InteracoesDeps): Router {
       if (!d.paginaMinima)
         return res.status(404).json({ message: 'Not Found' });
       const i = await interacao(req, res, req.params.uid);
-      if (!i) return invalida(res);
+      if (!i) return invalida(res, req.params.uid);
       const erro = typeof req.query.erro === 'string' ? req.query.erro : '';
+      comScript(res, SCRIPT_ENTRAR);
       res.type('html').send(
         paginaLogin({
           acao: `${d.caminho}/interaction/${i.uid}`,
@@ -113,7 +148,7 @@ export function interacoes(d: InteracoesDeps): Router {
     corpo,
     seguro(async (req, res) => {
       const i = await interacao(req, res, req.params.uid);
-      if (!i) return invalida(res);
+      if (!i) return invalida(res, req.params.uid);
       const { email, password } = req.body ?? {};
       if (
         typeof email !== 'string' ||
@@ -161,7 +196,7 @@ export function interacoes(d: InteracoesDeps): Router {
     '/interaction/:uid/abort',
     seguro(async (req, res) => {
       const i = await interacao(req, res, req.params.uid);
-      if (!i) return invalida(res);
+      if (!i) return invalida(res, req.params.uid);
       return d.provider.interactionFinished(req, res, {
         error: 'access_denied',
         error_description: 'login cancelado',
@@ -173,7 +208,7 @@ export function interacoes(d: InteracoesDeps): Router {
     '/interaction/:uid/google',
     seguro(async (req, res) => {
       const i = await interacao(req, res, req.params.uid);
-      if (!i) return invalida(res);
+      if (!i) return invalida(res, req.params.uid);
       if (!d.google) return voltar(res, i.uid, 'google_off');
       const st = {
         state: randomToken(),
@@ -207,11 +242,11 @@ export function interacoes(d: InteracoesDeps): Router {
       const st = verifyState(req.cookies?.[OIDC_GOOGLE_COOKIE], d.jwtSecret);
       const state = typeof req.query.state === 'string' ? req.query.state : '';
       if (!d.google || !st?.uid || !sameString(st.state, state)) {
-        return invalida(res);
+        return invalida(res, st?.uid ?? null);
       }
       // A interação do cookie TEM de ser a do estado assinado (uid forjado → recusa).
       const i = await interacao(req, res, st.uid);
-      if (!i) return invalida(res);
+      if (!i) return invalida(res, st.uid);
       const code = typeof req.query.code === 'string' ? req.query.code : '';
       if (req.query.error || !code) return voltar(res, i.uid, 'cancelled');
 
