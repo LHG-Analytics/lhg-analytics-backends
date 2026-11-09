@@ -25,6 +25,8 @@ export interface Discovery {
 export const TOLERANCIA_S = 30;
 /** Timeout das chamadas ao provedor. */
 const TIMEOUT_MS = 10000;
+/** A saída no servidor segura o clique em "Sair": tempo curto, depois a reserva. */
+export const SAIR_TIMEOUT_MS = 3000;
 /** Intervalo mínimo entre duas buscas do JWKS por "kid desconhecido". */
 const JWKS_RETRY_MS = 30000;
 export const EVENTO_BACKCHANNEL =
@@ -217,6 +219,32 @@ export class HubOidc {
     }
     if ('nonce' in payload) throw new TokenInvalido('logout_token: nonce');
     return payload;
+  }
+
+  /**
+   * Saída no SERVIDOR do login central (POST {issuer}/cliente/sair,
+   * client_secret_basic + id_token_hint): encerra a sessão SSO sem página no
+   * navegador. true só com 204; qualquer outra resposta, timeout ou erro de
+   * rede → false (quem chama cai no end_session, a reserva).
+   */
+  async sairNoServidor(idTokenHint: string): Promise<boolean> {
+    const basic = Buffer.from(
+      `${encodeURIComponent(this.s.clientId)}:${encodeURIComponent(this.s.clientSecret)}`,
+    ).toString('base64');
+    try {
+      const r = await this.buscar(`${this.s.issuer}/cliente/sair`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${basic}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ id_token_hint: idTokenHint }).toString(),
+        signal: AbortSignal.timeout(SAIR_TIMEOUT_MS),
+      });
+      return r.status === 204;
+    } catch {
+      return false;
+    }
   }
 
   /** end_session do HUB (client_id, post_logout_redirect_uri e o hint, se houver). */

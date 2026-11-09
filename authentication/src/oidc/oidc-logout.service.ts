@@ -50,7 +50,14 @@ export class OidcLogoutService {
   }
 
   /** Grava os avisos (um por cliente + sid), só para quem tem a URI. */
-  async enfileirar(evento: EventoDeLogout, avisos: Aviso[]): Promise<number> {
+  async enfileirar(
+    evento: EventoDeLogout,
+    avisos: Aviso[],
+    semAvisoPara?: string,
+  ): Promise<number> {
+    // Quem pediu a saída (cliente.sair) já sabe: não recebe o aviso.
+    if (semAvisoPara)
+      avisos = avisos.filter((a) => a.clientId !== semAvisoPara);
     const comAviso = await this.clientesComAviso(avisos.map((a) => a.clientId));
     const vistos = new Set<string>();
     const linhas = avisos.filter((a) => {
@@ -71,11 +78,15 @@ export class OidcLogoutService {
    * destruiu a sessão, mas NÃO revoga os grants cujo refresh sobrevive à
    * sessão (persistsLogout, o caso do hub). Aqui: revoga os grants de TODOS
    * os clientes da sessão e enfileira os avisos, com o sid de cada um.
+   * `semAvisoPara`: o cliente que pediu a saída (não recebe o aviso).
    */
-  async aposLogoutCompleto(session: {
-    accountId?: string;
-    authorizations?: Record<string, Autorizacao>;
-  }): Promise<number> {
+  async aposLogoutCompleto(
+    session: {
+      accountId?: string;
+      authorizations?: Record<string, Autorizacao>;
+    },
+    opts: { semAvisoPara?: string } = {},
+  ): Promise<number> {
     if (!session?.accountId) return 0;
     const grantIds = Object.values(session.authorizations ?? {})
       .map((a) => a?.grantId)
@@ -97,7 +108,47 @@ export class OidcLogoutService {
         sid: a?.sid ?? null,
       }),
     );
-    return this.enfileirar('logout', avisos);
+    return this.enfileirar('logout', avisos, opts.semAvisoPara);
+  }
+
+  /**
+   * "Sair" de um cliente (cliente.sair), só com o banco: o mesmo efeito do
+   * end_session confirmado. Escopo 'sid': a(s) sessão(ões) SSO da pessoa com
+   * esse sid no cliente; revoga os grants de TODOS os clientes delas (o
+   * portal inclusive), avisa os OUTROS clientes e apaga a sessão. Escopo
+   * 'todas': todas as sessões e todos os grants da pessoa. Idempotente:
+   * repetir depois de já encerrado devolve zeros, sem erro.
+   */
+  async sairDoCliente(
+    clientId: string,
+    sub: string,
+    sid: string,
+    escopo: 'sid' | 'todas',
+  ): Promise<{ sessoes: number; grants: number }> {
+    if (escopo === 'todas') {
+      const o = await this.encerrar(sub, 'logout', { semAvisoPara: clientId });
+      return { sessoes: o.sessoes, grants: o.grants };
+    }
+    const linhas = await this.db.$queryRaw<{ id: string; payload: any }[]>`
+      SELECT id, payload FROM "OidcPayload"
+       WHERE type = 'Session' AND "accountId" = ${sub}
+         AND payload -> 'authorizations' -> ${clientId}::text ->> 'sid' = ${sid}`;
+    let grants = 0;
+    for (const l of linhas) {
+      const authorizations = (l.payload?.authorizations ?? {}) as Record<
+        string,
+        Autorizacao
+      >;
+      grants += Object.values(authorizations).filter((a) => a?.grantId).length;
+      await this.aposLogoutCompleto(
+        { accountId: sub, authorizations },
+        { semAvisoPara: clientId },
+      );
+      await this.db.oidcPayload.deleteMany({
+        where: { type: 'Session', id: l.id },
+      });
+    }
+    return { sessoes: linhas.length, grants };
   }
 
   /**
@@ -107,13 +158,20 @@ export class OidcLogoutService {
    * - password_change: as OUTRAS sessões SSO e os grants delas (e os grants
    *   soltos, sem sessão); a sessão `manterSessao` e os grants dela ficam;
    * - flag_revoked: só os grants dos clientes do sistema `systemKey`; as
-   *   sessões SSO ficam (os outros sistemas continuam).
+   *   sessões SSO ficam (os outros sistemas continuam);
+   * - logout: o "Sair" de um cliente no escopo 'todas' (cliente.sair): como
+   *   a inativação (todas as sessões, todos os grants), sem aviso para o
+   *   cliente `semAvisoPara`, que pediu a saída.
    * Devolve quantos grants/sessões caíram e quantos avisos foram enfileirados.
    */
   async encerrar(
     publicId: string,
-    evento: Exclude<EventoDeLogout, 'logout'>,
-    opts: { manterSessao?: string; systemKey?: string } = {},
+    evento: EventoDeLogout,
+    opts: {
+      manterSessao?: string;
+      systemKey?: string;
+      semAvisoPara?: string;
+    } = {},
   ): Promise<{ grants: number; sessoes: number; avisos: number }> {
     const linhas = await this.db.oidcPayload.findMany({
       where: { accountId: publicId, type: { in: ['Session', 'Grant'] } },
@@ -187,7 +245,11 @@ export class OidcLogoutService {
         },
       }),
     ]);
-    const enfileirados = await this.enfileirar(evento, avisos);
+    const enfileirados = await this.enfileirar(
+      evento,
+      avisos,
+      opts.semAvisoPara,
+    );
     if (ids.length || sessoesEncerrar.length) {
       this.logger.log(
         `oidc: ${evento} → ${ids.length} grant(s) e ${sessoesEncerrar.length} sessão(ões) encerrados, ${enfileirados} aviso(s) na fila`,

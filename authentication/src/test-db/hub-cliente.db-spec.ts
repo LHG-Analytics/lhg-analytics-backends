@@ -72,11 +72,20 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
   let n = 0;
 
   // O cliente fala com o issuer público; aqui ele é o próprio app local.
-  const buscar = (u: string, init?: RequestInit) =>
-    fetch(
+  // sairFalha simula a saída no servidor fora do ar (5xx ou rede).
+  let sairFalha: 'nao' | '500' | 'rede' = 'nao';
+  const buscar = async (u: string, init?: RequestInit) => {
+    if (u === `${ISSUER}/cliente/sair` && sairFalha === '500') {
+      return new Response(null, { status: 500 });
+    }
+    if (u === `${ISSUER}/cliente/sair` && sairFalha === 'rede') {
+      throw new TypeError('fetch failed');
+    }
+    return fetch(
       u.startsWith(ISSUER) ? `${base}/oidc${u.slice(ISSUER.length)}` : u,
       init,
     );
+  };
 
   async function pessoa(
     d: { role?: any; unit?: any; systems?: string[]; status?: any } = {},
@@ -624,7 +633,7 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
     }
   });
 
-  it('9. logout: Origin certo → 303 ao end_session (id_token_hint, client_id, post_logout); cookies limpos e refresh revogado. Origin errado → 403', async () => {
+  it('9. logout: Origin certo → saída no SERVIDOR (cliente/sair) e 303 direto ao portal (?saiu=1), sem página; sessão SSO encerrada; cookies limpos e refresh revogado. Origin errado → 403', async () => {
     const u = await pessoa();
     const pote = new Pote();
     await entrarPeloHub(pote, u.email);
@@ -645,13 +654,17 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
         .set('Cookie', cabecalho),
     );
     expect(r.status).toBe(303);
-    const loc = new URL(r.headers.location);
-    expect(loc.origin + loc.pathname).toBe(`${ISSUER}/session/end`);
-    expect(loc.searchParams.get('client_id')).toBe('analytics');
-    expect(loc.searchParams.get('post_logout_redirect_uri')).toBe(PORTAL);
-    expect(lerJwt(loc.searchParams.get('id_token_hint')!).payload.aud).toBe(
-      'analytics',
-    );
+    expect(r.headers.location).toBe(`${PORTAL}?saiu=1`);
+    // a sessão SSO caiu no servidor: o próximo login pede senha
+    expect(
+      await db.oidcPayload.count({
+        where: { type: 'Session', accountId: u.publicId },
+      }),
+    ).toBe(0);
+    const [saida] = await db.auditEvent.findMany({
+      where: { action: 'cliente.sair', targetUserId: u.id },
+    });
+    expect(saida.metadata).toMatchObject({ clientId: 'analytics', sessoes: 1 });
     for (const nome of ['access_token', 'refresh_token', COOKIE_IDT]) {
       expect(cookie(r, nome)).toMatch(/expires=Thu, 01 Jan 1970/i);
     }
@@ -675,6 +688,35 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
           .set('Cookie', p2.header())
       ).status,
     ).toBe(303);
+  });
+
+  it('9b. saída no servidor FALHOU (5xx ou rede) → reserva: 303 ao end_session antigo (id_token_hint, client_id, post_logout)', async () => {
+    for (const falha of ['500', 'rede'] as const) {
+      const u = await pessoa();
+      const pote = new Pote();
+      await entrarPeloHub(pote, u.email);
+      sairFalha = falha;
+      try {
+        const r = await request(srv)
+          .post('/api/hub/logout')
+          .set('Origin', PUBLICO)
+          .set('Cookie', pote.header());
+        expect(r.status).toBe(303);
+        const loc = new URL(r.headers.location);
+        expect(loc.origin + loc.pathname).toBe(`${ISSUER}/session/end`);
+        expect(loc.searchParams.get('client_id')).toBe('analytics');
+        expect(loc.searchParams.get('post_logout_redirect_uri')).toBe(PORTAL);
+        expect(lerJwt(loc.searchParams.get('id_token_hint')!).payload.aud).toBe(
+          'analytics',
+        );
+        const [ev] = await db.auditEvent.findMany({
+          where: { action: 'hub.logout', targetUserId: u.id },
+        });
+        expect(ev.metadata).toMatchObject({ viaServidor: false });
+      } finally {
+        sairFalha = 'nao';
+      }
+    }
   });
 
   it('10. logout com id_token VENCIDO como hint: o provedor aceita e a saída é direta (sem a tela de confirmação)', async () => {
@@ -982,9 +1024,7 @@ describe('Analytics como cliente do HUB (/api/hub/*)', () => {
           .set('Cookie', cabecalho),
       );
       expect(ok.status).toBe(303);
-      expect(
-        new URL(ok.headers.location).searchParams.get('id_token_hint'),
-      ).toBeTruthy();
+      expect(ok.headers.location).toBe(`${PORTAL}?saiu=1`);
       expect(
         (await request(srv).post('/api/refresh').set('Cookie', cabecalho))
           .status,

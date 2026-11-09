@@ -334,21 +334,49 @@ export class HubClientController implements OnModuleInit {
     res.clearCookie('access_token', opcoes);
     res.clearCookie('refresh_token', opcoes);
     this.limparCookieHub(res, s, COOKIE_IDT);
+    // Saída no servidor do login central (falhou → end_session, a reserva).
+    const viaServidor = !!idt?.t && (await this.oidc(s).sairNoServidor(idt.t));
     await this.access.audit({
       action: 'hub.logout',
       actorUserId: userId,
       targetUserId: userId,
       systemKey: ANALYTICS,
-      metadata: { comHint: !!idt?.t },
+      metadata: { comHint: !!idt?.t, viaServidor },
       ctx: requestContext(req),
     });
-    let destino: string | null = null;
-    try {
-      destino = await this.oidc(s).urlDeSaida(idt?.t ?? null);
-    } catch {
-      destino = null;
+    return res.redirect(
+      303,
+      await this.destinoDaSaida(s, viaServidor, idt?.t ?? null),
+    );
+  }
+
+  /**
+   * Para onde o "Sair" manda o navegador:
+   * - saída no servidor OK (204) → direto ao portal (?saiu=1), sem página;
+   * - sem id_token, ou a saída falhou (timeout de 3 s, 5xx, rede) → RESERVA:
+   *   o end_session do login central, que encerra a sessão SSO pelo
+   *   navegador (a página só aparece nessa falha rara). Mandar ao
+   *   portal sem encerrar deixaria a sessão do provedor viva, e o SSO
+   *   entraria de novo num computador compartilhado;
+   * - sem portal configurado → a tela de login do front.
+   */
+  private async destinoDaSaida(
+    s: HubClientSettings,
+    encerrada: boolean,
+    idTokenHint: string | null,
+  ): Promise<string> {
+    if (encerrada && s.portalUrl) {
+      const u = new URL(s.portalUrl);
+      u.searchParams.set('saiu', '1');
+      return u.toString();
     }
-    return res.redirect(303, destino ?? `${s.publicOrigin}/login`);
+    try {
+      const fim = await this.oidc(s).urlDeSaida(idTokenHint);
+      if (fim) return fim;
+    } catch {
+      /* cai no login do front */
+    }
+    return `${s.publicOrigin}/login`;
   }
 
   // ── POST /api/hub/backchannel-logout ───────────────────────────────────
