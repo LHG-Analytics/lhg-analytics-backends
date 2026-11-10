@@ -630,12 +630,13 @@ describe('1d-D2: login central', () => {
   });
 
   describe('(c) e (e): configuração explícita, CORS e páginas', () => {
-    it('(c) discovery: só client_secret_basic; sem registration, introspection, revocation', async () => {
+    it('(c) discovery: client_secret_basic (e o post, só para o conector do Claude: o filtro do /token recusa os outros); sem registration, introspection, revocation', async () => {
       const d = (
         await request(srv).get('/oidc/.well-known/openid-configuration')
       ).body;
       expect(d.token_endpoint_auth_methods_supported).toEqual([
         'client_secret_basic',
+        'client_secret_post',
       ]);
       expect(d).not.toHaveProperty('registration_endpoint');
       expect(d).not.toHaveProperty('introspection_endpoint');

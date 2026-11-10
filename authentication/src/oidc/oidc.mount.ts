@@ -18,6 +18,7 @@ import { InvitationsService } from '../invitations/invitations.service';
 import { UsersService } from '../users/users.service';
 import { rotasDoHub } from './oidc-hub';
 import { rotasDeAdmin } from './oidc-hub-admin';
+import { CLIENTE_MCP, rotaDoMcp } from '../mcp/analytics-mcp';
 import { escopoDeSaida, rotaDeSairDoCliente } from './oidc-cliente-sair';
 import { rotaDeSair } from './oidc-hub-sair';
 import { interacoes } from './oidc-interactions';
@@ -33,6 +34,7 @@ import {
 import { OidcLogoutService } from './oidc-logout.service';
 import { lerMaxHoras, OutboxWorker } from './oidc-outbox';
 import { limitadorDoOidc } from './oidc-rate-limit';
+import { filtroDoToken, registrarLogsDoToken } from './oidc-token-auth';
 import { limparVencidos, prismaAdapter } from './prisma-adapter';
 
 const SETE_DIAS = 7 * 24 * 60 * 60;
@@ -94,6 +96,10 @@ function configuracao(p: {
   urlDaInteracao: (uid: string) => string;
   /** Chamado quando o provedor cria uma interação (uid → client_id). */
   aoCriarInteracao?: (uid: string, clientId: unknown) => void;
+  /** URL do MCP (o único servidor de recursos, RFC 8707), ou null. */
+  mcpUrl?: string | null;
+  /** Erro invalid_target do provedor. */
+  alvoInvalido?: () => Error;
 }) {
   const cookie = {
     httpOnly: true,
@@ -118,8 +124,11 @@ function configuracao(p: {
     // Só authorization code, com PKCE obrigatório (S256 é o único método na v9).
     responseTypes: ['code'],
     pkce: { required: () => true },
-    // (c) Autenticação dos clientes: SÓ client_secret_basic (decisão D3).
-    clientAuthMethods: ['client_secret_basic'],
+    // (c) Autenticação dos clientes: client_secret_basic (decisão D3). O
+    // client_secret_post fica ligado AQUI só para o provedor ler o segredo do
+    // corpo, mas o filtro do /token (oidc-token-auth) o recusa para todos
+    // menos o conector do Claude (analytics-mcp), que manda o segredo no corpo.
+    clientAuthMethods: ['client_secret_basic', 'client_secret_post'],
     // Sem CORS de navegador nos endpoints dos clientes (token/userinfo são
     // chamados pelo servidor do cliente, nunca pelo navegador).
     clientBasedCORS: () => false,
@@ -137,6 +146,35 @@ function configuracao(p: {
         enabled: true,
         logoutSource,
         postLogoutSuccessSource,
+      },
+      // Resource indicators (RFC 8707): o ÚNICO servidor de recursos é o MCP
+      // do Analytics, e só para o cliente analytics-mcp (o Claude manda
+      // resource=<URL do MCP>). O token sai opaco, com aud = a URL do MCP.
+      // Qualquer outro resource → invalid_target, como antes.
+      resourceIndicators: {
+        enabled: true,
+        useGrantedResource: async () => true,
+        getResourceServerInfo: async (
+          _ctx: unknown,
+          indicador: string,
+          client: { clientId?: string },
+        ) => {
+          if (
+            p.mcpUrl &&
+            client?.clientId === CLIENTE_MCP &&
+            indicador === p.mcpUrl
+          ) {
+            return {
+              scope: 'openid email profile',
+              audience: p.mcpUrl,
+              accessTokenFormat: 'opaque',
+              accessTokenTTL: 600,
+            };
+          }
+          throw p.alvoInvalido
+            ? p.alvoInvalido()
+            : new Error('resource indicator desconhecido');
+        },
       },
     },
     renderError,
@@ -344,6 +382,10 @@ export async function mountOidc(
     return url && !hostReservado(url) ? url : null;
   };
 
+  // URL pública EXATA do MCP do Analytics (ANALYTICS_MCP_URL, https), ou null.
+  const urlMcp = origensHttpsExatas(get('ANALYTICS_MCP_URL')).length
+    ? get('ANALYTICS_MCP_URL')!.trim().replace(/\/+$/, '')
+    : null;
   const oidc = await loadOidcModule();
   const Provider = oidc.default ?? oidc.Provider;
   const contas = new OidcAccounts(prisma, access, oidc.errors);
@@ -358,9 +400,13 @@ export async function mountOidc(
       policy: politica(oidc.interactionPolicy),
       urlDaInteracao,
       aoCriarInteracao: (uid, clientId) => memoria.registrar(uid, clientId),
+      mcpUrl: urlMcp,
+      alvoInvalido: () => new oidc.errors.InvalidTarget(),
     }),
   );
   provider.proxy = true;
+  // Motivo dos erros do /token no log (sem segredo); método nos sucessos do MCP.
+  registrarLogsDoToken(provider, [CLIENTE_MCP]);
   // O sid vai SEMPRE no id_token (o cliente casa o logout token com a sessão
   // dele). O provedor só o põe quando a URI de back-channel está cadastrada
   // NELE, mas aí ele mesmo enviaria, sem fila; as URIs ficam só no banco e
@@ -493,6 +539,29 @@ export async function mountOidc(
     rotaDeSairDoCliente({ provider, prisma, logout, access, escopo }),
   );
   logger.log(`oidc: saída do cliente (/cliente/sair) com escopo=${escopo}`);
+  // MCP do LHG Analytics (conector do Claude): só com ANALYTICS_MCP_URL (a
+  // URL pública exata, https) e o JWT_SECRET; sem eles, /mcp não existe.
+  const segredoJwt = get('JWT_SECRET');
+  if (urlMcp && segredoJwt) {
+    express.use(
+      '/mcp',
+      rotaDoMcp({
+        provider,
+        prisma,
+        access,
+        urlPublica: urlMcp,
+        issuer: s.issuer,
+        jwtSecret: segredoJwt,
+        lhgApiUrl:
+          get('LHG_API_INTERNAL_URL')?.trim() || 'http://127.0.0.1:3010',
+      }),
+    );
+  }
+  logger.log(
+    `mcp: ${urlMcp && segredoJwt ? 'ATIVO' : 'desligado (sem ANALYTICS_MCP_URL)'}`,
+  );
+  // Segredo no corpo (client_secret_post) só para o conector do Claude.
+  express.use('/oidc/token', filtroDoToken([CLIENTE_MCP]));
   express.use('/oidc', (req: Request, res: Response) => callback(req, res));
 
   agendarLimpeza(app, prisma);
