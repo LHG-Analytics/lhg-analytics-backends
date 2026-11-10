@@ -3,7 +3,7 @@
 // verdade, com o app montado como o main.ts; o lhg-api é um servidor FALSO
 // local que confere o JWT interno e aplica a regra de unidade do UnitsGuard.
 // Chaves e segredos de TESTE gerados aqui, na hora.
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import * as http from 'http';
@@ -308,6 +308,87 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
       expect(new URL(a.headers.location).searchParams.get('error')).toBe(
         'invalid_target',
       );
+    }
+  });
+
+  /** Login até o code, SEM trocar (para os casos do /token). */
+  async function ateOCodigo(clientId: 'analytics-mcp' | 'hub', email: string) {
+    const pote = new Pote();
+    const p = pkce();
+    const a = await f.autorizar(pote, clientId, p);
+    const uid = f.uidDa(a.headers.location);
+    const l = pote.guardar(
+      await request(srv)
+        .post(`/oidc/interaction/${uid}/login`)
+        .set('Cookie', pote.header())
+        .type('form')
+        .send({ email, password: SENHA }),
+    );
+    const fim = await f.ateOCliente(pote, l.headers.location);
+    return { code: fim.searchParams.get('code')!, verifier: p.verifier };
+  }
+
+  it('o Claude manda o segredo no CORPO (client_secret_post): aceito SÓ para o analytics-mcp; o hub com segredo no corpo → 401; o log diz o motivo e o método, sem o segredo', async () => {
+    const avisos: string[] = [];
+    const espiao = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation((m: any) => void avisos.push(String(m)));
+    const info: string[] = [];
+    const espiaoLog = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation((m: any) => void info.push(String(m)));
+    try {
+      const u = await pessoa();
+      const c = await ateOCodigo('analytics-mcp', u.email);
+      const ok = await request(srv).post('/oidc/token').type('form').send({
+        grant_type: 'authorization_code',
+        code: c.code,
+        redirect_uri: CALLBACK_CLAUDE,
+        code_verifier: c.verifier,
+        client_id: 'analytics-mcp',
+        client_secret: CLIENTES['analytics-mcp'].segredo,
+      });
+      expect(ok.status).toBe(200);
+      expect(ok.body.access_token).toBeTruthy();
+      expect(info.join('\n')).toContain(
+        'oidc: token emitido client=analytics-mcp metodo=post grant=authorization_code',
+      );
+      // o hub segue SÓ com Basic
+      const h = await pessoa();
+      const ch = await ateOCodigo('hub', h.email);
+      const nao = await request(srv).post('/oidc/token').type('form').send({
+        grant_type: 'authorization_code',
+        code: ch.code,
+        redirect_uri: CLIENTES.hub.redirect,
+        code_verifier: ch.verifier,
+        client_id: 'hub',
+        client_secret: CLIENTES.hub.segredo,
+      });
+      expect(nao.status).toBe(401);
+      expect(nao.body.error).toBe('invalid_client');
+      // segredo errado (Basic): o provedor recusa e o log diz o motivo
+      const c2 = await ateOCodigo('analytics-mcp', u.email);
+      const errado = await request(srv)
+        .post('/oidc/token')
+        .auth('analytics-mcp', 'segredo-errado-de-teste')
+        .type('form')
+        .send({
+          grant_type: 'authorization_code',
+          code: c2.code,
+          redirect_uri: CALLBACK_CLAUDE,
+          code_verifier: c2.verifier,
+        });
+      expect(errado.status).toBe(401);
+      const log = avisos.join('\n');
+      expect(log).toMatch(
+        /oidc: token recusado erro=invalid_client descricao="[^"]*" client=analytics-mcp metodo=basic grant=authorization_code/,
+      );
+      expect(log).not.toContain('segredo-errado-de-teste');
+      expect(log).not.toContain(CLIENTES['analytics-mcp'].segredo);
+      expect(log).not.toContain(c2.code);
+    } finally {
+      espiao.mockRestore();
+      espiaoLog.mockRestore();
     }
   });
 
