@@ -18,6 +18,7 @@ import { InvitationsService } from '../invitations/invitations.service';
 import { UsersService } from '../users/users.service';
 import { rotasDoHub } from './oidc-hub';
 import { rotasDeAdmin } from './oidc-hub-admin';
+import { CLIENTE_MCP, rotaDoMcp } from '../mcp/analytics-mcp';
 import { escopoDeSaida, rotaDeSairDoCliente } from './oidc-cliente-sair';
 import { rotaDeSair } from './oidc-hub-sair';
 import { interacoes } from './oidc-interactions';
@@ -94,6 +95,10 @@ function configuracao(p: {
   urlDaInteracao: (uid: string) => string;
   /** Chamado quando o provedor cria uma interação (uid → client_id). */
   aoCriarInteracao?: (uid: string, clientId: unknown) => void;
+  /** URL do MCP (o único servidor de recursos, RFC 8707), ou null. */
+  mcpUrl?: string | null;
+  /** Erro invalid_target do provedor. */
+  alvoInvalido?: () => Error;
 }) {
   const cookie = {
     httpOnly: true,
@@ -137,6 +142,35 @@ function configuracao(p: {
         enabled: true,
         logoutSource,
         postLogoutSuccessSource,
+      },
+      // Resource indicators (RFC 8707): o ÚNICO servidor de recursos é o MCP
+      // do Analytics, e só para o cliente analytics-mcp (o Claude manda
+      // resource=<URL do MCP>). O token sai opaco, com aud = a URL do MCP.
+      // Qualquer outro resource → invalid_target, como antes.
+      resourceIndicators: {
+        enabled: true,
+        useGrantedResource: async () => true,
+        getResourceServerInfo: async (
+          _ctx: unknown,
+          indicador: string,
+          client: { clientId?: string },
+        ) => {
+          if (
+            p.mcpUrl &&
+            client?.clientId === CLIENTE_MCP &&
+            indicador === p.mcpUrl
+          ) {
+            return {
+              scope: 'openid email profile',
+              audience: p.mcpUrl,
+              accessTokenFormat: 'opaque',
+              accessTokenTTL: 600,
+            };
+          }
+          throw p.alvoInvalido
+            ? p.alvoInvalido()
+            : new Error('resource indicator desconhecido');
+        },
       },
     },
     renderError,
@@ -344,6 +378,10 @@ export async function mountOidc(
     return url && !hostReservado(url) ? url : null;
   };
 
+  // URL pública EXATA do MCP do Analytics (ANALYTICS_MCP_URL, https), ou null.
+  const urlMcp = origensHttpsExatas(get('ANALYTICS_MCP_URL')).length
+    ? get('ANALYTICS_MCP_URL')!.trim().replace(/\/+$/, '')
+    : null;
   const oidc = await loadOidcModule();
   const Provider = oidc.default ?? oidc.Provider;
   const contas = new OidcAccounts(prisma, access, oidc.errors);
@@ -358,6 +396,8 @@ export async function mountOidc(
       policy: politica(oidc.interactionPolicy),
       urlDaInteracao,
       aoCriarInteracao: (uid, clientId) => memoria.registrar(uid, clientId),
+      mcpUrl: urlMcp,
+      alvoInvalido: () => new oidc.errors.InvalidTarget(),
     }),
   );
   provider.proxy = true;
@@ -493,6 +533,27 @@ export async function mountOidc(
     rotaDeSairDoCliente({ provider, prisma, logout, access, escopo }),
   );
   logger.log(`oidc: saída do cliente (/cliente/sair) com escopo=${escopo}`);
+  // MCP do LHG Analytics (conector do Claude): só com ANALYTICS_MCP_URL (a
+  // URL pública exata, https) e o JWT_SECRET; sem eles, /mcp não existe.
+  const segredoJwt = get('JWT_SECRET');
+  if (urlMcp && segredoJwt) {
+    express.use(
+      '/mcp',
+      rotaDoMcp({
+        provider,
+        prisma,
+        access,
+        urlPublica: urlMcp,
+        issuer: s.issuer,
+        jwtSecret: segredoJwt,
+        lhgApiUrl:
+          get('LHG_API_INTERNAL_URL')?.trim() || 'http://127.0.0.1:3010',
+      }),
+    );
+  }
+  logger.log(
+    `mcp: ${urlMcp && segredoJwt ? 'ATIVO' : 'desligado (sem ANALYTICS_MCP_URL)'}`,
+  );
   express.use('/oidc', (req: Request, res: Response) => callback(req, res));
 
   agendarLimpeza(app, prisma);
