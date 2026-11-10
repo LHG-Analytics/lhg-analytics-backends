@@ -34,6 +34,7 @@ import {
 import { OidcLogoutService } from './oidc-logout.service';
 import { lerMaxHoras, OutboxWorker } from './oidc-outbox';
 import { limitadorDoOidc } from './oidc-rate-limit';
+import { filtroDoToken, registrarLogsDoToken } from './oidc-token-auth';
 import { limparVencidos, prismaAdapter } from './prisma-adapter';
 
 const SETE_DIAS = 7 * 24 * 60 * 60;
@@ -123,8 +124,11 @@ function configuracao(p: {
     // Só authorization code, com PKCE obrigatório (S256 é o único método na v9).
     responseTypes: ['code'],
     pkce: { required: () => true },
-    // (c) Autenticação dos clientes: SÓ client_secret_basic (decisão D3).
-    clientAuthMethods: ['client_secret_basic'],
+    // (c) Autenticação dos clientes: client_secret_basic (decisão D3). O
+    // client_secret_post fica ligado AQUI só para o provedor ler o segredo do
+    // corpo, mas o filtro do /token (oidc-token-auth) o recusa para todos
+    // menos o conector do Claude (analytics-mcp), que manda o segredo no corpo.
+    clientAuthMethods: ['client_secret_basic', 'client_secret_post'],
     // Sem CORS de navegador nos endpoints dos clientes (token/userinfo são
     // chamados pelo servidor do cliente, nunca pelo navegador).
     clientBasedCORS: () => false,
@@ -401,6 +405,8 @@ export async function mountOidc(
     }),
   );
   provider.proxy = true;
+  // Motivo dos erros do /token no log (sem segredo); método nos sucessos do MCP.
+  registrarLogsDoToken(provider, [CLIENTE_MCP]);
   // O sid vai SEMPRE no id_token (o cliente casa o logout token com a sessão
   // dele). O provedor só o põe quando a URI de back-channel está cadastrada
   // NELE, mas aí ele mesmo enviaria, sem fila; as URIs ficam só no banco e
@@ -554,6 +560,8 @@ export async function mountOidc(
   logger.log(
     `mcp: ${urlMcp && segredoJwt ? 'ATIVO' : 'desligado (sem ANALYTICS_MCP_URL)'}`,
   );
+  // Segredo no corpo (client_secret_post) só para o conector do Claude.
+  express.use('/oidc/token', filtroDoToken([CLIENTE_MCP]));
   express.use('/oidc', (req: Request, res: Response) => callback(req, res));
 
   agendarLimpeza(app, prisma);
