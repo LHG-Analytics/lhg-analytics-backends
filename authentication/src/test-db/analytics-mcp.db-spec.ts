@@ -247,6 +247,14 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
       if (p.unit !== 'LHG' && p.unit.toLowerCase() !== m[1]) {
         return void res.writeHead(403).end();
       }
+      // Altana: consulta "pesada", passa do tempo do MCP (1,5 s no teste).
+      if (m[1] === 'altana') {
+        setTimeout(() => {
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify(KPIS(m[1])));
+        }, 3000);
+        return;
+      }
       chamadasLhgApi.push({
         slug: m[1],
         unit: p.unit,
@@ -266,6 +274,7 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
       OIDC_MINIMAL_LOGIN_PAGE: 'true',
       ANALYTICS_MCP_URL: MCP_URL,
       LHG_API_INTERNAL_URL: `http://127.0.0.1:${(falso.address() as AddressInfo).port}`,
+      MCP_LHG_API_TIMEOUT_MS: '1500',
     });
     ({ app } = await subirComoMain());
     srv = app.getHttpServer();
@@ -284,6 +293,7 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
       'OIDC_MINIMAL_LOGIN_PAGE',
       'ANALYTICS_MCP_URL',
       'LHG_API_INTERNAL_URL',
+      'MCP_LHG_API_TIMEOUT_MS',
     ]) {
       delete process.env[k];
     }
@@ -683,6 +693,50 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
     ]);
     expect(d.giro_por_categoria[1].dias['sábado']).toBe(6.25);
     expect(JSON.stringify(r.body)).not.toContain('11999999999');
+  });
+
+  it('consulta pesada (passa do tempo do MCP): mensagem clara para perguntar de novo; o ERRO é auditado com a unidade e o(s) período(s)', async () => {
+    const u = await pessoa({ role: 'ADMIN', unit: 'LHG' });
+    const tok = await tokenDe(u.email);
+    const r = await ferramenta(tok, 'visao_geral', {
+      unidade: 'altana',
+      inicio: '2026-10-01',
+      fim: '2026-10-31',
+    });
+    expect(r.body.result.isError).toBe(true);
+    expect(r.body.result.content[0].text).toBe(
+      'consulta pesada em processamento; o resultado fica pronto em 1–2 min, pergunte de novo',
+    );
+    const c = await ferramenta(tok, 'comparar_periodos', {
+      unidade: 'altana',
+      periodo_a: { inicio: '2026-09-01', fim: '2026-09-30' },
+      periodo_b: { inicio: '2026-10-01', fim: '2026-10-31' },
+    });
+    expect(c.body.result.isError).toBe(true);
+    const ev = await db.auditEvent.findMany({
+      where: { action: 'mcp.tool', targetUserId: u.id },
+      orderBy: { id: 'asc' },
+    });
+    expect(ev.map((e) => e.metadata)).toEqual([
+      {
+        ferramenta: 'visao_geral',
+        resultado: 'erro',
+        unidade: 'altana',
+        inicio: '01/10/2026',
+        fim: '31/10/2026',
+        motivo: expect.stringContaining('consulta pesada'),
+      },
+      {
+        ferramenta: 'comparar_periodos',
+        resultado: 'erro',
+        unidade: 'altana',
+        inicio_a: '01/09/2026',
+        fim_a: '30/09/2026',
+        inicio_b: '01/10/2026',
+        fim_b: '31/10/2026',
+        motivo: expect.stringContaining('consulta pesada'),
+      },
+    ]);
   });
 
   it('comparar_periodos: valores de A e B, diferença e variação %', async () => {

@@ -40,6 +40,8 @@ export interface McpDeps {
   lhgApiUrl: string;
   /** fetch para o lhg-api (os testes trocam). */
   buscar?: typeof fetch;
+  /** Espera pelo lhg-api (padrão MCP_TIMEOUT_LHG_API_MS). */
+  timeoutMs?: number;
   agora?: () => Date;
 }
 
@@ -174,6 +176,40 @@ const FERRAMENTAS = [
 class ErroDeFerramenta extends Error {}
 
 /**
+ * Espera pelo lhg-api. Fica abaixo do statement_timeout do banco (2 min):
+ * consultas pesadas (ex.: o mês cheio do LIV) passavam dos 45 s antigos.
+ */
+export const MCP_TIMEOUT_LHG_API_MS = 100_000;
+/** Mensagem quando o lhg-api passa do tempo (ele segue calculando e guarda no cache). */
+export const MSG_CONSULTA_PESADA =
+  'consulta pesada em processamento; o resultado fica pronto em 1–2 min, pergunte de novo';
+
+/** Período(s) pedido(s), para a auditoria também dos ERROS (sem números). */
+function periodosParaAuditoria(
+  nome: string,
+  args: any,
+  agora: Date = new Date(),
+): Record<string, string> {
+  const per = (a: unknown) => {
+    const p = resolverPeriodo(
+      (a && typeof a === 'object' ? a : {}) as Record<string, unknown>,
+      agora,
+    );
+    return typeof p === 'string' ? null : p;
+  };
+  if (nome === 'comparar_periodos') {
+    const a = per(args?.periodo_a);
+    const b = per(args?.periodo_b);
+    return {
+      ...(a ? { inicio_a: a.inicio, fim_a: a.fim } : {}),
+      ...(b ? { inicio_b: b.inicio, fim_b: b.fim } : {}),
+    };
+  }
+  const p = per(args);
+  return p ? { inicio: p.inicio, fim: p.fim } : {};
+}
+
+/**
  * MCP do LHG Analytics (Streamable HTTP, só POST com resposta JSON), para o
  * conector do Claude. SÓ LEITURA.
  * - Autenticação: access token do login central EMITIDO PARA o cliente
@@ -285,10 +321,23 @@ export function rotaDoMcp(d: McpDeps): Router {
     const u = new URL(`${d.lhgApiUrl}/${slug}/api/Company/kpis/date-range`);
     u.searchParams.set('startDate', per.inicio);
     u.searchParams.set('endDate', per.fim);
-    const resp = await buscar(u.toString(), {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      signal: AbortSignal.timeout(45_000),
-    });
+    let resp: Awaited<ReturnType<typeof fetch>>;
+    try {
+      resp = await buscar(u.toString(), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(d.timeoutMs ?? MCP_TIMEOUT_LHG_API_MS),
+      });
+    } catch (e) {
+      // Passou do tempo: o lhg-api segue calculando e grava no cache dele.
+      const n = (e as Error)?.name;
+      if (n === 'TimeoutError' || n === 'AbortError') {
+        throw new ErroDeFerramenta(MSG_CONSULTA_PESADA);
+      }
+      throw e;
+    }
     if (resp.status === 403)
       throw new ErroDeFerramenta('sem acesso a esta unidade');
     if (!resp.ok) {
@@ -533,6 +582,7 @@ export function rotaDoMcp(d: McpDeps): Router {
                   typeof args?.unidade === 'string'
                     ? args.unidade.slice(0, 40)
                     : null,
+                ...periodosParaAuditoria(nome, args, agora()),
                 motivo: texto.slice(0, 80),
               });
               return res.json({
