@@ -39,6 +39,21 @@ import { filtroDoToken, registrarLogsDoToken } from './oidc-token-auth';
 import { limparVencidos, prismaAdapter } from './prisma-adapter';
 
 const SETE_DIAS = 7 * 24 * 60 * 60;
+
+/**
+ * Clientes de SESSÃO LONGA (decisão do Danilo: a TV fica sempre logada).
+ * Lista FIXA no código, de propósito (nada de variável de ambiente, para não
+ * abrir isso a outro cliente por engano). Para eles, o refresh token E o
+ * grant valem SESSAO_LONGA_S e DESLIZAM: a cada refresh, o refresh novo e o
+ * grant passam a vencer em "agora + SESSAO_LONGA_S". Em uso, nunca vence;
+ * parado esse tempo, morre sozinho. O corte continua pela conta: status e
+ * flag são conferidos em TODO refresh (findAccount). Os outros: 7 e 7 dias.
+ */
+export const CLIENTES_SESSAO_LONGA: readonly string[] = ['painel-tv'];
+/** 90 dias. */
+export const SESSAO_LONGA_S = 90 * 24 * 60 * 60;
+const sessaoLonga = (clientId: unknown) =>
+  typeof clientId === 'string' && CLIENTES_SESSAO_LONGA.includes(clientId);
 /** Inatividade máxima da sessão SSO (D2 aprovada). */
 export const INATIVIDADE_MAX = 24 * 60 * 60;
 /** Intervalo do envio dos avisos de logout (Outbox). */
@@ -192,8 +207,15 @@ function configuracao(p: {
       AuthorizationCode: 60,
       AccessToken: 600,
       IdToken: 600,
-      RefreshToken: SETE_DIAS,
-      Grant: SETE_DIAS,
+      // Sessão longa (deslizante) só para CLIENTES_SESSAO_LONGA; os outros 7 dias.
+      RefreshToken: (_ctx: unknown, token: any, client: any) =>
+        sessaoLonga(client?.clientId ?? token?.clientId)
+          ? SESSAO_LONGA_S
+          : SETE_DIAS,
+      Grant: (_ctx: unknown, grant: any, client: any) =>
+        sessaoLonga(client?.clientId ?? grant?.clientId)
+          ? SESSAO_LONGA_S
+          : SETE_DIAS,
       // (d) 7 dias, com expiração por 24 h de inatividade.
       Session: (_ctx: unknown, session: { loginTs?: number }) =>
         ttlDaSessao(session?.loginTs),
@@ -406,6 +428,23 @@ export async function mountOidc(
     }),
   );
   provider.proxy = true;
+  // Grant DESLIZANTE da sessão longa: o provedor não regrava o grant no
+  // refresh (o TTL dele seria um teto desde o login). A cada refresh token
+  // salvo de um cliente de sessão longa (a rotação cria um novo a cada uso),
+  // o grant passa a vencer em "agora + SESSAO_LONGA_S", junto com o refresh.
+  provider.on('refresh_token.saved', (token: any) => {
+    if (!sessaoLonga(token?.clientId) || !token?.grantId) return;
+    void (async () => {
+      const grant = await provider.Grant.find(token.grantId);
+      if (!grant) return;
+      grant.exp = Math.floor(Date.now() / 1000) + SESSAO_LONGA_S;
+      await grant.save();
+    })().catch((e: Error) =>
+      logger.warn(
+        `oidc: falha ao renovar o grant de sessão longa (${e?.name ?? 'erro'})`,
+      ),
+    );
+  });
   // Motivo dos erros do /token no log (sem segredo); método nos sucessos do MCP.
   registrarLogsDoToken(provider, [CLIENTE_MCP]);
   // O sid vai SEMPRE no id_token (o cliente casa o logout token com a sessão
