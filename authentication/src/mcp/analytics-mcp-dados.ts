@@ -3,6 +3,17 @@
  * pessoa pode ver, períodos, e a lista FECHADA de campos devolvidos.
  */
 
+/** Moeda dos valores de uma unidade (os endpoints por unidade não convertem). */
+export type Moeda = 'BRL' | 'USD';
+
+/**
+ * Moeda NATIVA de cada unidade. Os endpoints por unidade do lhg-api devolvem
+ * os valores na moeda da unidade; só as visões CONSOLIDADAS convertem USD→BRL
+ * (currency-conversion.service). O LIV opera em dólar.
+ */
+export const MOEDA_POR_SLUG: Record<string, Moeda> = { liv: 'USD' };
+export const moedaDe = (slug: string): Moeda => MOEDA_POR_SLUG[slug] ?? 'BRL';
+
 /** Unidades do lhg-api: slug da rota (:unit) e o enum da unidade no perfil. */
 export const UNIDADES: { slug: string; unidade: string; nome: string }[] = [
   { slug: 'lush_ipiranga', unidade: 'LUSH_IPIRANGA', nome: 'Lush Ipiranga' },
