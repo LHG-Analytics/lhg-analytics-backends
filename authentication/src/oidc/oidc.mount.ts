@@ -19,6 +19,7 @@ import { UsersService } from '../users/users.service';
 import { rotasDoHub } from './oidc-hub';
 import { rotasDeAdmin } from './oidc-hub-admin';
 import { CLIENTE_MCP, rotaDoMcp } from '../mcp/analytics-mcp';
+import { rotaDoPainelTv } from '../painel/painel-tv';
 import { escopoDeSaida, rotaDeSairDoCliente } from './oidc-cliente-sair';
 import { rotaDeSair } from './oidc-hub-sair';
 import { interacoes } from './oidc-interactions';
@@ -563,6 +564,26 @@ export async function mountOidc(
   }
   logger.log(
     `mcp: ${urlMcp && segredoJwt ? 'ATIVO' : 'desligado (sem ANALYTICS_MCP_URL)'}`,
+  );
+  // Dados do Painel TV (servidor → servidor, só leitura): só com o SHA-256 do
+  // token de serviço no Render (PAINEL_TV_TOKEN_SHA256, 64 hex); sem ele,
+  // /painel não existe.
+  const hashPainel = (get('PAINEL_TV_TOKEN_SHA256') ?? '').trim();
+  const painelAtivo = /^[0-9a-fA-F]{64}$/.test(hashPainel) && !!segredoJwt;
+  if (painelAtivo) {
+    express.use(
+      '/painel',
+      rotaDoPainelTv({
+        access,
+        tokenSha256: hashPainel,
+        jwtSecret: segredoJwt!,
+        lhgApiUrl:
+          get('LHG_API_INTERNAL_URL')?.trim() || 'http://127.0.0.1:3010',
+      }),
+    );
+  }
+  logger.log(
+    `painel-tv: ${painelAtivo ? 'ATIVO' : 'desligado (sem PAINEL_TV_TOKEN_SHA256)'}`,
   );
   // Segredo no corpo (client_secret_post) só para o conector do Claude.
   express.use('/oidc/token', filtroDoToken([CLIENTE_MCP]));
