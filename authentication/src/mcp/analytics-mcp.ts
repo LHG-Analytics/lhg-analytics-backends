@@ -15,6 +15,7 @@ import {
   camposPorCategoria,
   camposPorDiaDaSemana,
   compararCampos,
+  moedaDe,
   resolverPeriodo,
   unidadesDe,
   type Periodo,
@@ -375,7 +376,11 @@ export function rotaDoMcp(d: McpDeps): Router {
         return {
           resumo: { unidades: us.length },
           dados: {
-            unidades: us.map((u) => ({ slug: u.slug, nome: u.nome })),
+            unidades: us.map((u) => ({
+              slug: u.slug,
+              nome: u.nome,
+              moeda: moedaDe(u.slug),
+            })),
             ...(us.length
               ? {}
               : {
@@ -390,7 +395,12 @@ export function rotaDoMcp(d: McpDeps): Router {
         const k = await kpis(p, u.slug, per);
         return {
           resumo: { unidade: u.slug, ...per },
-          dados: { unidade: u.nome, periodo: per, ...k },
+          dados: {
+            unidade: u.nome,
+            moeda: moedaDe(u.slug),
+            periodo: per,
+            ...k,
+          },
         };
       }
       case 'comparar_periodos': {
@@ -405,6 +415,7 @@ export function rotaDoMcp(d: McpDeps): Router {
           resumo: { unidade: u.slug, a: pa, b: pb },
           dados: {
             unidade: u.nome,
+            moeda: moedaDe(u.slug),
             periodo_a: pa,
             periodo_b: pb,
             comparacao: compararCampos(ka, kb),
@@ -420,6 +431,7 @@ export function rotaDoMcp(d: McpDeps): Router {
           resumo: { unidade: u.slug, ...per },
           dados: {
             unidade: u.nome,
+            moeda: moedaDe(u.slug),
             periodo: per,
             categorias: camposPorCategoria(bruto),
             total: {
@@ -443,6 +455,7 @@ export function rotaDoMcp(d: McpDeps): Router {
           resumo: { unidade: u.slug, ...per },
           dados: {
             unidade: u.nome,
+            moeda: moedaDe(u.slug),
             periodo: per,
             ...camposPorDiaDaSemana(bruto),
           },
@@ -513,7 +526,7 @@ export function rotaDoMcp(d: McpDeps): Router {
                   version: '1.0.0',
                 },
                 instructions:
-                  'Dados da Visão Geral do LHG Analytics (só leitura, números agregados). Comece por listar_unidades. Valores em reais (BRL); o dia é o dia comercial (06:00 às 05:59).',
+                  'Dados da Visão Geral do LHG Analytics (só leitura, números agregados). Comece por listar_unidades. Os valores vêm na moeda da unidade (campo "moeda" de cada resposta): BRL, exceto o LIV, em dólar (USD). O dia é o dia comercial (06:00 às 05:59).',
               },
             });
           }
