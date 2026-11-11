@@ -68,7 +68,96 @@ const KPIS = (unidade: string) => ({
     totalOccupancyRate: 41.25,
   },
   DataTableSuiteCategory: [
-    { cliente: 'NOME-QUE-NAO-PODE-SAIR', cpf: '00000000000' },
+    {
+      LUSH: {
+        totalRentalsApartments: 20,
+        totalValue: 700.5,
+        totalTicketAverage: 35.03,
+        giro: 2.1,
+        revpar: 70.1,
+        trevpar: 75.2,
+        averageOccupationTime: '02:00:00',
+        occupancyRate: 45.5,
+        cliente: 'NOME-QUE-NAO-PODE-SAIR',
+        cpf: '00000000000',
+      },
+    },
+    {
+      STANDARD: {
+        totalRentalsApartments: 10,
+        totalValue: 300,
+        totalTicketAverage: 30,
+        giro: 1.5,
+        revpar: 40,
+        trevpar: 42,
+        averageOccupationTime: '02:30:00',
+        occupancyRate: 30.25,
+      },
+    },
+  ],
+  DataTableGiroByWeek: [
+    {
+      LUSH: Object.fromEntries(
+        [
+          'domingo',
+          'segunda-feira',
+          'terça-feira',
+          'quarta-feira',
+          'quinta-feira',
+          'sexta-feira',
+          'sábado',
+        ].map((d, i) => [
+          d,
+          { giro: i + 0.5, totalGiro: i + 1, telefone: '11999999999' },
+        ]),
+      ),
+    },
+    {
+      STANDARD: Object.fromEntries(
+        [
+          'domingo',
+          'segunda-feira',
+          'terça-feira',
+          'quarta-feira',
+          'quinta-feira',
+          'sexta-feira',
+          'sábado',
+        ].map((d, i) => [d, { giro: i + 0.25, totalGiro: i + 1 }]),
+      ),
+    },
+  ],
+  DataTableRevparByWeek: [
+    {
+      LUSH: Object.fromEntries(
+        [
+          'domingo',
+          'segunda-feira',
+          'terça-feira',
+          'quarta-feira',
+          'quinta-feira',
+          'sexta-feira',
+          'sábado',
+        ].map((d, i) => [d, { revpar: 10 * i, totalRevpar: 10 * i + 5 }]),
+      ),
+    },
+  ],
+  DataTableOccupancyRateByWeek: [
+    {
+      LUSH: Object.fromEntries(
+        [
+          'domingo',
+          'segunda-feira',
+          'terça-feira',
+          'quarta-feira',
+          'quinta-feira',
+          'sexta-feira',
+          'sábado',
+        ].map((d, i) => [
+          d,
+          { occupancyRate: 20 + i, totalOccupancyRate: 30 + i },
+        ]),
+      ),
+    },
   ],
   RevenueByDate: [{ x: 1 }],
 });
@@ -405,6 +494,8 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
       'listar_unidades',
       'visao_geral',
       'comparar_periodos',
+      'resumo_por_categoria',
+      'giro_por_dia_semana',
     ]);
     for (const t of r.body.result.tools)
       expect(t.annotations.readOnlyHint).toBe(true);
@@ -507,6 +598,91 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
       expect(r.body.result.isError).toBe(true);
     }
     expect(chamadasLhgApi.length).toBe(antes);
+  });
+
+  it('resumo_por_categoria: os KPIs por categoria do MESMO endpoint, em lista fechada, mais o total; outra unidade → erro', async () => {
+    const u = await pessoa({ unit: 'TOUT' });
+    const tok = await tokenDe(u.email);
+    const r = await ferramenta(tok, 'resumo_por_categoria', {
+      unidade: 'tout',
+      inicio: '2026-10-22',
+      fim: '2026-10-31',
+    });
+    const d = r.body.result.structuredContent;
+    expect(d.periodo).toEqual({ inicio: '22/10/2026', fim: '31/10/2026' });
+    expect(d.categorias).toEqual([
+      {
+        categoria: 'LUSH',
+        faturamento: 700.5,
+        locacoes: 20,
+        ticket_medio: 35.03,
+        giro: 2.1,
+        revpar: 70.1,
+        trevpar: 75.2,
+        taxa_ocupacao_percentual: 45.5,
+        tempo_medio_ocupacao: '02:00:00',
+      },
+      {
+        categoria: 'STANDARD',
+        faturamento: 300,
+        locacoes: 10,
+        ticket_medio: 30,
+        giro: 1.5,
+        revpar: 40,
+        trevpar: 42,
+        taxa_ocupacao_percentual: 30.25,
+        tempo_medio_ocupacao: '02:30:00',
+      },
+    ]);
+    expect(d.total).toMatchObject({ faturamento: 1000.5, locacoes: 30 });
+    const texto = JSON.stringify(r.body);
+    expect(texto).not.toContain('NOME-QUE-NAO-PODE-SAIR');
+    expect(texto).not.toContain('00000000000');
+    const outra = await ferramenta(tok, 'resumo_por_categoria', {
+      unidade: 'liv',
+      periodo: 'ontem',
+    });
+    expect(outra.body.result.isError).toBe(true);
+    const ev = await db.auditEvent.findMany({
+      where: { action: 'mcp.tool', targetUserId: u.id },
+      orderBy: { id: 'asc' },
+    });
+    expect(ev[0].metadata).toMatchObject({
+      ferramenta: 'resumo_por_categoria',
+      resultado: 'ok',
+      unidade: 'tout',
+    });
+  });
+
+  it('giro_por_dia_semana: domingo a sábado com giro, RevPAR e ocupação do dia (os totais da tela) e o giro por categoria; nada fora da lista', async () => {
+    const tok = await tokenDe((await pessoa({ unit: 'TOUT' })).email);
+    const r = await ferramenta(tok, 'giro_por_dia_semana', {
+      unidade: 'tout',
+      periodo: 'mes_anterior',
+    });
+    const d = r.body.result.structuredContent;
+    expect(d.dias.map((x: any) => x.dia)).toEqual([
+      'domingo',
+      'segunda-feira',
+      'terça-feira',
+      'quarta-feira',
+      'quinta-feira',
+      'sexta-feira',
+      'sábado',
+    ]);
+    expect(d.dias[5]).toEqual({
+      dia: 'sexta-feira',
+      giro: 6,
+      revpar: 55,
+      taxa_ocupacao_percentual: 35,
+    });
+    expect(d.dias[6]).toMatchObject({ dia: 'sábado', giro: 7 });
+    expect(d.giro_por_categoria.map((c: any) => c.categoria)).toEqual([
+      'LUSH',
+      'STANDARD',
+    ]);
+    expect(d.giro_por_categoria[1].dias['sábado']).toBe(6.25);
+    expect(JSON.stringify(r.body)).not.toContain('11999999999');
   });
 
   it('comparar_periodos: valores de A e B, diferença e variação %', async () => {
