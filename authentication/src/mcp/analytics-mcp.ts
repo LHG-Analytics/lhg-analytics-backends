@@ -12,6 +12,8 @@ import {
 import {
   ATALHOS,
   camposDaVisaoGeral,
+  camposPorCategoria,
+  camposPorDiaDaSemana,
   compararCampos,
   resolverPeriodo,
   unidadesDe,
@@ -119,6 +121,54 @@ const FERRAMENTAS = [
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
+  {
+    name: 'resumo_por_categoria',
+    title: 'Resumo por categoria de suíte',
+    description:
+      'Os KPIs da Visão Geral de UMA unidade num período, quebrados por categoria de suíte (a tela "Resumo por Categoria" do LHG Analytics): faturamento, locações, ticket médio, giro, RevPAR, TRevPAR, taxa de ocupação e tempo médio de cada categoria, mais o total. Use "periodo" (atalho) OU "inicio" e "fim".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        unidade: {
+          type: 'string',
+          description: 'slug da unidade (veja listar_unidades)',
+        },
+        periodo: { type: 'string', enum: [...ATALHOS] },
+        inicio: { type: 'string', description: 'AAAA-MM-DD ou DD/MM/AAAA' },
+        fim: {
+          type: 'string',
+          description: 'AAAA-MM-DD ou DD/MM/AAAA (inclusivo)',
+        },
+      },
+      required: ['unidade'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: 'giro_por_dia_semana',
+    title: 'Giro por dia da semana',
+    description:
+      'Giro, RevPAR e taxa de ocupação de UMA unidade por dia da semana (domingo a sábado) no período, como o LHG Analytics mostra, mais o giro de cada categoria por dia. Faturamento e locações por dia da semana não fazem parte desta tela. Use "periodo" (atalho) OU "inicio" e "fim".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        unidade: {
+          type: 'string',
+          description: 'slug da unidade (veja listar_unidades)',
+        },
+        periodo: { type: 'string', enum: [...ATALHOS] },
+        inicio: { type: 'string', description: 'AAAA-MM-DD ou DD/MM/AAAA' },
+        fim: {
+          type: 'string',
+          description: 'AAAA-MM-DD ou DD/MM/AAAA (inclusivo)',
+        },
+      },
+      required: ['unidade'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
 ];
 
 class ErroDeFerramenta extends Error {}
@@ -216,8 +266,17 @@ export function rotaDoMcp(d: McpDeps): Router {
     return c.n <= MCP_LIMITE_MIN;
   }
 
-  /** KPIs da Visão Geral no lhg-api, como a própria pessoa. */
+  /** KPIs da Visão Geral no lhg-api, como a própria pessoa (lista fechada). */
   async function kpis(p: Pessoa, slug: string, per: Periodo) {
+    return camposDaVisaoGeral(await kpisBrutos(p, slug, per));
+  }
+
+  /**
+   * A resposta do endpoint da Visão Geral (a MESMA do dashboard), como a
+   * própria pessoa. NUNCA sai crua: cada ferramenta tira dela só a sua lista
+   * fechada de campos.
+   */
+  async function kpisBrutos(p: Pessoa, slug: string, per: Periodo) {
     const token = jwt.sign(
       { id: p.id, email: p.email, name: p.name, unit: p.unit, role: p.role },
       d.jwtSecret,
@@ -237,7 +296,7 @@ export function rotaDoMcp(d: McpDeps): Router {
         `o Analytics não respondeu agora (${resp.status}); tente de novo`,
       );
     }
-    return camposDaVisaoGeral(await resp.json());
+    return resp.json();
   }
 
   function unidadePermitida(p: Pessoa, slug: unknown) {
@@ -300,6 +359,43 @@ export function rotaDoMcp(d: McpDeps): Router {
             periodo_a: pa,
             periodo_b: pb,
             comparacao: compararCampos(ka, kb),
+          },
+        };
+      }
+      case 'resumo_por_categoria': {
+        const u = unidadePermitida(p, args?.unidade);
+        const per = periodo(args);
+        const bruto = await kpisBrutos(p, u.slug, per);
+        const geral = camposDaVisaoGeral(bruto);
+        return {
+          resumo: { unidade: u.slug, ...per },
+          dados: {
+            unidade: u.nome,
+            periodo: per,
+            categorias: camposPorCategoria(bruto),
+            total: {
+              faturamento: geral.faturamento,
+              locacoes: geral.locacoes,
+              ticket_medio: geral.ticket_medio,
+              giro: geral.giro,
+              revpar: geral.revpar,
+              trevpar: geral.trevpar,
+              taxa_ocupacao_percentual: geral.taxa_ocupacao_percentual,
+              tempo_medio_ocupacao: geral.tempo_medio_ocupacao,
+            },
+          },
+        };
+      }
+      case 'giro_por_dia_semana': {
+        const u = unidadePermitida(p, args?.unidade);
+        const per = periodo(args);
+        const bruto = await kpisBrutos(p, u.slug, per);
+        return {
+          resumo: { unidade: u.slug, ...per },
+          dados: {
+            unidade: u.nome,
+            periodo: per,
+            ...camposPorDiaDaSemana(bruto),
           },
         };
       }
