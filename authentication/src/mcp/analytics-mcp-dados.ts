@@ -248,3 +248,96 @@ export function compararCampos(
   }
   return out;
 }
+
+/** Nome de categoria de suíte (texto curto; nunca dado de pessoa). */
+const nomeCategoria = (v: unknown) =>
+  typeof v === 'string' ? v.slice(0, 60) : '';
+
+/**
+ * "Resumo por Categoria" do dashboard: os KPIs da Visão Geral quebrados por
+ * categoria de suíte (DataTableSuiteCategory do MESMO endpoint), em lista
+ * fechada. A ordem é a do dashboard.
+ */
+export function camposPorCategoria(bruto: any) {
+  const linhas: any[] = Array.isArray(bruto?.DataTableSuiteCategory)
+    ? bruto.DataTableSuiteCategory
+    : [];
+  return linhas
+    .map((linha) => {
+      const [nome, v] = Object.entries(linha ?? {})[0] ?? [];
+      const k: any = v ?? {};
+      return {
+        categoria: nomeCategoria(nome),
+        faturamento: num(k.totalValue),
+        locacoes: num(k.totalRentalsApartments),
+        ticket_medio: num(k.totalTicketAverage),
+        giro: num(k.giro),
+        revpar: num(k.revpar),
+        trevpar: num(k.trevpar),
+        taxa_ocupacao_percentual: num(k.occupancyRate),
+        tempo_medio_ocupacao: txt(k.averageOccupationTime),
+      };
+    })
+    .filter((c) => c.categoria);
+}
+
+/** Dias da semana na ordem do dashboard. */
+export const DIAS_DA_SEMANA = [
+  'domingo',
+  'segunda-feira',
+  'terça-feira',
+  'quarta-feira',
+  'quinta-feira',
+  'sexta-feira',
+  'sábado',
+];
+
+/** Valor de um dia numa tabela "por semana" do dashboard ([{categoria: {dia: {...}}}]). */
+function porDia(tabela: unknown, campoTotal: string, campo: string) {
+  const linhas: any[] = Array.isArray(tabela) ? tabela : [];
+  const total: Record<string, number | null> = {};
+  const porCategoria: {
+    categoria: string;
+    dias: Record<string, number | null>;
+  }[] = [];
+  for (const linha of linhas) {
+    const [nome, dias] = Object.entries(linha ?? {})[0] ?? [];
+    if (!nomeCategoria(nome)) continue;
+    const d: any = dias ?? {};
+    const valores: Record<string, number | null> = {};
+    for (const dia of DIAS_DA_SEMANA) {
+      valores[dia] = num(d[dia]?.[campo]);
+      // O total do dia é o mesmo em todas as categorias (valor global do dia).
+      if (total[dia] === undefined || total[dia] === null) {
+        total[dia] = num(d[dia]?.[campoTotal]);
+      }
+    }
+    porCategoria.push({ categoria: nomeCategoria(nome), dias: valores });
+  }
+  return { total, porCategoria };
+}
+
+/**
+ * Giro por dia da semana do dashboard (DataTableGiroByWeek do MESMO
+ * endpoint), com RevPAR e taxa de ocupação do dia (as outras duas tabelas
+ * por semana da tela). Faturamento e locações por dia da semana NÃO existem
+ * nessa tela, então não entram.
+ */
+export function camposPorDiaDaSemana(bruto: any) {
+  const giro = porDia(bruto?.DataTableGiroByWeek, 'totalGiro', 'giro');
+  const revpar = porDia(bruto?.DataTableRevparByWeek, 'totalRevpar', 'revpar');
+  const ocup = porDia(
+    bruto?.DataTableOccupancyRateByWeek,
+    'totalOccupancyRate',
+    'occupancyRate',
+  );
+  return {
+    dias: DIAS_DA_SEMANA.map((dia) => ({
+      dia,
+      giro: giro.total[dia] ?? null,
+      revpar: revpar.total[dia] ?? null,
+      taxa_ocupacao_percentual: ocup.total[dia] ?? null,
+    })),
+    giro_por_categoria: giro.porCategoria,
+  };
+}

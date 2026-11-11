@@ -12,6 +12,8 @@ import {
 import {
   ATALHOS,
   camposDaVisaoGeral,
+  camposPorCategoria,
+  camposPorDiaDaSemana,
   compararCampos,
   resolverPeriodo,
   unidadesDe,
@@ -38,6 +40,8 @@ export interface McpDeps {
   lhgApiUrl: string;
   /** fetch para o lhg-api (os testes trocam). */
   buscar?: typeof fetch;
+  /** Espera pelo lhg-api (padrão MCP_TIMEOUT_LHG_API_MS). */
+  timeoutMs?: number;
   agora?: () => Date;
 }
 
@@ -119,9 +123,91 @@ const FERRAMENTAS = [
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
+  {
+    name: 'resumo_por_categoria',
+    title: 'Resumo por categoria de suíte',
+    description:
+      'Os KPIs da Visão Geral de UMA unidade num período, quebrados por categoria de suíte (a tela "Resumo por Categoria" do LHG Analytics): faturamento, locações, ticket médio, giro, RevPAR, TRevPAR, taxa de ocupação e tempo médio de cada categoria, mais o total. Use "periodo" (atalho) OU "inicio" e "fim".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        unidade: {
+          type: 'string',
+          description: 'slug da unidade (veja listar_unidades)',
+        },
+        periodo: { type: 'string', enum: [...ATALHOS] },
+        inicio: { type: 'string', description: 'AAAA-MM-DD ou DD/MM/AAAA' },
+        fim: {
+          type: 'string',
+          description: 'AAAA-MM-DD ou DD/MM/AAAA (inclusivo)',
+        },
+      },
+      required: ['unidade'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: 'giro_por_dia_semana',
+    title: 'Giro por dia da semana',
+    description:
+      'Giro, RevPAR e taxa de ocupação de UMA unidade por dia da semana (domingo a sábado) no período, como o LHG Analytics mostra, mais o giro de cada categoria por dia. Faturamento e locações por dia da semana não fazem parte desta tela. Use "periodo" (atalho) OU "inicio" e "fim".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        unidade: {
+          type: 'string',
+          description: 'slug da unidade (veja listar_unidades)',
+        },
+        periodo: { type: 'string', enum: [...ATALHOS] },
+        inicio: { type: 'string', description: 'AAAA-MM-DD ou DD/MM/AAAA' },
+        fim: {
+          type: 'string',
+          description: 'AAAA-MM-DD ou DD/MM/AAAA (inclusivo)',
+        },
+      },
+      required: ['unidade'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
 ];
 
 class ErroDeFerramenta extends Error {}
+
+/**
+ * Espera pelo lhg-api. Fica abaixo do statement_timeout do banco (2 min):
+ * consultas pesadas (ex.: o mês cheio do LIV) passavam dos 45 s antigos.
+ */
+export const MCP_TIMEOUT_LHG_API_MS = 100_000;
+/** Mensagem quando o lhg-api passa do tempo (ele segue calculando e guarda no cache). */
+export const MSG_CONSULTA_PESADA =
+  'consulta pesada em processamento; o resultado fica pronto em 1–2 min, pergunte de novo';
+
+/** Período(s) pedido(s), para a auditoria também dos ERROS (sem números). */
+function periodosParaAuditoria(
+  nome: string,
+  args: any,
+  agora: Date = new Date(),
+): Record<string, string> {
+  const per = (a: unknown) => {
+    const p = resolverPeriodo(
+      (a && typeof a === 'object' ? a : {}) as Record<string, unknown>,
+      agora,
+    );
+    return typeof p === 'string' ? null : p;
+  };
+  if (nome === 'comparar_periodos') {
+    const a = per(args?.periodo_a);
+    const b = per(args?.periodo_b);
+    return {
+      ...(a ? { inicio_a: a.inicio, fim_a: a.fim } : {}),
+      ...(b ? { inicio_b: b.inicio, fim_b: b.fim } : {}),
+    };
+  }
+  const p = per(args);
+  return p ? { inicio: p.inicio, fim: p.fim } : {};
+}
 
 /**
  * MCP do LHG Analytics (Streamable HTTP, só POST com resposta JSON), para o
@@ -216,8 +302,17 @@ export function rotaDoMcp(d: McpDeps): Router {
     return c.n <= MCP_LIMITE_MIN;
   }
 
-  /** KPIs da Visão Geral no lhg-api, como a própria pessoa. */
+  /** KPIs da Visão Geral no lhg-api, como a própria pessoa (lista fechada). */
   async function kpis(p: Pessoa, slug: string, per: Periodo) {
+    return camposDaVisaoGeral(await kpisBrutos(p, slug, per));
+  }
+
+  /**
+   * A resposta do endpoint da Visão Geral (a MESMA do dashboard), como a
+   * própria pessoa. NUNCA sai crua: cada ferramenta tira dela só a sua lista
+   * fechada de campos.
+   */
+  async function kpisBrutos(p: Pessoa, slug: string, per: Periodo) {
     const token = jwt.sign(
       { id: p.id, email: p.email, name: p.name, unit: p.unit, role: p.role },
       d.jwtSecret,
@@ -226,10 +321,23 @@ export function rotaDoMcp(d: McpDeps): Router {
     const u = new URL(`${d.lhgApiUrl}/${slug}/api/Company/kpis/date-range`);
     u.searchParams.set('startDate', per.inicio);
     u.searchParams.set('endDate', per.fim);
-    const resp = await buscar(u.toString(), {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      signal: AbortSignal.timeout(45_000),
-    });
+    let resp: Awaited<ReturnType<typeof fetch>>;
+    try {
+      resp = await buscar(u.toString(), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(d.timeoutMs ?? MCP_TIMEOUT_LHG_API_MS),
+      });
+    } catch (e) {
+      // Passou do tempo: o lhg-api segue calculando e grava no cache dele.
+      const n = (e as Error)?.name;
+      if (n === 'TimeoutError' || n === 'AbortError') {
+        throw new ErroDeFerramenta(MSG_CONSULTA_PESADA);
+      }
+      throw e;
+    }
     if (resp.status === 403)
       throw new ErroDeFerramenta('sem acesso a esta unidade');
     if (!resp.ok) {
@@ -237,7 +345,7 @@ export function rotaDoMcp(d: McpDeps): Router {
         `o Analytics não respondeu agora (${resp.status}); tente de novo`,
       );
     }
-    return camposDaVisaoGeral(await resp.json());
+    return resp.json();
   }
 
   function unidadePermitida(p: Pessoa, slug: unknown) {
@@ -300,6 +408,43 @@ export function rotaDoMcp(d: McpDeps): Router {
             periodo_a: pa,
             periodo_b: pb,
             comparacao: compararCampos(ka, kb),
+          },
+        };
+      }
+      case 'resumo_por_categoria': {
+        const u = unidadePermitida(p, args?.unidade);
+        const per = periodo(args);
+        const bruto = await kpisBrutos(p, u.slug, per);
+        const geral = camposDaVisaoGeral(bruto);
+        return {
+          resumo: { unidade: u.slug, ...per },
+          dados: {
+            unidade: u.nome,
+            periodo: per,
+            categorias: camposPorCategoria(bruto),
+            total: {
+              faturamento: geral.faturamento,
+              locacoes: geral.locacoes,
+              ticket_medio: geral.ticket_medio,
+              giro: geral.giro,
+              revpar: geral.revpar,
+              trevpar: geral.trevpar,
+              taxa_ocupacao_percentual: geral.taxa_ocupacao_percentual,
+              tempo_medio_ocupacao: geral.tempo_medio_ocupacao,
+            },
+          },
+        };
+      }
+      case 'giro_por_dia_semana': {
+        const u = unidadePermitida(p, args?.unidade);
+        const per = periodo(args);
+        const bruto = await kpisBrutos(p, u.slug, per);
+        return {
+          resumo: { unidade: u.slug, ...per },
+          dados: {
+            unidade: u.nome,
+            periodo: per,
+            ...camposPorDiaDaSemana(bruto),
           },
         };
       }
@@ -437,6 +582,7 @@ export function rotaDoMcp(d: McpDeps): Router {
                   typeof args?.unidade === 'string'
                     ? args.unidade.slice(0, 40)
                     : null,
+                ...periodosParaAuditoria(nome, args, agora()),
                 motivo: texto.slice(0, 80),
               });
               return res.json({
