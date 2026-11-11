@@ -165,6 +165,14 @@ describe('Painel TV (/painel/mes e /painel/historico)', () => {
       reservas: 7,
     });
     expect(r.body.unidades.map((u: any) => u.slug)).toContain('liv');
+    // O LIV vem em dólar (o endpoint por unidade não converte); o resto em reais.
+    const moedas = Object.fromEntries(
+      r.body.unidades.map((u: any) => [u.slug, u.moeda]),
+    );
+    expect(moedas.liv).toBe('USD');
+    expect(
+      Object.entries(moedas).filter(([s, m]) => s !== 'liv' && m !== 'BRL'),
+    ).toEqual([]);
     expect(JSON.stringify(r.body)).not.toContain('00000000000');
     expect(
       chamadas.find((c) => c.caminho === 'liv:Company/kpis')?.inicio,

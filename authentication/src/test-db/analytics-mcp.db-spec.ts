@@ -520,13 +520,23 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
     const g = await tokenDe((await pessoa({ unit: 'TOUT' })).email);
     const rg = await ferramenta(g, 'listar_unidades');
     expect(rg.body.result.structuredContent.unidades).toEqual([
-      { slug: 'tout', nome: 'Tout' },
+      { slug: 'tout', nome: 'Tout', moeda: 'BRL' },
     ]);
     const a = await tokenDe(
       (await pessoa({ role: 'ADMIN', unit: 'LHG' })).email,
     );
     const ra = await ferramenta(a, 'listar_unidades');
     expect(ra.body.result.structuredContent.unidades).toHaveLength(12);
+    // O LIV opera em dólar (os endpoints por unidade não convertem); o resto em reais.
+    const moedas = Object.fromEntries(
+      ra.body.result.structuredContent.unidades.map((x: any) => [
+        x.slug,
+        x.moeda,
+      ]),
+    );
+    expect(moedas.liv).toBe('USD');
+    expect(moedas.tout).toBe('BRL');
+    expect(moedas.altana).toBe('BRL');
     const o = await tokenDe(
       (await pessoa({ role: 'GERENTE_OPERACIONAL', unit: 'TOUT' })).email,
     );
@@ -549,6 +559,7 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
         'faturamento',
         'giro',
         'locacoes',
+        'moeda',
         'periodo',
         'previsao_do_mes',
         'revpar',

@@ -4,7 +4,12 @@ import { NextFunction, Request, Response, Router } from 'express';
 import * as jwt from 'jsonwebtoken';
 import { AccessService, requestContext } from '../access/access.service';
 import { clientIp } from '../common/client-ip';
-import { UNIDADES, hojeComercial } from '../mcp/analytics-mcp-dados';
+import {
+  Moeda,
+  UNIDADES,
+  hojeComercial,
+  moedaDe,
+} from '../mcp/analytics-mcp-dados';
 
 /**
  * Dados do Painel TV (lhg-painel-tv), SÓ LEITURA, servidor → servidor:
@@ -35,7 +40,7 @@ export interface PainelDeps {
 
 export type UnidadePainel = {
   slug: string;
-  moeda: 'BRL';
+  moeda: Moeda;
   faturamento: number;
   faturamentoReservas: number;
   locacoes: number;
@@ -171,7 +176,7 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
       : {};
     return {
       slug,
-      moeda: 'BRL',
+      moeda: moedaDe(slug),
       faturamento: num(t.totalAllValue),
       faturamentoReservas: num(b.totalAllValue),
       locacoes: num(t.totalAllRentalsApartments),
