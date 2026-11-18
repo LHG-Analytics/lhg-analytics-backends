@@ -15,7 +15,8 @@ import {
  * Dados do Painel TV (lhg-painel-tv), SÓ LEITURA, servidor → servidor:
  * - GET /painel/mes?ano=AAAA&mes=MM: por unidade, o mês até agora (dia
  *   comercial): faturamento, faturamento de reservas, locações e reservas;
- * - GET /painel/historico?meses=15: os mesmos 4 números por mês FECHADO.
+ * - GET /painel/historico?meses=15: os mesmos números por mês FECHADO.
+ * Por canal (só as reservas daquele canal): e-commerce (site) e Guia de Motéis.
  * Os números vêm dos MESMOS endpoints do dashboard no lhg-api (Visão Geral:
  * Company/kpis/date-range; Reservas: Bookings/bookings/date-range), como uma
  * identidade de serviço ADMIN/LHG com JWT interno de 5 min.
@@ -45,8 +46,17 @@ export type UnidadePainel = {
   faturamentoReservas: number;
   locacoes: number;
   reservas: number;
+  /** E-commerce (site oficial, origem 4): WEBSITE_IMMEDIATE + WEBSITE_SCHEDULED. */
+  reservasEcommerce: number;
+  receitaEcommerce: number;
+  /** Guia de Motéis (origem 3): GUIA_GO + GUIA_SCHEDULED. */
+  reservasGuia: number;
+  receitaGuia: number;
   atualizadoEm: string;
 };
+
+/** Canais do Guia de Motéis (chaves do KpiTableByChannelType do lhg-api). */
+const CANAIS_GUIA = ['GUIA_GO', 'GUIA_SCHEDULED'];
 
 /** Cache do mês corrente (o painel consulta a cada 5 min). */
 export const PAINEL_CACHE_MES_MS = 5 * 60 * 1000;
@@ -113,6 +123,37 @@ const num = (v: unknown) => {
   const x = typeof v === 'number' ? v : Number(v);
   return Number.isFinite(x) ? x : 0;
 };
+
+/**
+ * Reservas e receita SÓ das reservas de cada canal, da resposta de
+ * Bookings/bookings/date-range (mesmo período e mesmo filtro por
+ * dataatendimento do total de reservas). E-commerce = BigNumbersEcommerce;
+ * Guia = GUIA_GO + GUIA_SCHEDULED do KpiTableByChannelType. Canal que a
+ * unidade não tem (ex.: site nas Getan) = 0.
+ */
+export function canaisDasReservas(bookings: any): {
+  reservasEcommerce: number;
+  receitaEcommerce: number;
+  reservasGuia: number;
+  receitaGuia: number;
+} {
+  const e = Array.isArray(bookings?.BigNumbersEcommerce)
+    ? (bookings.BigNumbersEcommerce[0]?.currentDate ?? {})
+    : {};
+  const k = Array.isArray(bookings?.KpiTableByChannelType)
+    ? (bookings.KpiTableByChannelType[0] ?? {})
+    : {};
+  const qtd = k.bookingsTotalRentalsByChannelType ?? {};
+  const val = k.bookingsRevenueByChannelType ?? {};
+  const soma = (m: Record<string, unknown>) =>
+    CANAIS_GUIA.reduce((s, c) => s + num(m[c]), 0);
+  return {
+    reservasEcommerce: num(e.totalAllBookings),
+    receitaEcommerce: num(e.totalAllValue),
+    reservasGuia: soma(qtd),
+    receitaGuia: Math.round(soma(val) * 100) / 100,
+  };
+}
 
 export function rotaDoPainelTv(d: PainelDeps): Router {
   const logger = new Logger('PainelTV');
@@ -181,6 +222,7 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
       faturamentoReservas: num(b.totalAllValue),
       locacoes: num(t.totalAllRentalsApartments),
       reservas: num(b.totalAllBookings),
+      ...canaisDasReservas(bookings),
       atualizadoEm: agora().toISOString(),
     };
   }

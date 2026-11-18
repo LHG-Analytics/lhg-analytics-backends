@@ -89,6 +89,30 @@ describe('Painel TV (/painel/mes e /painel/historico)', () => {
               BigNumbers: [
                 { currentDate: { totalAllValue: 200.25, totalAllBookings: 7 } },
               ],
+              // Como o lhg-api: Getan não tem site (e-commerce 0), só Guia.
+              BigNumbersEcommerce: [
+                {
+                  currentDate: m[1].startsWith('getan_')
+                    ? { totalAllValue: 0, totalAllBookings: 0 }
+                    : { totalAllValue: 80.5, totalAllBookings: 3 },
+                },
+              ],
+              KpiTableByChannelType: [
+                {
+                  bookingsTotalRentalsByChannelType: {
+                    GUIA_GO: 2,
+                    GUIA_SCHEDULED: 1,
+                    INTERNAL: 1,
+                    TOTALALLBOOKINGS: 7,
+                  },
+                  bookingsRevenueByChannelType: {
+                    GUIA_GO: 50,
+                    GUIA_SCHEDULED: 30.25,
+                    INTERNAL: 39.5,
+                    TOTALALLVALUE: 200.25,
+                  },
+                },
+              ],
             };
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(corpo));
@@ -164,6 +188,23 @@ describe('Painel TV (/painel/mes e /painel/historico)', () => {
       locacoes: 30,
       reservas: 7,
     });
+    // Por canal: só as reservas do canal (nunca o faturamento da unidade).
+    const porSlug = Object.fromEntries(
+      r.body.unidades.map((u: any) => [u.slug, u]),
+    );
+    expect(porSlug.tout).toMatchObject({
+      reservasEcommerce: 3,
+      receitaEcommerce: 80.5,
+      reservasGuia: 3,
+      receitaGuia: 80.25,
+    });
+    const getan = r.body.unidades.find((u: any) => u.slug.startsWith('getan_'));
+    expect(getan).toMatchObject({
+      reservasEcommerce: 0,
+      receitaEcommerce: 0,
+      reservasGuia: 3,
+      receitaGuia: 80.25,
+    });
     expect(r.body.unidades.map((u: any) => u.slug)).toContain('liv');
     // O LIV vem em dólar (o endpoint por unidade não converte); o resto em reais.
     const moedas = Object.fromEntries(
@@ -213,7 +254,13 @@ describe('Painel TV (/painel/mes e /painel/historico)', () => {
         faturamentoReservas: 200.25,
         locacoes: 30,
         reservas: 7,
+        reservasEcommerce: m.unidades[0].slug.startsWith('getan_') ? 0 : 3,
+        receitaEcommerce: m.unidades[0].slug.startsWith('getan_') ? 0 : 80.5,
+        reservasGuia: 3,
+        receitaGuia: 80.25,
       });
+      const g = m.unidades.find((u: any) => u.slug.startsWith('getan_'));
+      expect(g).toMatchObject({ reservasEcommerce: 0, receitaGuia: 80.25 });
       const ultimo = new Date(Date.UTC(m.ano, m.mes, 0)).getUTCDate();
       const c = chamadas.find(
         (x) =>
