@@ -233,16 +233,25 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
   const cache = new Map<string, ItemPainelGuardado<UnidadePainel>>();
   const falhas = new Map<string, { em: number; motivo: MotivoPendencia }>();
   const emCurso = new Map<string, Promise<void>>();
-  const fila: (() => Promise<void>)[] = [];
-  let rodando = 0;
+  const fila: { slug: string; rodar: () => Promise<void> }[] = [];
+  /** Unidades com um cálculo em andamento (no máximo 1 por unidade). */
+  const ocupadas = new Set<string>();
   const contas = new Map<string, { inicio: number; n: number }>();
 
+  /**
+   * Até PARALELO cálculos ao mesmo tempo, mas NUNCA dois da mesma unidade
+   * (dois meses da LIV juntos esgotavam as conexões do lhg-api com o banco
+   * dela). Pega o 1º da fila cuja unidade está livre; a ordem da fila (mês
+   * mais novo primeiro) é mantida.
+   */
   const proximo = () => {
-    while (rodando < PARALELO && fila.length) {
-      const t = fila.shift()!;
-      rodando++;
-      t().finally(() => {
-        rodando--;
+    while (ocupadas.size < PARALELO) {
+      const i = fila.findIndex((t) => !ocupadas.has(t.slug));
+      if (i < 0) return;
+      const [t] = fila.splice(i, 1);
+      ocupadas.add(t.slug);
+      t.rodar().finally(() => {
+        ocupadas.delete(t.slug);
         proximo();
       });
     }
@@ -323,26 +332,29 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
     const ja = emCurso.get(chave);
     if (ja) return ja;
     const p = new Promise<void>((ok) => {
-      fila.push(async () => {
-        try {
-          const item = {
-            em: agora().getTime(),
-            fim,
-            valor: await calcular(slug, inicio, fim, fechado),
-          };
-          cache.set(chave, item);
-          falhas.delete(chave);
-          if (fechado) await store.gravar(chave, item, PAINEL_REDIS_TTL_S);
-        } catch (e) {
-          const motivo = motivoDaFalha(e);
-          falhas.set(chave, { em: agora().getTime(), motivo });
-          logger.warn(
-            `painel: falha em ${slug} ${inicio}–${fim} (${motivo}: ${(e as Error)?.message ?? 'erro'})`,
-          );
-        } finally {
-          emCurso.delete(chave);
-          ok();
-        }
+      fila.push({
+        slug,
+        rodar: async () => {
+          try {
+            const item = {
+              em: agora().getTime(),
+              fim,
+              valor: await calcular(slug, inicio, fim, fechado),
+            };
+            cache.set(chave, item);
+            falhas.delete(chave);
+            if (fechado) await store.gravar(chave, item, PAINEL_REDIS_TTL_S);
+          } catch (e) {
+            const motivo = motivoDaFalha(e);
+            falhas.set(chave, { em: agora().getTime(), motivo });
+            logger.warn(
+              `painel: falha em ${slug} ${inicio}–${fim} (${motivo}: ${(e as Error)?.message ?? 'erro'})`,
+            );
+          } finally {
+            emCurso.delete(chave);
+            ok();
+          }
+        },
       });
       proximo();
     });
