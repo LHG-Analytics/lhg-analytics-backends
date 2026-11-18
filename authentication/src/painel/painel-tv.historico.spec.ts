@@ -212,4 +212,33 @@ describe('Painel TV — histórico', () => {
     await flush();
     expect(api.chamadas).toHaveLength(0);
   });
+
+  it('timeout: meses fechados usam o limite maior (timeoutFechadoMs); o mês corrente segue com o de sempre (timeoutMs)', async () => {
+    // A LIV demora 300 ms (respeitando o cancelamento, como o fetch real).
+    const api = lhgApiFalso();
+    const lento = ((url: string, init?: RequestInit) => {
+      if (!new URL(url).pathname.startsWith('/liv/'))
+        return api.buscar(url, init);
+      return new Promise<Response>((ok, falha) => {
+        const t = setTimeout(() => ok(api.buscar(url, init)), 300);
+        init?.signal?.addEventListener('abort', () => {
+          clearTimeout(t);
+          falha(init.signal!.reason);
+        });
+      });
+    }) as unknown as typeof fetch;
+    const app = montar({
+      buscar: lento,
+      timeoutMs: 100,
+      timeoutFechadoMs: 1_000,
+    });
+    const h = await get(app, '/painel/historico?meses=1');
+    expect(h.body.pendentes).toBe(0);
+    expect(h.body.meses[0].unidades.map((u: any) => u.slug)).toContain('liv');
+
+    const m = await get(app, '/painel/mes?ano=2026&mes=11');
+    expect(m.body.pendentesDetalhe).toEqual([
+      { slug: 'liv', motivo: 'timeout' },
+    ]);
+  });
 });
