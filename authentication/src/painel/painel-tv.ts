@@ -43,8 +43,14 @@ export interface PainelDeps {
   lhgApiUrl: string;
   buscar?: typeof fetch;
   agora?: () => Date;
-  /** Espera por chamada ao lhg-api. */
+  /** Espera por chamada ao lhg-api (mês corrente). Padrão: 100 s. */
   timeoutMs?: number;
+  /**
+   * Espera por chamada ao lhg-api nos MESES FECHADOS (calculados em segundo
+   * plano e guardados no Redis; a resposta não espera por eles). Padrão: 300 s
+   * — a LIV passa dos 100 s a partir do Render. Variável PAINEL_LHG_API_TIMEOUT_MS.
+   */
+  timeoutFechadoMs?: number;
   /** Quanto a requisição espera pelos cálculos antes de responder com o que tem. */
   esperaMs?: number;
   /** Onde guardar os meses fechados (Redis); padrão: só memória. */
@@ -88,6 +94,10 @@ export const PAINEL_CACHE_FECHADO_MS = 24 * 60 * 60 * 1000;
 export const PAINEL_LIMITE_MIN = 30;
 /** Cálculos ao mesmo tempo no lhg-api (não sobrecarregar os bancos). */
 const PARALELO = 2;
+/** Tempo por chamada ao lhg-api no mês corrente. */
+export const PAINEL_TIMEOUT_MS = 100_000;
+/** Tempo por chamada ao lhg-api nos meses fechados (segundo plano; a LIV passa de 100 s). */
+export const PAINEL_TIMEOUT_FECHADO_MS = 300_000;
 /** Uma falha fica registrada por este tempo: a unidade/mês não volta à fila antes. */
 export const PAINEL_FALHA_MS = 10 * 60 * 1000;
 /** Expiração no Redis de um mês fechado (é recalculado a cada 24 h de uso). */
@@ -238,7 +248,12 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
     }
   };
 
-  async function lhgApi(caminho: string, inicio: string, fim: string) {
+  async function lhgApi(
+    caminho: string,
+    inicio: string,
+    fim: string,
+    timeoutMs: number,
+  ) {
     const token = jwt.sign(
       {
         id: 0,
@@ -255,7 +270,7 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
     u.searchParams.set('endDate', fim);
     const resp = await buscar(u.toString(), {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      signal: AbortSignal.timeout(d.timeoutMs ?? 100_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!resp.ok) {
       throw new ErroLhgApi(resp.status, await resp.text().catch(() => ''));
@@ -268,10 +283,15 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
     slug: string,
     inicio: string,
     fim: string,
+    fechado: boolean,
   ): Promise<UnidadePainel> {
+    // Mês fechado: tempo maior (em segundo plano); mês corrente: o de sempre.
+    const limite = fechado
+      ? (d.timeoutFechadoMs ?? PAINEL_TIMEOUT_FECHADO_MS)
+      : (d.timeoutMs ?? PAINEL_TIMEOUT_MS);
     const [company, bookings] = await Promise.all([
-      lhgApi(`/${slug}/api/Company/kpis/date-range`, inicio, fim),
-      lhgApi(`/${slug}/api/Bookings/bookings/date-range`, inicio, fim),
+      lhgApi(`/${slug}/api/Company/kpis/date-range`, inicio, fim, limite),
+      lhgApi(`/${slug}/api/Bookings/bookings/date-range`, inicio, fim, limite),
     ]);
     const t = company?.TotalResult ?? {};
     const b = Array.isArray(bookings?.BigNumbers)
@@ -308,7 +328,7 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
           const item = {
             em: agora().getTime(),
             fim,
-            valor: await calcular(slug, inicio, fim),
+            valor: await calcular(slug, inicio, fim, fechado),
           };
           cache.set(chave, item);
           falhas.delete(chave);
