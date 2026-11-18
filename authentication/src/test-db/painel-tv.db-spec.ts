@@ -125,6 +125,8 @@ describe('Painel TV (/painel/mes e /painel/historico)', () => {
       OIDC_CLIENT_SECRET_HUB: segredo(),
       PAINEL_TV_TOKEN_SHA256: HASH,
       LHG_API_INTERNAL_URL: `http://127.0.0.1:${(falso.address() as AddressInfo).port}`,
+      // Sem pré-aquecimento aqui (ele tem teste próprio): as contagens de chamadas ficam exatas.
+      PAINEL_PREAQUECER_MS: '-1',
     });
     ({ app } = await subirComoMain());
     srv = app.getHttpServer();
@@ -140,6 +142,7 @@ describe('Painel TV (/painel/mes e /painel/historico)', () => {
       'OIDC_CLIENT_SECRET_HUB',
       'PAINEL_TV_TOKEN_SHA256',
       'LHG_API_INTERNAL_URL',
+      'PAINEL_PREAQUECER_MS',
     ]) {
       delete process.env[k];
     }
@@ -284,6 +287,13 @@ describe('Painel TV (/painel/mes e /painel/historico)', () => {
       );
       expect(ultimo.unidades).toHaveLength(11);
       expect(r.body.pendentes).toBeGreaterThan(0);
+      // O motivo de cada pendência (o lhg-api falso responde 400 sem detalhe).
+      expect(r.body.pendentesDetalhe).toContainEqual({
+        slug: 'getan_grid',
+        ano: ultimo.ano,
+        mes: ultimo.mes,
+        motivo: 'erro_lhg_api',
+      });
     } finally {
       falhar.delete('getan_grid');
     }
