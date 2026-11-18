@@ -10,6 +10,11 @@ import {
   hojeComercial,
   moedaDe,
 } from '../mcp/analytics-mcp-dados';
+import {
+  ItemPainelGuardado,
+  PainelStore,
+  storeSoMemoria,
+} from './painel-cache';
 
 /**
  * Dados do Painel TV (lhg-painel-tv), SÓ LEITURA, servidor → servidor:
@@ -23,6 +28,11 @@ import {
  * Autenticação: token de serviço (Bearer), conferido pelo SHA-256 guardado
  * no Render (PAINEL_TV_TOKEN_SHA256), em tempo constante. O token em si fica
  * só no painel (Vercel). Rate limit por IP e auditoria painel.consulta.
+ * Histórico: os meses FECHADOS ficam também no Redis do cache de KPIs (não
+ * se perdem no deploy); a fila calcula do mês mais novo para o mais antigo;
+ * no boot, pré-aquece os 3 últimos meses fechados; uma falha fica registrada
+ * por ~10 min (não volta à fila a cada consulta); 'pendentesDetalhe' diz o
+ * motivo de cada pendência.
  */
 
 export interface PainelDeps {
@@ -37,7 +47,19 @@ export interface PainelDeps {
   timeoutMs?: number;
   /** Quanto a requisição espera pelos cálculos antes de responder com o que tem. */
   esperaMs?: number;
+  /** Onde guardar os meses fechados (Redis); padrão: só memória. */
+  store?: PainelStore<UnidadePainel>;
+  /** Pré-aquecimento dos últimos meses fechados N ms após subir; null = não pré-aquece. */
+  preaquecerMs?: number | null;
 }
+
+/** Por que uma unidade/mês ainda não veio. */
+export type MotivoPendencia =
+  | 'calculando'
+  | 'timeout'
+  | 'banco_inacessivel'
+  | 'erro_lhg_api'
+  | 'erro';
 
 export type UnidadePainel = {
   slug: string;
@@ -66,6 +88,42 @@ export const PAINEL_CACHE_FECHADO_MS = 24 * 60 * 60 * 1000;
 export const PAINEL_LIMITE_MIN = 30;
 /** Cálculos ao mesmo tempo no lhg-api (não sobrecarregar os bancos). */
 const PARALELO = 2;
+/** Uma falha fica registrada por este tempo: a unidade/mês não volta à fila antes. */
+export const PAINEL_FALHA_MS = 10 * 60 * 1000;
+/** Expiração no Redis de um mês fechado (é recalculado a cada 24 h de uso). */
+export const PAINEL_REDIS_TTL_S = 30 * 24 * 60 * 60;
+/** Meses fechados pré-aquecidos no boot (o que o painel usa para as metas). */
+export const PAINEL_PREAQUECER_MESES = 3;
+
+/** Chave de cache de uma unidade num mês (AAAA-MM). */
+export const chaveDoMes = (slug: string, ano: number, mes: number) =>
+  `${slug}:${ano}-${String(mes).padStart(2, '0')}`;
+
+/** Erro do lhg-api com o corpo (a mensagem diz se o banco da unidade não respondeu). */
+class ErroLhgApi extends Error {
+  constructor(
+    readonly status: number,
+    readonly corpo: string,
+  ) {
+    super(`lhg-api ${status}`);
+  }
+}
+
+/** Classifica a falha de um cálculo para 'pendentesDetalhe'. */
+export function motivoDaFalha(e: unknown): MotivoPendencia {
+  const nome = (e as Error)?.name ?? '';
+  if (nome === 'TimeoutError' || nome === 'AbortError') return 'timeout';
+  if (e instanceof ErroLhgApi) {
+    if (
+      /ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ETIMEDOUT|timeout exceeded when trying to connect|Connection terminated/i.test(
+        e.corpo,
+      )
+    )
+      return 'banco_inacessivel';
+    return 'erro_lhg_api';
+  }
+  return 'erro';
+}
 
 const dd = (n: number) => String(n).padStart(2, '0');
 const ddmmaaaa = (a: number, m: number, d: number) => `${dd(d)}/${dd(m)}/${a}`;
@@ -161,7 +219,9 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
   const agora = d.agora ?? (() => new Date());
   const buscar = d.buscar ?? fetch;
   const espera = d.esperaMs ?? 25_000;
-  const cache = new Map<string, { em: number; valor: UnidadePainel }>();
+  const store = d.store ?? storeSoMemoria<UnidadePainel>();
+  const cache = new Map<string, ItemPainelGuardado<UnidadePainel>>();
+  const falhas = new Map<string, { em: number; motivo: MotivoPendencia }>();
   const emCurso = new Map<string, Promise<void>>();
   const fila: (() => Promise<void>)[] = [];
   let rodando = 0;
@@ -197,11 +257,13 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
       signal: AbortSignal.timeout(d.timeoutMs ?? 100_000),
     });
-    if (!resp.ok) throw new Error(`lhg-api ${resp.status}`);
+    if (!resp.ok) {
+      throw new ErroLhgApi(resp.status, await resp.text().catch(() => ''));
+    }
     return resp.json() as Promise<any>;
   }
 
-  /** Os 4 números de UMA unidade num período (os mesmos endpoints do dashboard). */
+  /** Os números de UMA unidade num período (os mesmos endpoints do dashboard). */
   async function calcular(
     slug: string,
     inicio: string,
@@ -227,25 +289,35 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
     };
   }
 
-  /** Atualiza a chave no cache (uma vez só por chave; fila com PARALELO). */
+  /**
+   * Atualiza a chave (uma vez só por chave; fila com PARALELO). Mês fechado
+   * calculado vai também para o Redis; a falha fica registrada por ~10 min.
+   */
   function atualizar(
     chave: string,
     slug: string,
     inicio: string,
     fim: string,
+    fechado: boolean,
   ): Promise<void> {
     const ja = emCurso.get(chave);
     if (ja) return ja;
     const p = new Promise<void>((ok) => {
       fila.push(async () => {
         try {
-          cache.set(chave, {
+          const item = {
             em: agora().getTime(),
+            fim,
             valor: await calcular(slug, inicio, fim),
-          });
+          };
+          cache.set(chave, item);
+          falhas.delete(chave);
+          if (fechado) await store.gravar(chave, item, PAINEL_REDIS_TTL_S);
         } catch (e) {
+          const motivo = motivoDaFalha(e);
+          falhas.set(chave, { em: agora().getTime(), motivo });
           logger.warn(
-            `painel: falha em ${slug} ${inicio}–${fim} (${(e as Error)?.message ?? 'erro'})`,
+            `painel: falha em ${slug} ${inicio}–${fim} (${motivo}: ${(e as Error)?.message ?? 'erro'})`,
           );
         } finally {
           emCurso.delete(chave);
@@ -259,8 +331,9 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
   }
 
   /**
-   * Valor para a chave: do cache se ainda vale; senão dispara a atualização
-   * (o valor antigo continua servindo enquanto o novo é calculado).
+   * Valor para a chave: do cache se ainda vale (mesmo período); senão dispara
+   * a atualização (o valor antigo serve enquanto o novo é calculado). Com
+   * falha recente, NÃO volta à fila: responde com o motivo.
    */
   function pedir(
     chave: string,
@@ -268,19 +341,103 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
     inicio: string,
     fim: string,
     validade: number,
+    fechado: boolean,
   ): { valor?: UnidadePainel; pendente: Promise<void> | null } {
     const c = cache.get(chave);
-    if (!c || agora().getTime() - c.em >= validade) {
-      return { valor: c?.valor, pendente: atualizar(chave, slug, inicio, fim) };
+    // Mês fechado só aproveita o valor do MESMO período (não um parcial antigo).
+    const util = c && (c.fim === fim || !fechado) ? c : undefined;
+    if (util && util.fim === fim && agora().getTime() - util.em < validade) {
+      return { valor: util.valor, pendente: null };
     }
-    return { valor: c.valor, pendente: null };
+    const f = falhas.get(chave);
+    if (
+      f &&
+      agora().getTime() - f.em < PAINEL_FALHA_MS &&
+      !emCurso.has(chave)
+    ) {
+      return { valor: util?.valor, pendente: null };
+    }
+    return {
+      valor: util?.valor,
+      pendente: atualizar(chave, slug, inicio, fim, fechado),
+    };
   }
 
-  const esperar = (ps: (Promise<void> | null)[]) =>
-    Promise.race([
+  /** Traz do Redis (para a memória) os meses fechados que ainda não estão nela. */
+  async function hidratar(itens: { chave: string; fim: string }[]) {
+    const faltam = itens.filter((i) => cache.get(i.chave)?.fim !== i.fim);
+    if (!faltam.length) return;
+    const lidos = await store.ler(faltam.map((i) => i.chave));
+    for (const i of faltam) {
+      const v = lidos.get(i.chave);
+      if (v && v.fim === i.fim && v.valor) cache.set(i.chave, v);
+    }
+  }
+
+  /** Por que a chave ainda não tem valor. */
+  const motivo = (chave: string): MotivoPendencia =>
+    emCurso.has(chave)
+      ? 'calculando'
+      : (falhas.get(chave)?.motivo ?? 'calculando');
+
+  /** Espera os cálculos até 'espera' ms (e solta o timer quando terminam antes). */
+  const esperar = async (ps: (Promise<void> | null)[]) => {
+    let t: NodeJS.Timeout | undefined;
+    await Promise.race([
       Promise.all(ps.filter(Boolean)),
-      new Promise((ok) => setTimeout(ok, espera)),
+      new Promise((ok) => (t = setTimeout(ok, espera))),
     ]);
+    clearTimeout(t);
+  };
+
+  /** Itens (unidade × mês fechado) de uma lista de meses, do MAIS NOVO ao mais antigo. */
+  function itensFechados(meses: { ano: number; mes: number }[]) {
+    return [...meses]
+      .sort((a, b) => b.ano - a.ano || b.mes - a.mes)
+      .flatMap(({ ano, mes }) => {
+        const per = periodoDoMes(ano, mes, agora())!;
+        return UNIDADES.map((u) => ({
+          ano,
+          mes,
+          slug: u.slug,
+          chave: chaveDoMes(u.slug, ano, mes),
+          inicio: per.inicio,
+          fim: per.fim,
+        }));
+      });
+  }
+
+  /** Pré-aquecimento: os últimos meses fechados de todas as unidades, mais novo primeiro. */
+  async function preaquecer() {
+    const itens = itensFechados(
+      mesesFechados(PAINEL_PREAQUECER_MESES, agora()),
+    );
+    await hidratar(itens);
+    let n = 0;
+    for (const i of itens) {
+      const p = pedir(
+        i.chave,
+        i.slug,
+        i.inicio,
+        i.fim,
+        PAINEL_CACHE_FECHADO_MS,
+        true,
+      );
+      if (p.pendente) n++;
+    }
+    logger.log(
+      `painel: pré-aquecimento de ${PAINEL_PREAQUECER_MESES} meses fechados — ${itens.length - n} prontos, ${n} na fila`,
+    );
+  }
+  if (d.preaquecerMs != null && d.preaquecerMs >= 0) {
+    setTimeout(() => {
+      preaquecer().catch((e) =>
+        logger.warn(
+          `painel: pré-aquecimento falhou (${(e as Error)?.message})`,
+        ),
+      );
+    }, d.preaquecerMs).unref?.();
+  }
 
   // Autenticação, rate limit e cabeçalhos — antes de qualquer cálculo.
   r.use((req: Request, res: Response, next: NextFunction) => {
@@ -334,28 +491,39 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
       }
       const per = periodoDoMes(ano, mes, agora());
       if (!per) return res.status(400).json({ error: 'mes_futuro' });
+      const fechado = !per.corrente;
       const validade = per.corrente
         ? PAINEL_CACHE_MES_MS
         : PAINEL_CACHE_FECHADO_MS;
+      // Uma chave por unidade e mês (o fim do mês corrente avança: vale o 'fim' guardado).
       const pedidos = UNIDADES.map((u) => ({
         u,
-        chave: `${u.slug}|${per.inicio}|${per.fim.slice(3)}`,
+        chave: chaveDoMes(u.slug, ano, mes),
+        fim: per.fim,
       }));
-      // A chave do mês corrente não depende do dia (o fim avança): uma por mês.
+      if (fechado) await hidratar(pedidos);
       let itens = pedidos.map(({ u, chave }) => ({
         u,
         chave,
-        ...pedir(chave, u.slug, per.inicio, per.fim, validade),
+        ...pedir(chave, u.slug, per.inicio, per.fim, validade, fechado),
       }));
       if (itens.some((i) => !i.valor)) {
         await esperar(itens.filter((i) => !i.valor).map((i) => i.pendente));
-        itens = itens.map((i) => ({
-          ...i,
-          valor: cache.get(i.chave)?.valor ?? i.valor,
-        }));
+        itens = itens.map((i) => {
+          const c = cache.get(i.chave);
+          return {
+            ...i,
+            valor: c && (c.fim === per.fim || !fechado) ? c.valor : i.valor,
+          };
+        });
       }
       const unidades = itens.filter((i) => i.valor).map((i) => i.valor!);
-      const pendentes = itens.filter((i) => !i.valor).map((i) => i.u.slug);
+      const faltam = itens.filter((i) => !i.valor);
+      const pendentes = faltam.map((i) => i.u.slug);
+      const pendentesDetalhe = faltam.map((i) => ({
+        slug: i.u.slug,
+        motivo: motivo(i.chave),
+      }));
       await auditar(req, {
         rota: 'mes',
         ano,
@@ -363,7 +531,12 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
         unidades: unidades.length,
         pendentes: pendentes.length,
       });
-      return res.json({ geradoEm: agora().toISOString(), unidades, pendentes });
+      return res.json({
+        geradoEm: agora().toISOString(),
+        unidades,
+        pendentes,
+        pendentesDetalhe,
+      });
     } catch (e) {
       next(e);
     }
@@ -378,43 +551,54 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
           return res.status(400).json({ error: 'parametros_invalidos' });
         }
         const meses = mesesFechados(n, agora());
-        const todos = meses.flatMap(({ ano, mes }) => {
-          const per = periodoDoMes(ano, mes, agora())!;
-          return UNIDADES.map((u) => {
-            const chave = `${u.slug}|${per.inicio}|${per.fim}`;
-            return {
-              ano,
-              mes,
-              chave,
-              ...pedir(
-                chave,
-                u.slug,
-                per.inicio,
-                per.fim,
-                PAINEL_CACHE_FECHADO_MS,
-              ),
-            };
-          });
-        });
+        // Do mais NOVO para o mais antigo: os meses que o painel usa saem primeiro.
+        const base = itensFechados(meses);
+        await hidratar(base);
+        const todos = base.map((i) => ({
+          ...i,
+          ...pedir(
+            i.chave,
+            i.slug,
+            i.inicio,
+            i.fim,
+            PAINEL_CACHE_FECHADO_MS,
+            true,
+          ),
+        }));
         const faltando = todos.filter((i) => !i.valor);
         if (faltando.length) await esperar(faltando.map((i) => i.pendente));
+        const valorDe = (i: (typeof todos)[number]) => {
+          const c = cache.get(i.chave);
+          return c && c.fim === i.fim ? c.valor : i.valor;
+        };
+        // Saída na ordem de sempre (do mais antigo ao mais novo).
         const saida = meses.map(({ ano, mes }) => ({
           ano,
           mes,
-          unidades: todos
-            .filter((i) => i.ano === ano && i.mes === mes)
-            .map((i) => cache.get(i.chave)?.valor ?? i.valor)
+          unidades: UNIDADES.map((u) =>
+            todos.find(
+              (i) => i.ano === ano && i.mes === mes && i.slug === u.slug,
+            ),
+          )
+            .map((i) => (i ? valorDe(i) : undefined))
             .filter((v): v is UnidadePainel => !!v)
             .map(({ atualizadoEm: _a, ...v }) => v),
         }));
-        const pendentes = todos.filter(
-          (i) => !(cache.get(i.chave)?.valor ?? i.valor),
-        ).length;
+        const pendentesDetalhe = todos
+          .filter((i) => !valorDe(i))
+          .map((i) => ({
+            slug: i.slug,
+            ano: i.ano,
+            mes: i.mes,
+            motivo: motivo(i.chave),
+          }));
+        const pendentes = pendentesDetalhe.length;
         await auditar(req, { rota: 'historico', meses: n, pendentes });
         return res.json({
           geradoEm: agora().toISOString(),
           meses: saida,
           pendentes,
+          pendentesDetalhe,
         });
       } catch (e) {
         next(e);
