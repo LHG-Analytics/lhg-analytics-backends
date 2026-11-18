@@ -213,6 +213,87 @@ describe('Painel TV — histórico', () => {
     expect(api.chamadas).toHaveLength(0);
   });
 
+  it('nunca calcula dois meses da MESMA unidade ao mesmo tempo (no máximo 2 cálculos, de unidades diferentes)', async () => {
+    // Todas as unidades prontas no store, menos a LIV: só sobram meses dela.
+    const { m, s } = storeFalso();
+    for (const mes of [8, 9, 10])
+      for (const slug of [
+        'lush_ipiranga',
+        'lush_lapa',
+        'tout',
+        'andar_de_cima',
+        'altana',
+        'getan_garavelo',
+        'getan_pq_oeste',
+        'getan_independencia',
+        'getan_novo_mundo',
+        'getan_vera_cruz',
+        'getan_grid',
+      ])
+        m.set(chaveDoMes(slug, 2026, mes), {
+          em: agora.getTime(),
+          fim: `${mes === 9 ? 30 : 31}/${String(mes).padStart(2, '0')}/2026`,
+          valor: { slug } as UnidadePainel,
+        });
+    const api = lhgApiFalso();
+    const emVoo = new Map<string, number>();
+    let maxUnidade = 0;
+    let maxTotal = 0;
+    const lento = (async (url: string, init?: RequestInit) => {
+      const u = new URL(url);
+      const slug = u.pathname.split('/')[1];
+      if (!u.pathname.includes('Company')) return api.buscar(url, init);
+      emVoo.set(slug, (emVoo.get(slug) ?? 0) + 1);
+      maxUnidade = Math.max(maxUnidade, emVoo.get(slug)!);
+      maxTotal = Math.max(
+        maxTotal,
+        [...emVoo.values()].reduce((a, b) => a + b, 0),
+      );
+      await new Promise((ok) => setTimeout(ok, 40));
+      emVoo.set(slug, emVoo.get(slug)! - 1);
+      return api.buscar(url, init);
+    }) as unknown as typeof fetch;
+    const r = await get(
+      montar({ buscar: lento, store: s }),
+      '/painel/historico?meses=3',
+    );
+    expect(r.body.pendentes).toBe(0);
+    // Só a LIV foi calculada: um mês por vez, do mais novo para o mais antigo.
+    expect(api.chamadas.map((c) => `${c.slug} ${c.inicio}`)).toEqual([
+      'liv 01/10/2026',
+      'liv 01/09/2026',
+      'liv 01/08/2026',
+    ]);
+    expect(maxUnidade).toBe(1);
+    expect(maxTotal).toBe(1);
+  });
+
+  it('com várias unidades na fila: até 2 cálculos ao mesmo tempo, nunca 2 da mesma unidade', async () => {
+    const api = lhgApiFalso();
+    const emVoo = new Map<string, number>();
+    let maxUnidade = 0;
+    let maxTotal = 0;
+    const lento = (async (url: string, init?: RequestInit) => {
+      const u = new URL(url);
+      const slug = u.pathname.split('/')[1];
+      if (!u.pathname.includes('Company')) return api.buscar(url, init);
+      emVoo.set(slug, (emVoo.get(slug) ?? 0) + 1);
+      maxUnidade = Math.max(maxUnidade, emVoo.get(slug)!);
+      maxTotal = Math.max(
+        maxTotal,
+        [...emVoo.values()].reduce((a, b) => a + b, 0),
+      );
+      await new Promise((ok) => setTimeout(ok, 10));
+      emVoo.set(slug, emVoo.get(slug)! - 1);
+      return api.buscar(url, init);
+    }) as unknown as typeof fetch;
+    const r = await get(montar({ buscar: lento }), '/painel/historico?meses=2');
+    expect(r.body.pendentes).toBe(0);
+    expect(api.chamadas).toHaveLength(2 * UNIDADES);
+    expect(maxUnidade).toBe(1);
+    expect(maxTotal).toBe(2);
+  });
+
   it('timeout: meses fechados usam o limite maior (timeoutFechadoMs); o mês corrente segue com o de sempre (timeoutMs)', async () => {
     // A LIV demora 300 ms (respeitando o cancelamento, como o fetch real).
     const api = lhgApiFalso();
