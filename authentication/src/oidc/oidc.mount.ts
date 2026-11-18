@@ -20,6 +20,7 @@ import { rotasDoHub } from './oidc-hub';
 import { rotasDeAdmin } from './oidc-hub-admin';
 import { CLIENTE_MCP, rotaDoMcp } from '../mcp/analytics-mcp';
 import { rotaDoPainelTv } from '../painel/painel-tv';
+import { namespaceDoCache, storeRedis } from '../painel/painel-cache';
 import { escopoDeSaida, rotaDeSairDoCliente } from './oidc-cliente-sair';
 import { rotaDeSair } from './oidc-hub-sair';
 import { interacoes } from './oidc-interactions';
@@ -610,6 +611,11 @@ export async function mountOidc(
   const hashPainel = (get('PAINEL_TV_TOKEN_SHA256') ?? '').trim();
   const painelAtivo = /^[0-9a-fA-F]{64}$/.test(hashPainel) && !!segredoJwt;
   if (painelAtivo) {
+    // Meses fechados do histórico no MESMO Redis do cache de KPIs (REDIS_URL,
+    // namespace CACHE_PREFIX); sem ele, só memória. Pré-aquecimento dos últimos
+    // meses fechados após subir (PAINEL_PREAQUECER_MS; -1 desliga).
+    const redisUrl = (get('REDIS_URL') ?? '').trim();
+    const preaquecer = Number(get('PAINEL_PREAQUECER_MS') ?? 30_000);
     express.use(
       '/painel',
       rotaDoPainelTv({
@@ -618,6 +624,11 @@ export async function mountOidc(
         jwtSecret: segredoJwt!,
         lhgApiUrl:
           get('LHG_API_INTERNAL_URL')?.trim() || 'http://127.0.0.1:3010',
+        store: redisUrl
+          ? storeRedis(redisUrl, namespaceDoCache(process.env))
+          : undefined,
+        preaquecerMs:
+          Number.isFinite(preaquecer) && preaquecer >= 0 ? preaquecer : null,
       }),
     );
   }
