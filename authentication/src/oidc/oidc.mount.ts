@@ -616,6 +616,9 @@ export async function mountOidc(
     // meses fechados após subir (PAINEL_PREAQUECER_MS; -1 desliga).
     const redisUrl = (get('REDIS_URL') ?? '').trim();
     const preaquecer = Number(get('PAINEL_PREAQUECER_MS') ?? 30_000);
+    // Tempo por chamada ao lhg-api nos MESES FECHADOS (padrão 300 s no painel);
+    // o mês corrente continua com 100 s.
+    const timeoutFechado = Number(get('PAINEL_LHG_API_TIMEOUT_MS'));
     express.use(
       '/painel',
       rotaDoPainelTv({
@@ -629,6 +632,7 @@ export async function mountOidc(
           : undefined,
         preaquecerMs:
           Number.isFinite(preaquecer) && preaquecer >= 0 ? preaquecer : null,
+        timeoutFechadoMs: timeoutFechado > 0 ? timeoutFechado : undefined,
       }),
     );
   }
