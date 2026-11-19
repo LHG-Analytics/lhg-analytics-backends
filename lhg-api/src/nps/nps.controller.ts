@@ -8,14 +8,18 @@
  *   Chat LHG (escopo 'contato'). O número nunca vai para o log.
  * - Endpoint D: POST /nps/v1/confirmar-cpf — os 3 primeiros dígitos de um CPF
  *   da estadia batem? Conferido NO BANCO; devolve só booleanos. O prefixo nunca
- *   vai para o log. 3 erros bloqueiam a raiz por 4h.
+ *   vai para o log. NPS_CPF_MAX_ERROS erros (padrão 15) bloqueiam a raiz por
+ *   NPS_CPF_BLOQUEIO_S (padrão 4h).
  * - Endpoint C com finalidade=retorno_avaliacao: o botão "Falar no Chat LHG"
  *   do painel; 30 dias, X-LHG-Ator obrigatório e assinado, 10/min por chave.
  * - Endpoint E: GET /nps/v1/suites — suítes ativas com a categoria (cache 1h).
  * - Endpoint F: GET /nps/v1/hospede — nomes da estadia, SÓ para a chave de
  *   escopo 'nps_pessoal' (painel interno), com X-LHG-Ator. O nome nunca vai
  *   para o log.
- * A, B, D e E não devolvem dados pessoais.
+ * - Endpoint G: POST /nps/v1/recentes — check-outs dos últimos minutos cuja
+ *   estadia tem um CPF começando pelos 3 dígitos (a regra do D, no banco), para
+ *   quem não leu o QR. Até 10 itens, sem nome e sem CPF; 20/min por unidade.
+ * A, B, D, E e G não devolvem dados pessoais.
  */
 import {
   BadRequestException,
@@ -43,19 +47,24 @@ import {
   lerConsultaContato,
   lerConsultaEstadia,
   lerConsultaHospede,
+  lerConsultaRecentes,
   lerConsultaSuites,
 } from './nps-estadia';
+import { NpsTentativasService } from './nps-tentativas.service';
 import {
   NpsService,
   PapelHospede,
   RespostaCheckouts,
   RespostaEstadia,
+  RespostaRecentes,
   RespostaSuites,
   ResultadoConfirmarCpf,
 } from './nps.service';
 
 /** Variante do C (retorno_avaliacao): no máximo 10 pedidos por minuto por chave. */
 export const CONTATO_RETORNO_POR_MIN = 10;
+/** Endpoint G: no máximo 20 pedidos por minuto por UNIDADE (Redis, ou Map). */
+export const RECENTES_POR_MIN_UNIDADE = 20;
 
 @ApiExcludeController()
 @Controller('nps/v1')
@@ -65,7 +74,10 @@ export class NpsController {
   private readonly logger = new Logger('Nps');
   private retornoUsos = new Map<string, number[]>();
 
-  constructor(private readonly nps: NpsService) {}
+  constructor(
+    private readonly nps: NpsService,
+    private readonly tentativas: NpsTentativasService,
+  ) {}
 
   /** Limite próprio da variante do C (o @Throttle vale para a rota inteira). */
   private limitarRetorno(keyId: string) {
@@ -172,6 +184,30 @@ export class NpsController {
       `nps.confirmar_cpf key=${req.npsKeyId} unidade=${consulta.estadia.tenant.slug} raiz=${consulta.estadia.raiz} resultado=${resultado}`,
     );
     if (!r.ok && 'sem_estadia' in r) throw new NotFoundException({ ok: false, motivo: 'sem_estadia' });
+    return r;
+  }
+
+  @Post('recentes')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  async recentes(@Body() corpo: unknown, @Req() req: any): Promise<RespostaRecentes> {
+    const lido = lerConsultaRecentes(corpo, Date.now());
+    if (!lido.ok) throw new BadRequestException(lido.erro);
+    const { consulta } = lido;
+    const slug = consulta.tenant.slug;
+    // Cota por UNIDADE, antes do banco (o @Throttle é por IP).
+    const cota = await this.tentativas.usarCota(`recentes:${slug}`, RECENTES_POR_MIN_UNIDADE, 60);
+    if (!cota.permitido) {
+      this.logger.warn(`nps.recentes key=${req.npsKeyId} unidade=${slug} resultado=cota_esgotada`);
+      throw new HttpException({ motivo: 'cota_unidade', retry_after: cota.retryAfter }, HttpStatus.TOO_MANY_REQUESTS);
+    }
+    const t0 = Date.now();
+    const r = await this.banco(() => this.nps.recentes(consulta));
+    // Auditoria SEM o prefixo: chave, unidade, janela e quantos itens.
+    this.logger.log(
+      `nps.recentes key=${req.npsKeyId} unidade=${slug} minutos=${consulta.minutos} ` +
+        `itens=${r.itens.length} ${Date.now() - t0}ms`,
+    );
     return r;
   }
 
