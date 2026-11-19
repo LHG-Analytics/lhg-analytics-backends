@@ -9,6 +9,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import * as request from 'supertest';
 import { InvitationsService } from '../invitations/invitations.service';
+import { REMETENTE, RESEND_URL } from '../email/email.service';
 import { mascararIp } from '../oidc/oidc-hub-admin';
 import { apagarSchema, cliente, migrar, novoSchema } from './db-helpers';
 import { Pote, fluxo, subirComoMain } from './oidc-harness';
@@ -43,6 +44,13 @@ const VARS = {
   OIDC_MINIMAL_LOGIN_PAGE: 'true',
   HUB_PROXY_KEY: CHAVE,
   INVITE_LINK_BASE_URL: 'https://hub.exemplo.invalid/convite',
+  RESEND_API_KEY: `re_teste_${segredo()}`,
+};
+/** Respostas do Resend FALSO (a rede nunca é chamada): status por envio. */
+const resend: { status: number; corpos: any[]; headers: any[] } = {
+  status: 200,
+  corpos: [],
+  headers: [],
 };
 const CPF = '52998224725';
 
@@ -145,6 +153,18 @@ describe('2g: admin do HUB por Bearer (/oidc/hub/admin/*)', () => {
     for (const m of ['log', 'warn', 'error', 'info'] as const) {
       espioes.push(jest.spyOn(console, m).mockImplementation());
     }
+    // Só a URL do Resend é interceptada; o resto segue para o fetch real.
+    const fetchReal = global.fetch;
+    espioes.push(
+      jest
+        .spyOn(global, 'fetch')
+        .mockImplementation(async (alvo: any, init?: any) => {
+          if (String(alvo) !== RESEND_URL) return fetchReal(alvo, init);
+          resend.corpos.push(JSON.parse(init.body));
+          resend.headers.push(init.headers);
+          return new Response('{}', { status: resend.status });
+        }),
+    );
     Object.assign(process.env, VARS);
     ({ app } = await subirComoMain(undefined, {
       providers: [InvitationsService],
@@ -552,7 +572,9 @@ describe('2g: admin do HUB por Bearer (/oidc/hub/admin/*)', () => {
       });
       expect(c.body.link).toMatch(/^https:\/\/hub\.exemplo\.invalid\/convite#/);
       semSegredos(c.body.convite);
-      expect(Object.keys(c.body).sort()).toEqual(['convite', 'link']);
+      expect(Object.keys(c.body).sort()).toEqual(['convite', 'email', 'link']);
+      // sem enviarEmail: nada enviado (compatível com o portal antigo)
+      expect(c.body.email).toEqual({ enviado: false });
       const [ev] = await ultimos('invite.created');
       expect(ev.actorUserId).toBe(a.id);
       expect(ev.ip).toBe(IP);
@@ -574,6 +596,7 @@ describe('2g: admin do HUB por Bearer (/oidc/hub/admin/*)', () => {
         t,
       ).expect(200);
       expect(nl.body.link).not.toBe(c.body.link);
+      expect(nl.body.email).toEqual({ enviado: false });
 
       await chamar('delete', `/convites/${c.body.convite.id}`, t).expect(200);
       const de = await chamar('delete', `/convites/${c.body.convite.id}`, t);
@@ -639,6 +662,130 @@ describe('2g: admin do HUB por Bearer (/oidc/hub/admin/*)', () => {
         validade: 'nunca',
         motivo: 'teste',
       }).expect(201);
+    });
+
+    describe('enviarEmail (Resend falso)', () => {
+      beforeEach(() => {
+        resend.status = 200;
+        resend.corpos.length = 0;
+        resend.headers.length = 0;
+      });
+      const novoEmail = () =>
+        `mail-${Date.now()}-${Math.random().toString(36).slice(2)}@example.invalid`;
+      /** Metadata da auditoria do envio: só o id do convite (e o motivo). */
+      const semLink = (ev: any, link: string) => {
+        const t = JSON.stringify(ev.metadata);
+        expect(t).not.toContain(link);
+        expect(t).not.toContain(link.split('#')[1]);
+        expect(t).not.toMatch(/token|link/i);
+      };
+
+      it('criar com enviarEmail: e-mail com o link vai ao convidado; email {enviado:true}; auditoria invite.email_sent sem token', async () => {
+        const a = await admin('mail-ok');
+        const t = await tokenDo(a.email);
+        const email = novoEmail();
+        const c = await chamar('post', '/convites', t, {
+          email,
+          nome: 'Convidada Mail',
+          sistemas: ['cms'],
+          validade: '7',
+          enviarEmail: true,
+        }).expect(201);
+        expect(c.body.email).toEqual({ enviado: true });
+        expect(c.body.link).toMatch(/#/); // o link continua na resposta (reserva)
+        expect(resend.corpos).toHaveLength(1);
+        const m = resend.corpos[0];
+        expect(m.from).toBe(REMETENTE);
+        expect(m.to).toEqual([email]);
+        expect(m.subject).toBe('Seu convite para o HUB LHG');
+        expect(m.html).toContain(c.body.link);
+        expect(m.text).toContain(c.body.link);
+        expect(m.text).toContain(`${a.name} convidou você`);
+        expect(m.text).toContain('Olá, Convidada Mail.');
+        expect(resend.headers[0].Authorization).toBe(
+          `Bearer ${VARS.RESEND_API_KEY}`,
+        );
+        const [ev] = await ultimos('invite.email_sent');
+        expect(ev.actorUserId).toBe(a.id);
+        expect(ev.ip).toBe(IP);
+        expect(ev.metadata).toEqual({ invitationId: c.body.convite.id });
+        semLink(ev, c.body.link);
+      });
+
+      it('Resend recusa: o convite é criado mesmo assim, com o link; email {enviado:false, erro:FALHA_ENVIO}; auditoria invite.email_failed', async () => {
+        resend.status = 500;
+        const a = await admin('mail-falha');
+        const t = await tokenDo(a.email);
+        const c = await chamar('post', '/convites', t, {
+          email: novoEmail(),
+          sistemas: ['cms'],
+          validade: '14',
+          enviarEmail: true,
+        }).expect(201);
+        expect(c.body.email).toEqual({ enviado: false, erro: 'FALHA_ENVIO' });
+        expect(c.body.convite.situacao).toBe('pendente');
+        expect(c.body.link).toMatch(/#/);
+        const [ev] = await ultimos('invite.email_failed');
+        expect(ev.metadata).toEqual({
+          invitationId: c.body.convite.id,
+          reason: 'FALHA_ENVIO',
+        });
+        semLink(ev, c.body.link);
+      });
+
+      it('link novo com enviarEmail: envia o link NOVO; corpo vazio continua aceito; enviarEmail não boolean → 400', async () => {
+        const a = await admin('mail-novo');
+        const t = await tokenDo(a.email);
+        const c = await chamar('post', '/convites', t, {
+          email: novoEmail(),
+          sistemas: ['cms'],
+          validade: '7',
+        }).expect(201);
+        expect(resend.corpos).toHaveLength(0);
+        const nl = await chamar(
+          'post',
+          `/convites/${c.body.convite.id}/novo-link`,
+          t,
+          { enviarEmail: true },
+        ).expect(200);
+        expect(nl.body.email).toEqual({ enviado: true });
+        expect(resend.corpos).toHaveLength(1);
+        expect(resend.corpos[0].text).toContain(nl.body.link);
+        expect(resend.corpos[0].text).not.toContain(c.body.link);
+        const vazio = await chamar(
+          'post',
+          `/convites/${c.body.convite.id}/novo-link`,
+          t,
+          {},
+        ).expect(200);
+        expect(vazio.body.email).toEqual({ enviado: false });
+        expect(resend.corpos).toHaveLength(1);
+        for (const ruim of ['sim', 1, null]) {
+          const r1 = await chamar('post', '/convites', t, {
+            email: novoEmail(),
+            sistemas: ['cms'],
+            validade: '7',
+            enviarEmail: ruim,
+          });
+          expect(r1.status).toBe(400);
+          expect(r1.body.code).toBe('INVALID_BODY');
+          const r2 = await chamar(
+            'post',
+            `/convites/${c.body.convite.id}/novo-link`,
+            t,
+            { enviarEmail: ruim },
+          );
+          expect(r2.status).toBe(400);
+        }
+        const outro = await chamar(
+          'post',
+          `/convites/${c.body.convite.id}/novo-link`,
+          t,
+          { outro: true },
+        );
+        expect(outro.status).toBe(400);
+        expect(resend.corpos).toHaveLength(1);
+      });
     });
   });
 });
