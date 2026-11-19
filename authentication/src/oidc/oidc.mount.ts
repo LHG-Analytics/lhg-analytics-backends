@@ -5,6 +5,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { AccessService } from '../access/access.service';
 import { LauncherService, safeLaunchUrl } from '../access/launcher.service';
 import { AuthService } from '../auth/auth.service';
+import { EmailService } from '../email/email.service';
 import { GoogleSettings, readGoogleSettings } from '../google/google.config';
 import { GoogleIdentityProvider } from '../google/google-identity.provider';
 import { GoogleLoginService } from '../google/google-login.service';
@@ -561,12 +562,17 @@ export async function mountOidc(
       }),
     );
   }
+  // E-mail pelo Resend (RESEND_API_KEY); sem a chave, nada é enviado.
+  const email = new EmailService(get);
   if (users && invitations) {
     express.use(
       '/oidc',
-      rotasDeAdmin({ provider, prisma, users, invitations }),
+      rotasDeAdmin({ provider, prisma, users, invitations, email, access }),
     );
   }
+  logger.log(
+    `oidc: e-mail=${email.configurado ? 'ok' : 'desligado (sem RESEND_API_KEY)'}`,
+  );
   logger.log(
     `oidc: admin do HUB=${!users || !invitations ? 'indisponível' : chaveDoProxy() ? 'ok' : 'FECHADO (sem HUB_PROXY_KEY)'}`,
   );
