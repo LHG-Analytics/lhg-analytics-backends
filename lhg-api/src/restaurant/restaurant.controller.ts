@@ -6,6 +6,7 @@
 import { BadRequestException, Controller, Get, HttpException, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { DateUtilsService, ValidationService } from '@lhg/utils';
+import { OPCOES_DATAS } from '../common/datas-do-servico';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -39,8 +40,8 @@ export class RestaurantController {
     try {
       this.validationService.validateDateInterval(startDate, endDate);
 
-      const start = this.dateUtilsService.convertToDate(startDate, { useUTC: true });
-      const end = this.dateUtilsService.convertToDate(endDate, { isEndDate: true, useUTC: true });
+      const start = this.dateUtilsService.convertToDate(startDate, OPCOES_DATAS.restaurant.inicio);
+      const end = this.dateUtilsService.convertToDate(endDate, OPCOES_DATAS.restaurant.fim);
 
       if (!start || !end) {
         throw new BadRequestException(

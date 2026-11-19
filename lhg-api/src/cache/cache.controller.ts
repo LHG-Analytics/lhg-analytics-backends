@@ -8,7 +8,9 @@ import { Controller, Get, HttpCode, HttpStatus, Logger, Post } from '@nestjs/com
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ModuleRef } from '@nestjs/core';
 import * as moment from 'moment-timezone';
+import { DateUtilsService } from '@lhg/utils';
 import { Public } from '../auth/public.decorator';
+import { datasDoServico } from '../common/datas-do-servico';
 import { allTenants } from '../tenant/tenant.registry';
 import { TenantConfig } from '../tenant/tenant.interfaces';
 import { CachePeriodEnum, ServiceType } from './cache.interfaces';
@@ -47,6 +49,7 @@ export class CacheController {
   constructor(
     private readonly cacheService: KpiCacheService,
     private readonly moduleRef: ModuleRef,
+    private readonly dateUtils: DateUtilsService,
   ) {}
 
   @Post('warmup')
@@ -112,42 +115,8 @@ export class CacheController {
     };
   }
 
-  private buildPeriods(): { name: string; period: CachePeriodEnum; start: Date; end: Date }[] {
-    // IMPORTANTE: o frontend consulta SEMPRE por datas explícitas (período CUSTOM)
-    // terminando HOJE — ex.: mês atual = 01/mês..hoje; últimos 7 = hoje-7..hoje.
-    // Por isso todos os períodos aqui são CUSTOM e terminam HOJE: a chave gerada
-    // (kpi:{unit}:{svc}:custom:{start}:{end}) fica IDÊNTICA à que o front pede, e
-    // o primeiro clique já vem do cache (antes o warmup terminava ONTEM → miss
-    // garantido → query ao vivo → timeout no front). O dado reflete o último
-    // warmup (0/6/12/15h BRT); atualiza a cada 6h.
-    const now = moment();
-    const endToday = moment(now).endOf('day').toDate();
-    return [
-      {
-        name: 'LAST_7_D',
-        period: CachePeriodEnum.CUSTOM,
-        start: moment(now).startOf('day').subtract(7, 'days').toDate(),
-        end: endToday,
-      },
-      {
-        name: 'LAST_MONTH',
-        period: CachePeriodEnum.CUSTOM,
-        start: moment(now).subtract(1, 'month').startOf('month').toDate(),
-        end: moment(now).subtract(1, 'month').endOf('month').toDate(),
-      },
-      {
-        name: 'THIS_MONTH',
-        period: CachePeriodEnum.CUSTOM,
-        start: moment(now).startOf('month').toDate(),
-        end: endToday,
-      },
-      {
-        name: 'YEAR_TO_DATE',
-        period: CachePeriodEnum.CUSTOM,
-        start: moment(now).startOf('year').toDate(),
-        end: endToday,
-      },
-    ];
+  private buildPeriods(): PeriodoDoWarmup[] {
+    return periodosDoWarmup(moment.tz('America/Sao_Paulo'));
   }
 
   private async runWarmupInternal(): Promise<void> {
@@ -193,16 +162,18 @@ export class CacheController {
           const key = `${tenant.slug}:${svc.name}:${p.name}`;
           try {
             const calcStart = Date.now();
-            const data = await this.withRetry(
-              () => svc.run(tenant, p.start, p.end),
-              key,
-            );
+            // As MESMAS datas que o controller do serviço calcula para esse
+            // período: a chave do cache usa o instante exato, então só assim
+            // o warmup serve a requisição do dashboard.
+            const { start, end } = datasDoServico(this.dateUtils, svc.name, p.inicio, p.fim);
+            if (!start || !end) throw new Error(`datas inválidas ${p.inicio}–${p.fim}`);
+            const data = await this.withRetry(() => svc.run(tenant, start, end), key);
             await this.cacheService.set(
               tenant.slug,
               svc.name,
               p.period,
               data,
-              p.period === CachePeriodEnum.CUSTOM ? { start: p.start, end: p.end } : undefined,
+              { start, end },
               WARMUP_TTL_SECONDS,
             );
             calculated++;
@@ -217,7 +188,6 @@ export class CacheController {
 
     // Worker do CONSOLIDATED (sequencial nas suas células — cada getUnifiedKpis
     // já faz fan-out paralelo interno para todas as unidades)
-    const fmt = (d: Date) => moment(d).format('DD/MM/YYYY');
     const consolidatedServices: { name: string; run: (s: string, e: string) => Promise<any> }[] = [
       {
         name: 'company',
@@ -247,7 +217,7 @@ export class CacheController {
           try {
             const calcStart = Date.now();
             // getUnifiedKpis cacheia internamente nas MESMAS chaves que a API consulta
-            await this.withRetry(() => svc.run(fmt(p.start), fmt(p.end)), key);
+            await this.withRetry(() => svc.run(p.inicio, p.fim), key);
             calculated++;
             this.logger.log(`${key}: CALCULATED (${Date.now() - calcStart}ms)`);
           } catch (error) {
@@ -304,4 +274,35 @@ export class CacheController {
     }
     throw lastErr;
   }
+}
+
+/** Um período do warmup: datas DD/MM/YYYY como o front envia (fuso de Brasília). */
+export interface PeriodoDoWarmup {
+  name: string;
+  period: CachePeriodEnum;
+  inicio: string;
+  fim: string;
+}
+
+/**
+ * Períodos do warmup, como o FRONT pede: datas explícitas (CUSTOM) no fuso de
+ * Brasília, terminando HOJE (exceto o mês passado, fechado). Cada serviço
+ * converte essas datas com as MESMAS opções do seu controller
+ * (datasDoServico), então a chave do warmup é a mesma da requisição.
+ */
+export function periodosDoWarmup(agora: moment.Moment): PeriodoDoWarmup[] {
+  const d = (m: moment.Moment) => m.format('DD/MM/YYYY');
+  const hoje = agora.clone().startOf('day');
+  const mesPassado = hoje.clone().subtract(1, 'month');
+  return [
+    { name: 'LAST_7_D', period: CachePeriodEnum.CUSTOM, inicio: d(hoje.clone().subtract(7, 'days')), fim: d(hoje) },
+    {
+      name: 'LAST_MONTH',
+      period: CachePeriodEnum.CUSTOM,
+      inicio: d(mesPassado.clone().startOf('month')),
+      fim: d(mesPassado.clone().endOf('month')),
+    },
+    { name: 'THIS_MONTH', period: CachePeriodEnum.CUSTOM, inicio: d(hoje.clone().startOf('month')), fim: d(hoje) },
+    { name: 'YEAR_TO_DATE', period: CachePeriodEnum.CUSTOM, inicio: d(hoje.clone().startOf('year')), fim: d(hoje) },
+  ];
 }
