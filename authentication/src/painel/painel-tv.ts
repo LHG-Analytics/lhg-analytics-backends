@@ -22,9 +22,10 @@ import {
  *   comercial): faturamento, faturamento de reservas, locações e reservas;
  * - GET /painel/historico?meses=15: os mesmos números por mês FECHADO.
  * Por canal (só as reservas daquele canal): e-commerce (site) e Guia de Motéis.
- * Os números vêm dos MESMOS endpoints do dashboard no lhg-api (Visão Geral:
- * Company/kpis/date-range; Reservas: Bookings/bookings/date-range), como uma
- * identidade de serviço ADMIN/LHG com JWT interno de 5 min.
+ * Os números vêm do resumo enxuto do lhg-api (/{unidade}/api/Painel/resumo),
+ * que usa o MESMO SQL do TotalResult da Visão Geral e dos BigNumbers das
+ * Reservas do dashboard, como uma identidade de serviço ADMIN/LHG com JWT
+ * interno de 5 min.
  * Autenticação: token de serviço (Bearer), conferido pelo SHA-256 guardado
  * no Render (PAINEL_TV_TOKEN_SHA256), em tempo constante. O token em si fica
  * só no painel (Vercel). Rate limit por IP e auditoria painel.consulta.
@@ -82,9 +83,6 @@ export type UnidadePainel = {
   receitaGuia: number;
   atualizadoEm: string;
 };
-
-/** Canais do Guia de Motéis (chaves do KpiTableByChannelType do lhg-api). */
-const CANAIS_GUIA = ['GUIA_GO', 'GUIA_SCHEDULED'];
 
 /** Cache do mês corrente (o painel consulta a cada 5 min). */
 export const PAINEL_CACHE_MES_MS = 5 * 60 * 1000;
@@ -192,37 +190,6 @@ const num = (v: unknown) => {
   return Number.isFinite(x) ? x : 0;
 };
 
-/**
- * Reservas e receita SÓ das reservas de cada canal, da resposta de
- * Bookings/bookings/date-range (mesmo período e mesmo filtro por
- * dataatendimento do total de reservas). E-commerce = BigNumbersEcommerce;
- * Guia = GUIA_GO + GUIA_SCHEDULED do KpiTableByChannelType. Canal que a
- * unidade não tem (ex.: site nas Getan) = 0.
- */
-export function canaisDasReservas(bookings: any): {
-  reservasEcommerce: number;
-  receitaEcommerce: number;
-  reservasGuia: number;
-  receitaGuia: number;
-} {
-  const e = Array.isArray(bookings?.BigNumbersEcommerce)
-    ? (bookings.BigNumbersEcommerce[0]?.currentDate ?? {})
-    : {};
-  const k = Array.isArray(bookings?.KpiTableByChannelType)
-    ? (bookings.KpiTableByChannelType[0] ?? {})
-    : {};
-  const qtd = k.bookingsTotalRentalsByChannelType ?? {};
-  const val = k.bookingsRevenueByChannelType ?? {};
-  const soma = (m: Record<string, unknown>) =>
-    CANAIS_GUIA.reduce((s, c) => s + num(m[c]), 0);
-  return {
-    reservasEcommerce: num(e.totalAllBookings),
-    receitaEcommerce: num(e.totalAllValue),
-    reservasGuia: soma(qtd),
-    receitaGuia: Math.round(soma(val) * 100) / 100,
-  };
-}
-
 export function rotaDoPainelTv(d: PainelDeps): Router {
   const logger = new Logger('PainelTV');
   const r = Router();
@@ -287,7 +254,12 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
     return resp.json() as Promise<any>;
   }
 
-  /** Os números de UMA unidade num período (os mesmos endpoints do dashboard). */
+  /**
+   * Os números de UMA unidade num período: o resumo enxuto do lhg-api
+   * (Painel/resumo — 2 consultas agregadas, o mesmo SQL do TotalResult da
+   * Visão Geral e dos BigNumbers das Reservas, sem período anterior nem
+   * previsão nem gráficos).
+   */
   async function calcular(
     slug: string,
     inicio: string,
@@ -298,22 +270,18 @@ export function rotaDoPainelTv(d: PainelDeps): Router {
     const limite = fechado
       ? (d.timeoutFechadoMs ?? PAINEL_TIMEOUT_FECHADO_MS)
       : (d.timeoutMs ?? PAINEL_TIMEOUT_MS);
-    const [company, bookings] = await Promise.all([
-      lhgApi(`/${slug}/api/Company/kpis/date-range`, inicio, fim, limite),
-      lhgApi(`/${slug}/api/Bookings/bookings/date-range`, inicio, fim, limite),
-    ]);
-    const t = company?.TotalResult ?? {};
-    const b = Array.isArray(bookings?.BigNumbers)
-      ? (bookings.BigNumbers[0]?.currentDate ?? {})
-      : {};
+    const r = await lhgApi(`/${slug}/api/Painel/resumo`, inicio, fim, limite);
     return {
       slug,
       moeda: moedaDe(slug),
-      faturamento: num(t.totalAllValue),
-      faturamentoReservas: num(b.totalAllValue),
-      locacoes: num(t.totalAllRentalsApartments),
-      reservas: num(b.totalAllBookings),
-      ...canaisDasReservas(bookings),
+      faturamento: num(r?.faturamento),
+      faturamentoReservas: num(r?.faturamentoReservas),
+      locacoes: num(r?.locacoes),
+      reservas: num(r?.reservas),
+      reservasEcommerce: num(r?.reservasEcommerce),
+      receitaEcommerce: num(r?.receitaEcommerce),
+      reservasGuia: num(r?.reservasGuia),
+      receitaGuia: num(r?.receitaGuia),
       atualizadoEm: agora().toISOString(),
     };
   }
