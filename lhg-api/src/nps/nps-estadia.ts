@@ -250,3 +250,49 @@ export function lerConsultaHospede(q: Record<string, unknown>, agoraServidorMs: 
     consulta: { tenant, raiz, limiteLocal: paraLocalAutomo(agoraServidorMs - HOSPEDE_JANELA_DIAS * 86_400_000) },
   };
 }
+
+/** Endpoint G: janela de check-out (minutos) e teto de itens. */
+export const RECENTES_MIN_PADRAO = 60;
+export const RECENTES_MIN_MAX = 120;
+export const RECENTES_MAX_ITENS = 10;
+
+export interface ConsultaRecentes {
+  tenant: TenantConfig;
+  /** Os 3 primeiros dígitos digitados (nunca vão para o log). */
+  prefixo: string;
+  minutos: number;
+  /** Check-out mais antigo aceito (agora deste servidor − minutos), hora local do Automo. */
+  desdeLocal: string;
+  /** Desde quando procurar estadias simultâneas do mesmo CPF (genérico, a regra do D). */
+  limiteGenericoLocal: string;
+}
+
+/**
+ * Endpoint G (corpo JSON): {unidade, prefixo3, minutos?} — check-outs recentes
+ * cuja estadia tem um CPF aceito com esse prefixo. A hora é a deste servidor.
+ */
+export function lerConsultaRecentes(corpo: unknown, agoraServidorMs: number): Leitura<ConsultaRecentes> {
+  const b = (corpo && typeof corpo === 'object' && !Array.isArray(corpo) ? corpo : {}) as Record<string, unknown>;
+  const tenant = getTenant(texto(b.unidade) ?? '');
+  if (!tenant) return { ok: false, erro: 'unidade inválida' };
+  const prefixo = typeof b.prefixo3 === 'string' ? b.prefixo3 : '';
+  if (!/^\d{3}$/.test(prefixo)) return { ok: false, erro: 'prefixo3 inválido (3 dígitos, como texto)' };
+  let minutos = RECENTES_MIN_PADRAO;
+  if (b.minutos !== undefined) {
+    const m = typeof b.minutos === 'string' && /^\d{1,3}$/.test(b.minutos.trim()) ? Number(b.minutos) : b.minutos;
+    if (typeof m !== 'number' || !Number.isInteger(m) || m < 1 || m > RECENTES_MIN_MAX) {
+      return { ok: false, erro: `minutos inválido (1 a ${RECENTES_MIN_MAX})` };
+    }
+    minutos = m;
+  }
+  return {
+    ok: true,
+    consulta: {
+      tenant,
+      prefixo,
+      minutos,
+      desdeLocal: paraLocalAutomo(agoraServidorMs - minutos * 60_000),
+      limiteGenericoLocal: paraLocalAutomo(agoraServidorMs - CPF_GENERICO_DIAS * 86_400_000),
+    },
+  };
+}

@@ -16,6 +16,8 @@ import {
   ConsultaHospede,
   ConsultaContato,
   ConsultaEstadia,
+  ConsultaRecentes,
+  RECENTES_MAX_ITENS,
   celularE164,
   deLocalAutomo,
 } from './nps-estadia';
@@ -95,6 +97,20 @@ export interface RespostaCheckouts {
   proximo: { desde: string; apos_ref: string } | null;
 }
 
+export interface RecenteNps {
+  locacao_raiz_ref: string;
+  /** Suíte final (a do check-out). */
+  suite: number;
+  categoria_id: number;
+  fim: string | null;
+  /** Estado ATUAL da suíte no Automo (LIVRE, SUJO, LIMPEZA...), ou null. */
+  status_suite: string | null;
+}
+
+export interface RespostaRecentes {
+  itens: RecenteNps[];
+}
+
 export type ResultadoContato =
   | { ok: true; celular: string; origem_reserva: string }
   | { ok: false; motivo: 'sem_contato' | 'fora_da_janela' | 'nao_encontrada' };
@@ -170,21 +186,32 @@ export const SQL_CADEIA = `
 // diferentes desde $2 (CPF da recepção): não vale. Entrada pelo índice de
 // datainicialdaocupacao (não há índice em col_locacaoapartamento_cliente.id_cliente).
 // 0 CPFs em mais de um cadastro (levantamento de 07/11/2026): pessoa = CPF.
-const CPF_CTES = `
+// `raizes` = SELECT com a coluna raiz (D: só $1; G: as raízes dos check-outs
+// recentes); aceitos sai por (raiz, cpf). A MESMA regra nos dois endpoints.
+const cpfCtes = (raizes: string) => `
+  raizes AS (${raizes}),
   cadeia AS (
-    SELECT id_apartamentostate AS id, 0 AS n FROM locacaoapartamento
-    WHERE id_apartamentostate = $1::int AND id_locacaoorigem IS NULL
+    SELECT l.id_apartamentostate AS raiz, l.id_apartamentostate AS id, 0 AS n
+    FROM raizes r JOIN locacaoapartamento l ON l.id_apartamentostate = r.raiz
+    WHERE l.id_locacaoorigem IS NULL
     UNION ALL
-    SELECT l.id_apartamentostate, c.n + 1 FROM locacaoapartamento l JOIN cadeia c ON l.id_locacaoorigem = c.id
+    SELECT c.raiz, l.id_apartamentostate, c.n + 1 FROM locacaoapartamento l JOIN cadeia c ON l.id_locacaoorigem = c.id
     WHERE c.n < 50
   ), pessoas AS (
-    SELECT DISTINCT pp.id_pessoa, regexp_replace(coalesce(pe.identificador, ''), '[^0-9]', '', 'g') AS cpf
+    -- LATERAL + OFFSET 0: busca pelo índice, locação a locação. Sem isso o
+    -- planejador superestima a cadeia recursiva e varre a pessoa inteira (~2 s).
+    SELECT DISTINCT c.raiz, x.id_pessoa, x.cpf
     FROM cadeia c
-    JOIN col_locacaoapartamento_cliente lc ON lc.id_locacaoapartamento = c.id
-    JOIN pessoapapel pp ON pp.id = lc.id_cliente
-    JOIN pessoa pe ON pe.id = pp.id_pessoa
+    CROSS JOIN LATERAL (
+      SELECT pp.id_pessoa, regexp_replace(coalesce(pe.identificador, ''), '[^0-9]', '', 'g') AS cpf
+      FROM col_locacaoapartamento_cliente lc
+      JOIN pessoapapel pp ON pp.id = lc.id_cliente
+      JOIN pessoa pe ON pe.id = pp.id_pessoa
+      WHERE lc.id_locacaoapartamento = c.id
+      OFFSET 0
+    ) x
   ), validos AS (
-    SELECT p.id_pessoa, p.cpf FROM pessoas p
+    SELECT p.raiz, p.id_pessoa, p.cpf FROM pessoas p
     WHERE p.cpf ~ '^[0-9]{11}$' AND p.cpf !~ '^([0-9])\\1{10}$'
       AND ((SELECT sum(substr(p.cpf, i, 1)::int * (11 - i)) FROM generate_series(1, 9) i) * 10 % 11) % 10
           = substr(p.cpf, 10, 1)::int
@@ -210,17 +237,55 @@ const CPF_CTES = `
     SELECT DISTINCT a.id_pessoa FROM usos_raiz a
     JOIN usos_raiz b ON b.id_pessoa = a.id_pessoa AND a.raiz < b.raiz AND a.ini < b.fim AND b.ini < a.fim
   ), aceitos AS (
-    SELECT v.cpf FROM validos v WHERE v.id_pessoa NOT IN (SELECT id_pessoa FROM genericos)
+    SELECT v.raiz, v.cpf FROM validos v WHERE v.id_pessoa NOT IN (SELECT id_pessoa FROM genericos)
   )`;
+const CPF_CTES_UMA_RAIZ = cpfCtes('SELECT $1::int AS raiz');
 
 /** tem_cpf da estadia (Endpoint A). $1 = raiz, $2 = início da busca de genéricos. */
-export const SQL_TEM_CPF = `WITH RECURSIVE ${CPF_CTES}
+export const SQL_TEM_CPF = `WITH RECURSIVE ${CPF_CTES_UMA_RAIZ}
   SELECT EXISTS (SELECT 1 FROM aceitos) AS tem_cpf`;
 
 /** Endpoint D: confere os 3 primeiros dígitos ($3) SÓ no banco; devolve booleanos. */
-export const SQL_CONFIRMAR_CPF = `WITH RECURSIVE ${CPF_CTES}
+export const SQL_CONFIRMAR_CPF = `WITH RECURSIVE ${CPF_CTES_UMA_RAIZ}
   SELECT EXISTS (SELECT 1 FROM aceitos) AS tem_cpf,
          EXISTS (SELECT 1 FROM aceitos WHERE left(cpf, 3) = $3::text) AS confere`;
+
+// Endpoint G: check-outs FINALIZADA desde $1 (hora local) em suítes da unidade
+// ($4), cuja ESTADIA (raiz da cadeia) tem um CPF aceito começando por $3 — a
+// regra do D, comparada só no banco. Sai só raiz, suíte, categoria, fim e o
+// estado ATUAL da suíte (a linha aberta de apartamentostatehistorico; há índice
+// em fim). Nenhum nome, CPF ou telefone sai daqui. Mais novos primeiro, até $5.
+export const SQL_RECENTES = `WITH RECURSIVE finais AS (
+    SELECT la.id_apartamentostate AS ref, la.datafinaldaocupacao AS fim, a.id AS id_apartamento,
+           a.numero AS suite, a.id_categoriaapartamento AS categoria_id
+    FROM locacaoapartamento la
+    JOIN apartamentostate s ON s.id = la.id_apartamentostate
+    JOIN apartamento a ON a.id = s.id_apartamento
+    WHERE la.fimocupacaotipo = 'FINALIZADA'
+      AND la.datafinaldaocupacao >= $1::timestamp
+      AND a.id_categoriaapartamento = ANY($4::int[])
+  ), sobe_final AS (
+    SELECT f.ref AS final, l.id_apartamentostate AS id, l.id_locacaoorigem AS origem, 0 AS n
+    FROM finais f JOIN locacaoapartamento l ON l.id_apartamentostate = f.ref
+    UNION ALL
+    SELECT s.final, l.id_apartamentostate, l.id_locacaoorigem, s.n + 1
+    FROM sobe_final s JOIN locacaoapartamento l ON l.id_apartamentostate = s.origem
+    WHERE s.n < 50
+  ), final_raiz AS (
+    SELECT DISTINCT ON (final) final, id AS raiz FROM sobe_final ORDER BY final, n DESC
+  ), ${cpfCtes('SELECT DISTINCT raiz FROM final_raiz')},
+  estado_atual AS (
+    SELECT DISTINCT ON (h.id_apartamento) h.id_apartamento, h.estado
+    FROM apartamentostatehistorico h WHERE h.fim IS NULL
+    ORDER BY h.id_apartamento, h.inicio DESC
+  )
+  SELECT fr.raiz::text AS raiz, f.suite, f.categoria_id, to_char(f.fim, ${LOCAL}) AS fim, e.estado AS status_suite
+  FROM finais f
+  JOIN final_raiz fr ON fr.final = f.ref
+  LEFT JOIN estado_atual e ON e.id_apartamento = f.id_apartamento
+  WHERE EXISTS (SELECT 1 FROM aceitos ac WHERE ac.raiz = fr.raiz AND left(ac.cpf, 3) = $3::text)
+  ORDER BY f.fim DESC, f.ref DESC
+  LIMIT $5`;
 
 // Endpoint E: suítes ATIVAS das categorias de suíte da unidade, com a categoria.
 export const SQL_SUITES = `
@@ -548,6 +613,32 @@ export class NpsService {
       itens,
       proximo:
         itens.length === c.limite && ultimo?.fim ? { desde: ultimo.fim, apos_ref: ultimo.locacao_ref } : null,
+    };
+  }
+
+  /** Endpoint G. Só referências e o estado da suíte; o prefixo é comparado no banco. */
+  async recentes(c: ConsultaRecentes): Promise<RespostaRecentes> {
+    const linhas = await this.pool.queryWithParams<{
+      raiz: string;
+      suite: number;
+      categoria_id: number;
+      fim: string;
+      status_suite: string | null;
+    }>(c.tenant.slug, SQL_RECENTES, [
+      c.desdeLocal,
+      c.limiteGenericoLocal,
+      c.prefixo,
+      c.tenant.suiteCategoryIds,
+      RECENTES_MAX_ITENS,
+    ]);
+    return {
+      itens: linhas.slice(0, RECENTES_MAX_ITENS).map((l) => ({
+        locacao_raiz_ref: l.raiz,
+        suite: Number(l.suite),
+        categoria_id: Number(l.categoria_id),
+        fim: deLocalAutomo(l.fim),
+        status_suite: l.status_suite ?? null,
+      })),
     };
   }
 
