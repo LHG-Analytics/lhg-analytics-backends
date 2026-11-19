@@ -3,9 +3,15 @@
 //   C: GET /nps/v1/contato (só a chave de escopo 'contato', a do Chat LHG)
 //   D: POST /nps/v1/confirmar-cpf (3 primeiros dígitos, conferidos no banco)
 //   E: GET /nps/v1/suites   F: GET /nps/v1/hospede (escopo 'nps_pessoal', com ator)
+//   G: POST /nps/v1/recentes (check-outs recentes pelo prefixo do CPF, 20/min por unidade)
 // HMAC e escopo, validação das consultas, regras (com um pool FALSO, sem banco)
 // e o HTTP de ponta a ponta. Segredos e telefones de TESTE, gerados/fictícios.
 // Rodar depois do build: node --test test/
+
+// O bloqueio do D é testado com 3 erros (o padrão de produção é 15, ver o teste
+// de lerLimitesCpf): a env é lida quando o serviço de tentativas é criado.
+process.env.NPS_CPF_MAX_ERROS = "3";
+delete process.env.NPS_CPF_BLOQUEIO_S;
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
@@ -66,10 +72,31 @@ function poolFalso() {
   };
   // Prefixos ACEITOS por raiz (o banco já tirou inválidos e genéricos). Fictícios.
   const cpfs = { 4990: ["123", "456"], 5002: [], 5003: [] };
+  // Endpoint G: check-outs recentes com os prefixos ACEITOS da estadia (fictícios).
+  // 12 com "777" para testar o teto de 10; 9300 saiu antes da janela.
+  const recentes = [
+    { raiz: "9100", suite: 101, categoria_id: 17, fim: "2026-11-07T11:40:00.000", status_suite: "SUJO", prefixos: ["123"] },
+    { raiz: "9101", suite: 102, categoria_id: 10, fim: "2026-11-07T11:20:00.000", status_suite: null, prefixos: ["123", "456"] },
+    { raiz: "9300", suite: 103, categoria_id: 10, fim: "2026-11-07T10:30:00.000", status_suite: "LIVRE", prefixos: ["123"] },
+    ...Array.from({ length: 12 }, (_, i) => ({
+      raiz: String(9200 + i), suite: 200 + i, categoria_id: 17,
+      fim: `2026-11-07T11:${String(10 + i).padStart(2, "0")}:00.000`, status_suite: "LIMPEZA", prefixos: ["777"],
+    })),
+  ];
   return {
     chamadas,
     async queryWithParams(slug, sql, params) {
       chamadas.push({ slug, sql, params });
+      if (sql === svc.SQL_RECENTES) {
+        const [desde, , prefixo, cats, limite] = params;
+        assert.ok(Array.isArray(cats) && cats.length > 0, "categorias da unidade");
+        return recentes
+          // no HTTP a janela parte da hora REAL: lá o teste liga ignorarJanela
+          .filter((r) => (this.ignorarJanela || r.fim.replace("T", " ") >= desde) && r.prefixos.includes(prefixo))
+          .sort((a, b) => (a.fim < b.fim ? 1 : -1))
+          .slice(0, limite)
+          .map(({ prefixos, ...r }) => r);
+      }
       if (sql === svc.SQL_SUITES) {
         assert.ok(Array.isArray(params[0]) && params[0].length > 0);
         return [
@@ -358,6 +385,35 @@ describe("consultas (nps-estadia)", () => {
     assert.match(est.lerConsultaHospede({ unidade: "?", raiz: "1" }, AGORA_MS).erro, /unidade/);
   });
 
+  test("G: corpo {unidade, prefixo3 (texto), minutos? 1–120, padrão 60} → janela pela hora DESTE servidor", () => {
+    const ler = (b) => est.lerConsultaRecentes(b, AGORA_MS);
+    const ok = ler({ unidade: "lush_ipiranga", prefixo3: "012" });
+    assert.ok(ok.ok, ok.erro);
+    assert.equal(ok.consulta.prefixo, "012"); // zero à esquerda preservado
+    assert.equal(ok.consulta.minutos, 60);
+    assert.equal(ok.consulta.desdeLocal, "2026-11-07 11:00:00.000");
+    assert.equal(ok.consulta.limiteGenericoLocal, "2026-09-08 12:00:00.000"); // a mesma regra do D
+    assert.equal(ler({ unidade: "lush_ipiranga", prefixo3: "012", minutos: 120 }).consulta.desdeLocal, "2026-11-07 10:00:00.000");
+    assert.equal(ler({ unidade: "lush_ipiranga", prefixo3: "012", minutos: "5" }).consulta.minutos, 5);
+    for (const [b, re] of [
+      [{ unidade: "lush_ipiranga", prefixo3: 12 }, /prefixo3/],
+      [{ unidade: "lush_ipiranga", prefixo3: "12" }, /prefixo3/],
+      [{ unidade: "lush_ipiranga", prefixo3: "1234" }, /prefixo3/],
+      [{ unidade: "lush_ipiranga" }, /prefixo3/],
+      [{ unidade: "x", prefixo3: "123" }, /unidade/],
+      [{ prefixo3: "123" }, /unidade/],
+      [{ unidade: "lush_ipiranga", prefixo3: "123", minutos: 0 }, /minutos/],
+      [{ unidade: "lush_ipiranga", prefixo3: "123", minutos: 121 }, /minutos/],
+      [{ unidade: "lush_ipiranga", prefixo3: "123", minutos: 1.5 }, /minutos/],
+      [{ unidade: "lush_ipiranga", prefixo3: "123", minutos: "60m" }, /minutos/],
+      [{ unidade: "lush_ipiranga", prefixo3: "123", minutos: null }, /minutos/],
+      [null, /unidade/],
+      [["123"], /unidade/],
+    ]) {
+      assert.match(ler(b).erro, re, JSON.stringify(b));
+    }
+  });
+
   test("celular brasileiro → E.164; fixo, curto ou lixo → null (o mesmo padrão do SQL do B)", () => {
     const casos = [
       ["(11) 90000-0001", "+5511900000001"],
@@ -392,14 +448,67 @@ describe("consultas (nps-estadia)", () => {
 
 describe("tentativas do Endpoint D (NpsTentativasService)", () => {
   const delRedis = process.env.REDIS_URL;
+  test("NPS_CPF_MAX_ERROS / NPS_CPF_BLOQUEIO_S: padrão 15 erros / 4h; env válida vale; lixo ou fora da faixa → padrão", async () => {
+    const L = tent.lerLimitesCpf;
+    assert.equal(tent.NPS_CPF_MAX_ERROS_PADRAO, 15);
+    assert.equal(tent.NPS_CPF_BLOQUEIO_S_PADRAO, 14400);
+    assert.deepEqual(L({}), { maxErros: 15, bloqueioS: 14400 });
+    assert.deepEqual(L({ NPS_CPF_MAX_ERROS: " 5 ", NPS_CPF_BLOQUEIO_S: "7200" }), { maxErros: 5, bloqueioS: 7200 });
+    for (const v of ["", "0", "-3", "abc", "2.5", "1001", "1e3"]) assert.equal(L({ NPS_CPF_MAX_ERROS: v }).maxErros, 15, v);
+    for (const v of ["59", "604801", "4h"]) assert.equal(L({ NPS_CPF_BLOQUEIO_S: v }).bloqueioS, 14400, v);
+    // sem a env, o serviço nasce com o padrão: 15 erros até o bloqueio
+    const antes = process.env.NPS_CPF_MAX_ERROS;
+    delete process.env.NPS_CPF_MAX_ERROS;
+    try {
+      delete process.env.REDIS_URL;
+      const t = new tent.NpsTentativasService();
+      assert.equal((await t.situacao("u:p")).restantes, 15);
+      for (let i = 1; i < 15; i++) assert.equal((await t.registrarErro("u:p")).restantes, 15 - i);
+      assert.deepEqual(await t.registrarErro("u:p"), { bloqueado: true, retryAfter: 14400, restantes: 0 });
+    } finally {
+      process.env.NPS_CPF_MAX_ERROS = antes;
+    }
+  });
+
+  test("cota do G em memória: 20 no minuto passam, o 21º não (com retryAfter); por chave; a janela vira", async () => {
+    let agora = AGORA_MS;
+    const t = new tent.NpsTentativasService();
+    t.agora = () => agora;
+    for (let i = 0; i < 20; i++) assert.deepEqual(await t.usarCota("recentes:tout", 20, 60), { permitido: true, retryAfter: 0 });
+    agora += 15_000;
+    assert.deepEqual(await t.usarCota("recentes:tout", 20, 60), { permitido: false, retryAfter: 45 });
+    assert.equal((await t.usarCota("recentes:liv", 20, 60)).permitido, true); // outra unidade, outra cota
+    agora += 45_000;
+    assert.equal((await t.usarCota("recentes:tout", 20, 60)).permitido, true);
+  });
+
+  test("cota do G no Redis (falso): INCR + EXPIRE só no 1º, TTL no excesso, chave com namespace; Redis caindo → Map", async () => {
+    const dados = new Map();
+    const ops = [];
+    const t = new tent.NpsTentativasService();
+    t.client = {
+      async incr(k) { ops.push(["incr", k]); const n = (dados.get(k) ?? 0) + 1; dados.set(k, n); return n; },
+      async expire(k, s) { ops.push(["expire", k, s]); return 1; },
+      async ttl() { return 37; },
+    };
+    t.redisReady = true;
+    assert.equal((await t.usarCota("recentes:tout", 2, 60)).permitido, true);
+    assert.equal((await t.usarCota("recentes:tout", 2, 60)).permitido, true);
+    assert.deepEqual(await t.usarCota("recentes:tout", 2, 60), { permitido: false, retryAfter: 37 });
+    assert.deepEqual(ops.filter((o) => o[0] === "expire").map((o) => o[2]), [60]);
+    for (const [, k] of ops) assert.match(k, /^[A-Za-z0-9_-]+:nps:cota:recentes:tout$/);
+    t.client = { async incr() { throw new Error("ECONNRESET"); } };
+    t.redisReady = true;
+    assert.equal((await t.usarCota("recentes:tout", 2, 60)).permitido, true); // memória começa do zero
+  });
+
   test("memória: 3 erros bloqueiam por 4h; acerto zera; o bloqueio vence", async () => {
     delete process.env.REDIS_URL;
     let agora = AGORA_MS;
     const t = new tent.NpsTentativasService();
     t.agora = () => agora;
     t.onModuleInit();
-    assert.equal(tent.NPS_CPF_MAX_ERROS, 3);
-    assert.equal(tent.NPS_CPF_BLOQUEIO_S, 14400);
+    assert.deepEqual(t.limites, { maxErros: 3, bloqueioS: 14400 }); // 3 pela env deste arquivo
     assert.deepEqual(await t.situacao("u:1"), { bloqueado: false, retryAfter: 0, restantes: 3 });
     assert.deepEqual(await t.registrarErro("u:1"), { bloqueado: false, retryAfter: 0, restantes: 2 });
     await t.limpar("u:1"); // acerto
@@ -618,6 +727,56 @@ describe("regras (NpsService, pool falso)", () => {
     const pool = poolFalso();
     await servico(pool).contato(est.lerConsultaContato({ unidade: "lush_ipiranga", locacao: "8001", finalidade: "retorno_avaliacao" }, AGORA_MS).consulta);
     assert.equal(pool.chamadas.find((c) => c.sql === svc.SQL_CONTATO).params[2], "2026-10-08 12:00:00.000");
+  });
+
+  test("G: check-outs da janela com o prefixo, mais novos primeiro, até 10; só referências e o estado da suíte", async () => {
+    const G = (prefixo3, minutos) =>
+      est.lerConsultaRecentes({ unidade: "lush_ipiranga", prefixo3, ...(minutos ? { minutos } : {}) }, AGORA_MS).consulta;
+    const pool = poolFalso();
+    const r = await servico(pool).recentes(G("123"));
+    assert.deepEqual(r, {
+      itens: [
+        { locacao_raiz_ref: "9100", suite: 101, categoria_id: 17, fim: "2026-11-07T11:40:00-03:00", status_suite: "SUJO" },
+        { locacao_raiz_ref: "9101", suite: 102, categoria_id: 10, fim: "2026-11-07T11:20:00-03:00", status_suite: null },
+      ],
+    });
+    const chamada = pool.chamadas.find((c) => c.sql === svc.SQL_RECENTES);
+    assert.equal(chamada.slug, "lush_ipiranga");
+    assert.deepEqual(chamada.params.slice(0, 3), ["2026-11-07 11:00:00.000", "2026-09-08 12:00:00.000", "123"]);
+    assert.equal(chamada.params[4], 10);
+    // janela maior pega o check-out das 10:30; o outro CPF da mesma estadia também vale
+    assert.equal((await servico(poolFalso()).recentes(G("123", 120))).itens.length, 3);
+    assert.deepEqual((await servico(poolFalso()).recentes(G("456"))).itens.map((i) => i.locacao_raiz_ref), ["9101"]);
+    // teto de 10, do mais novo para o mais antigo
+    const muitos = (await servico(poolFalso()).recentes(G("777"))).itens;
+    assert.equal(muitos.length, 10);
+    assert.equal(muitos[0].locacao_raiz_ref, "9211");
+    assert.ok(muitos.every((x, i) => i === 0 || muitos[i - 1].fim > x.fim));
+    assert.deepEqual((await servico(poolFalso()).recentes(G("999"))).itens, []);
+    // nenhum campo pessoal na resposta
+    for (const i of muitos) assert.deepEqual(Object.keys(i).sort(), ["categoria_id", "fim", "locacao_raiz_ref", "status_suite", "suite"]);
+  });
+
+  test("G (SQL): a regra do CPF é a MESMA do D, o prefixo é comparado no banco e só saem referências", () => {
+    const g = svc.SQL_RECENTES;
+    assert.doesNotMatch(g, /now\(|current_(timestamp|date|time)|localtime|clock_timestamp|statement_timestamp/i);
+    assert.match(g, /fimocupacaotipo = 'FINALIZADA'/);
+    assert.match(g, /datafinaldaocupacao >= \$1::timestamp/);
+    assert.match(g, /id_categoriaapartamento = ANY\(\$4::int\[\]\)/);
+    assert.match(g, /left\(ac\.cpf, 3\) = \$3::text/);
+    assert.match(g, /LIMIT \$5\s*$/);
+    assert.match(g, /ORDER BY f\.fim DESC/);
+    // estado atual = a linha ABERTA do histórico
+    assert.match(g, /FROM apartamentostatehistorico h WHERE h\.fim IS NULL/);
+    // os CTEs do CPF são os mesmos do D (só muda de onde vêm as raízes)
+    const ctes = (sql) => sql.slice(sql.indexOf("cadeia AS ("), sql.indexOf("aceitos AS (")).trim();
+    assert.equal(ctes(g), ctes(svc.SQL_CONFIRMAR_CPF));
+    assert.equal(ctes(svc.SQL_TEM_CPF), ctes(svc.SQL_CONFIRMAR_CPF));
+    assert.match(svc.SQL_CONFIRMAR_CPF, /raizes AS \(SELECT \$1::int AS raiz\)/);
+    assert.match(g, /raizes AS \(SELECT DISTINCT raiz FROM final_raiz\)/);
+    // o SELECT final só tem referências, suíte, categoria, fim e estado
+    const saida = g.slice(g.lastIndexOf("SELECT fr.raiz"), g.indexOf("FROM finais f\n  JOIN final_raiz"));
+    assert.doesNotMatch(saida, /identificador|cpf|nome|telefone|celular|email/i);
   });
 
   test("nenhuma query usa o relógio do banco (réplica ~9 min adiantada) e todas são parametrizadas", () => {
@@ -881,6 +1040,53 @@ describe("HTTP de ponta a ponta (/nps/v1/*)", () => {
     assert.equal((await comoChat("/nps/v1/contato?unidade=lush_ipiranga&locacao=8001")).status, 200);
   });
 
+  const postarG = (corpo, { id = "k1", seg = S1 } = {}) => {
+    const bruto = JSON.stringify(corpo);
+    const ts = String(Math.floor(Date.now() / 1000));
+    return fetch(base + "/nps/v1/recentes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-LHG-Key-Id": id,
+        "X-LHG-Timestamp": ts,
+        "X-LHG-Signature": hmac.assinarNps(seg, "POST", "/nps/v1/recentes", ts, bruto),
+      },
+      body: bruto,
+    });
+  };
+
+  test("G (chave do NPS): 200 {itens} sem dado pessoal, no-store; chaves do Chat LHG e do painel → 403; 400", async () => {
+    pool.ignorarJanela = true;
+    const ok =await postarG({ unidade: "lush_ipiranga", prefixo3: "777", minutos: 120 });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get("cache-control"), "no-store");
+    const j = await ok.json();
+    assert.deepEqual(Object.keys(j), ["itens"]);
+    assert.equal(j.itens.length, 10);
+    assert.deepEqual(j.itens[0], {
+      locacao_raiz_ref: "9211", suite: 211, categoria_id: 17, fim: "2026-11-07T11:21:00-03:00", status_suite: "LIMPEZA",
+    });
+    assert.deepEqual((await (await postarG({ unidade: "lush_ipiranga", prefixo3: "999" })).json()), { itens: [] });
+    assert.equal((await postarG({ unidade: "lush_ipiranga", prefixo3: "777" }, { id: "chat", seg: SC })).status, 403);
+    assert.equal((await postarG({ unidade: "lush_ipiranga", prefixo3: "777" }, { id: "painel", seg: SP })).status, 403);
+    assert.equal((await postarG({ unidade: "lush_ipiranga", prefixo3: "77" })).status, 400);
+    assert.equal((await postarG({ unidade: "lush_ipiranga", prefixo3: "777", minutos: 500 })).status, 400);
+  });
+
+  test("G: 20 por minuto por UNIDADE → 429 {motivo: cota_unidade} antes do banco; outra unidade segue", async () => {
+    const n = pool.chamadas.length;
+    const status = [];
+    for (let i = 0; i < 21; i++) status.push((await postarG({ unidade: "tout", prefixo3: "123" })).status);
+    assert.equal(status.filter((x) => x === 200).length, 20);
+    const r = await postarG({ unidade: "tout", prefixo3: "123" });
+    assert.equal(r.status, 429);
+    const j = await r.json();
+    assert.equal(j.motivo, "cota_unidade");
+    assert.ok(j.retry_after > 0 && j.retry_after <= 60);
+    assert.equal(pool.chamadas.length - n, 20); // os recusados nem chegam ao banco
+    assert.equal((await postarG({ unidade: "liv", prefixo3: "123" })).status, 200);
+  });
+
   test("auditoria: chave, unidade e resultado no log; nenhum segredo, assinatura ou TELEFONE", () => {
     const tudo = logs.join("\n");
     assert.match(tudo, /nps\.estadia key=k1 unidade=lush_ipiranga suite=101 estado=ativa/);
@@ -907,6 +1113,12 @@ describe("HTTP de ponta a ponta (/nps/v1/*)", () => {
     for (const linha of logs.filter((l) => l.includes("confirmar_cpf"))) {
       const resto = linha.replace(/raiz=\d+/, "").replace(/restantes=\d/, "");
       assert.doesNotMatch(resto, /prefix|\b(123|456|90[1-3]|99[7-9]|12)\b/);
+    }
+    assert.match(tudo, /nps\.recentes key=k1 unidade=lush_ipiranga minutos=120 itens=10 \d+ms/);
+    assert.match(tudo, /nps\.recentes key=k1 unidade=tout resultado=cota_esgotada/);
+    for (const linha of logs.filter((l) => l.includes("nps.recentes"))) {
+      const resto = linha.replace(/minutos=\d+/, "").replace(/itens=\d+/, "").replace(/\d+ms/, "");
+      assert.doesNotMatch(resto, /prefix|\b(123|777|999|77)\b/);
     }
     for (const s of [S1, S2, SC, SP]) assert.ok(!tudo.includes(s));
     assert.doesNotMatch(tudo, /[0-9a-f]{64}/);
