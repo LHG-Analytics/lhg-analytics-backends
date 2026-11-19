@@ -10,7 +10,8 @@ import { allTenants } from './tenant/tenant.registry';
 import { CacheController } from './cache/cache.controller';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody: o HMAC do NPS assina o corpo exato (POST /nps/v1/confirmar-cpf).
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.use(compression());
   app.use(helmet());
