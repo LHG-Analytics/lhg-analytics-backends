@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { DateUtilsService, ValidationService } from '@lhg/utils';
+import { OPCOES_DATAS } from '../common/datas-do-servico';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -49,29 +50,11 @@ export class PainelController {
     try {
       this.validationService.validateDateInterval(startDate, endDate);
       // Início: dia comercial 06:00 (igual aos dois controllers do dashboard).
-      const inicio = this.dateUtilsService.convertToDate(startDate, {
-        useUTC: true,
-        startHour: 6,
-        startMinute: 0,
-        startSecond: 0,
-      });
+      const inicio = this.dateUtilsService.convertToDate(startDate, OPCOES_DATAS.company.inicio);
       // Fim da Visão Geral (CompanyController): 05:59:59 de D+1.
-      const fimVisao = this.dateUtilsService.convertToDate(endDate, {
-        isEndDate: true,
-        useUTC: true,
-        endHour: 5,
-        endMinute: 59,
-        endSecond: 59,
-        addDayForEndDate: true,
-      });
+      const fimVisao = this.dateUtilsService.convertToDate(endDate, OPCOES_DATAS.company.fim);
       // Fim das Reservas (BookingsController): 05:59:59 do próprio dia.
-      const fimReservas = this.dateUtilsService.convertToDate(endDate, {
-        isEndDate: true,
-        useUTC: true,
-        endHour: 5,
-        endMinute: 59,
-        endSecond: 59,
-      });
+      const fimReservas = this.dateUtilsService.convertToDate(endDate, OPCOES_DATAS.bookings.fim);
       if (!inicio || !fimVisao || !fimReservas) {
         throw new BadRequestException('Start and end dates are required');
       }
