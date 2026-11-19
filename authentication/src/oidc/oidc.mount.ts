@@ -24,6 +24,7 @@ import { rotaDoPainelTv } from '../painel/painel-tv';
 import { namespaceDoCache, storeRedis } from '../painel/painel-cache';
 import { escopoDeSaida, rotaDeSairDoCliente } from './oidc-cliente-sair';
 import { rotaDeSair } from './oidc-hub-sair';
+import { SenhaService, rotasDaSenha } from './oidc-senha';
 import { interacoes } from './oidc-interactions';
 import { MemoriaDeInteracoes, hostReservado } from './oidc-interacao-memoria';
 import { loadOidcModule } from './oidc-loader';
@@ -572,6 +573,24 @@ export async function mountOidc(
   }
   logger.log(
     `oidc: e-mail=${email.configurado ? 'ok' : 'desligado (sem RESEND_API_KEY)'}`,
+  );
+  // "Esqueci a senha" (o link é {issuer}/senha/nova#<token>); volta ao HUB.
+  const portalDaSenha =
+    safeLaunchUrl(get('HUB_BASE_URL')) ??
+    safeLaunchUrl(get('INVITE_LINK_BASE_URL'));
+  express.use(
+    '/oidc',
+    rotasDaSenha({
+      servico: new SenhaService({
+        prisma,
+        access,
+        logout,
+        email,
+        issuer: s.issuer,
+      }),
+      caminho,
+      hub: portalDaSenha ? new URL(portalDaSenha).origin : null,
+    }),
   );
   logger.log(
     `oidc: admin do HUB=${!users || !invitations ? 'indisponível' : chaveDoProxy() ? 'ok' : 'FECHADO (sem HUB_PROXY_KEY)'}`,
