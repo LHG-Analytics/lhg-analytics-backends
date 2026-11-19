@@ -11,7 +11,7 @@ const JANELA_MS = 60 * 1000;
  * mesmo IP), por isso o limite maior.
  */
 export const LIMITES = {
-  login: 10, // POST /interaction/:uid/login, /conta/senha e /convite(/senha)
+  login: 10, // POST /interaction/:uid/login, /conta/senha, /convite(/senha) e /senha/(esqueci|nova)
   google: 20, // POST /interaction/:uid/google e GET /google/callback
   auth: 60, // GET /auth (e a retomada /auth/:uid)
   token: 300, // POST /token
@@ -27,7 +27,8 @@ export function regraDa(method: string, caminho: string): Regra {
     method === 'POST' &&
     (/^\/interaction\/[^/]+\/login$/.test(caminho) ||
       caminho === '/conta/senha' ||
-      /^\/convite(\/senha)?$/.test(caminho))
+      /^\/convite(\/senha)?$/.test(caminho) ||
+      /^\/senha\/(esqueci|nova)$/.test(caminho))
   ) {
     return 'login';
   }
