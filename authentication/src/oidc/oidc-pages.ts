@@ -432,3 +432,56 @@ export function paginaConviteInvalido(entrar: string | null): string {
     }`,
   );
 }
+
+// ── Nova senha ("esqueci a senha", /oidc/senha/nova) ───────────────────
+
+/** Como o ABRIR_CONVITE: token do FRAGMENTO → POST, sem query string. */
+export const ABRIR_SENHA =
+  "(function(){var h=location.hash.slice(1),t=h.indexOf('token=')===0?h.slice(6):h;try{t=decodeURIComponent(t)}catch(e){t=''}try{history.replaceState(null,'',location.pathname)}catch(e){}if(t){var f=document.getElementById('senha-nova');f.elements.token.value=t;f.submit()}else{document.getElementById('abrindo').hidden=true;document.getElementById('sem-token').hidden=false}})();";
+
+/** GET /senha/nova: só abre o link (o token está no fragmento). */
+export function paginaSenhaAbrindo(acao: string): string {
+  return pagina(
+    'Nova senha — HUB LHG',
+    `<div id="abrindo"><div class="spinner" aria-hidden="true"></div><h1 role="status">Abrindo…</h1></div>
+<div id="sem-token" hidden><h1>Link incompleto</h1><p>Abra o link exatamente como chegou no e-mail. Se não der certo, peça um novo em "Esqueci a senha".</p></div>
+<noscript><p class="erro">Para continuar, ative o JavaScript do navegador.</p></noscript>
+<form id="senha-nova" method="post" action="${html(acao)}"><input type="hidden" name="token" value=""></form>`,
+    ABRIR_SENHA,
+    'saindo',
+  );
+}
+
+/** POST /senha/nova (só o token): o formulário da nova senha. */
+export function paginaNovaSenha(p: {
+  acao: string;
+  token: string;
+  emailMasked: string;
+  erro?: string | null;
+  minimo: number;
+}): string {
+  return pagina(
+    'Nova senha — HUB LHG',
+    `<h1>Criar uma nova senha</h1>
+<p>Conta: ${html(p.emailMasked)}</p>
+${p.erro ? `<p class="erro" role="alert">${html(p.erro)}</p>` : ''}
+<form method="post" action="${html(p.acao)}" autocomplete="off">
+<input type="hidden" name="token" value="${html(p.token)}">
+<label for="senha">Nova senha (mínimo ${p.minimo} caracteres)</label><input id="senha" name="senha" type="password" required minlength="${p.minimo}" autocomplete="new-password">
+<label for="confirmacao">Confirme a nova senha</label><input id="confirmacao" name="confirmacao" type="password" required minlength="${p.minimo}" autocomplete="new-password">
+<button type="submit">Salvar a nova senha</button></form>
+<p class="aviso">Ao salvar, você sai de todos os aparelhos e entra de novo com a senha nova.</p>`,
+  );
+}
+
+/** Link que não serve (não revela o motivo: vencido, usado ou substituído). */
+export function paginaSenhaInvalida(esqueci: string | null): string {
+  return pagina(
+    'Nova senha — HUB LHG',
+    `<h1>Este link não vale mais</h1><p>Ele pode ter vencido (vale 30 minutos), já ter sido usado ou ter sido trocado por um pedido mais novo.</p>${
+      esqueci
+        ? `<p class="aviso"><a href="${html(esqueci)}">Pedir um novo link</a></p>`
+        : ''
+    }`,
+  );
+}
