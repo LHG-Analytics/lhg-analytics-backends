@@ -3,8 +3,10 @@ import { Prisma, PrismaClient, UserStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { NextFunction, Request, Response, Router, json } from 'express';
 import { isIP } from 'net';
-import { requestContext } from '../access/access.service';
+import { AccessService, requestContext } from '../access/access.service';
 import { HUB_PROXY_KEY, chaveDoProxy } from '../common/client-ip';
+import { emailDoConvite } from '../email/convite-email';
+import { EmailService, ErroEmail } from '../email/email.service';
 import { CreateInvitationDto } from '../invitations/dto/invitation.dto';
 import {
   InvitationsService,
@@ -25,7 +27,14 @@ export interface AdminDeps {
   invitations: InvitationsService;
   /** HUB_PROXY_KEY (≥ 32); sem ela, as rotas de admin ficam fechadas. */
   chave?: string | null;
+  /** Envio do convite por e-mail (enviarEmail); sem ele → NAO_CONFIGURADO. */
+  email?: EmailService | null;
+  /** Auditoria do envio (invite.email_sent / invite.email_failed). */
+  access?: AccessService | null;
 }
+
+/** Resultado do envio que sai na resposta do convite (sempre presente). */
+export type EmailDoConvite = { enviado: boolean; erro?: ErroEmail };
 
 /** Quem chama: a pessoa do access token, conferida no banco. */
 interface Chamador {
@@ -666,6 +675,64 @@ export function rotasDeAdmin(d: AdminDeps): Router {
     }),
   );
 
+  /** enviarEmail: boolean opcional (ausente = false); outro tipo → 400. */
+  const lerEnviarEmail = (v: unknown): boolean => {
+    if (v === undefined) return false;
+    if (typeof v !== 'boolean') {
+      throw new ErroAdmin(400, 'INVALID_BODY', 'enviarEmail deve ser boolean');
+    }
+    return v;
+  };
+
+  /**
+   * Envia o convite por e-mail, se pedido, e audita o resultado
+   * (invite.email_sent / invite.email_failed, sem token nem link). Nunca
+   * derruba a criação: o link continua na resposta como reserva.
+   */
+  async function enviarConvite(
+    pedido: boolean,
+    inv: Convite,
+    link: string | null,
+    c: Chamador,
+    req: Request,
+  ): Promise<EmailDoConvite> {
+    if (!pedido) return { enviado: false };
+    let r: EmailDoConvite;
+    if (!d.email || !link) {
+      r = { enviado: false, erro: 'NAO_CONFIGURADO' };
+    } else {
+      try {
+        const nomes = await d.prisma.system.findMany({
+          where: { key: { in: inv.systems } },
+          select: { key: true, name: true },
+        });
+        const porChave = new Map(nomes.map((s) => [s.key, s.name]));
+        r = await d.email.enviar(
+          emailDoConvite({
+            para: inv.email,
+            nome: inv.name,
+            convidadoPor: c.nome,
+            sistemas: inv.systems.map((k) => porChave.get(k) ?? k),
+            expiraEm: inv.expiresAt,
+            link,
+          }),
+        );
+      } catch {
+        r = { enviado: false, erro: 'FALHA_ENVIO' };
+      }
+    }
+    await d.access?.audit({
+      action: r.enviado ? 'invite.email_sent' : 'invite.email_failed',
+      actorUserId: c.id,
+      metadata: {
+        invitationId: inv.id,
+        ...(!r.enviado && r.erro && { reason: r.erro }),
+      },
+      ctx: requestContext(req),
+    });
+    return r;
+  }
+
   r.post(
     '/hub/admin/convites',
     rota(async (req, res, c) => {
@@ -677,7 +744,9 @@ export function rotasDeAdmin(d: AdminDeps): Router {
         'unidade',
         'validade',
         'motivo',
+        'enviarEmail',
       ]);
+      const enviarEmail = lerEnviarEmail(b.enviarEmail);
       const validity = VALIDADE[String(b.validade)];
       if (!validity) {
         throw new ErroAdmin(
@@ -699,10 +768,19 @@ export function rotasDeAdmin(d: AdminDeps): Router {
         { type: 'body', metatype: CreateInvitationDto },
       )) as CreateInvitationDto;
       const criado = await d.invitations.create(dto, ator(c, req));
+      const convite = criado as unknown as Convite;
+      const email = await enviarConvite(
+        enviarEmail,
+        convite,
+        criado.link,
+        c,
+        req,
+      );
       res.status(201).json({
-        convite: convitePublico(criado as unknown as Convite),
+        convite: convitePublico(convite),
         // O link aparece SÓ nesta resposta (o token não é guardado).
         link: criado.link,
+        email,
       });
     }),
   );
@@ -725,13 +803,24 @@ export function rotasDeAdmin(d: AdminDeps): Router {
   r.post(
     '/hub/admin/convites/:id/novo-link',
     rota(async (req, res, c) => {
+      // Corpo opcional (o portal antigo manda vazio): só enviarEmail.
+      const vazio =
+        req.body === undefined ||
+        (req.body &&
+          typeof req.body === 'object' &&
+          !Object.keys(req.body).length);
+      const b = vazio ? {} : corpoCom(req.body, ['enviarEmail']);
+      const enviarEmail = lerEnviarEmail(b.enviarEmail);
       const n = await d.invitations.newLink(
         idDoConvite(req.params.id),
         ator(c, req),
       );
+      const convite = n as unknown as Convite;
+      const email = await enviarConvite(enviarEmail, convite, n.link, c, req);
       res.json({
-        convite: convitePublico(n as unknown as Convite),
+        convite: convitePublico(convite),
         link: n.link,
+        email,
       });
     }),
   );

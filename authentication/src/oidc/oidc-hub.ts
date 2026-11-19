@@ -1,5 +1,5 @@
-import { HttpException, Logger, UnauthorizedException } from '@nestjs/common';
-import { PrismaClient, UserStatus } from '@prisma/client';
+import { HttpException, Logger } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
 import { NextFunction, Request, Response, Router, urlencoded } from 'express';
 import { requestContext } from '../access/access.service';
@@ -93,19 +93,11 @@ export function rotasDoHub(d: HubDeps): Router {
       ) {
         return negar(res);
       }
-      const u = await d.prisma.user.findUnique({
-        where: { publicId: at.accountId },
-        select: { id: true, status: true },
-      });
-      if (!u || u.status !== UserStatus.ACTIVE) return negar(res);
-      try {
-        // As MESMAS regras do GET /api/me/systems (flags e catálogo ativos,
-        // URL segura).
-        return res.json(await d.launcher.listFor(u.id));
-      } catch (e) {
-        if (e instanceof UnauthorizedException) return negar(res);
-        throw e;
-      }
+      // As MESMAS regras do GET /api/me/systems (pessoa ATIVA, flags e
+      // catálogo ativos, URL segura), numa consulta só: token + 1 ida ao banco.
+      const itens = await d.launcher.listForPublicId(String(at.accountId));
+      if (!itens) return negar(res);
+      return res.json(itens);
     }),
   );
 
