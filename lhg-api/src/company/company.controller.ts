@@ -1,6 +1,7 @@
 import { BadRequestException, Controller, Get, HttpException, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { DateUtilsService, ValidationService } from '@lhg/utils';
+import { OPCOES_DATAS } from '../common/datas-do-servico';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -35,20 +36,8 @@ export class CompanyController {
       this.validationService.validateDateInterval(startDate, endDate);
 
       // Dia comercial 06:00 → 05:59 (D+1)
-      const start = this.dateUtilsService.convertToDate(startDate, {
-        useUTC: true,
-        startHour: 6,
-        startMinute: 0,
-        startSecond: 0,
-      });
-      const end = this.dateUtilsService.convertToDate(endDate, {
-        isEndDate: true,
-        useUTC: true,
-        endHour: 5,
-        endMinute: 59,
-        endSecond: 59,
-        addDayForEndDate: true,
-      });
+      const start = this.dateUtilsService.convertToDate(startDate, OPCOES_DATAS.company.inicio);
+      const end = this.dateUtilsService.convertToDate(endDate, OPCOES_DATAS.company.fim);
 
       if (!start || !end) {
         throw new BadRequestException('Start and end dates are required');
