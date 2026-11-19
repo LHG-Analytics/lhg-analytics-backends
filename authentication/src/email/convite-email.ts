@@ -1,4 +1,5 @@
-import { Mensagem, emailComBotao } from './email.service';
+import { Mensagem } from './email.service';
+import { emailDoHub } from './moldura';
 
 export interface DadosEmailConvite {
   para: string;
@@ -26,24 +27,33 @@ export function dataBr(d: Date): string {
 /** E-mail do convite do HUB LHG (o conteúdo combinado com o HUB). */
 export function emailDoConvite(c: DadosEmailConvite): Mensagem {
   const quem = c.convidadoPor?.trim();
-  const sistemas = c.sistemas.length ? c.sistemas.join(', ') : null;
-  const paragrafos = [
-    c.nome?.trim() ? `Olá, ${c.nome.trim()}.` : 'Olá.',
-    quem
-      ? `${quem} convidou você para acessar o HUB LHG, o portal dos sistemas da LHG.`
-      : 'Você foi convidado(a) para acessar o HUB LHG, o portal dos sistemas da LHG.',
-    ...(sistemas ? [`Acesso liberado: ${sistemas}.`] : []),
-    c.expiraEm
-      ? `O convite vale até ${dataBr(c.expiraEm)}.`
-      : 'O convite não tem prazo de validade.',
-    'Para aceitar, defina uma senha ou entre com a sua conta Google.',
-  ];
-  const { html, texto } = emailComBotao({
+  const { html, texto } = emailDoHub({
+    previa: quem
+      ? `${quem} convidou você para o HUB LHG.`
+      : 'Você foi convidado(a) para o HUB LHG.',
     titulo: 'Seu convite para o HUB LHG',
-    paragrafos,
+    paragrafos: [
+      c.nome?.trim() ? `Olá, ${c.nome.trim()}.` : 'Olá.',
+      quem
+        ? `${quem} convidou você para acessar o HUB LHG, o portal dos sistemas da LHG.`
+        : 'Você foi convidado(a) para acessar o HUB LHG, o portal dos sistemas da LHG.',
+      'Para aceitar, defina uma senha ou entre com a sua conta Google.',
+    ],
+    detalhes: [
+      [
+        'Acesso liberado',
+        c.sistemas.length
+          ? c.sistemas.join(', ')
+          : 'Nenhum sistema por enquanto',
+      ],
+      [
+        'Convite válido até',
+        c.expiraEm ? dataBr(c.expiraEm) : 'Sem prazo de validade',
+      ],
+    ],
     botao: { texto: 'Aceitar o convite', url: c.link },
-    rodape:
-      'Se você não esperava este convite, ignore este e-mail. Este endereço não recebe respostas.',
+    motivo:
+      'Você recebeu este e-mail porque um administrador da LHG convidou você. Se não esperava este convite, ignore este e-mail.',
   });
   return { para: c.para, assunto: 'Seu convite para o HUB LHG', html, texto };
 }
