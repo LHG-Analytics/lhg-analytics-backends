@@ -1,7 +1,7 @@
 // Painel TV: GET /painel/mes e /painel/historico, servidor → servidor, com
 // token de serviço (o Render guarda só o SHA-256). No banco migrado de
 // verdade, com o app montado como o main.ts; o lhg-api é um servidor FALSO
-// que confere o JWT interno (ADMIN/LHG) e devolve a Visão Geral e as Reservas.
+// que confere o JWT interno (ADMIN/LHG) e devolve o resumo enxuto (Painel/resumo).
 // Token e chaves de TESTE gerados aqui, na hora.
 import { INestApplication } from '@nestjs/common';
 import * as crypto from 'crypto';
@@ -65,10 +65,8 @@ describe('Painel TV (/painel/mes e /painel/historico)', () => {
       }
       if (p.unit !== 'LHG' || p.role !== 'ADMIN')
         return void res.writeHead(403).end();
-      const m =
-        /^\/([a-z_]+)\/api\/(Company\/kpis|Bookings\/bookings)\/date-range$/.exec(
-          u.pathname,
-        );
+      // O painel usa só o resumo enxuto do lhg-api.
+      const m = /^\/([a-z_]+)\/api\/(Painel\/resumo)$/.exec(u.pathname);
       if (!m) return void res.writeHead(404).end();
       if (falhar.has(m[1])) return void res.writeHead(400).end();
       chamadas.push({
@@ -76,44 +74,20 @@ describe('Painel TV (/painel/mes e /painel/historico)', () => {
         inicio: u.searchParams.get('startDate')!,
         fim: u.searchParams.get('endDate')!,
       });
-      const corpo =
-        m[2] === 'Company/kpis'
-          ? {
-              TotalResult: {
-                totalAllValue: 1000.5,
-                totalAllRentalsApartments: 30,
-              },
-              Clientes: [{ cpf: '00000000000' }],
-            }
-          : {
-              BigNumbers: [
-                { currentDate: { totalAllValue: 200.25, totalAllBookings: 7 } },
-              ],
-              // Como o lhg-api: Getan não tem site (e-commerce 0), só Guia.
-              BigNumbersEcommerce: [
-                {
-                  currentDate: m[1].startsWith('getan_')
-                    ? { totalAllValue: 0, totalAllBookings: 0 }
-                    : { totalAllValue: 80.5, totalAllBookings: 3 },
-                },
-              ],
-              KpiTableByChannelType: [
-                {
-                  bookingsTotalRentalsByChannelType: {
-                    GUIA_GO: 2,
-                    GUIA_SCHEDULED: 1,
-                    INTERNAL: 1,
-                    TOTALALLBOOKINGS: 7,
-                  },
-                  bookingsRevenueByChannelType: {
-                    GUIA_GO: 50,
-                    GUIA_SCHEDULED: 30.25,
-                    INTERNAL: 39.5,
-                    TOTALALLVALUE: 200.25,
-                  },
-                },
-              ],
-            };
+      // Como o lhg-api: Getan não tem site (e-commerce 0), só Guia.
+      const getan = m[1].startsWith('getan_');
+      const corpo = {
+        faturamento: 1000.5,
+        locacoes: 30,
+        faturamentoReservas: 200.25,
+        reservas: 7,
+        reservasEcommerce: getan ? 0 : 3,
+        receitaEcommerce: getan ? 0 : 80.5,
+        reservasGuia: 3,
+        receitaGuia: 80.25,
+        // campo a mais: o painel só repassa os campos conhecidos (nunca isto)
+        Clientes: [{ cpf: '00000000000' }],
+      };
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(corpo));
     });
@@ -219,7 +193,7 @@ describe('Painel TV (/painel/mes e /painel/historico)', () => {
     ).toEqual([]);
     expect(JSON.stringify(r.body)).not.toContain('00000000000');
     expect(
-      chamadas.find((c) => c.caminho === 'liv:Company/kpis')?.inicio,
+      chamadas.find((c) => c.caminho === 'liv:Painel/resumo')?.inicio,
     ).toMatch(/^01\//);
     const antes = chamadas.length;
     expect((await get(`/painel/mes?ano=${ano}&mes=${mes}`)).status).toBe(200);
@@ -267,7 +241,7 @@ describe('Painel TV (/painel/mes e /painel/historico)', () => {
       const ultimo = new Date(Date.UTC(m.ano, m.mes, 0)).getUTCDate();
       const c = chamadas.find(
         (x) =>
-          x.caminho === 'tout:Company/kpis' &&
+          x.caminho === 'tout:Painel/resumo' &&
           x.inicio === `01/${String(m.mes).padStart(2, '0')}/${m.ano}`,
       );
       expect(c?.fim).toBe(

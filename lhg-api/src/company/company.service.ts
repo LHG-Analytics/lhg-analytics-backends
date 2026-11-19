@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PeriodEnum, RentalTypeEnum } from '../common/enums';
 import { TenantPoolService } from '../database/tenant-pool.service';
 import { TenantConfig } from '../tenant/tenant.interfaces';
+import { cteDadosPorCategoria, cteSuitesPorCategoria } from './company-categorias.sql';
 import * as moment from 'moment-timezone';
 import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
@@ -1422,57 +1423,8 @@ export class CompanyService {
     // === IMPLEMENTAÇÃO DO DATATABLESUITEACATEGORY ===
     // Consulta SQL para KPIs por categoria de suíte usando campos corretos do schema
     const suiteCategoryKpisQuery = `
-      WITH suite_category_data AS (
-        SELECT
-          ca.descricao as suite_category_name,
-          COUNT(*) as total_rentals,
-          -- Receita total: (permanencia + ocupadicional + consumo) - desconto
-          -- Importante: la.desconto já contém desconto de locação + desconto de consumo
-          COALESCE(SUM(
-            COALESCE(CAST(la.valortotalpermanencia AS DECIMAL(15,4)), 0) +
-            COALESCE(CAST(la.valortotalocupadicional AS DECIMAL(15,4)), 0) +
-            COALESCE(
-              (
-                SELECT COALESCE(SUM(
-                  CAST(sei.precovenda AS DECIMAL(15,4)) * CAST(sei.quantidade AS DECIMAL(15,4))
-                ), 0)
-                FROM vendalocacao vl
-                INNER JOIN saidaestoque se ON vl.id_saidaestoque = se.id
-                INNER JOIN saidaestoqueitem sei ON se.id = sei.id_saidaestoque
-                WHERE vl.id_locacaoapartamento = la.id_apartamentostate
-                  AND sei.cancelado IS NULL
-              ), 0
-            ) -
-            COALESCE(CAST(la.desconto AS DECIMAL(15,4)), 0)
-          ), 0) as total_value,
-          -- Receita apenas de locação líquida (valorliquidolocacao já contém desconto aplicado)
-          COALESCE(SUM(
-            COALESCE(CAST(la.valorliquidolocacao AS DECIMAL(15,4)), 0)
-          ), 0) as rental_revenue,
-          -- Tempo total de ocupação em segundos
-          COALESCE(SUM(
-            EXTRACT(EPOCH FROM la.datafinaldaocupacao - la.datainicialdaocupacao)
-          ), 0) as total_occupied_time
-        FROM locacaoapartamento la
-        INNER JOIN apartamentostate aps ON la.id_apartamentostate = aps.id
-        INNER JOIN apartamento a ON aps.id_apartamento = a.id
-        INNER JOIN categoriaapartamento ca ON a.id_categoriaapartamento = ca.id
-        WHERE la.datainicialdaocupacao >= '${formattedStart}'::timestamp
-          AND la.datainicialdaocupacao <= '${formattedEnd}'::timestamp
-          AND la.fimocupacaotipo = 'FINALIZADA'
-          AND ca.id IN (${suiteIdsSqlList})
-          GROUP BY ca.id, ca.descricao
-      ),
-      suite_counts AS (
-        SELECT
-          ca.descricao as suite_category_name,
-          COUNT(DISTINCT a.id) as total_suites_in_category
-        FROM categoriaapartamento ca
-        INNER JOIN apartamento a ON ca.id = a.id_categoriaapartamento
-        WHERE ca.id IN (${suiteIdsSqlList})
-          AND a.dataexclusao IS NULL
-          GROUP BY ca.id, ca.descricao
-      ),
+      WITH suite_category_data AS (${cteDadosPorCategoria(suiteIdsSqlList, formattedStart, formattedEnd)}      ),
+      suite_counts AS (${cteSuitesPorCategoria(suiteIdsSqlList)}      ),
       all_unavailable_periods AS (
         -- União de todos os períodos de indisponibilidade (limpeza + defeitos/manutenções)
         -- Todos cortados para ficarem dentro do período de consulta

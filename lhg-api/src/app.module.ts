@@ -15,6 +15,7 @@ import { GovernanceModule } from './governance/governance.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { CompanyModule } from './company/company.module';
 import { ConsolidatedModule } from './consolidated/consolidated.module';
+import { PainelModule } from './painel/painel.module';
 import { NpsModule } from './nps/nps.module';
 
 @Module({
@@ -36,6 +37,7 @@ import { NpsModule } from './nps/nps.module';
     GovernanceModule,
     BookingsModule,
     CompanyModule,
+    PainelModule,
   ],
   controllers: [HealthController],
   providers: [
