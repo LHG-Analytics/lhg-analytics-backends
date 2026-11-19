@@ -12,7 +12,7 @@ import {
   InvitationsService,
   situacao,
 } from '../invitations/invitations.service';
-import { Actor, UsersService } from '../users/users.service';
+import { Actor, UsersService, travaDeAdmins } from '../users/users.service';
 import { CLIENTE_HUB } from './oidc-hub';
 
 /** Login recente exigido para inativar e para mudar acesso (2g, item b). */
@@ -615,28 +615,9 @@ export function rotasDeAdmin(d: AdminDeps): Router {
       if (u.status === UserStatus.INACTIVE) {
         return res.json({ status: 'INACTIVE', mudou: false });
       }
-      await d.users.remove(u.id, ator(c, req), async (tx) => {
-        // Trava as linhas dos admins da LHG ativos: duas inativações ao
-        // mesmo tempo se enfileiram, e a segunda vê o resultado da primeira.
-        const admins = await tx.$queryRaw<{ id: number }[]>`
-          SELECT id FROM "User"
-           WHERE role = 'ADMIN' AND unit = 'LHG' AND status = 'ACTIVE'
-           FOR UPDATE`;
-        if (!admins.some((a) => a.id === c.id)) {
-          throw new ErroAdmin(
-            403,
-            'FORBIDDEN_NOT_ADMIN',
-            'Só administradores da LHG',
-          );
-        }
-        if (!admins.some((a) => a.id !== u.id)) {
-          throw new ErroAdmin(
-            409,
-            'LAST_ADMIN',
-            'Não é possível ficar sem nenhum administrador da LHG ativo',
-          );
-        }
-      });
+      // A mesma trava da API legada (users.service): reconfere que quem pede
+      // ainda é admin e nunca deixa zero admin da LHG ativo (FOR UPDATE).
+      await d.users.remove(u.id, ator(c, req), travaDeAdmins(c.id, u.id));
       res.json({ status: 'INACTIVE', mudou: true });
     }),
   );
