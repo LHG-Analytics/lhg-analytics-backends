@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, UserStatus } from '@prisma/client';
 import { OidcLogoutService } from '../oidc/oidc-logout.service';
@@ -27,6 +33,64 @@ export interface Actor {
 export type ChecagemNaTransacao = (
   tx: Prisma.TransactionClient,
 ) => Promise<void>;
+
+/** Recusa de administração com código estável (painel do HUB e API legada). */
+export function recusaDeAdmin(
+  status: 403 | 409,
+  code: string,
+  message: string,
+): ForbiddenException | ConflictException {
+  return status === 403
+    ? new ForbiddenException({
+        statusCode: 403,
+        error: 'Forbidden',
+        message,
+        code,
+      })
+    : new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        message,
+        code,
+      });
+}
+
+/** Administrador da LHG ativo (quem usa o painel admin do HUB). */
+const ehAdminLhg = (u: { role: unknown; unit: unknown; status: unknown }) =>
+  u.role === 'ADMIN' && u.unit === 'LHG' && u.status === UserStatus.ACTIVE;
+
+/**
+ * Nunca ficar sem nenhum administrador da LHG ativo, DENTRO da transação:
+ * trava as linhas dos admins ativos (duas mudanças ao mesmo tempo se
+ * enfileiram, e a segunda vê o resultado da primeira) e recusa se `alvoId`
+ * for o último. Com `chamadorId`, reconfere também que quem pede ainda é
+ * admin (o JWT pode estar velho).
+ */
+export function travaDeAdmins(
+  chamadorId: number | undefined,
+  alvoId: number,
+): ChecagemNaTransacao {
+  return async (tx) => {
+    const admins = await tx.$queryRaw<{ id: number }[]>`
+      SELECT id FROM "User"
+       WHERE role = 'ADMIN' AND unit = 'LHG' AND status = 'ACTIVE'
+       FOR UPDATE`;
+    if (chamadorId !== undefined && !admins.some((a) => a.id === chamadorId)) {
+      throw recusaDeAdmin(
+        403,
+        'FORBIDDEN_NOT_ADMIN',
+        'Só administradores da LHG',
+      );
+    }
+    if (!admins.some((a) => a.id !== alvoId)) {
+      throw recusaDeAdmin(
+        409,
+        'LAST_ADMIN',
+        'Não é possível ficar sem nenhum administrador da LHG ativo',
+      );
+    }
+  };
+}
 
 @Injectable()
 export class UsersService {
@@ -214,10 +278,30 @@ export class UsersService {
       data.email = normalizeEmail(data.email);
     }
 
+    // Tirar o ADMIN/LHG de alguém (perfil ou unidade): as travas do painel do
+    // HUB, também aqui. Ninguém rebaixa a si mesmo, e nunca fica zero admin.
+    const perdeAdmin =
+      ehAdminLhg(user) &&
+      ((data.role ?? user.role) !== 'ADMIN' ||
+        (data.unit ?? user.unit) !== 'LHG');
+    if (perdeAdmin && actor.id === id) {
+      throw recusaDeAdmin(
+        409,
+        'SELF_ROLE_CHANGE',
+        'Você não pode tirar o seu próprio perfil de administrador da LHG',
+      );
+    }
+
     try {
-      return await this.prisma.prismaOnline.user.update({
-        where: { id },
-        data: { ...user, ...data },
+      if (!perdeAdmin) {
+        return await this.prisma.prismaOnline.user.update({
+          where: { id },
+          data: { ...user, ...data },
+        });
+      }
+      return await this.prisma.prismaOnline.$transaction(async (tx) => {
+        await travaDeAdmins(actor.id, id)(tx);
+        return tx.user.update({ where: { id }, data: { ...user, ...data } });
       });
     } catch (error) {
       if (isEmailConflict(error)) throw emailInUse();
@@ -233,8 +317,19 @@ export class UsersService {
   async remove(id: number, actor: Actor = {}, antes?: ChecagemNaTransacao) {
     const user = await this.findById(id); // Verifica se o usuário existe
 
+    // As travas do painel do HUB valem em QUALQUER caminho (inclusive o
+    // DELETE /users/:id legado): ninguém se inativa e nunca fica zero admin.
+    if (actor.id === id) {
+      throw recusaDeAdmin(
+        409,
+        'SELF_DEACTIVATION',
+        'Você não pode inativar a si mesmo',
+      );
+    }
+
     if (user.status !== UserStatus.INACTIVE) {
       await this.prisma.prismaOnline.$transaction(async (tx) => {
+        if (ehAdminLhg(user)) await travaDeAdmins(actor.id, id)(tx);
         if (antes) await antes(tx);
         await tx.user.update({
           where: { id },
@@ -349,6 +444,15 @@ export class UsersService {
         }
         const atuais = new Set(ativos.map((a) => a.systemKey));
         const revogar = ativos.filter((a) => !desejados.includes(a.systemKey));
+        // Ninguém tira os PRÓPRIOS acessos (conceder a si mesmo pode): a mesma
+        // trava do painel do HUB, também na API legada (PUT /users/:id/systems).
+        if (actor.id === id && revogar.length) {
+          throw recusaDeAdmin(
+            409,
+            'SELF_ACCESS_CHANGE',
+            'Você não pode tirar os próprios acessos',
+          );
+        }
         const conceder = desejados.filter((k) => !atuais.has(k));
         const agora = new Date();
 
