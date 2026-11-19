@@ -34,9 +34,9 @@ function lhgApiFalso() {
   const buscar = (async (url: string) => {
     const u = new URL(url);
     const slug = u.pathname.split('/')[1];
-    const company = u.pathname.includes('Company');
-    if (company)
-      chamadas.push({ slug, inicio: u.searchParams.get('startDate')! });
+    if (!u.pathname.endsWith('/api/Painel/resumo'))
+      return new Response('{}', { status: 404 });
+    chamadas.push({ slug, inicio: u.searchParams.get('startDate')! });
     const e = erro.get(slug);
     if (e === 'timeout')
       throw Object.assign(new Error('timeout'), { name: 'TimeoutError' });
@@ -44,20 +44,21 @@ function lhgApiFalso() {
       return new Response(
         JSON.stringify({
           message:
-            'Failed to fetch Company KPIs: timeout exceeded when trying to connect',
+            'Failed to fetch Painel resumo: timeout exceeded when trying to connect',
         }),
         { status: 400 },
       );
     return new Response(
-      JSON.stringify(
-        company
-          ? { TotalResult: { totalAllValue: 10, totalAllRentalsApartments: 1 } }
-          : {
-              BigNumbers: [
-                { currentDate: { totalAllValue: 5, totalAllBookings: 1 } },
-              ],
-            },
-      ),
+      JSON.stringify({
+        faturamento: 10,
+        locacoes: 1,
+        faturamentoReservas: 5,
+        reservas: 1,
+        reservasEcommerce: 0,
+        receitaEcommerce: 0,
+        reservasGuia: 1,
+        receitaGuia: 5,
+      }),
       { status: 200, headers: { 'content-type': 'application/json' } },
     );
   }) as unknown as typeof fetch;
@@ -242,7 +243,7 @@ describe('Painel TV — histórico', () => {
     const lento = (async (url: string, init?: RequestInit) => {
       const u = new URL(url);
       const slug = u.pathname.split('/')[1];
-      if (!u.pathname.includes('Company')) return api.buscar(url, init);
+      if (!u.pathname.includes('Painel')) return api.buscar(url, init);
       emVoo.set(slug, (emVoo.get(slug) ?? 0) + 1);
       maxUnidade = Math.max(maxUnidade, emVoo.get(slug)!);
       maxTotal = Math.max(
@@ -276,7 +277,7 @@ describe('Painel TV — histórico', () => {
     const lento = (async (url: string, init?: RequestInit) => {
       const u = new URL(url);
       const slug = u.pathname.split('/')[1];
-      if (!u.pathname.includes('Company')) return api.buscar(url, init);
+      if (!u.pathname.includes('Painel')) return api.buscar(url, init);
       emVoo.set(slug, (emVoo.get(slug) ?? 0) + 1);
       maxUnidade = Math.max(maxUnidade, emVoo.get(slug)!);
       maxTotal = Math.max(
