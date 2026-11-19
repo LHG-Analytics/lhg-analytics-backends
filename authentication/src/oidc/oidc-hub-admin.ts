@@ -12,7 +12,13 @@ import {
   InvitationsService,
   situacao,
 } from '../invitations/invitations.service';
-import { Actor, UsersService, travaDeAdmins } from '../users/users.service';
+import {
+  Actor,
+  UsersService,
+  travaDeAdmins,
+  travaHubAdmins,
+} from '../users/users.service';
+import { HUB_ADMIN, RegraDoAdmin, ehPermissao } from '../access/permissoes';
 import { CLIENTE_HUB } from './oidc-hub';
 
 /** Login recente exigido para inativar e para mudar acesso (2g, item b). */
@@ -31,6 +37,8 @@ export interface AdminDeps {
   email?: EmailService | null;
   /** Auditoria do envio (invite.email_sent / invite.email_failed). */
   access?: AccessService | null;
+  /** Quem usa o painel: HUB_ADMIN_REGRA ('perfil' = ADMIN/LHG; 'flag' = 'hub-admin'). */
+  regra?: RegraDoAdmin;
 }
 
 /** Resultado do envio que sai na resposta do convite (sempre presente). */
@@ -41,7 +49,10 @@ interface Chamador {
   id: number;
   publicId: string;
   nome: string | null;
+  /** Pode usar o painel, pela regra vigente. */
   admin: boolean;
+  /** Tem a permissão 'hub-admin' ativa (independe da regra). */
+  hubAdmin: boolean;
   sessionUid?: string;
 }
 
@@ -245,6 +256,7 @@ export function rotasDeAdmin(d: AdminDeps): Router {
   const logger = new Logger('OIDC');
   const r = Router();
   const chave = d.chave === undefined ? chaveDoProxy() : d.chave;
+  const regra: RegraDoAdmin = d.regra ?? 'perfil';
 
   r.use('/hub/admin', json({ limit: '16kb' }), (_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -278,16 +290,28 @@ export function rotasDeAdmin(d: AdminDeps): Router {
         status: true,
         role: true,
         unit: true,
+        systemAccesses: {
+          where: {
+            systemKey: HUB_ADMIN,
+            revokedAt: null,
+            system: { active: true },
+          },
+          select: { id: true },
+          take: 1,
+        },
       },
     });
     if (!u || u.status !== UserStatus.ACTIVE) {
       throw new ErroAdmin(401, 'INVALID_TOKEN', 'Não autorizado');
     }
+    const hubAdmin = u.systemAccesses.length > 0;
     return {
       id: u.id,
       publicId: u.publicId,
       nome: u.name,
-      admin: u.role === 'ADMIN' && u.unit === 'LHG',
+      admin:
+        regra === 'flag' ? hubAdmin : u.role === 'ADMIN' && u.unit === 'LHG',
+      hubAdmin,
       sessionUid: at.sessionUid,
     };
   }
@@ -297,7 +321,9 @@ export function rotasDeAdmin(d: AdminDeps): Router {
       throw new ErroAdmin(
         403,
         'FORBIDDEN_NOT_ADMIN',
-        'Só administradores da LHG',
+        regra === 'flag'
+          ? 'Só administradores do HUB'
+          : 'Só administradores da LHG',
       );
     }
   };
@@ -387,7 +413,12 @@ export function rotasDeAdmin(d: AdminDeps): Router {
     '/hub/admin/eu',
     rota(
       async (_req, res, c) => {
-        res.json({ id: c.publicId, nome: c.nome, admin: c.admin });
+        res.json({
+          id: c.publicId,
+          nome: c.nome,
+          admin: c.admin,
+          hubAdmin: c.hubAdmin,
+        });
       },
       { soAdmin: false },
     ),
@@ -587,10 +618,23 @@ export function rotasDeAdmin(d: AdminDeps): Router {
           'Você não pode tirar os próprios acessos',
         );
       }
+      // Permissão ('hub-admin'): só quem a tem dá ou tira, nas DUAS regras,
+      // conferido de novo na transação (FOR UPDATE). Nada do pedido é gravado
+      // se recusado.
+      const mexeEmPermissao = [...conceder, ...revogar].some(ehPermissao);
+      if (mexeEmPermissao && !c.hubAdmin) {
+        throw new ErroAdmin(
+          403,
+          'HUB_ADMIN_REQUIRED',
+          'Só quem é admin do HUB pode dar ou tirar essa permissão',
+        );
+      }
       const r2 = await d.users.changeSystems(
         u.id,
         { conceder, revogar },
         ator(c, req),
+        mexeEmPermissao ? travaHubAdmins(c.id, null) : undefined,
+        { permissoes: true },
       );
       res.json({
         sistemas: r2.systems,
@@ -617,7 +661,15 @@ export function rotasDeAdmin(d: AdminDeps): Router {
       }
       // A mesma trava da API legada (users.service): reconfere que quem pede
       // ainda é admin e nunca deixa zero admin da LHG ativo (FOR UPDATE).
-      await d.users.remove(u.id, ator(c, req), travaDeAdmins(c.id, u.id));
+      // Quem pede ainda é admin pela regra vigente (conferido na transação);
+      // o "nunca zero" (admin da LHG e admin do HUB) o serviço garante.
+      await d.users.remove(
+        u.id,
+        ator(c, req),
+        regra === 'flag'
+          ? travaHubAdmins(c.id, null)
+          : travaDeAdmins(c.id, u.id),
+      );
       res.json({ status: 'INACTIVE', mudou: true });
     }),
   );

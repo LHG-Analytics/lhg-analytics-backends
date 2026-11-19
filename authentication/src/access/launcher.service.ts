@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, UserStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ehPermissao } from './permissoes';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -101,27 +102,31 @@ export class LauncherService {
     if (!linhas.length || linhas[0].status !== UserStatus.ACTIVE) return null;
     const base = this.hubBase();
 
-    return linhas
-      .filter((s): s is LinhaDoLauncher & { key: string; name: string } =>
-        Boolean(s.key && s.name),
-      )
-      .map((s) => {
-        const rota = ROTA_DO_HUB[s.key];
-        const launchUrl = rota
-          ? base && safeLaunchUrl(base + rota)
-          : safeLaunchUrl(s.launchUrl);
-        return launchUrl
-          ? {
-              key: s.key,
-              name: s.name,
-              description: s.description,
-              launchUrl,
-              icon: s.icon,
-              order: Number(s.order ?? 0),
-            }
-          : null;
-      })
-      .filter((x): x is LauncherItem => x !== null)
-      .sort((a, b) => a.order - b.order || a.key.localeCompare(b.key));
+    return (
+      linhas
+        // Permissões (ex.: 'hub-admin') nunca viram cartão.
+        .filter(
+          (s): s is LinhaDoLauncher & { key: string; name: string } =>
+            Boolean(s.key && s.name) && !ehPermissao(s.key as string),
+        )
+        .map((s) => {
+          const rota = ROTA_DO_HUB[s.key];
+          const launchUrl = rota
+            ? base && safeLaunchUrl(base + rota)
+            : safeLaunchUrl(s.launchUrl);
+          return launchUrl
+            ? {
+                key: s.key,
+                name: s.name,
+                description: s.description,
+                launchUrl,
+                icon: s.icon,
+                order: Number(s.order ?? 0),
+              }
+            : null;
+        })
+        .filter((x): x is LauncherItem => x !== null)
+        .sort((a, b) => a.order - b.order || a.key.localeCompare(b.key))
+    );
   }
 }
