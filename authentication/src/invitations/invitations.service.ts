@@ -14,6 +14,7 @@ import {
 } from '../access/access.service';
 import { safeLaunchUrl } from '../access/launcher.service';
 import { emailInUse, isEmailConflict, normalizeEmail } from '../common/email';
+import { ehPermissao, permissaoNaoPermitida } from '../access/permissoes';
 import { hashPassword, looksLikeBcryptHash } from '../common/password';
 import { PrismaService } from '../prisma/prisma.service';
 import { Actor } from '../users/users.service';
@@ -101,6 +102,11 @@ export class InvitationsService {
   /** POST /api/invitations (ADMIN da LHG). O token aparece SÓ nesta resposta. */
   async create(dto: CreateInvitationDto, actor: Actor = {}) {
     const email = normalizeEmail(dto.email);
+    // Permissão (ex.: 'hub-admin') nunca entra por convite: só pela ficha.
+    const permissoes = (dto.systems ?? []).filter(ehPermissao);
+    if (permissoes.length) {
+      throw permissaoNaoPermitida(permissoes, 'PERMISSION_NOT_IN_INVITE');
+    }
     const systems = await this.access.resolveSystems(dto.systems);
     if (systems.includes(ANALYTICS) && (!dto.role || !dto.unit)) {
       throw profileRequired();

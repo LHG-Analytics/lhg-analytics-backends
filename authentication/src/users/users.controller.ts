@@ -23,7 +23,7 @@ import { UnitsGuard } from '../auth/guards/units.guard';
 import { requestContext } from '../access/access.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SetSystemsDto } from './dto/set-systems.dto';
-import { Actor, UsersService } from './users.service';
+import { Actor, UsersService, travaDeAdminsSeAlvoAdmin } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 // Quem está logado (o JwtAuthGuard põe em req.user) e de onde veio.
@@ -111,6 +111,13 @@ export class UsersController {
   // Inativa (não apaga a linha); a resposta é a mesma de antes.
   @Delete(':id')
   remove(@Param('id') id: string, @Request() req: any) {
-    return this.usersService.remove(+id, actorOf(req));
+    // API do Analytics: para inativar um admin da LHG, quem pede tem de AINDA
+    // ser admin no banco (o JWT pode estar velho), conferido na transação.
+    const actor = actorOf(req);
+    return this.usersService.remove(
+      +id,
+      actor,
+      travaDeAdminsSeAlvoAdmin(actor.id, +id),
+    );
   }
 }
