@@ -37,6 +37,8 @@ const SERVICE_PREFIXES: Record<ServiceType, string> = {
 };
 
 const CACHE_KEY_PREFIX = 'kpi';
+/** Instante (UTC) nas chaves CUSTOM: AAAA-MM-DDTHHmmss. */
+const INSTANTE_DA_CHAVE = 'YYYY-MM-DD[T]HHmmss';
 // Dimensionado pelo registry: (unidades + consolidated + folga) × 4 serviços × ~15 slots.
 // Escala sozinho quando novas unidades (Goiânia) entrarem no tenant registry.
 // (só usado no fallback em memória — o Redis expira sozinho via TTL nativo)
@@ -167,8 +169,13 @@ export class KpiCacheService implements OnModuleInit, OnModuleDestroy {
   ): string {
     const prefix = SERVICE_PREFIXES[service];
     if (period === CachePeriodEnum.CUSTOM && customDates) {
-      const start = moment(customDates.start).format('YYYY-MM-DD');
-      const end = moment(customDates.end).format('YYYY-MM-DD');
+      // O INSTANTE exato (UTC, ao segundo), e não só a data: períodos com as
+      // mesmas datas e horários diferentes (ex.: o pedido do dashboard "dia 1
+      // até ontem", das 06:00 UTC, e a previsão do mês, das 06:00 de Brasília)
+      // colidiam e um recebia o cálculo do outro. Sem ':' no instante, para não
+      // confundir os separadores da chave.
+      const start = moment.utc(customDates.start).format(INSTANTE_DA_CHAVE);
+      const end = moment.utc(customDates.end).format(INSTANTE_DA_CHAVE);
       return `${CACHE_KEY_PREFIX}:${unit}:${prefix}:custom:${start}:${end}`;
     }
     return `${CACHE_KEY_PREFIX}:${unit}:${prefix}:${period.toLowerCase()}`;
