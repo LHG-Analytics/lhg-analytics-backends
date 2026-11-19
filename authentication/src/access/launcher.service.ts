@@ -1,7 +1,20 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { UserStatus } from '@prisma/client';
+import { Prisma, UserStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Linha da consulta única do launcher (sistema nulo = sem flag ativa). */
+type LinhaDoLauncher = {
+  status: string;
+  key: string | null;
+  name: string | null;
+  description: string | null;
+  launchUrl: string | null;
+  icon: string | null;
+  order: number | null;
+};
 
 /** Um item do launcher do HUB. */
 export interface LauncherItem {
@@ -51,26 +64,48 @@ export class LauncherService {
   }
 
   /**
+   * A pessoa (status) e os sistemas das flags ATIVAS dela no catálogo ativo,
+   * numa consulta só (o banco fica longe: cada ida e volta conta). Sem a
+   * pessoa → []; com a pessoa e sem sistemas → uma linha com key nula.
+   */
+  private linhas(onde: Prisma.Sql) {
+    return this.prisma.prismaOnline.$queryRaw<LinhaDoLauncher[]>`
+      SELECT u.status::text AS status, s.key, s.name, s.description,
+             s."launchUrl", s.icon, s."order"
+      FROM "User" u
+      LEFT JOIN "SystemAccess" a ON a."userId" = u.id AND a."revokedAt" IS NULL
+      LEFT JOIN "System" s ON s.key = a."systemKey" AND s.active
+      WHERE ${onde}`;
+  }
+
+  /**
    * Sistemas que a pessoa pode abrir: só as flags ATIVAS dela, só o catálogo
    * ativo e só com URL segura (sem URL = fora da lista), na ordem do catálogo.
    */
   async listFor(userId: number): Promise<LauncherItem[]> {
-    const user = await this.prisma.prismaOnline.user.findUnique({
-      where: { id: userId },
-      select: { status: true },
-    });
-    if (!user || user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Sessão inválida');
-    }
+    const itens = this.itens(await this.linhas(Prisma.sql`u.id = ${userId}`));
+    if (!itens) throw new UnauthorizedException('Sessão inválida');
+    return itens;
+  }
 
-    const acessos = await this.prisma.prismaOnline.systemAccess.findMany({
-      where: { userId, revokedAt: null, system: { active: true } },
-      include: { system: true },
-    });
+  /** O mesmo, pelo publicId (o sub do login central); null = sem pessoa ativa. */
+  async listForPublicId(publicId: string): Promise<LauncherItem[] | null> {
+    if (!UUID.test(publicId)) return null;
+    return this.itens(
+      await this.linhas(Prisma.sql`u."publicId" = ${publicId}::uuid`),
+    );
+  }
+
+  /** null = pessoa inexistente ou não ATIVA. */
+  private itens(linhas: LinhaDoLauncher[]): LauncherItem[] | null {
+    if (!linhas.length || linhas[0].status !== UserStatus.ACTIVE) return null;
     const base = this.hubBase();
 
-    return acessos
-      .map(({ system: s }) => {
+    return linhas
+      .filter((s): s is LinhaDoLauncher & { key: string; name: string } =>
+        Boolean(s.key && s.name),
+      )
+      .map((s) => {
         const rota = ROTA_DO_HUB[s.key];
         const launchUrl = rota
           ? base && safeLaunchUrl(base + rota)
@@ -82,7 +117,7 @@ export class LauncherService {
               description: s.description,
               launchUrl,
               icon: s.icon,
-              order: s.order,
+              order: Number(s.order ?? 0),
             }
           : null;
       })

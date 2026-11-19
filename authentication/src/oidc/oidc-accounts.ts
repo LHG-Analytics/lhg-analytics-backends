@@ -9,6 +9,19 @@ export type OidcDenial = 'inactive' | 'no_flag';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** A pessoa + a flag do cliente, lidas numa consulta só (OidcAccounts.conta). */
+type LinhaConta = {
+  id: number;
+  publicId: string;
+  email: string;
+  name: string | null;
+  emailVerifiedAt: Date | null;
+  status: UserStatus;
+  systemKey: string | null;
+  flag: boolean;
+};
+type Recusa = { motivo: OidcDenial; userId?: number; systemKey?: string };
+
 /**
  * Origem da requisição para a auditoria. SEMPRE pelo req do Express (o IP
  * resolvido pelo trust proxy do serviço), NUNCA pelo ctx.ip do provedor: com
@@ -30,45 +43,44 @@ export class OidcAccounts {
     private readonly errors: any,
   ) {}
 
-  private pessoa(publicId: string) {
-    if (!UUID.test(publicId ?? '')) return null;
-    return this.prisma.user.findUnique({ where: { publicId } });
-  }
-
-  /** A flag exigida pelo cliente (null = basta a pessoa estar ATIVA). */
-  private async systemKeyDo(clientId: string): Promise<string | null> {
-    const c = await this.prisma.oidcClient.findUnique({
-      where: { clientId },
-      select: { systemKey: true },
-    });
-    return c?.systemKey ?? null;
-  }
-
-  /** Pode usar este cliente? Devolve o motivo da recusa, ou null se pode. */
-  async recusa(
+  /**
+   * A pessoa, a flag exigida pelo cliente (OidcClient.systemKey; null = basta
+   * estar ATIVA) e se ela tem essa flag (acesso não revogado de um sistema
+   * ativo), numa ida ao banco só: o banco de usuários fica longe do serviço e
+   * cada consulta em sequência custa uma ida e volta. Sem clientId, só a pessoa.
+   */
+  private async conta(
     publicId: string,
-    clientId: string,
-  ): Promise<{
-    motivo: OidcDenial;
-    userId?: number;
-    systemKey?: string;
-  } | null> {
-    const u = await this.pessoa(publicId);
+    clientId: string | null,
+  ): Promise<LinhaConta | null> {
+    if (!UUID.test(publicId ?? '')) return null;
+    const [l] = await this.prisma.$queryRaw<LinhaConta[]>`
+      SELECT u.id, u."publicId"::text AS "publicId", u.email, u.name,
+             u."emailVerifiedAt", u.status::text AS status, c."systemKey",
+             (c."systemKey" IS NOT NULL AND EXISTS (
+               SELECT 1 FROM "SystemAccess" a
+               JOIN "System" s ON s.key = a."systemKey"
+               WHERE a."userId" = u.id AND a."systemKey" = c."systemKey"
+                 AND a."revokedAt" IS NULL AND s.active
+             )) AS flag
+      FROM "User" u
+      LEFT JOIN "OidcClient" c ON c."clientId" = ${clientId}
+      WHERE u."publicId" = ${publicId}::uuid`;
+    return l ?? null;
+  }
+
+  /** Motivo da recusa para a linha lida, ou null se pode usar o cliente. */
+  private motivo(u: LinhaConta | null): Recusa | null {
     if (!u || u.status !== UserStatus.ACTIVE) {
       return { motivo: 'inactive', userId: u?.id };
     }
-    const systemKey = await this.systemKeyDo(clientId);
-    if (!systemKey) return null;
-    const flag = await this.prisma.systemAccess.findFirst({
-      where: {
-        userId: u.id,
-        systemKey,
-        revokedAt: null,
-        system: { active: true },
-      },
-      select: { id: true },
-    });
-    return flag ? null : { motivo: 'no_flag', userId: u.id, systemKey };
+    if (!u.systemKey || u.flag) return null;
+    return { motivo: 'no_flag', userId: u.id, systemKey: u.systemKey };
+  }
+
+  /** Pode usar este cliente? Devolve o motivo da recusa, ou null se pode. */
+  async recusa(publicId: string, clientId: string): Promise<Recusa | null> {
+    return this.motivo(await this.conta(publicId, clientId));
   }
 
   private async auditarRecusa(
@@ -102,15 +114,16 @@ export class OidcAccounts {
    * (o provedor responde invalid_grant / invalid_token).
    */
   findAccount = async (ctx: any, sub: string, token?: any) => {
+    // A MESMA leitura serve para a regra de acesso e para as claims.
+    const u = await this.conta(sub, token?.clientId ?? null);
     if (token?.clientId) {
-      const r = await this.recusa(sub, token.clientId);
+      const r = this.motivo(u);
       if (r) {
         await this.auditarRecusa(r, token.clientId, 'token', ctx);
         await this.revogarGrant(token.grantId);
         return undefined;
       }
     }
-    const u = await this.pessoa(sub);
     if (!u || u.status !== UserStatus.ACTIVE) return undefined;
     const claims = {
       sub: u.publicId,

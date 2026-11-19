@@ -62,11 +62,16 @@ export function prismaAdapter(prisma: PrismaClient): OidcAdapterClass {
       return this.ler({ payload: { path: ['userCode'], equals: userCode } });
     }
 
+    /**
+     * Um UPDATE só: o updateMany do Prisma vira BEGIN/UPDATE/COMMIT (3 idas
+     * ao banco, que fica longe). Hora em UTC, como o Prisma grava DateTime.
+     */
     async consume(id: string) {
-      await prisma.oidcPayload.updateMany({
-        where: { id, type: this.type },
-        data: { consumedAt: new Date() },
-      });
+      const agora = new Date().toISOString();
+      await prisma.$executeRaw`
+        UPDATE "OidcPayload"
+           SET "consumedAt" = (${agora}::timestamptz AT TIME ZONE 'UTC')
+         WHERE id = ${id} AND type = ${this.type}`;
     }
 
     async destroy(id: string) {
