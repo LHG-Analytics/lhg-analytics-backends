@@ -22,6 +22,11 @@ import {
   userInactive,
 } from '../access/access.service';
 import { LoginLockService } from '../access/login-lock.service';
+import {
+  HUB_ADMIN,
+  ehPermissao,
+  permissaoNaoPermitida,
+} from '../access/permissoes';
 
 /** Quem faz a ação (admin logado) e de onde, para auditoria e autoria. */
 export interface Actor {
@@ -87,6 +92,63 @@ export function travaDeAdmins(
         409,
         'LAST_ADMIN',
         'Não é possível ficar sem nenhum administrador da LHG ativo',
+      );
+    }
+  };
+}
+
+/**
+ * travaDeAdmins só quando o ALVO é admin da LHG ativo (API legada: quem
+ * inativa um admin precisa ainda ser admin no banco; os demais, como antes).
+ */
+export function travaDeAdminsSeAlvoAdmin(
+  chamadorId: number | undefined,
+  alvoId: number,
+): ChecagemNaTransacao {
+  return async (tx) => {
+    const alvo = await tx.user.findUnique({
+      where: { id: alvoId },
+      select: { role: true, unit: true, status: true },
+    });
+    if (alvo && ehAdminLhg(alvo)) await travaDeAdmins(chamadorId, alvoId)(tx);
+  };
+}
+
+/**
+ * Nunca ficar sem nenhum admin do HUB (permissão 'hub-admin' ativa de pessoa
+ * ATIVA), DENTRO da transação. Trava as linhas das concessões E das pessoas
+ * (FOR UPDATE OF a, u): uma revogação ou inativação ao mesmo tempo faz a outra
+ * esperar e reler. `alvoId` = quem vai perder (null = ninguém): recusa se for o
+ * último (409 LAST_HUB_ADMIN). `chamadorId` = quem pede: precisa ter a
+ * permissão (403 HUB_ADMIN_REQUIRED).
+ */
+export function travaHubAdmins(
+  chamadorId: number | undefined,
+  alvoId: number | null,
+): ChecagemNaTransacao {
+  return async (tx) => {
+    const donos = await tx.$queryRaw<{ id: number }[]>`
+      SELECT u.id FROM "SystemAccess" a
+      JOIN "User" u ON u.id = a."userId"
+      WHERE a."systemKey" = ${HUB_ADMIN} AND a."revokedAt" IS NULL
+        AND u.status = 'ACTIVE'
+      FOR UPDATE OF a, u`;
+    if (chamadorId !== undefined && !donos.some((d) => d.id === chamadorId)) {
+      throw recusaDeAdmin(
+        403,
+        'HUB_ADMIN_REQUIRED',
+        'Só quem é admin do HUB pode dar ou tirar essa permissão',
+      );
+    }
+    if (
+      alvoId !== null &&
+      donos.some((d) => d.id === alvoId) &&
+      !donos.some((d) => d.id !== alvoId)
+    ) {
+      throw recusaDeAdmin(
+        409,
+        'LAST_HUB_ADMIN',
+        'Não é possível ficar sem nenhum admin do HUB',
       );
     }
   };
@@ -329,7 +391,10 @@ export class UsersService {
 
     if (user.status !== UserStatus.INACTIVE) {
       await this.prisma.prismaOnline.$transaction(async (tx) => {
-        if (ehAdminLhg(user)) await travaDeAdmins(actor.id, id)(tx);
+        // Quem pede é conferido pela rota (antes); aqui, em qualquer caminho,
+        // só "nunca zero": admin da LHG (Analytics) e admin do HUB.
+        if (ehAdminLhg(user)) await travaDeAdmins(undefined, id)(tx);
+        await travaHubAdmins(undefined, id)(tx);
         if (antes) await antes(tx);
         await tx.user.update({
           where: { id },
@@ -396,8 +461,14 @@ export class UsersService {
    * AuditEvent por mudança. Revogar o Analytics derruba as sessões.
    */
   async setSystems(id: number, pedidos: string[], actor: Actor = {}) {
+    // API legada: não pede permissão (400) e não mexe nas que a pessoa já
+    // tem (a lista substitui só os SISTEMAS).
     const desejados = await this.access.resolveSystems(pedidos);
-    return this.aplicarSistemas(id, () => desejados, actor);
+    return this.aplicarSistemas(
+      id,
+      (atuais) => [...new Set([...desejados, ...atuais.filter(ehPermissao)])],
+      actor,
+    );
   }
 
   /**
@@ -410,8 +481,17 @@ export class UsersService {
     mudanca: { conceder: string[]; revogar: string[] },
     actor: Actor = {},
     antes?: ChecagemNaTransacao,
+    opcoes: { permissoes?: boolean } = {},
   ) {
-    const novos = await this.access.resolveSystems(mudanca.conceder);
+    const novos = await this.access.resolveSystems(
+      mudanca.conceder,
+      undefined,
+      opcoes,
+    );
+    const revogarPermissao = mudanca.revogar.filter(ehPermissao);
+    if (!opcoes.permissoes && revogarPermissao.length) {
+      throw permissaoNaoPermitida(revogarPermissao);
+    }
     const sair = new Set(mudanca.revogar);
     return this.aplicarSistemas(
       id,
@@ -452,6 +532,10 @@ export class UsersService {
             'SELF_ACCESS_CHANGE',
             'Você não pode tirar os próprios acessos',
           );
+        }
+        // Tirar a permissão de admin do HUB de alguém: nunca o último.
+        if (revogar.some((a) => a.systemKey === HUB_ADMIN)) {
+          await travaHubAdmins(undefined, id)(tx);
         }
         const conceder = desejados.filter((k) => !atuais.has(k));
         const agora = new Date();

@@ -106,6 +106,8 @@ describe('1c-C2: catálogo do launcher e GET /api/me/systems', () => {
       ['cms', 'LHG CMS', 'layout', 4],
       ['chat-lhg', 'Chat LHG', 'chat', 5],
       ['helpdesk', 'Help Desk', 'lifebuoy', 6],
+      // permissão (não é sistema): sem cartão, sempre no fim
+      ['hub-admin', 'Admin do HUB', 'shield', 99],
     ]);
     expect(cat.every((s) => !!s.description)).toBe(true);
   });

@@ -186,7 +186,12 @@ describe('2g: admin do HUB por Bearer (/oidc/hub/admin/*)', () => {
       const a = await admin('eu-admin');
       const g = await pessoa('eu-gerente');
       const ra = await chamar('get', '/eu', await tokenDo(a.email)).expect(200);
-      expect(ra.body).toEqual({ id: a.publicId, nome: a.name, admin: true });
+      expect(ra.body).toEqual({
+        id: a.publicId,
+        nome: a.name,
+        admin: true,
+        hubAdmin: false,
+      });
       expect(ra.headers['cache-control']).toBe('no-store');
       const rg = await chamar('get', '/eu', await tokenDo(g.email)).expect(200);
       expect(rg.body.admin).toBe(false);
