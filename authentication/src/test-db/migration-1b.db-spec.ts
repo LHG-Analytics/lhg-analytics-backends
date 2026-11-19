@@ -48,7 +48,8 @@ describe('migration 1b', () => {
           });
         });
       }
-      expect(await db.system.count()).toBe(6);
+      // 6 sistemas + a permissão 'hub-admin' (migration do admin do HUB)
+      expect(await db.system.count()).toBe(7);
       const flags = await db.systemAccess.count({
         where: { systemKey: 'analytics', revokedAt: null },
       });

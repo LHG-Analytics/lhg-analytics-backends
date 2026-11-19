@@ -8,6 +8,7 @@ import {
 import { Prisma, UserStatus } from '@prisma/client';
 import { clientIp } from '../common/client-ip';
 import { PrismaService } from '../prisma/prisma.service';
+import { ehPermissao, permissaoNaoPermitida } from './permissoes';
 
 /** Chave do Analytics no catálogo de sistemas. */
 export const ANALYTICS = 'analytics';
@@ -150,11 +151,19 @@ export class AccessService {
 
   /**
    * Lista de sistemas pedida → chaves únicas, todas existentes e ativas no
-   * catálogo. Senão, 400 UNKNOWN_SYSTEM.
+   * catálogo. Senão, 400 UNKNOWN_SYSTEM. Permissões (ex.: 'hub-admin') só com
+   * `permissoes: true` (a ficha no painel do HUB); por convite e pela API
+   * legada → 400 PERMISSION_NOT_ALLOWED.
    */
-  async resolveSystems(keys: string[], db?: Db): Promise<string[]> {
+  async resolveSystems(
+    keys: string[],
+    db?: Db,
+    opcoes: { permissoes?: boolean } = {},
+  ): Promise<string[]> {
     const unicos = [...new Set(keys)];
     if (unicos.length === 0) return [];
+    const proibidas = opcoes.permissoes ? [] : unicos.filter(ehPermissao);
+    if (proibidas.length) throw permissaoNaoPermitida(proibidas);
     const ativos = await (db ?? this.prisma.prismaOnline).system.findMany({
       where: { key: { in: unicos }, active: true },
       select: { key: true },

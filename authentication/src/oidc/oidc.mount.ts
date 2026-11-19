@@ -6,6 +6,7 @@ import { AccessService } from '../access/access.service';
 import { LauncherService, safeLaunchUrl } from '../access/launcher.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../email/email.service';
+import { lerRegraDoAdmin } from '../access/permissoes';
 import { GoogleSettings, readGoogleSettings } from '../google/google.config';
 import { GoogleIdentityProvider } from '../google/google-identity.provider';
 import { GoogleLoginService } from '../google/google-login.service';
@@ -565,12 +566,26 @@ export async function mountOidc(
   }
   // E-mail pelo Resend (RESEND_API_KEY); sem a chave, nada é enviado.
   const email = new EmailService(get);
+  // Quem usa o painel admin do HUB: perfil ADMIN/LHG (padrão) ou a
+  // permissão 'hub-admin' (HUB_ADMIN_REGRA=flag). Lida no boot.
+  const regra = lerRegraDoAdmin(get('HUB_ADMIN_REGRA'));
   if (users && invitations) {
     express.use(
       '/oidc',
-      rotasDeAdmin({ provider, prisma, users, invitations, email, access }),
+      rotasDeAdmin({
+        provider,
+        prisma,
+        users,
+        invitations,
+        email,
+        access,
+        regra,
+      }),
     );
   }
+  logger.log(
+    `oidc: admin do HUB por ${regra === 'flag' ? "flag (permissão 'hub-admin')" : 'perfil (ADMIN/LHG)'}`,
+  );
   logger.log(
     `oidc: e-mail=${email.configurado ? 'ok' : 'desligado (sem RESEND_API_KEY)'}`,
   );
