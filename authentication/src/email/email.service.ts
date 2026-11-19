@@ -79,33 +79,3 @@ export function escaparHtml(s: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
-
-/** Moldura comum dos e-mails do HUB: título, parágrafos, um botão e o rodapé. */
-export function emailComBotao(o: {
-  titulo: string;
-  paragrafos: string[];
-  botao: { texto: string; url: string };
-  rodape: string;
-}): { html: string; texto: string } {
-  const p = (t: string) =>
-    `<p style="margin:0 0 14px;font-size:15px;line-height:1.5;color:#1f2933">${escaparHtml(t)}</p>`;
-  const html = `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:24px;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center">
-<table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:8px;padding:28px">
-<tr><td>
-<h1 style="margin:0 0 18px;font-size:20px;color:#111827">${escaparHtml(o.titulo)}</h1>
-${o.paragrafos.map(p).join('\n')}
-<p style="margin:22px 0"><a href="${escaparHtml(o.botao.url)}" style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:6px;font-size:15px">${escaparHtml(o.botao.texto)}</a></p>
-<p style="margin:0 0 14px;font-size:13px;line-height:1.5;color:#52606d">Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all">${escaparHtml(o.botao.url)}</span></p>
-<p style="margin:18px 0 0;font-size:12px;line-height:1.5;color:#7b8794">${escaparHtml(o.rodape)}</p>
-</td></tr></table></td></tr></table></body></html>`;
-  const texto = [
-    o.titulo,
-    '',
-    ...o.paragrafos.flatMap((t) => [t, '']),
-    `${o.botao.texto}: ${o.botao.url}`,
-    '',
-    o.rodape,
-  ].join('\n');
-  return { html, texto };
-}
