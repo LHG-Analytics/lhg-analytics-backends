@@ -9,6 +9,8 @@ import {
   RESEND_URL,
   escaparHtml,
 } from './email.service';
+import { LOGO_PADRAO, SUPORTE_EMAIL, SUPORTE_URL } from './moldura';
+import { emailDeRedefinicao } from './senha-email';
 
 const CHAVE = 're_teste_' + 'x'.repeat(24);
 const MSG = {
@@ -105,13 +107,15 @@ describe('e-mail do convite', () => {
     expect(m.assunto).toBe('Seu convite para o HUB LHG');
     for (const t of [m.html, m.texto]) {
       expect(t).toContain('Admin Teste convidou você');
-      expect(t).toContain('Acesso liberado: CMS, Help Desk.');
-      expect(t).toContain('O convite vale até 26/11/2026.');
+      expect(t).toContain('Acesso liberado');
+      expect(t).toContain('CMS, Help Desk');
+      expect(t).toContain('Convite válido até');
+      expect(t).toContain('26/11/2026');
       expect(t).toContain(LINK);
-      expect(t).toContain(
-        'Se você não esperava este convite, ignore este e-mail.',
-      );
+      expect(t).toContain('Se não esperava este convite, ignore este e-mail.');
     }
+    expect(m.texto).toContain('Acesso liberado: CMS, Help Desk');
+    expect(m.texto).toContain('Convite válido até: 26/11/2026');
     expect(m.html).toContain(`href="${LINK}"`);
     // o nome vem do admin: escapado no HTML
     expect(m.html).toContain('Olá, Pessoa &lt;b&gt;Teste&lt;/b&gt;.');
@@ -128,8 +132,87 @@ describe('e-mail do convite', () => {
     });
     expect(m.texto).toContain('Olá.');
     expect(m.texto).toContain('Você foi convidado(a) para acessar o HUB LHG');
-    expect(m.texto).not.toContain('Acesso liberado');
-    expect(m.texto).toContain('O convite não tem prazo de validade.');
+    expect(m.texto).toContain('Acesso liberado: Nenhum sistema por enquanto');
+    expect(m.texto).toContain('Convite válido até: Sem prazo de validade');
+  });
+
+  it('moldura do HUB: tabelas e CSS inline (600 px), faixa roxa com o logo BRANCO e o selo HUB em HTML, botão sólido com VML para o Outlook, link por extenso, rodapé com suporte e "não responda"', () => {
+    const { html, texto } = emailDoConvite(base);
+    expect(html).toContain('max-width:600px');
+    expect(html).toContain('bgcolor="#4A3059"');
+    expect(html).toContain(`src="${LOGO_PADRAO}"`);
+    expect(html).toContain('width="117" height="36" alt="LHG"');
+    expect(html).toMatch(/>HUB<\/span>/);
+    expect(html).toContain('v:roundrect');
+    expect(html).toContain('Se o botão não funcionar, copie e cole');
+    expect(html).toContain(`mailto:${SUPORTE_EMAIL}`);
+    expect(html).toContain('não responda');
+    expect(html).toContain('<meta name="color-scheme" content="light only">');
+    // versão texto completa: marca, link sozinho numa linha, suporte
+    expect(texto.startsWith('HUB LHG\n')).toBe(true);
+    expect(texto.split('\n')).toContain(LINK);
+    expect(texto).toContain(SUPORTE_URL);
+  });
+
+  it('sem rastreador nem imagem de terceiros: a ÚNICA imagem é o logo, do domínio da LHG; sem CSS/fonte externa', () => {
+    for (const m of [
+      emailDoConvite(base),
+      emailDeRedefinicao({
+        para: 'x@example.invalid',
+        nome: 'X',
+        link: LINK,
+        minutos: 30,
+      }),
+    ]) {
+      const imgs = m.html.match(/<img\b[^>]*>/g) ?? [];
+      expect(imgs).toHaveLength(1);
+      expect(imgs[0]).toContain('https://hub.lhgmoteis.com.br/');
+      expect(m.html).not.toMatch(/<link\b|@import|url\(|background-image/i);
+      expect(m.html).not.toMatch(
+        /https?:\/\/(?!hub\.lhgmoteis\.com\.br\/|hub\.exemplo\.invalid\/|www\.w3\.org\/1999\/xhtml)[^"'\s<]+/,
+      );
+    }
+  });
+
+  it('EMAIL_LOGO_URL troca o logo, mas só https sem credenciais (senão, o padrão)', () => {
+    const antes = process.env.EMAIL_LOGO_URL;
+    try {
+      process.env.EMAIL_LOGO_URL =
+        'https://hub.lhgmoteis.com.br/email/logo-maior.png';
+      expect(emailDoConvite(base).html).toContain(
+        'src="https://hub.lhgmoteis.com.br/email/logo-maior.png"',
+      );
+      for (const ruim of [
+        'http://hub.lhgmoteis.com.br/x.png',
+        'https://u:s@hub.lhgmoteis.com.br/x.png',
+        'javascript:alert(1)',
+        'lixo',
+      ]) {
+        process.env.EMAIL_LOGO_URL = ruim;
+        expect(emailDoConvite(base).html).toContain(`src="${LOGO_PADRAO}"`);
+      }
+    } finally {
+      if (antes === undefined) delete process.env.EMAIL_LOGO_URL;
+      else process.env.EMAIL_LOGO_URL = antes;
+    }
+  });
+
+  it('e-mail do esqueci a senha: título, validade, botão, motivo próprio', () => {
+    const m = emailDeRedefinicao({
+      para: 'x@example.invalid',
+      nome: 'Pessoa X',
+      link: LINK,
+      minutos: 30,
+    });
+    expect(m.assunto).toBe('Redefinir a sua senha do HUB LHG');
+    for (const t of [m.html, m.texto]) {
+      expect(t).toContain('Olá, Pessoa X.');
+      expect(t).toContain('30 minutos');
+      expect(t).toContain('Criar uma nova senha');
+      expect(t).toContain(
+        'porque alguém pediu uma senha nova para este e-mail',
+      );
+    }
   });
 
   it('escaparHtml cobre & < > " e apóstrofo', () => {
