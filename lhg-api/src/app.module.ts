@@ -17,6 +17,7 @@ import { CompanyModule } from './company/company.module';
 import { ConsolidatedModule } from './consolidated/consolidated.module';
 import { PainelModule } from './painel/painel.module';
 import { NpsModule } from './nps/nps.module';
+import { CrmEtlModule } from './crm-etl/crm-etl.module';
 
 @Module({
   imports: [
@@ -33,6 +34,8 @@ import { NpsModule } from './nps/nps.module';
     ConsolidatedModule,
     // API servidor-a-servidor do NPS LHG (HMAC; desligada sem NPS_HMAC_KEYS).
     NpsModule,
+    // Job do CRM (Automo → raw do Supabase do CRM); sem rota, desligado sem env.
+    CrmEtlModule,
     RestaurantModule,
     GovernanceModule,
     BookingsModule,

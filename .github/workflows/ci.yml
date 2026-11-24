@@ -68,8 +68,12 @@ jobs:
 
       # Testes de integração leves (node:test) do proxy e do lhg-api, em
       # test/*.test.mjs. Rodam depois do build (usam o lhg-api/dist).
+      # TEST_DATABASE_URL: o gravador do job do CRM é testado num schema
+      # descartável do Postgres efêmero do job.
       - name: Testes do proxy e do lhg-api
         shell: bash
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lhg_test
         run: |
           if compgen -G "test/*.test.mjs" > /dev/null; then
             node --test "test/*.test.mjs"
