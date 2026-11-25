@@ -94,6 +94,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #c7a9dc;outline-offset:2p
 a{color:inherit}
 .erro{background:#fde8e8;color:#8f1d1d;padding:10px 12px;border-radius:8px;font-size:.9rem}
 .aviso{color:var(--suave);font-size:.8rem;margin-top:16px}form.inline{margin:0}
+label.lembrar{display:flex;align-items:center;gap:8px;color:var(--texto)}label.lembrar input{width:auto;margin:0}label.lembrar+.aviso{margin-top:4px}
 [hidden]{display:none!important}
 a.botao{display:block;box-sizing:border-box;width:100%;margin-top:14px;padding:12px;font-size:1rem;font-weight:600;text-align:center;text-decoration:none;border-radius:8px;border:1px solid var(--borda);color:var(--texto)}
 .ou{text-align:center;color:var(--suave);font-size:.85rem;margin:18px 0 0}
@@ -183,9 +184,11 @@ ${p.erro ? `<p class="erro" role="alert">${html(p.erro)}</p>` : ''}
 <form id="form-entrar" method="post" action="${html(p.acao)}/login" autocomplete="on">
 <label for="email">E-mail</label><input id="email" name="email" type="email" required autocomplete="username">
 <label for="password">Senha</label><input id="password" name="password" type="password" required autocomplete="current-password">
+<label class="lembrar"><input type="checkbox" name="lembrar" value="1"> Manter conectado</label>
+<p class="aviso">Não marque em computador compartilhado.</p>
 <button id="botao-entrar" type="submit">Entrar</button>
 <p id="aviso-entrar" class="erro" role="status" hidden></p></form>
-${p.google ? `<form class="inline" method="post" action="${html(p.acao)}/google"><button type="submit">Entrar com Google</button></form>` : ''}
+${p.google ? `<form class="inline" method="post" action="${html(p.acao)}/google"><label class="lembrar"><input type="checkbox" name="lembrar" value="1"> Manter conectado</label> <button type="submit">Entrar com Google</button></form>` : ''}
 <form class="inline" method="post" action="${html(p.acao)}/abort"><button type="submit">Cancelar</button></form>
 <p class="aviso">Tela mínima de homologação.</p>
 <script>${SCRIPT_ENTRAR}</script>`,

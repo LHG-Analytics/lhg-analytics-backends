@@ -60,6 +60,14 @@ const sessaoLonga = (clientId: unknown) =>
   typeof clientId === 'string' && CLIENTES_SESSAO_LONGA.includes(clientId);
 /** Inatividade máxima da sessão SSO (D2 aprovada). */
 export const INATIVIDADE_MAX = 24 * 60 * 60;
+/**
+ * "Manter conectado" (aprovado pelo Danilo em 25/11/2026): marcado no login,
+ * a sessão SSO dura 30 dias desde o login, com 7 dias sem uso. Desmarcado
+ * (padrão), a sessão é de navegador (cookie sem validade: acaba ao fechar) e
+ * segue as 24 h / 7 dias de sempre. Inativação, flag e Sair derrubam igual.
+ */
+export const LEMBRAR_INATIVIDADE_MAX = 7 * 24 * 60 * 60;
+export const LEMBRAR_ABSOLUTO = 30 * 24 * 60 * 60;
 /** Intervalo do envio dos avisos de logout (Outbox). */
 const OUTBOX_MS = 30 * 1000;
 /** Intervalo da limpeza dos registros vencidos do OidcPayload. */
@@ -74,9 +82,12 @@ const LIMPEZA_MS = 60 * 60 * 1000;
 export function ttlDaSessao(
   loginTs: number | undefined,
   agora = Math.floor(Date.now() / 1000),
+  lembrar = false,
 ): number {
-  const restoAbsoluto = loginTs ? loginTs + SETE_DIAS - agora : SETE_DIAS;
-  return Math.max(1, Math.min(INATIVIDADE_MAX, restoAbsoluto));
+  const absoluto = lembrar ? LEMBRAR_ABSOLUTO : SETE_DIAS;
+  const inatividade = lembrar ? LEMBRAR_INATIVIDADE_MAX : INATIVIDADE_MAX;
+  const restoAbsoluto = loginTs ? loginTs + absoluto - agora : absoluto;
+  return Math.max(1, Math.min(inatividade, restoAbsoluto));
 }
 
 /**
@@ -221,8 +232,10 @@ function configuracao(p: {
           ? SESSAO_LONGA_S
           : SETE_DIAS,
       // (d) 7 dias, com expiração por 24 h de inatividade.
-      Session: (_ctx: unknown, session: { loginTs?: number }) =>
-        ttlDaSessao(session?.loginTs),
+      Session: (
+        _ctx: unknown,
+        session: { loginTs?: number; lembrar?: boolean },
+      ) => ttlDaSessao(session?.loginTs, undefined, session?.lembrar === true),
       Interaction: 60 * 60,
     },
     // Refresh token para quem tem o grant refresh_token (o hub), rotativo, e
@@ -334,6 +347,29 @@ function agendarLimpeza(app: INestApplication, prisma: PrismaClient) {
   }, LIMPEZA_MS);
   timer.unref();
   app.getHttpServer().on('close', () => clearInterval(timer));
+}
+
+/**
+ * "Manter conectado": o provedor só grava `transient` quando o login vem
+ * com remember=false, e as sessões criadas ANTES desta versão também não o
+ * têm. Por isso a marca é um campo PRÓPRIO, `lembrar`, gravado só nos
+ * logins com a caixa marcada: uma sessão antiga nunca ganha os 30 dias.
+ */
+export function marcarManterConectado(provider: any): void {
+  const Sessao = provider.Session;
+  const campos: string[] = Sessao.IN_PAYLOAD;
+  if (!campos.includes('lembrar')) {
+    Object.defineProperty(Sessao, 'IN_PAYLOAD', {
+      configurable: true,
+      get: () => [...campos, 'lembrar'],
+    });
+  }
+  const original = Sessao.prototype.loginAccount;
+  Sessao.prototype.loginAccount = function (details: { transient?: boolean }) {
+    original.call(this, details);
+    if (details?.transient) delete this.lembrar;
+    else this.lembrar = true;
+  };
 }
 
 /**
@@ -456,6 +492,7 @@ export async function mountOidc(
   // NELE, mas aí ele mesmo enviaria, sem fila; as URIs ficam só no banco e
   // quem envia é o OutboxWorker.
   provider.Client.prototype.includeSid = () => true;
+  marcarManterConectado(provider);
 
   // Logout no HUB ("sair de tudo"): depois do end_session e ANTES de a
   // resposta sair, revoga os grants de todos os clientes da sessão (o
