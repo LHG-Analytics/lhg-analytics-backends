@@ -175,6 +175,7 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
     inicio: string;
     fim: string;
   }[] = [];
+  const chamadasCategorias: string[] = [];
   let n = 0;
 
   async function pessoa(
@@ -241,6 +242,27 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
         p = jwt.verify(tok, JWT_TESTE);
       } catch {
         res.writeHead(401).end();
+        return;
+      }
+      // Categorias de suíte (listar_categorias): o LIV falha (500), para o
+      // teste da falha parcial; um campo a mais (fora da lista) não pode vazar.
+      const mc = /^\/([a-z_]+)\/api\/Company\/categorias$/.exec(u.pathname);
+      if (mc) {
+        if (p.unit !== 'LHG' && p.unit.toLowerCase() !== mc[1]) {
+          return void res.writeHead(403).end();
+        }
+        chamadasCategorias.push(mc[1]);
+        if (mc[1] === 'liv') return void res.writeHead(500).end();
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            unidade: mc[1],
+            categorias: [
+              { id: 10, nome: 'LUXO', suites: 12, interno: 'x' },
+              { id: 11, nome: 'MASTER', suites: 0 },
+            ],
+          }),
+        );
         return;
       }
       if (!m) return void res.writeHead(404).end();
@@ -497,11 +519,12 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
     expect(r.tokens).toBeNull();
   });
 
-  it('tools/list: só as 3 ferramentas, todas só leitura; notificação → 202', async () => {
+  it('tools/list: só as 6 ferramentas, todas só leitura; notificação → 202', async () => {
     const tok = await tokenDe((await pessoa()).email);
     const r = await rpc(tok, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
     expect(r.body.result.tools.map((t: any) => t.name)).toEqual([
       'listar_unidades',
+      'listar_categorias',
       'visao_geral',
       'comparar_periodos',
       'resumo_por_categoria',
@@ -542,6 +565,63 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
     );
     const ro = await ferramenta(o, 'listar_unidades');
     expect(ro.body.result.structuredContent.unidades).toEqual([]);
+  });
+
+  it('listar_categorias: ID do Automo, nome e suítes (lista fechada); só as unidades liberadas; sem unidade = todas, com falha parcial; auditoria', async () => {
+    // Gerente: a própria unidade; outra unidade → erro sem chamar o lhg-api.
+    const g = await pessoa({ unit: 'TOUT' });
+    const tg = await tokenDe(g.email);
+    const r1 = await ferramenta(tg, 'listar_categorias', { unidade: 'tout' });
+    expect(r1.body.result.isError).toBeUndefined();
+    expect(r1.body.result.structuredContent).toEqual({
+      unidades: [
+        {
+          slug: 'tout',
+          categorias: [
+            { id: 10, nome: 'LUXO', suites: 12 },
+            { id: 11, nome: 'MASTER', suites: 0 },
+          ],
+        },
+      ],
+    });
+    const antes = chamadasCategorias.length;
+    const r2 = await ferramenta(tg, 'listar_categorias', { unidade: 'liv' });
+    expect(r2.body.result.isError).toBe(true);
+    expect(chamadasCategorias.length).toBe(antes);
+    // Sem unidade, o gerente continua vendo só a dele.
+    const r3 = await ferramenta(tg, 'listar_categorias');
+    expect(
+      r3.body.result.structuredContent.unidades.map((x: any) => x.slug),
+    ).toEqual(['tout']);
+
+    // ADMIN/LHG sem unidade: as 12, na ordem de listar_unidades; o LIV falhou
+    // e vem com erro, sem derrubar as outras.
+    const a = await pessoa({ role: 'ADMIN', unit: 'LHG' });
+    const ta = await tokenDe(a.email);
+    const r4 = await ferramenta(ta, 'listar_categorias');
+    const us = r4.body.result.structuredContent.unidades;
+    expect(us).toHaveLength(12);
+    expect(us.find((x: any) => x.slug === 'liv')).toEqual({
+      slug: 'liv',
+      erro: 'o Analytics não respondeu agora (500); tente de novo',
+    });
+    expect(us.filter((x: any) => x.categorias).length).toBe(11);
+    expect(JSON.stringify(us)).not.toContain('interno');
+    // Uma unidade só e ela falha → erro da ferramenta.
+    const r5 = await ferramenta(ta, 'listar_categorias', { unidade: 'liv' });
+    expect(r5.body.result.isError).toBe(true);
+
+    const ev = await db.auditEvent.findMany({
+      where: { action: 'mcp.tool', targetUserId: a.id },
+      orderBy: { id: 'asc' },
+    });
+    expect(ev[0].metadata).toEqual({
+      ferramenta: 'listar_categorias',
+      resultado: 'ok',
+      unidades: 12,
+      erros: 1,
+    });
+    expect((ev[1].metadata as any).resultado).toBe('erro');
   });
 
   it('visao_geral: só os campos da lista fechada (nada de nome/CPF nem séries); período por datas e por atalho; auditoria sem números', async () => {
