@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PeriodEnum, RentalTypeEnum } from '../common/enums';
 import { TenantPoolService } from '../database/tenant-pool.service';
 import { TenantConfig } from '../tenant/tenant.interfaces';
-import { cteDadosPorCategoria, cteSuitesPorCategoria } from './company-categorias.sql';
+import { cteDadosPorCategoria, cteSuitesPorCategoria, sqlListaCategorias } from './company-categorias.sql';
 import * as moment from 'moment-timezone';
 import { KpiCacheService } from '../cache/kpi-cache.service';
 import { CachePeriodEnum } from '../cache/cache.interfaces';
@@ -239,12 +239,37 @@ export interface CompanyKpiApexChartsResponse {
   DataTableRevparByWeek: WeeklyRevparData[];
 }
 
+export interface CategoriaSuite {
+  /** categoriaapartamento.id do Automo */
+  id: number;
+  nome: string;
+  /** suítes ativas (dataexclusao IS NULL) */
+  suites: number;
+}
+export const CATEGORIAS_TTL_MS = 6 * 3600_000;
+
 @Injectable()
 export class CompanyService {
   constructor(
     private readonly pools: TenantPoolService,
     private kpiCacheService: KpiCacheService,
   ) {}
+
+  /** Categorias por unidade (mudam raramente): cache em memória do processo. */
+  private categoriasCache = new Map<string, { em: number; dados: CategoriaSuite[] }>();
+
+  /** Categorias de suíte da unidade: ID do Automo, nome e suítes ativas. Cache de 6 h. */
+  async listarCategorias(tenant: TenantConfig): Promise<CategoriaSuite[]> {
+    const c = this.categoriasCache.get(tenant.slug);
+    if (c && Date.now() - c.em < CATEGORIAS_TTL_MS) return c.dados;
+    const linhas = await this.pools.query<{ id: number; nome: string | null; suites: string }>(
+      tenant.slug,
+      sqlListaCategorias(tenant.suiteCategoryIds.join(',')),
+    );
+    const dados = linhas.map((l) => ({ id: Number(l.id), nome: (l.nome ?? '').trim(), suites: Number(l.suites) }));
+    this.categoriasCache.set(tenant.slug, { em: Date.now(), dados });
+    return dados;
+  }
 
   private formatCurrency(value: number): string {
     return value.toLocaleString('pt-BR', {
