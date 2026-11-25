@@ -176,6 +176,17 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
     fim: string;
   }[] = [];
   const chamadasCategorias: string[] = [];
+  /** O 503 que o lhg-api dá quando o banco da unidade não aceita conexão. */
+  const foraDoAr = (res: http.ServerResponse) => {
+    res.writeHead(503, { 'content-type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        statusCode: 503,
+        message: 'UNIDADE_INDISPONIVEL',
+        error: 'Service Unavailable',
+      }),
+    );
+  };
   let n = 0;
 
   async function pessoa(
@@ -244,8 +255,10 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
         res.writeHead(401).end();
         return;
       }
-      // Categorias de suíte (listar_categorias): o LIV falha (500), para o
-      // teste da falha parcial; um campo a mais (fora da lista) não pode vazar.
+      // Categorias de suíte (listar_categorias): o LIV falha com um erro
+      // qualquer (500); a GETAN PQ Oeste está com o banco FORA (503
+      // UNIDADE_INDISPONIVEL) e a Novo Mundo não responde (passa do tempo
+      // curto). Um campo a mais (fora da lista) não pode vazar.
       const mc = /^\/([a-z_]+)\/api\/Company\/categorias$/.exec(u.pathname);
       if (mc) {
         if (p.unit !== 'LHG' && p.unit.toLowerCase() !== mc[1]) {
@@ -253,6 +266,11 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
         }
         chamadasCategorias.push(mc[1]);
         if (mc[1] === 'liv') return void res.writeHead(500).end();
+        if (mc[1] === 'getan_pq_oeste') return void foraDoAr(res);
+        if (mc[1] === 'getan_novo_mundo') {
+          setTimeout(() => res.writeHead(200).end('{}'), 3000);
+          return;
+        }
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(
           JSON.stringify({
@@ -268,6 +286,11 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
       if (!m) return void res.writeHead(404).end();
       if (p.unit !== 'LHG' && p.unit.toLowerCase() !== m[1]) {
         return void res.writeHead(403).end();
+      }
+      // GETAN Vera Cruz: banco fora também nos KPIs (503 do lhg-api).
+      if (m[1] === 'getan_vera_cruz') {
+        chamadasLhgApi.push({ slug: m[1], unit: p.unit, inicio: '', fim: '' });
+        return void foraDoAr(res);
       }
       // Altana: consulta "pesada", passa do tempo do MCP (1,5 s no teste).
       if (m[1] === 'altana') {
@@ -297,6 +320,7 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
       ANALYTICS_MCP_URL: MCP_URL,
       LHG_API_INTERNAL_URL: `http://127.0.0.1:${(falso.address() as AddressInfo).port}`,
       MCP_LHG_API_TIMEOUT_MS: '1500',
+      MCP_CATEGORIAS_TIMEOUT_MS: '800',
     });
     ({ app } = await subirComoMain());
     srv = app.getHttpServer();
@@ -316,6 +340,7 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
       'ANALYTICS_MCP_URL',
       'LHG_API_INTERNAL_URL',
       'MCP_LHG_API_TIMEOUT_MS',
+      'MCP_CATEGORIAS_TIMEOUT_MS',
     ]) {
       delete process.env[k];
     }
@@ -594,22 +619,61 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
       r3.body.result.structuredContent.unidades.map((x: any) => x.slug),
     ).toEqual(['tout']);
 
-    // ADMIN/LHG sem unidade: as 12, na ordem de listar_unidades; o LIV falhou
-    // e vem com erro, sem derrubar as outras.
+    // ADMIN/LHG sem unidade: as 12, na ordem de listar_unidades. O LIV falhou
+    // (erro qualquer) e as 2 GETAN estão fora; vêm com erro, sem derrubar nem
+    // ATRASAR as outras (uma espera curta só, em paralelo).
     const a = await pessoa({ role: 'ADMIN', unit: 'LHG' });
     const ta = await tokenDe(a.email);
+    let t0 = Date.now();
     const r4 = await ferramenta(ta, 'listar_categorias');
+    const ms1 = Date.now() - t0;
     const us = r4.body.result.structuredContent.unidades;
     expect(us).toHaveLength(12);
     expect(us.find((x: any) => x.slug === 'liv')).toEqual({
       slug: 'liv',
       erro: 'o Analytics não respondeu agora (500); tente de novo',
     });
-    expect(us.filter((x: any) => x.categorias).length).toBe(11);
+    for (const s of ['getan_pq_oeste', 'getan_novo_mundo']) {
+      expect(us.find((x: any) => x.slug === s)).toEqual({
+        slug: s,
+        erro: 'servidor da unidade indisponível',
+      });
+    }
+    expect(us.filter((x: any) => x.categorias).length).toBe(9);
     expect(JSON.stringify(us)).not.toContain('interno');
+    expect(ms1).toBeLessThan(2500); // 1 tempo curto (800 ms no teste), não 1 por unidade
+
+    // 2ª chamada: o disjuntor já sabe que as 2 GETAN estão fora — nem tenta,
+    // e responde na hora. O LIV (erro qualquer, não "fora") é tentado de novo.
+    const n0 = chamadasCategorias.length;
+    t0 = Date.now();
+    const r5 = await ferramenta(ta, 'listar_categorias');
+    const ms2 = Date.now() - t0;
+    const novas = chamadasCategorias.slice(n0);
+    expect(novas).not.toContain('getan_pq_oeste');
+    expect(novas).not.toContain('getan_novo_mundo');
+    expect(novas).toContain('liv');
+    expect(ms2).toBeLessThan(700);
+    expect(
+      r5.body.result.structuredContent.unidades.find(
+        (x: any) => x.slug === 'getan_novo_mundo',
+      ).erro,
+    ).toBe('servidor da unidade indisponível');
+    // As OUTRAS ferramentas também respeitam o disjuntor: visao_geral da
+    // unidade fora volta na hora, sem chamar o lhg-api.
+    const k0 = chamadasLhgApi.length;
+    const r6 = await ferramenta(ta, 'visao_geral', {
+      unidade: 'getan_pq_oeste',
+      periodo: 'ontem',
+    });
+    expect(r6.body.result.isError).toBe(true);
+    expect(r6.body.result.content[0].text).toBe(
+      'servidor da unidade indisponível',
+    );
+    expect(chamadasLhgApi.length).toBe(k0);
     // Uma unidade só e ela falha → erro da ferramenta.
-    const r5 = await ferramenta(ta, 'listar_categorias', { unidade: 'liv' });
-    expect(r5.body.result.isError).toBe(true);
+    const r7 = await ferramenta(ta, 'listar_categorias', { unidade: 'liv' });
+    expect(r7.body.result.isError).toBe(true);
 
     const ev = await db.auditEvent.findMany({
       where: { action: 'mcp.tool', targetUserId: a.id },
@@ -619,9 +683,39 @@ describe('MCP do LHG Analytics (/mcp, conector do Claude)', () => {
       ferramenta: 'listar_categorias',
       resultado: 'ok',
       unidades: 12,
-      erros: 1,
+      erros: 3,
     });
-    expect((ev[1].metadata as any).resultado).toBe('erro');
+    expect((ev[2].metadata as any).motivo).toBe(
+      'servidor da unidade indisponível',
+    );
+  });
+
+  it('banco da unidade fora nos KPIs (503 do lhg-api): erro claro e o disjuntor evita a próxima chamada; consulta pesada NÃO abre o disjuntor', async () => {
+    const a = await pessoa({ role: 'ADMIN', unit: 'LHG' });
+    const ta = await tokenDe(a.email);
+    const k0 = chamadasLhgApi.length;
+    const r1 = await ferramenta(ta, 'visao_geral', {
+      unidade: 'getan_vera_cruz',
+      periodo: 'ontem',
+    });
+    expect(r1.body.result.content[0].text).toBe(
+      'servidor da unidade indisponível',
+    );
+    expect(chamadasLhgApi.length).toBe(k0 + 1);
+    const r2 = await ferramenta(ta, 'resumo_por_categoria', {
+      unidade: 'getan_vera_cruz',
+      periodo: 'ontem',
+    });
+    expect(r2.body.result.content[0].text).toBe(
+      'servidor da unidade indisponível',
+    );
+    expect(chamadasLhgApi.length).toBe(k0 + 1); // nem chamou
+    // O disjuntor é por unidade: as outras seguem normais.
+    const r3 = await ferramenta(ta, 'visao_geral', {
+      unidade: 'tout',
+      periodo: 'ontem',
+    });
+    expect(r3.body.result.isError).toBeUndefined();
   });
 
   it('visao_geral: só os campos da lista fechada (nada de nome/CPF nem séries); período por datas e por atalho; auditoria sem números', async () => {
