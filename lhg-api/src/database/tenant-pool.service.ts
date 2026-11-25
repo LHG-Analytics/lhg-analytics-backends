@@ -8,6 +8,32 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Pool, PoolConfig } from 'pg';
 import { getTenant } from '../tenant/tenant.registry';
 
+/**
+ * O banco da unidade não aceitou a CONEXÃO (servidor fora, rede, porta
+ * fechada). Diferente de erro de SQL ou de consulta lenta: os controllers que
+ * o reconhecem respondem 503 UNIDADE_INDISPONIVEL, e o MCP segue com as outras
+ * unidades.
+ */
+export class UnidadeIndisponivelError extends Error {
+  constructor(
+    readonly slug: string,
+    readonly causa?: unknown,
+  ) {
+    super(`unidade ${slug} indisponível`);
+    this.name = 'UnidadeIndisponivelError';
+  }
+}
+
+const CODIGOS_DE_CONEXAO = new Set(['ECONNREFUSED', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENETUNREACH', 'ENOTFOUND', 'EAI_AGAIN']);
+
+/** Falha ao CONECTAR no banco da unidade (não um erro da consulta em si). */
+export function ehFalhaDeConexao(e: unknown): boolean {
+  const err = e as { code?: string; message?: string } | null;
+  if (!err) return false;
+  if (err.code && CODIGOS_DE_CONEXAO.has(err.code)) return true;
+  return /connection timeout|timeout exceeded when trying to connect/i.test(err.message ?? '');
+}
+
 @Injectable()
 export class TenantPoolService implements OnModuleDestroy {
   private readonly logger = new Logger(TenantPoolService.name);
@@ -52,7 +78,7 @@ export class TenantPoolService implements OnModuleDestroy {
       return result.rows as T[];
     } catch (error) {
       this.logger.error(`[${slug}] Erro na query: ${(error as Error).message}`);
-      throw error;
+      throw ehFalhaDeConexao(error) ? new UnidadeIndisponivelError(slug, error) : error;
     }
   }
 
@@ -62,7 +88,7 @@ export class TenantPoolService implements OnModuleDestroy {
       return result.rows as T[];
     } catch (error) {
       this.logger.error(`[${slug}] Erro na query: ${(error as Error).message}`);
-      throw error;
+      throw ehFalhaDeConexao(error) ? new UnidadeIndisponivelError(slug, error) : error;
     }
   }
 

@@ -637,6 +637,10 @@ export async function mountOidc(
           Number(get('MCP_LHG_API_TIMEOUT_MS')) > 0
             ? Number(get('MCP_LHG_API_TIMEOUT_MS'))
             : undefined,
+        timeoutCategoriasMs:
+          Number(get('MCP_CATEGORIAS_TIMEOUT_MS')) > 0
+            ? Number(get('MCP_CATEGORIAS_TIMEOUT_MS'))
+            : undefined,
         lhgApiUrl:
           get('LHG_API_INTERNAL_URL')?.trim() || 'http://127.0.0.1:3010',
       }),
