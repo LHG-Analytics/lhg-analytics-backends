@@ -59,6 +59,14 @@ export interface InteracoesDeps {
  * provedor. O corpo do formulário é lido aqui (urlencoded, pequeno); as
  * rotas do provedor (token etc.) continuam recebendo o corpo cru.
  */
+/**
+ * "Manter conectado": só o valor exato "1" conta como marcado. Sem o campo
+ * (padrão, ou tela antiga), a sessão é de navegador.
+ */
+export function marcouManterConectado(corpo: unknown): boolean {
+  return (corpo as { lembrar?: unknown } | undefined)?.lembrar === '1';
+}
+
 export function interacoes(d: InteracoesDeps): Router {
   const logger = new Logger('OIDC');
   const r = Router();
@@ -150,6 +158,7 @@ export function interacoes(d: InteracoesDeps): Router {
       const i = await interacao(req, res, req.params.uid);
       if (!i) return invalida(res, req.params.uid);
       const { email, password } = req.body ?? {};
+      const lembrar = marcouManterConectado(req.body);
       if (
         typeof email !== 'string' ||
         typeof password !== 'string' ||
@@ -186,7 +195,9 @@ export function interacoes(d: InteracoesDeps): Router {
       return d.provider.interactionFinished(
         req,
         res,
-        { login: { accountId: user.publicId, amr: ['pwd'] } },
+        {
+          login: { accountId: user.publicId, amr: ['pwd'], remember: lembrar },
+        },
         { mergeWithLastSubmission: false },
       );
     }),
@@ -206,6 +217,7 @@ export function interacoes(d: InteracoesDeps): Router {
 
   r.post(
     '/interaction/:uid/google',
+    corpo,
     seguro(async (req, res) => {
       const i = await interacao(req, res, req.params.uid);
       if (!i) return invalida(res, req.params.uid);
@@ -216,6 +228,7 @@ export function interacoes(d: InteracoesDeps): Router {
         verifier: randomToken(),
         uid: i.uid,
         exp: Date.now() + OAUTH_TTL_MS,
+        lembrar: marcouManterConectado(req.body),
       };
       res.cookie(OIDC_GOOGLE_COOKIE, signState(st, d.jwtSecret), {
         httpOnly: true,
@@ -271,7 +284,13 @@ export function interacoes(d: InteracoesDeps): Router {
         return d.provider.interactionFinished(
           req,
           res,
-          { login: { accountId: user.publicId, amr: ['google'] } },
+          {
+            login: {
+              accountId: user.publicId,
+              amr: ['google'],
+              remember: st.lembrar === true,
+            },
+          },
           { mergeWithLastSubmission: false },
         );
       } catch (error) {

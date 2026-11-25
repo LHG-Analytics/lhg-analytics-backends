@@ -12,6 +12,8 @@ export interface OAuthState {
   invite?: string;
   /** uid da interação do login central, quando o fluxo veio do OIDC. */
   uid?: string;
+  /** "Manter conectado" marcado na tela (login central). */
+  lembrar?: boolean;
   exp: number;
 }
 
