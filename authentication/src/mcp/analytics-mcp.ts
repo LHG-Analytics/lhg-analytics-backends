@@ -11,6 +11,8 @@ import {
 } from '../access/access.service';
 import {
   ATALHOS,
+  CATEGORIAS_CONCORRENCIA,
+  camposDasCategorias,
   camposDaVisaoGeral,
   camposPorCategoria,
   camposPorDiaDaSemana,
@@ -63,6 +65,23 @@ const FERRAMENTAS = [
     inputSchema: {
       type: 'object',
       properties: {},
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: 'listar_categorias',
+    title: 'Categorias de suíte',
+    description:
+      'Categorias de suíte da unidade: ID no Automo, nome e suítes ativas. Sem unidade, lista todas as unidades que você pode consultar.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        unidade: {
+          type: 'string',
+          description: 'slug da unidade (opcional)',
+        },
+      },
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
@@ -314,14 +333,26 @@ export function rotaDoMcp(d: McpDeps): Router {
    * fechada de campos.
    */
   async function kpisBrutos(p: Pessoa, slug: string, per: Periodo) {
+    return doLhgApi(p, slug, 'kpis/date-range', {
+      startDate: per.inicio,
+      endDate: per.fim,
+    });
+  }
+
+  /** GET /:slug/api/Company/<caminho> no lhg-api, como a própria pessoa. */
+  async function doLhgApi(
+    p: Pessoa,
+    slug: string,
+    caminho: string,
+    params: Record<string, string> = {},
+  ) {
     const token = jwt.sign(
       { id: p.id, email: p.email, name: p.name, unit: p.unit, role: p.role },
       d.jwtSecret,
       { expiresIn: 300 },
     );
-    const u = new URL(`${d.lhgApiUrl}/${slug}/api/Company/kpis/date-range`);
-    u.searchParams.set('startDate', per.inicio);
-    u.searchParams.set('endDate', per.fim);
+    const u = new URL(`${d.lhgApiUrl}/${slug}/api/Company/${caminho}`);
+    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
     let resp: Awaited<ReturnType<typeof fetch>>;
     try {
       resp = await buscar(u.toString(), {
@@ -387,6 +418,62 @@ export function rotaDoMcp(d: McpDeps): Router {
                   aviso: 'seu perfil não tem acesso à Visão Geral do Analytics',
                 }),
           },
+        };
+      }
+      case 'listar_categorias': {
+        // Com unidade: só ela (se liberada). Sem: todas as liberadas, poucas
+        // de cada vez; a falha de uma unidade não derruba as outras.
+        const us =
+          args?.unidade !== undefined
+            ? [unidadePermitida(p, args.unidade)]
+            : unidadesDe(p);
+        if (!us.length) {
+          throw new ErroDeFerramenta(
+            'seu perfil não tem acesso à Visão Geral do Analytics',
+          );
+        }
+        const saida: {
+          slug: string;
+          categorias?: ReturnType<typeof camposDasCategorias>;
+          erro?: string;
+        }[] = [];
+        for (let i = 0; i < us.length; i += CATEGORIAS_CONCORRENCIA) {
+          const bloco = us.slice(i, i + CATEGORIAS_CONCORRENCIA);
+          const r = await Promise.allSettled(
+            bloco.map((u) => doLhgApi(p, u.slug, 'categorias')),
+          );
+          r.forEach((x, j) => {
+            if (x.status === 'fulfilled') {
+              saida.push({
+                slug: bloco[j].slug,
+                categorias: camposDasCategorias(x.value),
+              });
+            } else {
+              if (!(x.reason instanceof ErroDeFerramenta)) {
+                logger.warn(
+                  `mcp: falha em listar_categorias (${(x.reason as Error)?.name ?? 'erro'})`,
+                );
+              }
+              saida.push({
+                slug: bloco[j].slug,
+                erro:
+                  x.reason instanceof ErroDeFerramenta
+                    ? x.reason.message
+                    : 'o Analytics não respondeu agora; tente de novo',
+              });
+            }
+          });
+        }
+        if (us.length === 1 && saida[0].erro) {
+          throw new ErroDeFerramenta(saida[0].erro);
+        }
+        return {
+          resumo: {
+            unidades: us.length,
+            ...(us.length === 1 ? { unidade: us[0].slug } : {}),
+            erros: saida.filter((s) => s.erro).length,
+          },
+          dados: { unidades: saida },
         };
       }
       case 'visao_geral': {

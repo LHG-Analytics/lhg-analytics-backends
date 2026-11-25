@@ -22,6 +22,13 @@ export class CompanyController {
     private readonly validationService: ValidationService,
   ) {}
 
+  @Get('categorias')
+  @ApiOperation({ summary: 'Categorias de suíte da unidade: ID do Automo, nome e suítes ativas' })
+  @ApiParam({ name: 'unit', description: 'Slug da unidade (ex.: lush_ipiranga, liv, altana)' })
+  async getCategorias(@CurrentTenant() tenant: TenantConfig) {
+    return { unidade: tenant.slug, categorias: await this.companyService.listarCategorias(tenant) };
+  }
+
   @Get('kpis/date-range')
   @ApiOperation({ summary: 'KPIs de company da unidade por período' })
   @ApiParam({ name: 'unit', description: 'Slug da unidade (ex.: lush_ipiranga, liv, altana)' })
