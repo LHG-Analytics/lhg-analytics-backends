@@ -45,6 +45,8 @@ export interface McpDeps {
   buscar?: typeof fetch;
   /** Espera pelo lhg-api (padrão MCP_TIMEOUT_LHG_API_MS). */
   timeoutMs?: number;
+  /** Espera por unidade em listar_categorias (padrão MCP_TIMEOUT_CATEGORIAS_MS). */
+  timeoutCategoriasMs?: number;
   agora?: () => Date;
 }
 
@@ -204,6 +206,17 @@ export const MCP_TIMEOUT_LHG_API_MS = 100_000;
 export const MSG_CONSULTA_PESADA =
   'consulta pesada em processamento; o resultado fica pronto em 1–2 min, pergunte de novo';
 
+/**
+ * Categorias são uma consulta leve (e com cache no lhg-api): passar disto é
+ * sinal de que o servidor da unidade está fora.
+ */
+export const MCP_TIMEOUT_CATEGORIAS_MS = 5_000;
+/** Unidade fora: as próximas chamadas nem tentam por este tempo ("disjuntor"). */
+export const MCP_DISJUNTOR_MS = 10 * 60_000;
+export const MSG_UNIDADE_FORA = 'servidor da unidade indisponível';
+/** Resposta do lhg-api quando o banco da unidade não aceita conexão (503). */
+const UNIDADE_INDISPONIVEL = 'UNIDADE_INDISPONIVEL';
+
 /** Período(s) pedido(s), para a auditoria também dos ERROS (sem números). */
 function periodosParaAuditoria(
   nome: string,
@@ -250,6 +263,17 @@ export function rotaDoMcp(d: McpDeps): Router {
   const buscar = d.buscar ?? fetch;
   const metadata = `${d.urlPublica}/.well-known/oauth-protected-resource`;
   const contas = new Map<number, { inicio: number; n: number }>();
+  /** Unidade → até quando está marcada como fora (disjuntor, por processo). */
+  const fora = new Map<string, number>();
+  const estaFora = (slug: string) => (fora.get(slug) ?? 0) > agora().getTime();
+  const marcarFora = (slug: string) => {
+    if (!estaFora(slug)) {
+      logger.warn(
+        `mcp: unidade ${slug} indisponível; disjuntor aberto por ${MCP_DISJUNTOR_MS / 60_000} min`,
+      );
+    }
+    fora.set(slug, agora().getTime() + MCP_DISJUNTOR_MS);
+  };
 
   // Protected resource metadata (RFC 9728): resource = a URL EXATA do MCP.
   r.get('/.well-known/oauth-protected-resource', (_req, res) => {
@@ -339,13 +363,21 @@ export function rotaDoMcp(d: McpDeps): Router {
     });
   }
 
-  /** GET /:slug/api/Company/<caminho> no lhg-api, como a própria pessoa. */
+  /**
+   * GET /:slug/api/Company/<caminho> no lhg-api, como a própria pessoa.
+   * Unidade com o disjuntor aberto nem é chamada. O disjuntor abre quando o
+   * lhg-api diz que o banco da unidade não aceita conexão (503), ou quando as
+   * categorias (consulta leve) passam do tempo curto. Consulta de KPI lenta
+   * NÃO abre o disjuntor: é cálculo pesado, não unidade fora.
+   */
   async function doLhgApi(
     p: Pessoa,
     slug: string,
     caminho: string,
     params: Record<string, string> = {},
   ) {
+    if (estaFora(slug)) throw new ErroDeFerramenta(MSG_UNIDADE_FORA);
+    const leve = caminho === 'categorias';
     const token = jwt.sign(
       { id: p.id, email: p.email, name: p.name, unit: p.unit, role: p.role },
       d.jwtSecret,
@@ -360,18 +392,34 @@ export function rotaDoMcp(d: McpDeps): Router {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
         },
-        signal: AbortSignal.timeout(d.timeoutMs ?? MCP_TIMEOUT_LHG_API_MS),
+        signal: AbortSignal.timeout(
+          leve
+            ? (d.timeoutCategoriasMs ?? MCP_TIMEOUT_CATEGORIAS_MS)
+            : (d.timeoutMs ?? MCP_TIMEOUT_LHG_API_MS),
+        ),
       });
     } catch (e) {
-      // Passou do tempo: o lhg-api segue calculando e grava no cache dele.
       const n = (e as Error)?.name;
       if (n === 'TimeoutError' || n === 'AbortError') {
+        // Consulta leve que não volta: unidade fora.
+        if (leve) {
+          marcarFora(slug);
+          throw new ErroDeFerramenta(MSG_UNIDADE_FORA);
+        }
+        // KPI: o lhg-api segue calculando e grava no cache dele.
         throw new ErroDeFerramenta(MSG_CONSULTA_PESADA);
       }
       throw e;
     }
     if (resp.status === 403)
       throw new ErroDeFerramenta('sem acesso a esta unidade');
+    if (resp.status === 503) {
+      const corpo = await resp.json().catch(() => null);
+      if (corpo?.message === UNIDADE_INDISPONIVEL) {
+        marcarFora(slug);
+        throw new ErroDeFerramenta(MSG_UNIDADE_FORA);
+      }
+    }
     if (!resp.ok) {
       throw new ErroDeFerramenta(
         `o Analytics não respondeu agora (${resp.status}); tente de novo`,
@@ -421,8 +469,9 @@ export function rotaDoMcp(d: McpDeps): Router {
         };
       }
       case 'listar_categorias': {
-        // Com unidade: só ela (se liberada). Sem: todas as liberadas, poucas
-        // de cada vez; a falha de uma unidade não derruba as outras.
+        // Com unidade: só ela (se liberada). Sem: todas as liberadas, em
+        // paralelo (consulta leve, com cache no lhg-api); unidade fora não
+        // atrasa as outras (tempo curto + disjuntor) e vem com o erro dela.
         const us =
           args?.unidade !== undefined
             ? [unidadePermitida(p, args.unidade)]

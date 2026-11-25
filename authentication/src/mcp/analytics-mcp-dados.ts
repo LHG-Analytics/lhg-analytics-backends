@@ -309,8 +309,12 @@ export function camposDasCategorias(bruto: any) {
     .filter((c) => c.id !== null);
 }
 
-/** Unidades consultadas ao mesmo tempo quando listar_categorias vem sem unidade. */
-export const CATEGORIAS_CONCORRENCIA = 3;
+/**
+ * Unidades consultadas ao mesmo tempo quando listar_categorias vem sem
+ * unidade. Todas de uma vez: a consulta é leve, com cache de 6 h no lhg-api,
+ * e assim uma unidade fora custa no máximo UM tempo curto, não um por bloco.
+ */
+export const CATEGORIAS_CONCORRENCIA = 12;
 
 /** Dias da semana na ordem do dashboard. */
 export const DIAS_DA_SEMANA = [

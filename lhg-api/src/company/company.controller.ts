@@ -1,4 +1,12 @@
-import { BadRequestException, Controller, Get, HttpException, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  HttpException,
+  Query,
+  ServiceUnavailableException,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { DateUtilsService, ValidationService } from '@lhg/utils';
 import { OPCOES_DATAS } from '../common/datas-do-servico';
@@ -10,6 +18,10 @@ import { TenantGuard } from '../tenant/tenant.guard';
 import { CurrentTenant } from '../tenant/tenant.decorator';
 import { TenantConfig } from '../tenant/tenant.interfaces';
 import { CompanyService } from './company.service';
+import { UnidadeIndisponivelError } from '../database/tenant-pool.service';
+
+/** Mensagem do 503 quando o banco da unidade não aceita conexão (o MCP reconhece). */
+export const UNIDADE_INDISPONIVEL = 'UNIDADE_INDISPONIVEL';
 
 @ApiTags('Company')
 @Controller(':unit/api/Company')
@@ -26,7 +38,12 @@ export class CompanyController {
   @ApiOperation({ summary: 'Categorias de suíte da unidade: ID do Automo, nome e suítes ativas' })
   @ApiParam({ name: 'unit', description: 'Slug da unidade (ex.: lush_ipiranga, liv, altana)' })
   async getCategorias(@CurrentTenant() tenant: TenantConfig) {
-    return { unidade: tenant.slug, categorias: await this.companyService.listarCategorias(tenant) };
+    try {
+      return { unidade: tenant.slug, categorias: await this.companyService.listarCategorias(tenant) };
+    } catch (error) {
+      if (error instanceof UnidadeIndisponivelError) throw new ServiceUnavailableException(UNIDADE_INDISPONIVEL);
+      throw error;
+    }
   }
 
   @Get('kpis/date-range')
@@ -53,6 +70,8 @@ export class CompanyController {
       return await this.companyService.calculateKpisByDateRangeSQL(tenant, start, end);
     } catch (error) {
       if (error instanceof HttpException) throw error;
+      // Banco da unidade fora: 503 (antes virava 400, como se o pedido estivesse errado).
+      if (error instanceof UnidadeIndisponivelError) throw new ServiceUnavailableException(UNIDADE_INDISPONIVEL);
       throw new BadRequestException(
         `Failed to fetch Company KPIs: ${error instanceof Error ? error.message : error}`,
       );
