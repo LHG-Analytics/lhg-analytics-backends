@@ -462,7 +462,7 @@ describe('1d-D2: login central', () => {
     expect(resto).toBeGreaterThan(LEMBRAR_INATIVIDADE_MAX - 120);
     expect(resto).toBeLessThanOrEqual(LEMBRAR_INATIVIDADE_MAX);
     expect(cookiesSso.length).toBeGreaterThan(0);
-    expect(cookiesSso.every((c) => /;s*expires=/i.test(c))).toBe(true);
+    expect(cookiesSso.every((c) => /;\s*expires=/i.test(c))).toBe(true);
   });
 
   it('(Manter conectado) DESMARCADO (padrão): sessão de navegador, 24 h sem uso', async () => {
@@ -479,7 +479,7 @@ describe('1d-D2: login central', () => {
     const resto = (sessao.expiresAt!.getTime() - Date.now()) / 1000;
     expect(resto).toBeLessThanOrEqual(INATIVIDADE_MAX);
     expect(cookiesSso.length).toBeGreaterThan(0);
-    expect(cookiesSso.some((c) => /;s*(expires|max-age)=/i.test(c))).toBe(
+    expect(cookiesSso.some((c) => /;\s*(expires|max-age)=/i.test(c))).toBe(
       false,
     );
   });
