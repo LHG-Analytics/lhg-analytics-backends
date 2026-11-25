@@ -78,3 +78,18 @@ export const sqlTotaisPorCategoria = (
       INNER JOIN suite_counts sc ON scd.suite_category_name = sc.suite_category_name
       ORDER BY scd.suite_category_name
     `;
+
+/**
+ * Categorias de suíte da unidade (as do registry): ID do Automo, nome e
+ * quantas suítes ativas têm (a MESMA regra do cteSuitesPorCategoria).
+ * Categoria do registry sem suíte ativa sai com 0.
+ */
+export const sqlListaCategorias = (suiteIdsSqlList: string): string => `
+        SELECT ca.id, ca.descricao AS nome,
+               COUNT(DISTINCT a.id) FILTER (WHERE a.dataexclusao IS NULL) AS suites
+        FROM categoriaapartamento ca
+        LEFT JOIN apartamento a ON a.id_categoriaapartamento = ca.id
+        WHERE ca.id IN (${suiteIdsSqlList})
+        GROUP BY ca.id, ca.descricao
+        ORDER BY ca.id
+`;

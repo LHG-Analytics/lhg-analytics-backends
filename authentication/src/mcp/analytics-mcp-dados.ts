@@ -292,6 +292,26 @@ export function camposPorCategoria(bruto: any) {
     .filter((c) => c.categoria);
 }
 
+/**
+ * Categorias de suíte da unidade (endpoint /:unit/api/Company/categorias), em
+ * lista fechada: ID do Automo (categoriaapartamento.id), nome e suítes ativas.
+ */
+export function camposDasCategorias(bruto: any) {
+  const linhas: any[] = Array.isArray(bruto?.categorias)
+    ? bruto.categorias
+    : [];
+  return linhas
+    .map((c) => ({
+      id: num(c?.id),
+      nome: nomeCategoria(c?.nome),
+      suites: num(c?.suites),
+    }))
+    .filter((c) => c.id !== null);
+}
+
+/** Unidades consultadas ao mesmo tempo quando listar_categorias vem sem unidade. */
+export const CATEGORIAS_CONCORRENCIA = 3;
+
 /** Dias da semana na ordem do dashboard. */
 export const DIAS_DA_SEMANA = [
   'domingo',
