@@ -16,6 +16,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { CompanyModule } from './company/company.module';
 import { ConsolidatedModule } from './consolidated/consolidated.module';
 import { PainelModule } from './painel/painel.module';
+import { ReplicaModule } from './replica/replica.module';
 import { NpsModule } from './nps/nps.module';
 import { CrmEtlModule } from './crm-etl/crm-etl.module';
 
@@ -28,6 +29,8 @@ import { CrmEtlModule } from './crm-etl/crm-etl.module';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 300 }]),
     DatabaseModule,
     CacheModule,
+    // Vigia das réplicas do Automo (e-mail + "dados até…"); rota estática api/replicas.
+    ReplicaModule,
     // ConsolidatedModule ANTES dos módulos de unidade: as rotas estáticas
     // /consolidated/api/... precisam registrar antes das paramétricas
     // /:unit/api/... (senão ':unit' captura o segmento 'consolidated').
