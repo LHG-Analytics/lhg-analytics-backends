@@ -433,6 +433,41 @@ export class KpiCacheService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /** Estados pequenos de outros módulos (fora do prefixo "kpi": o clear e o status não os tocam). */
+  private estados = new Map<string, { valor: unknown; expira: number }>();
+
+  async lerEstado<T>(chave: string): Promise<T | null> {
+    const k = `estado:${chave}`;
+    if (this.useRedis()) {
+      try {
+        const raw = await this.client!.get(this.rk(k));
+        return raw ? (JSON.parse(raw) as T) : null;
+      } catch (err) {
+        this.logRedisFallback('lerEstado', err);
+      }
+    }
+    const e = this.estados.get(k);
+    return e && e.expira > Date.now() ? (e.valor as T) : null;
+  }
+
+  async gravarEstado(chave: string, valor: unknown, ttlS: number): Promise<void> {
+    const k = `estado:${chave}`;
+    if (this.useRedis()) {
+      try {
+        await this.client!.set(this.rk(k), JSON.stringify(valor), 'EX', ttlS);
+        return;
+      } catch (err) {
+        this.logRedisFallback('gravarEstado', err);
+      }
+    }
+    this.estados.set(k, { valor, expira: Date.now() + ttlS * 1000 });
+  }
+
+  /** Namespace do ambiente (prod, dev…), para quem precisa dizer de onde fala. */
+  get ambiente(): string {
+    return this.ns;
+  }
+
   async clearAll(): Promise<number> {
     // NUNCA usa FLUSHDB — o Redis é compartilhado com o outro ambiente. Apaga só
     // as chaves do namespace atual.
