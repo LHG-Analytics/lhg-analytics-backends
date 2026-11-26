@@ -83,6 +83,12 @@ module.exports = {
         // Auto-warmup no boot (default ligado). WARMUP_ON_BOOT=false desliga.
         WARMUP_ON_BOOT: process.env.WARMUP_ON_BOOT,
         WARMUP_ON_BOOT_DELAY_MS: process.env.WARMUP_ON_BOOT_DELAY_MS,
+        // Vigia das réplicas: e-mail de "réplica atrasada" (a mesma chave do
+        // Resend do authentication). Sem RESEND_API_KEY, só o aviso nas telas.
+        RESEND_API_KEY: process.env.RESEND_API_KEY,
+        ALERTA_REPLICA_PARA: process.env.ALERTA_REPLICA_PARA,
+        ALERTA_REPLICA_DESLIGADO: process.env.ALERTA_REPLICA_DESLIGADO,
+        REPLICA_ATRASO_MAX_MIN: process.env.REPLICA_ATRASO_MAX_MIN,
       },
       env_production: {
         PORT: 3010,
