@@ -81,9 +81,9 @@ describe("valor pago no SQL real", { skip: !process.env.TEST_DATABASE_URL && "se
     assert.equal(Number(por.WEBSITE_IMMEDIATE.totalBookings), 4);
     assert.equal(Number(por.INTERNAL.totalValue), 200);
 
-    // O critério antigo dava 1566 + 3×522 + 0 + 700,80 + 3×233,60 + 300 = 4.832,40.
+    // O critério antigo dava (1566 + 3×522) + 0 + (700,80 + 3×233,60) + 300 = 4.833,60.
     const antigo = (await c.query(sqlFaturamentoPorCanal("2026-11-27 00:00:00", "2026-11-27 23:59:59")
       .replace('nl."id_contapagarreceber" IS NULL', 'nl."versao" = 0'))).rows;
-    assert.equal(Number(antigo.find((l) => l.channel_type === "WEBSITE_IMMEDIATE").totalValue), 4832.4);
+    assert.equal(Number(antigo.find((l) => l.channel_type === "WEBSITE_IMMEDIATE").totalValue), 4833.6);
   });
 });
