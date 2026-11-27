@@ -8,7 +8,11 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import * as request from 'supertest';
 import { MAX_FAILURES } from '../access/login-lock.service';
-import { INATIVIDADE_MAX, ttlDaSessao } from '../oidc/oidc.mount';
+import {
+  INATIVIDADE_MAX,
+  LEMBRAR_INATIVIDADE_MAX,
+  ttlDaSessao,
+} from '../oidc/oidc.mount';
 import { SCRIPT_ENTRAR } from '../oidc/oidc-pages';
 import { limparVencidos } from '../oidc/prisma-adapter';
 import { apagarSchema, cliente, migrar, novoSchema } from './db-helpers';
@@ -412,6 +416,72 @@ describe('1d-D2: login central', () => {
     expect(resto).toBeLessThanOrEqual(90);
     expect(ttlDaSessao(quase7)).toBeLessThanOrEqual(90);
     expect(ttlDaSessao(undefined)).toBe(INATIVIDADE_MAX);
+  });
+
+  /** Login por senha com ou sem "Manter conectado"; devolve os Set-Cookie do hub_sso e a sessão gravada. */
+  async function loginManterConectado(email: string, lembrar: boolean) {
+    const pote = new Pote();
+    const a = await autorizar(pote, 'hub');
+    const uid = uidDa(a.headers.location);
+    const l = pote.guardar(
+      await request(srv)
+        .post(`/oidc/interaction/${uid}/login`)
+        .set('Cookie', pote.header())
+        .type('form')
+        .send({ email, password: SENHA, ...(lembrar && { lembrar: '1' }) }),
+    );
+    expect(l.status).toBe(303);
+    const cookiesSso: string[] = [];
+    let loc = l.headers.location as string;
+    for (let i = 0; i < 5 && loc.startsWith(ISSUER); i++) {
+      const r = pote.guardar(
+        await request(srv).get(local(ISSUER, loc)).set('Cookie', pote.header()),
+      );
+      for (const c of ([] as string[]).concat(r.headers['set-cookie'] ?? []))
+        if (c.startsWith('hub_sso=')) cookiesSso.push(c);
+      loc = r.headers.location;
+    }
+    expect(new URL(loc).searchParams.get('code')).toBeTruthy();
+    const sessao = await db.oidcPayload.findFirst({
+      where: { type: 'Session', accountId: pessoas.ida.publicId },
+      orderBy: { expiresAt: 'desc' },
+    });
+    return { pote, cookiesSso, sessao: sessao! };
+  }
+
+  it('(Manter conectado) MARCADO: sessão de 7 dias sem uso (até 30 dias), cookie persistente', async () => {
+    await db.oidcPayload.deleteMany({
+      where: { type: 'Session', accountId: pessoas.ida.publicId },
+    });
+    const { cookiesSso, sessao } = await loginManterConectado(
+      pessoas.ida.email,
+      true,
+    );
+    expect((sessao.payload as Record<string, unknown>).lembrar).toBe(true);
+    const resto = (sessao.expiresAt!.getTime() - Date.now()) / 1000;
+    expect(resto).toBeGreaterThan(LEMBRAR_INATIVIDADE_MAX - 120);
+    expect(resto).toBeLessThanOrEqual(LEMBRAR_INATIVIDADE_MAX);
+    expect(cookiesSso.length).toBeGreaterThan(0);
+    expect(cookiesSso.every((c) => /;\s*expires=/i.test(c))).toBe(true);
+  });
+
+  it('(Manter conectado) DESMARCADO (padrão): sessão de navegador, 24 h sem uso', async () => {
+    await db.oidcPayload.deleteMany({
+      where: { type: 'Session', accountId: pessoas.ida.publicId },
+    });
+    const { cookiesSso, sessao } = await loginManterConectado(
+      pessoas.ida.email,
+      false,
+    );
+    const payload = sessao.payload as Record<string, unknown>;
+    expect(payload.lembrar).toBeUndefined();
+    expect(payload.transient).toBe(true);
+    const resto = (sessao.expiresAt!.getTime() - Date.now()) / 1000;
+    expect(resto).toBeLessThanOrEqual(INATIVIDADE_MAX);
+    expect(cookiesSso.length).toBeGreaterThan(0);
+    expect(cookiesSso.some((c) => /;\s*(expires|max-age)=/i.test(c))).toBe(
+      false,
+    );
   });
 
   it('9. refresh rotativo; depois de revogar a flag do sistema → invalid_grant, grant revogado e auditoria', async () => {
