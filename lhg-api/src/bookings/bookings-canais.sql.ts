@@ -3,7 +3,10 @@
  * WEBSITE_IMMEDIATE/SCHEDULED, GUIA_GO/SCHEDULED, INTERNAL, BOOKING, EXPEDIA...).
  * Compartilhado pelo dashboard de Reservas (bookings.service) e pelo resumo do
  * Painel TV (painel.service): o MESMO texto nos dois, para os números baterem.
- * Para WEBSITE (origem 4) o valor vem do novo_lancamento (versao 0, RESERVA).
+ * Para WEBSITE (origem 4) o valor é o PAGO: o lançamento RESERVA "cabeça" (sem
+ * id_contapagarreceber). As parcelas do cartão também são lançamentos RESERVA
+ * (com id_contapagarreceber) e, enquanto não processadas, têm versao 0: o
+ * filtro antigo "versao = 0" as somava e inflava o mês corrente.
  */
 export const sqlFaturamentoPorCanal = (
   formattedStart: string,
@@ -59,7 +62,7 @@ export const sqlFaturamentoPorCanal = (
     JOIN "reserva" r ON rcr."id" = r."id"
     WHERE rcr."id_tipoorigemreserva" != 4
   ),
-  -- Para canal WEBSITE (4), usa novo_lancamento com versao=0 e tipolancamento='RESERVA'
+  -- Para canal WEBSITE (4), usa o lançamento RESERVA "cabeça" (id_contapagarreceber nulo: o valor pago, sem as parcelas)
   valores_website AS (
     SELECT
       rcr."id",
@@ -68,7 +71,7 @@ export const sqlFaturamentoPorCanal = (
     FROM reservas_com_canal_refinado rcr
     JOIN "novo_lancamento" nl ON rcr."id" = nl."id_originado"
     WHERE rcr."id_tipoorigemreserva" = 4
-      AND nl."versao" = 0
+      AND nl."id_contapagarreceber" IS NULL
       AND nl."dataexclusao" IS NULL
       AND nl."tipolancamento" = 'RESERVA'
     GROUP BY rcr."id", rcr.channel_type

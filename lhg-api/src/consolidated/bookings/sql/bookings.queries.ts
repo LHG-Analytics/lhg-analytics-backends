@@ -43,7 +43,7 @@ export function getDateRangeWithCutoff(
 /**
  * Query para BigNumbers de Bookings - totais do período
  * Usa mesma lógica do serviço individual: calcula valores por canal e soma
- * Para WEBSITE (id=4), usa novo_lancamento com versao=0 e tipolancamento='RESERVA'
+ * Para WEBSITE (id=4), usa o lançamento RESERVA "cabeça" (id_contapagarreceber nulo: o valor pago, sem as parcelas)
  * Retorna: totalValue, totalBookings, totalRevenue (para representatividade)
  */
 export function getBookingsBigNumbersSQL(
@@ -92,7 +92,7 @@ export function getBookingsBigNumbersSQL(
       FROM reservas_base rb
       JOIN "novo_lancamento" nl ON rb."id" = nl."id_originado"
       WHERE rb."id_tipoorigemreserva" = 4
-        AND nl."versao" = 0
+        AND nl."id_contapagarreceber" IS NULL
         AND nl."dataexclusao" IS NULL
         AND nl."tipolancamento" = 'RESERVA'
       GROUP BY rb."id"
@@ -130,7 +130,7 @@ export function getBookingsBigNumbersSQL(
 /**
  * Query para Faturamento de Reservas por data
  * Usa mesma lógica do serviço individual: DATE(dataatendimento) sem ajuste de 6h
- * Para WEBSITE (id=4), usa novo_lancamento com versao=0 e tipolancamento='RESERVA'
+ * Para WEBSITE (id=4), usa o lançamento RESERVA "cabeça" (id_contapagarreceber nulo: o valor pago, sem as parcelas)
  */
 export function getBillingByDateSQL(
   unit: UnitKey,
@@ -182,7 +182,7 @@ export function getBillingByDateSQL(
       FROM reservas_base rb
       JOIN "novo_lancamento" nl ON rb."id" = nl."id_originado"
       WHERE rb."id_tipoorigemreserva" = 4
-        AND nl."versao" = 0
+        AND nl."id_contapagarreceber" IS NULL
         AND nl."dataexclusao" IS NULL
         AND nl."tipolancamento" = 'RESERVA'
       GROUP BY rb."id", DATE(rb."dataatendimento")
@@ -204,7 +204,7 @@ export function getBillingByDateSQL(
 
 /**
  * Query para Ecommerce BigNumbers (canal 4 = RESERVA_API - WEBSITE_IMMEDIATE + WEBSITE_SCHEDULED)
- * Usa novo_lancamento com versao=0 e tipolancamento='RESERVA' para obter valores corretos
+ * Usa o lançamento RESERVA "cabeça" (id_contapagarreceber nulo: o valor pago, sem as parcelas)
  */
 export function getEcommerceBigNumbersSQL(
   unit: UnitKey,
@@ -236,7 +236,7 @@ export function getEcommerceBigNumbersSQL(
         COALESCE(SUM(nl."valor"), 0) AS valor
       FROM reservas_website rw
       JOIN "novo_lancamento" nl ON rw."id" = nl."id_originado"
-      WHERE nl."versao" = 0
+      WHERE nl."id_contapagarreceber" IS NULL
         AND nl."dataexclusao" IS NULL
         AND nl."tipolancamento" = 'RESERVA'
       GROUP BY rw."id"
@@ -271,7 +271,7 @@ export function getEcommerceBigNumbersSQL(
 
 /**
  * Query para Ecommerce por data (canal 4 = RESERVA_API)
- * Usa novo_lancamento com versao=0 e tipolancamento='RESERVA' para obter valores corretos
+ * Usa o lançamento RESERVA "cabeça" (id_contapagarreceber nulo: o valor pago, sem as parcelas)
  */
 export function getEcommerceByDateSQL(
   unit: UnitKey,
@@ -306,7 +306,7 @@ export function getEcommerceByDateSQL(
         COALESCE(SUM(nl."valor"), 0) AS valor
       FROM reservas_website rw
       JOIN "novo_lancamento" nl ON rw."id" = nl."id_originado"
-      WHERE nl."versao" = 0
+      WHERE nl."id_contapagarreceber" IS NULL
         AND nl."dataexclusao" IS NULL
         AND nl."tipolancamento" = 'RESERVA'
       GROUP BY rw."id", DATE(rw."dataatendimento")

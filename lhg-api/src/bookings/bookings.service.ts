@@ -433,7 +433,7 @@ FROM vendas_diretas vd, locacoes loc;
 
     // Query SQL para classificação refinada de canais
     // Para WEBSITE (id=4): usa periodocontratado + hora para classificar SCHEDULED vs IMMEDIATE
-    // Para WEBSITE: usa novo_lancamento com versao=0 e tipolancamento='RESERVA' para obter o valor correto
+    // Para WEBSITE: usa o lançamento RESERVA "cabeça" (id_contapagarreceber nulo: o valor pago, sem as parcelas) para obter o valor correto
     const billingPerChannelSQL = sqlFaturamentoPorCanal(formattedStart, formattedEnd);
 
     const [
