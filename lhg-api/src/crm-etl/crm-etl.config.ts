@@ -12,6 +12,9 @@
  *   CRM_ETL_BACKFILL_DESDE   início do histórico (padrão 2024-01-01)
  *   CRM_ETL_JANELA           horário em que o job roda, hora de São Paulo (padrão 02-06)
  *   CRM_ETL_REPROCESSAR_DIAS cada execução relê estes dias antes da marca d'água (padrão 7)
+ *   CRM_ETL_DB_CA            certificado raiz do Supabase (prod-ca-2021.crt), em PEM — com "\n"
+ *                            no lugar das quebras de linha, ou em base64. Com ele, a conexão com o
+ *                            CRM VERIFICA o certificado do servidor; sem ele, só criptografa.
  */
 export const UNIDADES_LHG = ['lush_ipiranga', 'lush_lapa', 'tout', 'andar_de_cima', 'liv', 'altana'] as const;
 
@@ -32,6 +35,17 @@ export interface CrmEtlConfig {
   /** [início, fim) em horas de São Paulo; o fim pode passar da meia-noite (ex.: 22-04). */
   janela: [number, number];
   reprocessarDias: number;
+  /** Certificado raiz (PEM) para verificar o servidor do CRM; null = só criptografa. */
+  ca: string | null;
+}
+
+/** PEM a partir da env: aceita "\n" (literal) no lugar das quebras de linha ou o arquivo em base64. */
+export function lerCa(bruto: string | undefined): string | null | 'invalida' {
+  const v = (bruto ?? '').trim();
+  if (!v) return null;
+  let pem = v.replace(/\\n/g, '\n');
+  if (!pem.includes('-----BEGIN CERTIFICATE-----')) pem = Buffer.from(v, 'base64').toString('utf8');
+  return /-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----/.test(pem) ? pem.trim() + '\n' : 'invalida';
 }
 
 export function lerConfigCrmEtl(env: NodeJS.ProcessEnv = process.env): CrmEtlConfig {
@@ -55,6 +69,7 @@ export function lerConfigCrmEtl(env: NodeJS.ProcessEnv = process.env): CrmEtlCon
   const backfillDesde = (env.CRM_ETL_BACKFILL_DESDE ?? '2024-01-01').trim();
   const [ji, jf] = (env.CRM_ETL_JANELA ?? '02-06').split('-').map((s) => Number(s));
   const reprocessarDias = Number(env.CRM_ETL_REPROCESSAR_DIAS ?? 7);
+  const ca = lerCa(env.CRM_ETL_DB_CA);
 
   let motivo: string | null = null;
   if (!urlDestino) motivo = 'sem CRM_ETL_DATABASE_URL';
@@ -65,6 +80,8 @@ export function lerConfigCrmEtl(env: NodeJS.ProcessEnv = process.env): CrmEtlCon
   else if (![ji, jf].every((h) => Number.isInteger(h) && h >= 0 && h <= 24) || ji === jf) motivo = 'CRM_ETL_JANELA inválida';
   else if (!Number.isInteger(reprocessarDias) || reprocessarDias < 0 || reprocessarDias > 31)
     motivo = 'CRM_ETL_REPROCESSAR_DIAS inválido (0 a 31)';
+  // Certificado informado mas ilegível: não liga sem verificar (falha fechada).
+  else if (ca === 'invalida') motivo = 'CRM_ETL_DB_CA inválida (PEM com \\n ou base64)';
 
   return {
     ativo: motivo === null,
@@ -76,6 +93,7 @@ export function lerConfigCrmEtl(env: NodeJS.ProcessEnv = process.env): CrmEtlCon
     backfillDesde,
     janela: [ji, jf],
     reprocessarDias,
+    ca: ca === 'invalida' ? null : ca,
   };
 }
 

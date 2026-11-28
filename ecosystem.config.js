@@ -98,6 +98,8 @@ module.exports = {
         CRM_ETL_BACKFILL_DESDE: process.env.CRM_ETL_BACKFILL_DESDE,
         CRM_ETL_JANELA: process.env.CRM_ETL_JANELA,
         CRM_ETL_REPROCESSAR_DIAS: process.env.CRM_ETL_REPROCESSAR_DIAS,
+        // Certificado raiz do Supabase (PEM com \n ou base64): verifica o servidor do CRM.
+        CRM_ETL_DB_CA: process.env.CRM_ETL_DB_CA,
       },
       env_production: {
         PORT: 3010,

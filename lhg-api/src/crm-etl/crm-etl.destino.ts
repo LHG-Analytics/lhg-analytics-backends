@@ -41,6 +41,20 @@ export const contar = (lote: LoteRaw): Contagens => ({
 
 const LOTE_SQL = 1000;
 
+/**
+ * Conexão com o CRM. Com o certificado raiz (CRM_ETL_DB_CA), o servidor é
+ * VERIFICADO (cadeia + nome do host): os parâmetros de SSL da URL saem, porque
+ * o driver (pg 8.x) os aplicaria por cima do `ssl` explícito. Sem o
+ * certificado, vale a URL como está (ex.: sslmode=require&uselibpqcompat=true:
+ * criptografa sem verificar, como o libpq).
+ */
+export function opcoesConexao(url: string, ca: string | null): { connectionString: string; ssl?: object } {
+  if (!ca) return { connectionString: url };
+  const u = new URL(url);
+  for (const p of ['sslmode', 'uselibpqcompat', 'sslrootcert', 'sslcert', 'sslkey', 'ssl']) u.searchParams.delete(p);
+  return { connectionString: u.toString(), ssl: { ca, rejectUnauthorized: true, servername: u.hostname } };
+}
+
 // ── Pg ─────────────────────────────────────────────────────────────────────
 export class DestinoPg implements DestinoCrm {
   private pool: Pool;
@@ -48,8 +62,9 @@ export class DestinoPg implements DestinoCrm {
   constructor(
     url: string,
     private readonly schema: string,
+    ca: string | null = null,
   ) {
-    this.pool = new Pool({ connectionString: url, max: 2, idleTimeoutMillis: 30000, connectionTimeoutMillis: 15000 });
+    this.pool = new Pool({ ...opcoesConexao(url, ca), max: 2, idleTimeoutMillis: 30000, connectionTimeoutMillis: 15000 });
     this.pool.on('error', () => undefined);
   }
 
