@@ -18,8 +18,23 @@ export interface DocumentoNormalizado {
   texto: string;
 }
 
+/**
+ * CPFs genéricos (contrato-raw-v1, seção 4, A7): os "de exemplo" que PASSAM no
+ * dígito verificador e que recepções/sistemas usam no balcão. Viram "cliente"
+ * falso se forem para o hash. Acrescentar aqui os CPFs de balcão das unidades.
+ * (Os 11 dígitos iguais já são recusados pela regra abaixo.)
+ */
+export const CPFS_GENERICOS: ReadonlySet<string> = new Set([
+  '12345678909',
+  '01234567890',
+  '00000000191',
+  '98765432100',
+  '11122233396',
+  '10000000019',
+]);
+
 export function cpfValido(d: string): boolean {
-  if (!/^\d{11}$/.test(d) || /^(\d)\1{10}$/.test(d)) return false;
+  if (!/^\d{11}$/.test(d) || /^(\d)\1{10}$/.test(d) || CPFS_GENERICOS.has(d)) return false;
   const dv = (n: number) => {
     let s = 0;
     for (let i = 0; i < n; i++) s += Number(d[i]) * (n + 1 - i);

@@ -75,6 +75,8 @@ SELECT x.id_locacaoapartamento::text AS loc, x.id_cliente::text AS id_cliente,
        pp.id_pessoa::text AS id_pessoa, p.identificador AS doc,
        p.celular, p.telefone1, p.telefone2, p.email,
        nullif(upper(trim(p.sexo)), '') AS sexo,
+       -- Só para o gênero pelo 1º nome (A1), em memória: NUNCA vai para o raw.
+       split_part(trim(p.nome), ' ', 1) AS primeiro_nome,
        EXTRACT(YEAR FROM p.nascimento)::int AS ano_nascimento,
        to_char(cl.datacadastro AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS cadastro_em
 FROM col_locacaoapartamento_cliente x
