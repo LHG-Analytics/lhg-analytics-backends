@@ -456,3 +456,29 @@ describe("A1: gênero pelo 1º nome", () => {
     assert.match(gen.SQL_DICIONARIO_NOMES, /HAVING count\(\*\) >= 3/);
   });
 });
+
+// ── TLS: verificar o servidor do CRM com o certificado raiz (CRM_ETL_DB_CA) ─
+describe("TLS com o certificado raiz do CRM", () => {
+  // PEM FICTÍCIO (só a forma); o real é o prod-ca-2021.crt do Supabase.
+  const PEM = "-----BEGIN CERTIFICATE-----\nMIIBFICTICIOabc\nDEFghi==\n-----END CERTIFICATE-----";
+  test("lerCa: PEM com \n literal, PEM real ou base64; lixo = inválida", () => {
+    assert.equal(cfgm.lerCa(undefined), null);
+    assert.equal(cfgm.lerCa(PEM.replace(/\n/g, "\n")), PEM + "\n");
+    assert.equal(cfgm.lerCa(PEM), PEM + "\n");
+    assert.equal(cfgm.lerCa(Buffer.from(PEM).toString("base64")), PEM + "\n");
+    assert.equal(cfgm.lerCa("qualquer coisa"), "invalida");
+  });
+  test("certificado informado mas inválido: o job NÃO liga (falha fechada); sem certificado, liga só criptografando", () => {
+    assert.equal(config({ CRM_ETL_DB_CA: "lixo" }).ativo, false);
+    assert.match(config({ CRM_ETL_DB_CA: "lixo" }).motivo, /CRM_ETL_DB_CA/);
+    assert.equal(config().ca, null);
+    assert.equal(config({ CRM_ETL_DB_CA: PEM.replace(/\n/g, "\n") }).ca, PEM + "\n");
+  });
+  test("opcoesConexao: com CA tira os parâmetros de SSL da URL e verifica cadeia + host; sem CA, URL intacta", () => {
+    const url = "postgresql://u:p@aws-0-x.pooler.supabase.com:6543/postgres?sslmode=require&uselibpqcompat=true";
+    assert.deepEqual(dst.opcoesConexao(url, null), { connectionString: url });
+    const o = dst.opcoesConexao(url, PEM);
+    assert.doesNotMatch(o.connectionString, /sslmode|uselibpqcompat/);
+    assert.deepEqual(o.ssl, { ca: PEM, rejectUnauthorized: true, servername: "aws-0-x.pooler.supabase.com" });
+  });
+});

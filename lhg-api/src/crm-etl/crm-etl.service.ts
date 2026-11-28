@@ -80,10 +80,11 @@ export class CrmEtlService implements OnApplicationBootstrap, OnModuleDestroy {
       this.logger.log(`crm_etl: desligado (${this.config.motivo})`);
       return;
     }
-    this.destino ??= new DestinoPg(this.config.urlDestino, this.config.schema);
+    this.destino ??= new DestinoPg(this.config.urlDestino, this.config.schema, this.config.ca);
     this.logger.log(
       `crm_etl: ATIVO unidades=${this.config.unidades.length} schema=${this.config.schema} ` +
-        `janela=${this.config.janela.join('-')}h chave=${this.config.chave!.id}`,
+        `janela=${this.config.janela.join('-')}h chave=${this.config.chave!.id} ` +
+        `tls=${this.config.ca ? 'certificado verificado' : 'só criptografia (sem CRM_ETL_DB_CA)'}`,
     );
     this.timer = setInterval(() => void this.ciclo(), CRM_ETL_INTERVALO_MS);
     this.timer.unref();
