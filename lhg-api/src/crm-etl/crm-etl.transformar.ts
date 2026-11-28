@@ -8,6 +8,7 @@ import * as moment from 'moment-timezone';
 import { TenantConfig } from '../tenant/tenant.interfaces';
 import { docHash, normalizarDocumento, TipoDocumento } from './crm-etl.doc';
 import { ehPacote, grupoDoItem } from './crm-etl.grupos';
+import { FonteGenero, Genero, generoDe } from './crm-etl.genero';
 
 export interface UnidadeCrm {
   slug: string;
@@ -57,6 +58,8 @@ export interface LinhaPessoa {
   telefone2: string | null;
   email: string | null;
   sexo: string | null;
+  /** Só para o gênero pelo 1º nome (A1); nunca sai desta função. */
+  primeiro_nome?: string | null;
   ano_nascimento: number | null;
   cadastro_em: string | null;
 }
@@ -143,7 +146,11 @@ export interface RawCliente extends Hash {
   id_pessoa: string | null;
   tem_telefone: boolean;
   tem_email: boolean;
+  /** Bruto do Automo (MASCULINO, FEMININO, OUTRO…). */
   sexo: string | null;
+  /** A1: corrigido pelo 1º nome (ver crm-etl.genero.ts). */
+  genero: Genero | null;
+  genero_fonte: FonteGenero | null;
   ano_nascimento: number | null;
   cadastro_em: string | null;
 }
@@ -260,6 +267,8 @@ export interface EntradaTransformar {
   itens: LinhaItem[];
   reservas: LinhaReserva[];
   tabelas: Map<string, string>;
+  /** Dicionário 1º nome → gênero da unidade (A1); sem ele, só o sexo do Automo. */
+  generos?: ReadonlyMap<string, Genero>;
 }
 
 export function transformar(e: EntradaTransformar): LoteRaw {
@@ -361,7 +370,8 @@ export function transformar(e: EntradaTransformar): LoteRaw {
         ...h,
         tem_telefone: temTel,
         tem_email: temEmail,
-        sexo: p.sexo === 'M' || p.sexo === 'F' ? p.sexo : null,
+        sexo: (p.sexo ?? '').trim().toUpperCase() || null,
+        ...generoDe(p.sexo, p.primeiro_nome, e.generos),
         ano_nascimento: p.ano_nascimento,
         cadastro_em: p.cadastro_em,
       });

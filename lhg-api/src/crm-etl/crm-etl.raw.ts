@@ -95,7 +95,9 @@ export const TABELAS_RAW: Record<'estadias' | 'pessoas' | 'clientes' | 'itens' |
       ...hash,
       c('tem_telefone', 'boolean'),
       c('tem_email', 'boolean'),
-      c('sexo', 'text', true),
+      c('sexo', 'text', true), // bruto do Automo
+      c('genero', 'text', true), // A1: F/M corrigido pelo 1º nome
+      c('genero_fonte', 'text', true), // A1: automo/nome
       c('ano_nascimento', 'integer', true),
       c('cadastro_em', 'timestamptz', true),
     ],

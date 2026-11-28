@@ -146,10 +146,10 @@ function entrada(cpfA, cpfB, slug = "lush_ipiranga") {
     estadias: [ESTADIA(), ESTADIA({ id_locacao: "6000", raiz: "6000", cadeia: ["6000"], chegada: "2026-11-16T10:00:00.000", ini: "2026-11-16T10:00:00.000", fim: "2026-11-16T12:00:00.000", descv: "0", meios: null, meios_dep: ["DINHEIRO"] })],
     pessoas: [
       // Acompanhante na última perna e titular na 1ª (chegada): titular = o da 1ª perna.
-      { loc: "5002", id_cliente: "902", ordem: 1, id_pessoa: "802", doc: cpfB, celular: null, telefone1: null, telefone2: null, email: null, sexo: "F", ano_nascimento: 1990, cadastro_em: null },
-      { loc: "5001", id_cliente: "901", ordem: 1, id_pessoa: "801", doc: mascara(cpfA), celular: TEL, telefone1: null, telefone2: null, email: EMAIL, sexo: "M", ano_nascimento: 1985, cadastro_em: "2025-01-01T12:00:00Z" },
+      { loc: "5002", id_cliente: "902", ordem: 1, id_pessoa: "802", doc: cpfB, celular: null, telefone1: null, telefone2: null, email: null, sexo: "FEMININO", primeiro_nome: "Beltrana", ano_nascimento: 1990, cadastro_em: null },
+      { loc: "5001", id_cliente: "901", ordem: 1, id_pessoa: "801", doc: mascara(cpfA), celular: TEL, telefone1: null, telefone2: null, email: EMAIL, sexo: "MASCULINO", primeiro_nome: "Fictícia", ano_nascimento: 1985, cadastro_em: "2025-01-01T12:00:00Z" },
       // O mesmo cliente nas duas pernas: um registro só.
-      { loc: "5002", id_cliente: "901", ordem: 2, id_pessoa: "801", doc: mascara(cpfA), celular: TEL, telefone1: null, telefone2: null, email: EMAIL, sexo: "M", ano_nascimento: 1985, cadastro_em: "2025-01-01T12:00:00Z" },
+      { loc: "5002", id_cliente: "901", ordem: 2, id_pessoa: "801", doc: mascara(cpfA), celular: TEL, telefone1: null, telefone2: null, email: EMAIL, sexo: "MASCULINO", primeiro_nome: "Fictícia", ano_nascimento: 1985, cadastro_em: "2025-01-01T12:00:00Z" },
       // Locação fora do lote: ignorada.
       { loc: "9999", id_cliente: "999", ordem: 1, id_pessoa: "899", doc: null, celular: null, telefone1: null, telefone2: null, email: null, sexo: null, ano_nascimento: null, cadastro_em: null },
     ],
@@ -163,6 +163,7 @@ function entrada(cpfA, cpfB, slug = "lush_ipiranga") {
       { id_reserva: "71", loc: null, id_cliente: "903", canal: "SITE", criada: "2026-11-14T09:00:00.000", inicio: "2026-11-16T14:00:00.000", cancelada: "2026-11-15T09:00:00.000", no_show: false, periodo: null, valor: null, qtd_hospedes: null, doc: null },
     ],
     tabelas: new Map([["5001", "TABELA PADRAO"]]),
+    generos: new Map([["FICTICIA", "F"]]),
   };
 }
 
@@ -401,5 +402,57 @@ describe("destino Pg", { skip: !process.env.TEST_DATABASE_URL && "sem TEST_DATAB
     const [run] = await q(`SELECT status, contagens->>'itens' AS itens FROM ${schema}.etl_runs ORDER BY terminado_em LIMIT 1`);
     assert.deepEqual(run, { status: "ok", itens: "3" });
     await c.end();
+  });
+});
+
+// ── A7: CPFs genéricos e A1: gênero pelo 1º nome (contrato-raw-v1) ───────────
+const gen = require("../lhg-api/dist/crm-etl/crm-etl.genero.js");
+
+describe("A7: CPFs genéricos", () => {
+  test("os CPFs 'de exemplo' passam no DV, mas não viram doc_hash", () => {
+    for (const c of ["12345678909", "01234567890", "00000000191", "98765432100", "11122233396", "10000000019"]) {
+      assert.ok(doc.CPFS_GENERICOS.has(c));
+      assert.equal(doc.cpfValido(c), false, c);
+      assert.equal(doc.normalizarDocumento(mascara(c), "BR"), null, c);
+    }
+    assert.equal(doc.normalizarDocumento(cpfGerado(), "BR").tipo, "CPF");
+  });
+});
+
+describe("A1: gênero pelo 1º nome", () => {
+  test("dicionário: feminino com ≥3 FEMININO e ≥50%; masculino com ≥3 MASCULINO e ≤5% FEMININO; acento não importa", () => {
+    const d = gen.montarDicionario([
+      { nome: "Fictícia", f: 6, m: 4 }, // vazios gravados como MASCULINO: ainda é feminino
+      { nome: "FICTICIA", f: 1, m: 0 },
+      { nome: "Ciclano", f: 0, m: 30 },
+      { nome: "Ambíguo", f: 3, m: 10 }, // 23% feminino: nem um nem outro
+      { nome: "Raro", f: 2, m: 0 }, // poucas ocorrências
+    ]);
+    assert.equal(d.get("FICTICIA"), "F");
+    assert.equal(d.get("CICLANO"), "M");
+    assert.equal(d.has("AMBIGUO"), false);
+    assert.equal(d.has("RARO"), false);
+  });
+  test("decisão: FEMININO do Automo > nome > MASCULINO do Automo > sem gênero", () => {
+    const d = new Map([["FICTICIA", "F"], ["CICLANO", "M"]]);
+    assert.deepEqual(gen.generoDe("FEMININO", "Ciclano", d), { genero: "F", genero_fonte: "automo" });
+    assert.deepEqual(gen.generoDe("MASCULINO", "Fictícia Silva", d), { genero: "F", genero_fonte: "nome" });
+    assert.deepEqual(gen.generoDe(null, "ciclano", d), { genero: "M", genero_fonte: "nome" });
+    assert.deepEqual(gen.generoDe("MASCULINO", "Desconhecido", d), { genero: "M", genero_fonte: "automo" });
+    assert.deepEqual(gen.generoDe("OUTRO", "Desconhecido", d), { genero: null, genero_fonte: null });
+    assert.deepEqual(gen.generoDe(null, null, undefined), { genero: null, genero_fonte: null });
+  });
+  test("no lote: sexo bruto, gênero corrigido, e o 1º nome NUNCA sai", () => {
+    const lote = tr.transformar(entrada(cpfGerado(), cpfGerado()));
+    const c901 = lote.clientes.find((c) => c.id_cliente === "901");
+    const c902 = lote.clientes.find((c) => c.id_cliente === "902");
+    assert.deepEqual([c901.sexo, c901.genero, c901.genero_fonte], ["MASCULINO", "F", "nome"]);
+    assert.deepEqual([c902.sexo, c902.genero, c902.genero_fonte], ["FEMININO", "F", "automo"]);
+    const tudo = JSON.stringify(lote);
+    for (const proibido of ["Fictícia", "FICTICIA", "Ficticia", "Beltrana", "primeiro_nome"]) assert.ok(!tudo.includes(proibido), proibido);
+  });
+  test("o SQL do dicionário devolve só agregados por 1º nome", () => {
+    assert.match(gen.SQL_DICIONARIO_NOMES, /GROUP BY 1/);
+    assert.match(gen.SQL_DICIONARIO_NOMES, /HAVING count\(\*\) >= 3/);
   });
 });

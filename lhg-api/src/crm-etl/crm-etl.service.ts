@@ -36,6 +36,7 @@ import {
   transformar,
   unidadeCrm,
 } from './crm-etl.transformar';
+import { Genero, SQL_DICIONARIO_NOMES, montarDicionario } from './crm-etl.genero';
 
 const FMT = 'YYYY-MM-DDTHH:mm:ss.SSS';
 /** Tokens opcionais (testes): destino falso e configuração explícita. */
@@ -44,6 +45,8 @@ export const CRM_ETL_CONFIG = 'CRM_ETL_CONFIG';
 export const CRM_ETL_INTERVALO_MS = 10 * 60_000;
 /** Marca d'água mais atrasada que isto → histórico (blocos de 1 mês). */
 export const CRM_ETL_ATRASO_BACKFILL_DIAS = 2;
+/** Dicionário de nomes (A1): relido uma vez por dia por unidade. */
+export const CRM_ETL_DICIONARIO_TTL_MS = 24 * 3600_000;
 
 /** Soma/subtrai em texto local (sem fuso), sem passar por horário de verão. */
 const somar = (local: string, n: number, un: 'days' | 'months') => moment.utc(local, FMT).add(n, un).format(FMT);
@@ -58,6 +61,7 @@ export class CrmEtlService implements OnApplicationBootstrap, OnModuleDestroy {
   /** Unidade → dia (São Paulo) do último incremental ok. */
   private incrementalFeito = new Map<string, string>();
   private capacidades = new Map<string, { tem_ordem: boolean; pode_tabela: boolean }>();
+  private dicionarios = new Map<string, { em: number; dic: ReadonlyMap<string, Genero> }>();
 
   /** Relógio (ms); trocado nos testes. */
   relogio: () => number = Date.now;
@@ -167,6 +171,7 @@ export class CrmEtlService implements OnApplicationBootstrap, OnModuleDestroy {
         itens,
         reservas,
         tabelas: new Map(tabelas.filter((x) => x.tabela).map((x) => [x.loc, x.tabela!])),
+        generos: pessoas.length ? await this.dicionarioDe(slug) : undefined,
       });
       const contagens = await this.destino!.gravar(exec, lote);
       this.logger.log(
@@ -185,6 +190,20 @@ export class CrmEtlService implements OnApplicationBootstrap, OnModuleDestroy {
       await this.destino!.registrarErro(exec, codigo).catch(() => undefined);
       throw e;
     }
+  }
+
+  /**
+   * Dicionário 1º nome → gênero da unidade (A1), lido uma vez por dia: no
+   * histórico em blocos, a mesma consulta agregada serve para todos os meses.
+   * Só agregados por nome; fica só em memória.
+   */
+  private async dicionarioDe(slug: string): Promise<ReadonlyMap<string, Genero>> {
+    const d = this.dicionarios.get(slug);
+    if (d && Date.now() - d.em < CRM_ETL_DICIONARIO_TTL_MS) return d.dic;
+    const linhas = await this.pools.query<{ nome: string; f: number; m: number }>(slug, SQL_DICIONARIO_NOMES);
+    const dic = montarDicionario(linhas);
+    this.dicionarios.set(slug, { em: Date.now(), dic });
+    return dic;
   }
 
   private async capacidadesDe(slug: string) {

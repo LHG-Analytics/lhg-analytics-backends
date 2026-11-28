@@ -57,6 +57,11 @@ GRANT USAGE ON SCHEMA raw TO crm_etl_lhg;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA raw TO crm_etl_lhg;
 ```
 
+## Ajustes do contrato-raw-v1 já aplicados
+
+- **A1, gênero pelo 1º nome:** `clientes.genero` (F/M) e `clientes.genero_fonte` (automo/nome), calculados em memória a partir de um dicionário de 1º nome por unidade, montado dos próprios cadastros do Automo (`crm-etl.genero.ts`). `sexo` passa a ser o valor bruto do Automo (MASCULINO, FEMININO, OUTRO). O 1º nome nunca vai para o raw.
+- **A7, CPFs genéricos:** lista fixa em `crm-etl.doc.ts` (`CPFS_GENERICOS`). Esses CPFs não viram doc_hash.
+
 ## DDL proposta
 
 ```sql
@@ -125,6 +130,8 @@ CREATE TABLE raw.clientes (
   tem_telefone boolean NOT NULL,
   tem_email boolean NOT NULL,
   sexo text,
+  genero text,
+  genero_fonte text,
   ano_nascimento integer,
   cadastro_em timestamptz,
   atualizado_em timestamptz NOT NULL DEFAULT now(),

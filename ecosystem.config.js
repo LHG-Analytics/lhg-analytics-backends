@@ -89,6 +89,15 @@ module.exports = {
         ALERTA_REPLICA_PARA: process.env.ALERTA_REPLICA_PARA,
         ALERTA_REPLICA_DESLIGADO: process.env.ALERTA_REPLICA_DESLIGADO,
         REPLICA_ATRASO_MAX_MIN: process.env.REPLICA_ATRASO_MAX_MIN,
+        // Job do CRM (Automo → raw do Supabase do CRM). Desligado sem as duas
+        // primeiras. Só UM ambiente pode ter CRM_ETL_DATABASE_URL (um gravador).
+        CRM_ETL_DATABASE_URL: process.env.CRM_ETL_DATABASE_URL,
+        CRM_DOC_HMAC_KEYS: process.env.CRM_DOC_HMAC_KEYS,
+        CRM_ETL_SCHEMA: process.env.CRM_ETL_SCHEMA,
+        CRM_ETL_UNIDADES: process.env.CRM_ETL_UNIDADES,
+        CRM_ETL_BACKFILL_DESDE: process.env.CRM_ETL_BACKFILL_DESDE,
+        CRM_ETL_JANELA: process.env.CRM_ETL_JANELA,
+        CRM_ETL_REPROCESSAR_DIAS: process.env.CRM_ETL_REPROCESSAR_DIAS,
       },
       env_production: {
         PORT: 3010,
